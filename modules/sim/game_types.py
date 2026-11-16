@@ -50,6 +50,8 @@ WORLD_VERSION = 1  # 1 = the simulated NFL world conserves usage: a backup QB si
 ECON_VERSION = 1  # 1 = the league economy follows consensus value: AI managers will not sell below the market for a user deal, pick values follow the rookies they become, an injury discounts a player by the share of the season he misses (0 = a save from before it: none of that, replays exactly as it did)
 STABILITY_VERSION = 1  # 1 = long-run stability: season outcomes feed back into next year's projection, early-career growth in the age curves, a self-correcting rookie supply, AI-AI trades held to consensus value and without picks, a middle-tier supply controller that keeps depth from thinning (0 = a save from before it: none of that, replays exactly as it did)
 VORP_VERSION = 1  # 1 = trades value a player by production over the league's starter line (not just the free-agent wire), so a backup QB in a one-QB league is no asset, and a counter asks for the smallest fair add (0 = a save from before it: replays exactly as it did)
+INCUMBENT_VERSION = 1  # 1 = dynasty depth charts keep incumbents: a starter loses his job only to a clearly better challenger (the margin follows his last season and his age), and every depth change is recorded as a depth_chart event (0 = a save from before it: re-sorted purely by projection, replays exactly as it did)
+DEFENSE_VERSION = 1  # 1 = every NFL defense has a per-position strength (vs QB/RB/WR/TE) that evolves season to season and scales a player's weekly expected points and projection by that week's opponent (0 = a save from before it: no opponent modeling, replays exactly as it did)
 HINT_VERSION = 1  # 1 = the user's draft hint / auto-pick / rookie auto-draft, counters and recaps use public information only (ADP, need, byes, projections, shown grade), never the hidden value (0 = a save from before it: the hidden-value helpers replay exactly as they were)
 BLOCK_VERSION = 2  # 1 = the trade block: user block, AI blocks, block-aware offers (0 = a save from before it: nothing changes); 2 = an asset leaving the team leaves the block for good
 TIEBREAKERS = ("points_for", "head_to_head")  # standings/seed tiebreak after win pct
@@ -236,6 +238,10 @@ class GameSettings:
     # Trade-valuation generation (0 = a save from before it: a player's trade value is production over the free-agent wire, a counter asks only for the
     # assets the AI wants most).
     vorp_v: int = 0
+    # Depth-chart generation (0 = a save from before it: each offseason re-sorts every NFL depth chart purely by projection).
+    incumbent_v: int = 0
+    # Opponent-defense generation (0 = a save from before it: a player's weekly expectation ignores who he plays).
+    defense_v: int = 0
     # First week the game plays (0 = the usual week 1; >= 2 = a league import that picked up from the real league's current week).
     # Serialized only when set, so every other save serializes, replays and fingerprints exactly as it did.
     start_week: int = 0
@@ -403,7 +409,7 @@ class GameSettings:
             slots=slots, rounds=rounds, roster_limit=limit, playoff_teams=4 if teams <= 8 else 6,
             mode=mode, te_premium=float(te_premium), superflex=superflex, flex_type=flex_type, include_k=include_k,
             include_def=include_def, bench=bench, tiebreaker=tiebreaker,
-            reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION, limit_v=LIMIT_VERSION, hint_v=HINT_VERSION, world_v=WORLD_VERSION, econ_v=ECON_VERSION, stability_v=STABILITY_VERSION, vorp_v=VORP_VERSION,
+            reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION, limit_v=LIMIT_VERSION, hint_v=HINT_VERSION, world_v=WORLD_VERSION, econ_v=ECON_VERSION, stability_v=STABILITY_VERSION, vorp_v=VORP_VERSION, incumbent_v=INCUMBENT_VERSION, defense_v=DEFENSE_VERSION,
             seasons=seasons, start_year=start_year, rookie_rounds=rookie_rounds,
             pick_years=PICK_YEARS if mode == "dynasty" else 0, dynasty_v=DYNASTY_VERSION if mode == "dynasty" else 0,
             names_v=NAMES_VERSION if mode == "dynasty" else 0, aging_v=AGING_VERSION if mode == "dynasty" else 0,
@@ -449,6 +455,10 @@ class GameSettings:
             out["stability_v"] = self.stability_v
         if self.vorp_v:  # absent on every save made before value-over-starter-line trade valuation
             out["vorp_v"] = self.vorp_v
+        if self.incumbent_v:  # absent on every save made before incumbent depth charts
+            out["incumbent_v"] = self.incumbent_v
+        if self.defense_v:  # absent on every save made before opponent-defense modeling
+            out["defense_v"] = self.defense_v
         if self.start_week:
             out["start_week"] = self.start_week
         if self.dynasty_v:  # only dynasty saves carry these: every other save serializes exactly as before
@@ -488,7 +498,7 @@ class GameSettings:
             dynasty_v=int(raw.get("dynasty_v") or 0), reserve_v=int(raw.get("reserve_v") or 0), block_v=int(raw.get("block_v") or 0), kd_v=int(raw.get("kd_v") or 0),
             ir_slots=int(raw.get("ir_slots") or 0), taxi_slots=int(raw.get("taxi_slots") or 0),
             taxi_years=int(raw.get("taxi_years", 2)), ai_v=int(raw.get("ai_v") or 0), names_v=int(raw.get("names_v") or 0),
-            limit_v=int(raw.get("limit_v") or 0), hint_v=int(raw.get("hint_v") or 0), world_v=int(raw.get("world_v") or 0), aging_v=int(raw.get("aging_v") or 0), econ_v=int(raw.get("econ_v") or 0), stability_v=int(raw.get("stability_v") or 0), vorp_v=int(raw.get("vorp_v") or 0), start_week=int(raw.get("start_week") or 0),
+            limit_v=int(raw.get("limit_v") or 0), hint_v=int(raw.get("hint_v") or 0), world_v=int(raw.get("world_v") or 0), aging_v=int(raw.get("aging_v") or 0), econ_v=int(raw.get("econ_v") or 0), stability_v=int(raw.get("stability_v") or 0), vorp_v=int(raw.get("vorp_v") or 0), incumbent_v=int(raw.get("incumbent_v") or 0), defense_v=int(raw.get("defense_v") or 0), start_week=int(raw.get("start_week") or 0),
         )
 
 
@@ -857,7 +867,7 @@ __all__ = [
     "GAME_ENGINE_VERSION", "DIFFICULTIES", "TEAM_COUNTS", "SCORING_NAMES", "DEFAULT_SLOTS",
     "FREE_SEASONS", "MAX_GAMES_PRO", "MAX_GAMES_FREE", "SCORING_PRESETS", "POOL_CAPS",
     "TE_PREMIUMS", "BENCH_RANGE", "DEFAULT_BENCH", "DEFAULT_TEAMS", "DEFAULT_SCORING", "IMPORT_TEAM_COUNTS",
-    "KD_VERSION", "HINT_VERSION", "WORLD_VERSION", "AGING_VERSION", "ECON_VERSION", "STABILITY_VERSION", "VORP_VERSION", "FLEX_TYPES", "DEFAULT_FLEX_TYPE", "FLEX_SLOT_FOR_TYPE", "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
+    "KD_VERSION", "HINT_VERSION", "WORLD_VERSION", "AGING_VERSION", "ECON_VERSION", "STABILITY_VERSION", "VORP_VERSION", "INCUMBENT_VERSION", "DEFENSE_VERSION", "FLEX_TYPES", "DEFAULT_FLEX_TYPE", "FLEX_SLOT_FOR_TYPE", "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
     "DRAFT_SPARE_SPOTS", "derive_layout", "scoring_label", "GAME_POSITIONS", "GAME_STRICT_SLOTS",
     "ImportedTeam", "RealWeek", "LeagueImport", "START_POINTS", "START_POINT_PRESEASON", "START_POINT_CURRENT", "MIN_START_WEEK", "LeagueTeamChoice", "LeagueTeams", "GameError", "GameSettings", "GamePlayer", "GameTeam", "GameSnapshot", "slot_positions",
     "playoff_rounds", "POSITIONS", "STRICT_SLOTS", "FLEX_SLOTS",

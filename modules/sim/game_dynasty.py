@@ -19,6 +19,7 @@ from dataclasses import replace
 from typing import Any, Mapping, Sequence
 
 from modules.sim import aging, scouting
+from modules.sim import depth_incumbency
 from modules.sim import season_outcomes as outcomes_mod
 from modules.sim.game_names import rookie_name
 from modules.sim.season_label import season_label, season_label_for_year
@@ -414,8 +415,12 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
         }
     for row in rookie_class(gen, rows, season):
         rows[row["pid"]] = row
+    depth_log: list[dict[str, Any]] | None = None
     if gen.settings.world_v:
-        refresh_depth_charts(rows)
+        if gen.settings.incumbent_v:  # incumbent_v 1+: starters keep their jobs unless a challenger is clearly better; the changes are logged
+            depth_log = depth_incumbency.refresh(rows, prev.players, outcomes_mod.last_season_ppg(root, prev, season))
+        else:
+            refresh_depth_charts(rows)
     players = value_pool(list(rows.values()), gen.settings)
     order = [t.tid for t in root.teams]
     perm = WorldRng(root.seed).stream(season, "gseason", 0).permutation(len(order))
@@ -425,6 +430,7 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
         scoring_model=root.scoring_model, notes=root.notes, seed=root.seed, start_picks=root.start_picks,
     )
     object.__setattr__(view, "_root", root)
+    object.__setattr__(view, "_depth_log", depth_log)
     return view
 
 
@@ -731,6 +737,9 @@ def start_next_season(em: Emitter, seed: int) -> None:
     for tid in snap.tids:
         slots, _ = ev.best_lineup(state.rosters[tid], 1)
         em.emit(1, "engine", "lineup_set", team=tid, slots=slots, auto=True)
+    depth_log = getattr(snap, "_depth_log", None) if snap.settings.incumbent_v else None
+    if depth_log:  # incumbent_v 1+: every starting job that changed hands this offseason, in the story log (see depth_incumbency)
+        em.emit(1, "engine", "depth_chart", season_no=state.season_no + 1, year=snap.settings.start_year + state.season_no, phase="offseason", changes=[dict(c) for c in depth_log])
     em.emit(1, "engine", "season_started", season_no=state.season_no + 1, year=snap.settings.start_year + state.season_no)
     generate_offers(em, snap, state, seed, 1)
 

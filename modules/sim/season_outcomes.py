@@ -76,4 +76,20 @@ def next_projection_shift(
     return out
 
 
-__all__ = ["next_projection_shift", "talent_center"]
+def last_season_ppg(root: GameSnapshot, prev: GameSnapshot, season: int) -> dict[str, float]:
+    """``{pid: points per game he produced when playing}`` for each QB/RB/WR/TE of season ``season - 1`` (the season profile the engine played).
+    ``incumbent_v`` reads it to decide how strongly last season protects a starter's job; like the projection shift it is hidden and never shown."""
+
+    from modules.sim.game_dynasty import season_seed
+    from modules.sim.game_engine import session_for
+
+    session = session_for(prev, season_seed(root.seed, season - 1))
+    out: dict[str, float] = {}
+    for pid in prev.pids:
+        p = prev.players[pid]
+        if p.pos in SKILL and p.mean > 0.0:
+            out[pid] = float(session.profile(pid).season_mean_ppg)
+    return out
+
+
+__all__ = ["next_projection_shift", "talent_center", "last_season_ppg"]

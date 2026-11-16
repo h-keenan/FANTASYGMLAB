@@ -13,10 +13,14 @@ from modules.sim.game_actions import cut_player
 from modules.sim.game_eval import Evaluator, USER_PARAMS
 
 
-def run(seed, n_seasons, teams=12):
+def run(seed, n_seasons, teams=12, flags=None):
+    """``flags``: GameSettings overrides, e.g. ``{"incumbent_v": 0, "defense_v": 0}`` for a before/after run."""
     model_id = game_scoring.default_model().model_id
     pool, byes = tail_report.pool_from_panel(dataset.load_panel())
     base = GameSettings.parse({"mode": "dynasty", "teams": teams, "user_slot": 3, "start_year": 2026, "seasons": n_seasons, "rookie_rounds": 3, "scoring": "ppr"})
+    if flags:
+        from dataclasses import replace
+        base = replace(base, **flags)
     root = build_snapshot(pool, byes, base, seed, scoring_model=model_id)
     state = GameState(root)
     em = Emitter(state, root)
@@ -60,6 +64,9 @@ def run(seed, n_seasons, teams=12):
         out.append(dict(season=state.season_no, champ=state.champion, user=snap.user_team.tid, weekly=weekly, margins=margins,
                         slot_pts={k: list(v) for k, v in slot_pts.items()}, pl=pl, team_val=team_val, team_age=team_age, wins=wins,
                         pfs=pfs, comp=comp, nplayers=len(snap.players),
+                        nfl={pid: p.nfl_team for pid, p in snap.players.items()}, depth={pid: p.extra.get("depth_chart_order") for pid, p in snap.players.items()},
+                        tot={pid: (snap.players[pid].pos, sum(x for x in h[:S.regular_weeks] if x is not None), len([x for x in h[:S.regular_weeks] if x is not None])) for pid, h in state.points.items() if pid in snap.players and any(x is not None for x in h[:S.regular_weeks])},
+                        depth_events=[e for e in em.events if e["type"] == "depth_chart"] if hasattr(em, "events") else [],
                         top_market=sorted([p.market for p in snap.players.values()], reverse=True)[:30]))
         if state.status != "offseason":
             break

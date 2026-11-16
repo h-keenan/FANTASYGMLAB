@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Iterable, Sequence
 
-from modules.sim import aging
+from modules.sim import aging, matchups
 from modules.sim.game_scoring import team_roles_mode
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot, slot_positions
@@ -73,6 +73,7 @@ class Evaluator:
         self._level: dict[str, float] = {}
         self._repl: dict[str, float] | None = None
         self._line: dict[str, float] = {}
+        self.defense = bool(snapshot.settings.defense_v)  # defense_v 1+: a player's week is scaled by who he plays (modules/sim/matchups.py)
         self.econ = bool(snapshot.settings.econ_v)  # a pure function of the settings (read again at every decision point)
         # vorp_v 1 prices TRADES over the starter line (a TradeDesk switches this on); waiver, depth and drop choices keep the wire's level, so an AI
         # manager still stashes the backup QB a trade would call worthless.
@@ -302,13 +303,31 @@ class Evaluator:
         r = self.role(pid, week)
         return r.mult if r is not None else 1.0
 
-    def role_param(self, pid: str, week: int):
-        """What the engine hands the scoring model for this week: a float multiplier (player-model-3) or a
-        ``(scale, points)`` pair (player-model-4+)."""
+    def matchup(self, pid: str, week: int) -> float:
+        """defense_v 1+: the multiplier on his expected points this week from the defense he plays (1.0 when off, on a bye, or for K / DEF)."""
 
+        if not self.defense:
+            return 1.0
+        p = self.snap.players[pid]
+        return matchups.for_snapshot(self.snap, self.state.view_no).factor(p.nfl_team, p.pos, week)
+
+    def matchup_info(self, pid: str, week: int) -> dict | None:
+        if not self.defense:
+            return None
+        p = self.snap.players[pid]
+        return matchups.for_snapshot(self.snap, self.state.view_no).info(p.nfl_team, p.pos, week)
+
+    def role_param(self, pid: str, week: int, matchup: bool = True):
+        """What the engine hands the scoring model for this week: a float multiplier (player-model-3) or a
+        ``(scale, points)`` pair (player-model-4+). ``matchup=False`` leaves out the opponent-defense factor (``defense_v``): the team-usage cap is
+        about how many touches a group has, which a soft defense does not create."""
+
+        f = self.matchup(pid, week) if matchup else 1.0
         if not self.additive:
-            return self.role_mult(pid, week)
+            return self.role_mult(pid, week) * f
         r = self.role(pid, week)
+        if f != 1.0:
+            return (r.mult * f, r.add * f) if r is not None else (f, 0.0)
         return (r.mult, r.add) if r is not None else (1.0, 0.0)
 
     def _additive_ros(self, pid: str) -> float:
@@ -339,8 +358,8 @@ class Evaluator:
         if self.additive:
             r = self.role(pid, week)
             scale, add = (r.mult, r.add) if r is not None else (1.0, 0.0)
-            return tr.soft_ceiling(self.level(pid) * scale + add, tr.PROJ_CEIL.get(self.snap.players[pid].pos))
-        return self.base_mean(pid) * self.role_mult(pid, week)
+            return tr.soft_ceiling((self.level(pid) * scale + add) * self.matchup(pid, week), tr.PROJ_CEIL.get(self.snap.players[pid].pos))
+        return self.base_mean(pid) * self.role_mult(pid, week) * self.matchup(pid, week)
 
     def next_game(self, pid: str, week: int) -> int | None:
         """The first week from ``week`` on in which he can play (not out, not on a bye), or None."""
@@ -373,6 +392,7 @@ class Evaluator:
         return {
             "kind": r.kind, "label": label, "covering": r.covering or None, "covering_name": covering,
             "if_starts": round(self.base_mean(pid), 1), "week": w,
+            **({"matchup": mi} if (mi := self.matchup_info(pid, w if w is not None else week)) else {}),
         }
 
     def out_in(self, pid: str, week: int) -> bool:

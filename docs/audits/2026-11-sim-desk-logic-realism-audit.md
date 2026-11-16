@@ -325,3 +325,57 @@ Measured (cheapest single user asset, neutral worth 0-100, an AI accepts for its
 | dynasty superflex | 61.9 -> 30.1 | 0 -> 0 |
 
 A starting QB still costs a fair amount (`tests/test_sim_vorp_v.py`): his own lineup need and his above-line production keep a good starter from going for the user's worst asset.
+
+## incumbent_v 1 and defense_v 1: sticky depth charts and opponent defenses
+
+Report: a sim QB went from QB2 (288 pts, 18.0 ppg) to QB41 (2.4 ppg, backup) the next season with no story, and the sim had no opponent-defense modeling.
+
+**Cause (incumbent_v).** `game_dynasty.refresh_depth_charts` (world_v 1) re-sorted every NFL team's chart each offseason purely by projected mean (then market). A projection is a noisy posterior, so a few-percent gap flipped starters. Real charts are sticky: on the real panel (2021-25, top-12 ppg at the position, same team the next year) the QB1 keeps the job 42 of 42, TE 92 percent, RB 81 percent, WR (top 12 still the team's top scorer) 67 percent.
+
+**Fix (flag `incumbent_v`, season boundary, dynasty only; new games carry 1, older saves 0 and replay identically).** `modules/sim/depth_incumbency.py`: a player who held a starting slot (QB 1, RB 2, WR 3, TE 1) carries a margin `MARGIN[pos] x protection x age`; the group is sorted by projection x (1 + margin), so a challenger must be clearly better. `protection` (0.15-1) is last season's production against the position's starter line (strong season protects fully, a bust weakly); past an age (QB 39, RB 29, WR 32, TE 33) the margin fades to zero over three years; a high-pick QB/RB rookie (class slots 1-16) gets a smaller opposite bonus (`CAPITAL`). Retired incumbents are simply gone from the pool. In season, a hurt starter keeps his chart slot while the role resolver (`team_roles`) fills in, and gets the job back when he returns (unchanged mechanism); the log now says so.
+
+**Event shape (`depth_chart`, actor `engine`, no state effect, one event per offseason and one per week with starter injuries/returns).**
+
+```
+{"type": "depth_chart", "week": 1 | W, "actor": "engine", "payload": {
+   "season_no": int, "year": int, "phase": "offseason" | "in_season",
+   "changes": [{
+     "nfl_team": "KC", "pos": "QB|RB|WR|TE", "slot": 1,          # the starting slot the new player holds
+     "pid": "<new holder>", "replaced_pid": "<old holder>" | null,
+     "reason": "outperformed_incumbent" | "rookie_won_job" | "incumbent_aged" | "incumbent_retired" | "incumbent_left"
+             | "filled_open_slot" | "injury" | "returned_from_injury",
+     "gap": 1.31, "needed": 1.18,                  # offseason only: challenger / incumbent projection, and the ratio he had to clear (null when the incumbent is gone)
+     "incumbent_season": "strong" | "solid" | "down",   # offseason only: how last year went (the protection tier)
+     "weeks": 3                                    # in_season "injury" only
+   }]}}
+```
+Only changes of who holds a starting slot are recorded (a swap between two starters is not a job change). `incumbent_season` is a coarse tier, not the hidden season number.
+
+**Measured** (`python -m modules.sim.calibration.incumbency_report --seeds 8 --seasons 5`, 12-team PPR dynasties, harness team passive; top-12 ppg at the position, 8+ games, same NFL team next season):
+
+Players who held the first chart slot last season and were top 12 in ppg at the position (n = 280-355 per row, 8 seeds x 4 season pairs). "Off the chart" = no longer first on his team's depth chart; "not team top scorer" = another player on his team scored more next season (injuries and in-season fill-ins count).
+
+| Position | Off the chart before -> after | Not team top scorer before -> after | Real panel (not team top scorer) | Next/this ppg p10 / p50 / p90 before | after | Real p10 / p50 / p90 |
+| --- | --- | --- | --- | --- | --- | --- |
+| QB | 1.4 -> 0.8 percent | 2.6 -> 1.1 percent | 0 percent | 0.66 / 0.92 / 1.21 | 0.67 / 0.91 / 1.20 | 0.69 / 0.94 / 1.15 |
+| RB | 12.5 -> 9.1 percent | 24.7 -> 27.7 percent | 19 percent | 0.54 / 0.82 / 1.12 | 0.54 / 0.81 / 1.11 | 0.59 / 0.84 / 1.12 |
+| WR | 14.6 -> 11.5 percent | 30.7 -> 30.8 percent | 33 percent | 0.49 / 0.81 / 1.10 | 0.46 / 0.79 / 1.09 | 0.60 / 0.91 / 1.19 |
+| TE | 6.0 -> 4.1 percent | 13.2 -> 16.2 percent | 8 percent | 0.43 / 0.84 / 1.28 | 0.43 / 0.84 / 1.28 | 0.68 / 0.92 / 1.21 |
+
+Reading: the QB and TE chart is now as sticky as the real one (a top-12 QB1 loses the chart in under 1 percent of seasons, the RB in about 9 percent, higher than QB as requested). Most offseason chart movement in the log is retirement (823 changes) and rookies filling the slots they open (575), not demotions: only 40 starters lost a job to a clearly better challenger over 8 dynasties x 4 offseasons, 17 to age. The remaining "not team top scorer" gap and the fat low tail of next/this ppg (p10 0.43-0.54 against the real 0.59-0.69) are NOT a depth-chart effect: they are the player model's season variance and injuries, which this change does not touch. Mean team score per week 98.55 -> 98.11 (the matchup factor has mean about 1.0005; the difference is the lineup mix of the new chart). Depth log volume over those 8 dynasties: 6,489 in-season changes (3,558 injuries, 2,931 returns), 1,561 offseason changes.
+
+
+**defense_v 1 (season-less, boundary week; new games carry 1).** `modules/sim/matchups.py`: every NFL team has a per-position strength (QB/RB/WR/TE) = a shared pass-defense (QB, WR, TE) or run-defense (RB) factor (loading 0.7) plus a position part, standard deviation per position, evolving as an AR(1) with persistence 0.5 (regression to the mean with noise, spread kept). Weekly opponents come from a seeded pairing of the teams not on a bye. The factor `exp(strength)` multiplies the week's role (scale and added points) in `Evaluator.role_param`, so it feeds the engine's scored week and, through `week_mean` / `proj` / `ros_mean` / lineup choice, the projections the user and AI managers see; `role_info` shows `{opponent, factor, label}`. The team-usage cap (`game_usage`) is computed without it (a soft defense creates no extra touches), and `level()` strips it with the role so a good matchup is not read as a better player.
+
+Calibration (no opponent column exists in the repo's panel, so this is documented public knowledge, not fitted): public fantasy-points-allowed tables show the best and worst defense vs a position about 12-18 percent either side of the mean in one season, but roughly half is sample noise/schedule and the year-to-year correlation is about 0.3-0.5; the sim already draws the noise, so only the persistent part is modelled. QBs sit lowest (a passer's volume absorbs a good coverage), TEs highest (most matchup-dependent):
+
+| Position | sd of log strength | Best-to-worst defense (32 teams, mean of 120 draws) | Best / worst factor |
+| --- | --- | --- | --- |
+| QB | 0.025 | 11.0 percent | 0.948 / 1.052 |
+| RB | 0.028 | 12.2 percent | 0.945 / 1.060 |
+| WR | 0.031 | 14.1 percent | 0.937 / 1.068 |
+| TE | 0.034 | 15.0 percent | 0.930 / 1.070 |
+
+League scoring level is unchanged (mean team score per week in the table above). K and DEF are not modelled. Old saves replay byte-identically (`tests/test_sim_realism_update.py` goldens, `OLD_FLAGS`).
+
+Tests: `tests/test_sim_incumbent_defense.py` (incumbent margin, bust/age/retired/rookie-capital cases, event shape, injury and return events, seeded matchup spread and persistence, projection and scoring wiring, flag gating). Pre-existing pins that build new games now pin `incumbent_v`/`defense_v` to 0 like earlier flags did; `tests/test_sim_player_sheet.py` gains a non-flat-projection case.

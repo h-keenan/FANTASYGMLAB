@@ -40,6 +40,8 @@ from modules.sim.game_types import (
     ECON_VERSION,
     STABILITY_VERSION,
     VORP_VERSION,
+    INCUMBENT_VERSION,
+    DEFENSE_VERSION,
     HINT_VERSION,
     KD_VERSION,
     LIMIT_VERSION,
@@ -61,6 +63,8 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "econ_v": (ECON_VERSION, NOW),
     "stability_v": (STABILITY_VERSION, SEASON),
     "vorp_v": (VORP_VERSION, NOW),
+    "incumbent_v": (INCUMBENT_VERSION, SEASON),
+    "defense_v": (DEFENSE_VERSION, WEEK),
 }
 
 # What the UI shows for each flag: a short label, one sentence of what changes, and whether it needs a dynasty with offseasons.
@@ -103,6 +107,16 @@ FLAGS: dict[str, dict[str, Any]] = {
     "vorp_v": {
         "label": "Fair prices for backup quarterbacks",
         "body": "Trades value a player by what he adds over a typical starter at his position, so a backup QB in a one-QB league is cheap, and a counter-offer asks for the smallest fair add instead of your best player.",
+        "dynasty_only": False,
+    },
+    "incumbent_v": {
+        "label": "Starters keep their jobs",
+        "body": "A starting QB, RB, WR or TE keeps his job each offseason unless a challenger is clearly better (a strong season protects him strongly, a bust weakly; age and a high draft pick can change that), and every depth chart change is written to the story log.",
+        "dynasty_only": True,
+    },
+    "defense_v": {
+        "label": "Matchups matter",
+        "body": "Every NFL defense is stronger or weaker against the QB, RB, WR and TE, changes from season to season, and nudges a player's weekly points and projection by about 5 to 8 percent depending on who he plays.",
         "dynasty_only": False,
     },
     "names_v": {
