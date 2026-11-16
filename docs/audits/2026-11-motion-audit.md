@@ -15,14 +15,14 @@ Press feedback everywhere (`PRESS`), `MotionIn` entrances, `CountUp` (recap and 
 | Success notices ("Trade done", claim landed) | static glyph; `.motion-success` existed but had no users | fixed: `SuccessCheck` in `SimNotice` |
 | Number tweens | uncapped: every `TickNumber` could run its own rAF loop | fixed: `acquireTween` cap of 12 |
 | Route changes (page to page) | hard cut; the new page's skeleton is the only continuity | open (see ranked list) |
-| Tab content inside a page (Team, Trades, League families; Roster/Top moves/Trade in the sample) | content swaps instantly (only the Sim League body cross-fades) | open |
-| Fairness meter (web) | glides `left`/`width` (layout) | open, allowlisted |
+| Tab content inside a page (Roster/Top moves/Trade in the sample) | content swapped instantly | fixed in the sample league (`PresenceSwap`, web + app); route-based family tabs are a route transition, still open |
+| Fairness meter and Toggle knob (web) | glided `left`/`width` (layout) | fixed: transform only, allowlist entries removed |
 | Trade accepted / declined state on a trade card | card is replaced by a notice; no state morph | open |
 | Draft pick landing / auto-pick | row slides away (`sim-row-drafted`), the pick itself does not land | open |
 | Week advance | `motion-sweep` band only; standings/scores update with no staging | partly (standings now reorder) |
 | Offseason transitions, onboarding steps | per-surface keyframes (0.28s/0.5s, own curves) | open |
 | Pull-to-refresh | native `RefreshControl` only (8 screens); no web equivalent | accepted |
-| Grade reveal | `LetterGrade` appears fully formed | open |
+| Grade reveal | `LetterGrade` appears fully formed | fixed for the big (lg) grade: `enter-pop` web / `PopIn` app |
 | Pill/orb morphing | pill page segment now exits; orb morph is bespoke | partly |
 
 ## 2. Inconsistencies found

@@ -185,6 +185,21 @@ export function SuccessCheck({ size = 28, label = 'Done' }: { size?: number; lab
   );
 }
 
+/** A one-shot reveal for a result that should land (a grade): fades in with a small scale pop, native driver. Static under reduced motion. Twin of the web `.enter-pop` class. */
+export function PopIn({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const reduced = useReducedMotion();
+  const scale = useRef(new Animated.Value(reduced ? 1 : 0.94)).current;
+  useEffect(() => {
+    if (reduced) return;
+    Animated.spring(scale, { toValue: 1, ...SPRING.settle, useNativeDriver: true }).start();
+  }, [reduced, scale]);
+  return (
+    <Animated.View style={[style, { opacity: scale.interpolate({ inputRange: [0.94, 1], outputRange: [0, 1], extrapolate: 'clamp' }), transform: [{ scale }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 /**
  * FLIP reorder for one row of a list that changes order (twin of web useFlipList): when the row's y changes it starts at the
  * old offset and glides to 0 (transform only, native driver, 240ms). No animation under reduced motion, for the first layout,

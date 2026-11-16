@@ -24,8 +24,6 @@ export const LAYOUT_TRANSITION_ALLOW = [
   { file: "web-next/src/app/globals.css", needle: "transition: left 200ms ease, bottom 200ms ease", why: "percentile explorer markers reposition on data change" },
   { file: "web-next/src/app/globals.css", needle: "transition: transform 180ms ease, width 180ms ease", why: "PillRow underline (legacy copy; owned by the PillRow work)" },
   { file: "web-next/src/components/ui/ui.css", needle: "width 180ms var(--ease-out, ease-out)", why: "PillRow active underline (owned by the PillRow work; migrate to transform there)" },
-  { file: "web-next/src/components/ui/FairnessMeterRow.tsx", needle: "transition:", why: "fairness meter glides left/width (candidate: transform)" },
-  { file: "web-next/src/components/Toggle.tsx", needle: "transition:", why: "toggle knob 120ms left (candidate: transform)" },
   { file: "mobile/src/components/Presence.tsx", needle: "useNativeDriver: false", why: "collapse animates measured height (the documented Presence exception)" },
   { file: "mobile/src/components/SegmentedTabBar.tsx", needle: "useNativeDriver: false", why: "tab indicator width/left (candidate: scaleX + translateX)" },
 ];
