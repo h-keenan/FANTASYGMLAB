@@ -391,9 +391,17 @@ export function PlayerQuickView({
           {identity.tags?.length ? (
             <>
               <PlayerBadges badges={identity.tags.map((tag) => badgeFromTag(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
-              {identity.tags.filter((tag) => !badgeFromTag(tag)).map((tag) => (
-                <ToneBadge key={tag.key} label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
-              ))}
+              {identity.tags.filter((tag) => !badgeFromTag(tag)).map((tag) =>
+                tag.key === "owner" ? (
+                  // The owning fantasy team: a small "Owner" cue ahead of the (unaltered) team name so it never reads as a stray tag.
+                  <span key={tag.key} className="pqv-owner-tag" role="group" aria-label={`Owner: ${tag.label}`} data-testid="pqv-owner-tag">
+                    <span className="pqv-owner-label" aria-hidden="true">Owner</span>
+                    <ToneBadge label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
+                  </span>
+                ) : (
+                  <ToneBadge key={tag.key} label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
+                ),
+              )}
             </>
           ) : injury.label ? (
             badgeFromInjury(injury.label) ? (

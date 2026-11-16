@@ -12,6 +12,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import type { SimHistorySeason } from '../lib/simGame';
 import { simCareerSeasonParts, simCareerSeasonTitle } from '../lib/simHistory';
+import { simScoreTierTone, simWeekTier } from '../lib/simScoreTier';
 
 /**
  * The sim's OWN seasons of a player, newest first, under the real career in the Stats tab: one compact module per season played
@@ -60,12 +61,17 @@ export function SimSimSeasons({ gameId, playerId }: { gameId: string; playerId: 
                   {s.teams.length ? ` · ${s.teams.map((t) => t.team_name).filter(Boolean).join(', ')}` : ''}
                 </AppText>
               ) : null}
-              {(s.weeks ?? []).map((w) => (
-                <View key={`${w.week}-${w.playoff ? 'p' : 'r'}`} style={common.rowBetween}>
-                  <AppText style={common.muted}>{w.playoff ? `Playoffs ${w.week}` : `Wk ${w.week}`}</AppText>
-                  <AppText style={common.bodyStrong}>{w.points.toFixed(1)}</AppText>
-                </View>
-              ))}
+              {(s.weeks ?? []).map((w) => {
+                // Boom / average / bust against this position's normal (lib/simScoreTier), on the shared semantic colors.
+                const tone = simScoreTierTone(simWeekTier(w.points, s.pos));
+                const toneColor = tone === 'success' ? colors.success : tone === 'warning' ? colors.warning : null;
+                return (
+                  <View key={`${w.week}-${w.playoff ? 'p' : 'r'}`} style={common.rowBetween}>
+                    <AppText style={common.muted}>{w.playoff ? `Playoffs ${w.week}` : `Wk ${w.week}`}</AppText>
+                    <AppText style={[common.bodyStrong, toneColor ? { color: toneColor } : null]}>{w.points.toFixed(1)}</AppText>
+                  </View>
+                );
+              })}
             </View>
           </CompactModule>
         ))

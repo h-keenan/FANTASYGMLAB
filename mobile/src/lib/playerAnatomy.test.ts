@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { barFractions, fairnessMeter, tradeEdge, METER_BAND, nextOpenId, nextSheetSnap, orderPlayerSheetTabs, PEEK_FIRST_LINE_PX, peekSheetHeight, peekShowsTabs, playerInitials, playerRowModel } from './playerAnatomy.ts';
+import { barFractions, fairnessMeter, tradeEdge, METER_BAND, nextOpenId, nextSheetSnap, orderPlayerSheetTabs, peekSheetHeight, peekShowsTabs, playerInitials, playerRowModel } from './playerAnatomy.ts';
 
 const chase = { id: '7564', name: "Ja'Marr Chase", team: 'CIN', age: 25 };
 
@@ -26,10 +26,10 @@ test('one open, fairness, bars, snap, tabs', () => {
 });
 
 test('peek sheet height is computed from the content and clamped to 65-75% of the screen', () => {
-  assert.equal(peekSheetHeight({ anchorBottom: 400, viewportH: 844 }), 400 + PEEK_FIRST_LINE_PX);
-  assert.equal(peekSheetHeight({ anchorBottom: 210, viewportH: 844 }), Math.round(844 * 0.65));
-  assert.equal(peekSheetHeight({ anchorBottom: 900, viewportH: 640 }), Math.round(640 * 0.75));
-  assert.equal(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 34 }), 584);
+  assert.equal(peekSheetHeight({ anchorBottom: 400, viewportH: 844 }), Math.round(844 * 0.88));
+  assert.equal(peekSheetHeight({ anchorBottom: 210, viewportH: 844 }), Math.round(844 * 0.88));
+  assert.equal(peekSheetHeight({ anchorBottom: 900, viewportH: 640 }), Math.round(640 * 0.92));
+  assert.equal(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 34 }), Math.round(844 * 0.88));
   assert.equal(peekShowsTabs(210, peekSheetHeight({ anchorBottom: 210, viewportH: 844 })), true);
   assert.equal(peekShowsTabs(300, 250), false);
 });

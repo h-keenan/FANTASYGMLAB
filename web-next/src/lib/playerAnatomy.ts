@@ -200,7 +200,7 @@ export function barFractions(values: ReadonlyArray<number | null | undefined>): 
 
 export type SheetSnap = "peek" | "full";
 /** Open heights of the player sheet in percent of the screen. */
-export const SHEET_SNAP_PCT: Record<SheetSnap, number> = { peek: 66, full: 92 };
+export const SHEET_SNAP_PCT: Record<SheetSnap, number> = { peek: 88, full: 94 };
 
 /** Drag the handle: up past 48px or a fast flick goes full, down past 48px from full goes back to peek. Down from peek is the dismiss gesture (not handled here). */
 export function nextSheetSnap(current: SheetSnap, dragY: number, velocity = 0): SheetSnap {
@@ -211,8 +211,8 @@ export function nextSheetSnap(current: SheetSnap, dragY: number, velocity = 0): 
 
 /** The first content line (one row of the open tab) that must be visible under the pills at the peek height. */
 export const PEEK_FIRST_LINE_PX = 150; // the first content BLOCK (a card or a few rows), not one line (coridian_ 2026-11-14: "opens too small")
-export const PEEK_MIN_FRAC = 0.65;
-export const PEEK_MAX_FRAC = 0.75;
+export const PEEK_MIN_FRAC = 0.88; // coridian_ 2026-11-16: the player sheet opened too small on phones; it now opens near full height
+export const PEEK_MAX_FRAC = 0.92;
 
 /**
  * Peek height in px, computed from the content (coridian_, 2026-11-14: the tab row sat clipped at the bottom of a fixed 56%

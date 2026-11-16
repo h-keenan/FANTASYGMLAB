@@ -1,7 +1,7 @@
 "use client";
 
 import { PlayerName } from "@/components/PlayerName";
-import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -19,7 +19,7 @@ import type { BadgeKind } from "@/lib/playerBadges";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SheetHandle } from "@/components/SheetHandle";
-import { TapScopeContext, type PickTapRef } from "@/components/ui/PlayerOpenContext";
+import { PickOpenContext, PlayerOpenContext, TapScopeContext, type PickTapRef } from "@/components/ui/PlayerOpenContext";
 import { SimTeamIdentity } from "@/components/SimTeamIdentity";
 import type { SimTeamSize } from "@/lib/simTeamIdentity";
 import { SimGlyph } from "@/components/SimGlyph";
@@ -667,6 +667,26 @@ export const SimOpenPlayerContext = createContext<((player: SimGamePlayer) => vo
 
 /** Opens the team scouting sheet. Provided once by the game screen; a team link outside it is plain text. */
 export const SimTeamOpenContext = createContext<((teamId: string) => void) | null>(null);
+
+/**
+ * THE sim opener scope: every player / team / pick tap inside it opens the SIM sheets (sim player id, sim PQV), never the
+ * real-NFL Player Quick View. It wraps the game screen AND the sheets the game opens (team scouting report, player sheet,
+ * pick sheet), because a sheet rendered outside it falls back to the real PQV and looks a fictional sim player up in real
+ * data ("Player Score -", "No market value yet"). Any new sim surface renders under this provider.
+ */
+export function SimOpenersProvider({ ctx, children }: { ctx: SimCtx; children: ReactNode }) {
+  const openPlayer = ctx.openPlayer;
+  const refOpener = useCallback((ref: Parameters<typeof simPlayerFromRef>[0]) => openPlayer(simPlayerFromRef(ref)), [openPlayer]);
+  return (
+    <SimTeamOpenContext.Provider value={ctx.openTeam}>
+      <SimOpenPlayerContext.Provider value={openPlayer}>
+        <PlayerOpenContext.Provider value={refOpener}>
+          <PickOpenContext.Provider value={ctx.openPick}>{children}</PickOpenContext.Provider>
+        </PlayerOpenContext.Provider>
+      </SimOpenPlayerContext.Provider>
+    </SimTeamOpenContext.Provider>
+  );
+}
 
 /**
  * A team's emblem and name as one tap target that opens its scouting sheet

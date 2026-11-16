@@ -29,9 +29,8 @@ import { SimGameOffseason } from '../components/SimGameOffseason';
 import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
 import { SimPickSheet } from '../components/SimPickSheet';
-import { PickOpenContext, PlayerOpenContext, type PickTapRef } from '../components/PlayerOpenContext';
-import type { PlayerRef } from '../lib/playerAnatomy';
-import { simPlayerFromRef, SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimRowAccordion, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
+import { type PickTapRef } from '../components/PlayerOpenContext';
+import { SimNotice, SimOpenersProvider, SimPreviewBanner, SimRowAccordion, createSimStyles, type SimCtx } from '../components/SimGameParts';
 import SimHub from '../components/SimHub';
 import { simMenuHero, simRulesParts } from '../lib/simSummaries';
 import CompactModule from '../components/CompactModule';
@@ -587,6 +586,7 @@ export default function GmGameScreen({ navigation }: Props) {
 
   if (flow.view === 'game' && game && ctx) {
     return shell(
+      <SimOpenersProvider ctx={ctx}>
       <GameScreen
         flow={flow}
         game={game}
@@ -629,8 +629,9 @@ export default function GmGameScreen({ navigation }: Props) {
           setGameState(null);
           void refreshList();
         }}
-      />,
-      <>
+      />
+      </SimOpenersProvider>,
+      <SimOpenersProvider ctx={ctx}>
         {simToOpen ? <SimToSheet ctx={ctx} onClose={() => setSimToOpen(false)} onRun={runSimTo} /> : null}
         {simToBusy ? (
           <View style={styles.simToBusy} accessibilityLiveRegion="polite" testID="sim-to-progress">
@@ -679,7 +680,7 @@ export default function GmGameScreen({ navigation }: Props) {
             }}
           />
         ) : null}
-      </>,
+      </SimOpenersProvider>,
     );
   }
 
@@ -1065,13 +1066,8 @@ function GameScreen({
   const stage = flow.stage;
   const recap = flow.recaps[flow.recapIndex];
   const inSeason = (stage === 'week' || stage === 'playoffs') && !draftRecap;
-  const simPlayerOpener = useCallback((ref: PlayerRef) => ctx.openPlayer(simPlayerFromRef(ref)), [ctx]);
 
   return (
-    <SimTeamOpenContext.Provider value={ctx.openTeam}>
-    <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
-    <PlayerOpenContext.Provider value={simPlayerOpener}>
-    <PickOpenContext.Provider value={ctx.openPick}>
     <SimRowAccordion>
     <View style={styles.stack}>
       <SimGameHeader game={game} onHub={onHub} onTeam={ctx.openTeam} onMore={() => onTab('more')} bell={<SimNotificationBell notif={notif} onOpenTab={onTab} />} />
@@ -1123,10 +1119,6 @@ function GameScreen({
       )}
     </View>
     </SimRowAccordion>
-    </PickOpenContext.Provider>
-    </PlayerOpenContext.Provider>
-    </SimOpenPlayerContext.Provider>
-    </SimTeamOpenContext.Provider>
   );
 }
 

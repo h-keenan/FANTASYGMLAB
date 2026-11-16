@@ -1,6 +1,7 @@
 // Shared (web + mobile twin): plain-words presentation of the Fantasy Sim history payloads
 // (GET /players/{id}/history and /teams/{id}/history). Pure and import-free of runtime code.
 
+import { simScoreTierTone, simRankTier, simSeasonTier } from "./simScoreTier";
 import { simSeasonLabel, type SimHistoryAsset, type SimHistoryEntry, type SimHistorySeason, type SimTeamHistoryMove } from "./simGame";
 
 interface When {
@@ -81,12 +82,15 @@ export function simSeasonRecord(s: { wins: number; losses: number; ties: number 
  * One sim season of a player's career, collapsed: "S3 2028 · 14 g · 212.4 pts · 15.2 avg · WR12". Points, games, average and
  * position rank are what the engine stores per player per game (component stats are not kept league-wide), so that is all it says.
  */
-export function simCareerSeasonParts(s: Pick<SimHistorySeason, "season" | "year" | "season_label" | "games" | "points" | "ppg" | "pos" | "pos_rank">): { key: string; text: string; strong?: boolean }[] {
+export function simCareerSeasonParts(s: Pick<SimHistorySeason, "season" | "year" | "season_label" | "games" | "points" | "ppg" | "pos" | "pos_rank">): { key: string; text: string; strong?: boolean; tone?: "success" | "warning" }[] {
+  // Points and average colour by how that per-game rate compares with the position's normal; the rank by where it sits in the position.
+  const avgTone = simScoreTierTone(simSeasonTier(s.ppg, s.pos));
+  const rankTone = simScoreTierTone(simRankTier(s.pos_rank, s.pos));
   return [
     { key: "games", text: `${s.games} g` },
-    { key: "pts", text: `${s.points.toFixed(1)} pts` },
-    s.ppg != null ? { key: "avg", text: `${s.ppg.toFixed(1)} avg` } : { key: "avg", text: "" },
-    s.pos && s.pos_rank ? { key: "rank", text: `${s.pos}${s.pos_rank}`, strong: true } : { key: "rank", text: "" },
+    { key: "pts", text: `${s.points.toFixed(1)} pts`, ...(avgTone ? { tone: avgTone } : null) },
+    s.ppg != null ? { key: "avg", text: `${s.ppg.toFixed(1)} avg`, ...(avgTone ? { tone: avgTone } : null) } : { key: "avg", text: "" },
+    s.pos && s.pos_rank ? { key: "rank", text: `${s.pos}${s.pos_rank}`, strong: true, ...(rankTone ? { tone: rankTone } : null) } : { key: "rank", text: "" },
   ].filter((p) => p.text);
 }
 
