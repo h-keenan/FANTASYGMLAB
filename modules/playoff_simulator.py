@@ -99,6 +99,7 @@ standings are deterministic and the sampled result is exact.
 from __future__ import annotations
 
 import time
+import zlib
 from typing import Any, Mapping, Sequence
 
 import numpy as np
@@ -637,6 +638,35 @@ def _playoff_odds_cache_bucket() -> int:
     return int(time.time() // PLAYOFF_ODDS_TTL_SECONDS)
 
 
+def shared_odds_seed(league_id: str, lens: str, n_trials: int | None = None, bucket: int | None = None) -> int:
+    """The ONE seed every playoff-odds number in the app is drawn with.
+
+    Stable across processes (crc32, not the per-process salted ``hash``) and
+    keyed on the cache bucket, so the league table, GM Plan, Dashboard, the
+    Season Outlook and the paired what-if/trade baselines are all the same
+    Monte Carlo draw: one league, one number, no sampling jitter between
+    surfaces. A what-if reuses the seed so its change against the baseline is
+    a paired difference, not two independent estimates.
+    """
+
+    n = DEFAULT_TRIALS if n_trials is None else n_trials
+    b = _playoff_odds_cache_bucket() if bucket is None else bucket
+    return zlib.crc32(f"{league_id}:{lens}:{n}:{b}".encode()) & 0xFFFFFFFF
+
+
+def shared_odds_rng(league_id: str, lens: str, n_trials: int | None = None) -> np.random.Generator:
+    return np.random.default_rng(shared_odds_seed(league_id, lens, n_trials))
+
+
+def team_odds_row(result: Mapping[str, Any], roster_id: str) -> dict[str, Any] | None:
+    """One team's row from a ``build_league_playoff_odds*`` result (None when not ready)."""
+
+    for team in result.get("teams") or []:
+        if str(team.get("roster_id") or "") == str(roster_id):
+            return dict(team)
+    return None
+
+
 def _safe_int(value: object, default: int = 0) -> int:
     try:
         return int(value)  # type: ignore[call-overload]
@@ -900,7 +930,7 @@ def _build_league_playoff_odds_cached(
     # hitting the same bucket), while a new bucket reseeds for a fresh draw —
     # consistent with this being an estimate that's expected to move only
     # when the TTL rolls over or real results change, never on reload.
-    rng = np.random.default_rng(seed=hash((league_id, lens, n_trials, _bucket)) & 0xFFFFFFFF)
+    rng = np.random.default_rng(seed=shared_odds_seed(league_id, lens, n_trials, _bucket))
     return build_league_playoff_odds(
         league_id, lens=lens, players_db_path=players_db_path, n_trials=n_trials, rng=rng
     )

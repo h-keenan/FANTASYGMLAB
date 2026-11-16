@@ -4,7 +4,10 @@
  * this file (scripts/check_lib_twins.mjs), so it has no imports.
  *
  * Season Outlook is a one-tap forecast of the user's real league: no
- * strategy, no setup. Nothing here reads or writes real league data, and
+ * strategy, no setup. Its playoff odds, title odds, projected record and
+ * finish are the app's ONE shared playoff-odds number (the same one GM Plan,
+ * Dashboard and Trade Odds show; docs/decisions/one-playoff-odds.md). The
+ * simulated replays only answer "what swings it". Nothing here reads or writes real league data, and
  * every screen says what the numbers are (as of today, on current rosters,
  * rest of season). The backend contract is GET /v1/sim/forecast in
  * docs/fantasy-sim-api.md.
@@ -31,16 +34,15 @@ export interface SimSwingFactor {
   week?: number | null;
   title: string;
   detail: string;
-  /** Change in playoff odds, 0..1 (a game: win minus lose). */
-  playoff_delta: number;
-  /** Change in title odds, 0..1. */
-  title_delta: number;
+  /** Change in playoff odds, 0..1 (a game: win minus lose). Null when the effect is "small" (inside the sampling noise). */
+  playoff_delta: number | null;
+  /** Change in title odds, 0..1. Null when "small". */
+  title_delta: number | null;
+  /** True when the effect is smaller than the replays can measure: show "small", never a number. */
+  small: boolean;
+  /** Standard error of the estimate, 0..1. */
+  noise?: number;
   players?: string[];
-}
-
-export interface SimFinishBucket {
-  finish: number;
-  probability: number;
 }
 
 export interface SimForecast {
@@ -50,9 +52,9 @@ export interface SimForecast {
   weeks_remaining: number;
   team: { team_id: string; name: string };
   current: { wins: number; losses: number; ties: number };
-  odds: { playoffs: number; finals: number; title: number; playoff_spots: number };
-  record: { wins: number; losses: number; wins_low: number; wins_high: number; projected: string; games: number };
-  finish: { median: number; low: number; high: number; teams: number; distribution: SimFinishBucket[] };
+  odds: { playoffs: number; title: number | null; playoff_spots: number; clinched?: boolean; eliminated?: boolean };
+  record: { wins: number; losses: number; projected: string; games: number };
+  finish: { median: number; teams: number };
   swing_factors: SimSwingFactor[];
 }
 
@@ -108,6 +110,7 @@ const REASON_COPY: Record<string, string> = {
   team_not_found: "We could not find your team in this league.",
   season_complete: "This league's regular season is over, so there is no rest-of-season forecast left to make.",
   players_unavailable: "Player values are not available right now. Try again soon.",
+  odds_unavailable: "Playoff odds are not ready for this league yet (for example in the offseason, before games are played). Try again once the season is underway.",
 };
 
 /** Customer-safe copy for a `reason` code; empty for success. */
@@ -148,7 +151,7 @@ export function simOddsTone(probability: number | undefined): SimTone {
 }
 
 /** Whole-percent odds, never a false 0% or 100%. */
-export function simFormatPercent(value: number | undefined): string {
+export function simFormatPercent(value: number | null | undefined): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
   const pct = value * 100;
   if (pct > 0 && pct < 1) return "<1%";
@@ -175,18 +178,6 @@ export function simOrdinal(n: number): string {
     default:
       return `${n}th`;
   }
-}
-
-/** "4th" or "3rd to 6th". */
-export function simFinishRange(finish: SimForecast["finish"]): string {
-  return finish.low === finish.high ? simOrdinal(finish.median) : `${simOrdinal(finish.low)} to ${simOrdinal(finish.high)}`;
-}
-
-/** "8 to 11 wins" or "9 wins". */
-export function simWinsRange(record: SimForecast["record"]): string {
-  const low = Math.round(record.wins_low);
-  const high = Math.round(record.wins_high);
-  return low === high ? `${low} ${low === 1 ? "win" : "wins"}` : `${low} to ${high} wins`;
 }
 
 export function simFormatCurrent(current: SimForecast["current"]): string {
@@ -233,13 +224,19 @@ export function simFactorKindLabel(kind: string): string {
 
 /** What a factor is worth, in plain words. */
 export function simFactorImpact(factor: SimSwingFactor): string {
+  if (factor.small || factor.playoff_delta === null) return "Small effect";
   const playoff = `${simFormatPointsSwing(factor.playoff_delta)} playoff odds`;
-  if (Math.abs(factor.title_delta) >= 0.01) return `${playoff}, ${simFormatPointsSwing(factor.title_delta)} title odds`;
+  if (factor.title_delta !== null && Math.abs(factor.title_delta) >= 0.01) return `${playoff}, ${simFormatPointsSwing(factor.title_delta)} title odds`;
   return playoff;
 }
 
 export function simFactorsIntro(factors: readonly SimSwingFactor[]): string {
   return factors.length > 0
-    ? "The games and moves that move your odds most, found by replaying the same seasons with and without them."
+    ? "The games and moves that move your odds most, found by replaying the same seasons with and without them. Effects smaller than the replays can measure are marked small."
     : "Nothing stands out: no single game or move moves your odds much right now.";
+}
+
+/** True when a swing factor helps (a "small" one is neutral). */
+export function simFactorIsGood(factor: SimSwingFactor): boolean {
+  return !factor.small && (factor.playoff_delta ?? 0) >= 0;
 }

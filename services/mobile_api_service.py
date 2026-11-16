@@ -3171,6 +3171,27 @@ def get_league_team_profile(
     }
 
 
+def _shared_playoff_odds(league_id: str, lens: str = "Dynasty") -> dict[str, Any]:
+    """The ONE playoff-odds number for a league (docs/decisions/one-playoff-odds.md).
+
+    Every surface (the Playoff Odds screen, GM Plan, Dashboard, Season Outlook,
+    the Season Simulator what-if and Trade Odds baselines) reads this
+    function's result. It is cached per league/lens/time bucket and drawn with
+    modules.playoff_simulator.shared_odds_seed, so the same league reads the
+    same number everywhere. There is no second playoff-odds model.
+    """
+
+    return playoff_simulator.build_league_playoff_odds_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+
+
+def _shared_playoff_odds_row(league_id: str, lens: str, roster_id: str) -> dict[str, Any] | None:
+    """One roster's row of :func:`_shared_playoff_odds` (None when odds are not ready)."""
+
+    return playoff_simulator.team_odds_row(_shared_playoff_odds(league_id, lens), roster_id)
+
+
 @app.get("/v1/leagues/{league_id}/playoff-odds")
 @_with_sleeper_as_of
 def get_league_playoff_odds(
@@ -3221,9 +3242,7 @@ def get_league_playoff_odds(
             "upsell": _PLAYOFF_ODDS_UPSELL,
         }
 
-    result = playoff_simulator.build_league_playoff_odds_cached(
-        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
-    )
+    result = _shared_playoff_odds(league_id, lens)
     return {**result, "is_premium": True, "upsell": None}
 
 
@@ -3280,9 +3299,7 @@ def get_games_season_sim(
     is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     base = {"ok": True, "is_premium": is_premium, "upsell": None if is_premium else _GAMES_WHAT_IF_UPSELL}
 
-    odds = playoff_simulator.build_league_playoff_odds_cached(
-        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
-    )
+    odds = _shared_playoff_odds(league_id, lens)
     if odds.get("reason"):
         return {**base, "reason": odds["reason"], "teams": [], "my_team": None, "roster": []}
     my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
@@ -3359,11 +3376,7 @@ def post_games_what_if(
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Premium. Re-runs the shared playoff simulation with the caller's Roster
-    Power recomputed for the add/drop, against an equally seeded baseline."""
-
-    import zlib
-
-    import numpy as np
+    Power recomputed for the add/drop, against the shared baseline."""
 
     _games_check_lens(lens)
     config = auth_supabase.get_supabase_config()
@@ -3413,17 +3426,16 @@ def post_games_what_if(
         return not_ready("no_rankings_data")
     scenario_power = my_power + (after["total_score"] - before["total_score"])
 
-    seed = zlib.crc32(f"{league_id}:{lens}".encode()) & 0xFFFFFFFF
-    base_run = playoff_simulator.build_league_playoff_odds(
-        league_id, lens=lens, players_db_path=PLAYERS_DB_PATH, rng=np.random.default_rng(seed)
-    )
+    # The baseline IS the shared number; the scenario reuses its seed, so the
+    # change is a paired difference against exactly what every other surface shows.
+    base_run = _shared_playoff_odds(league_id, lens)
     if base_run.get("reason"):
         return not_ready(base_run["reason"])
     scenario_run = playoff_simulator.build_league_playoff_odds(
         league_id,
         lens=lens,
         players_db_path=PLAYERS_DB_PATH,
-        rng=np.random.default_rng(seed),
+        rng=playoff_simulator.shared_odds_rng(league_id, lens),
         power_overrides={my_rid: scenario_power},
     )
     base_team = next((t for t in base_run["teams"] if t["roster_id"] == my_rid), None)
@@ -3523,10 +3535,6 @@ def _trade_odds_effect_for_package(
     base_team: dict[str, Any],
     package: TradeOddsPackage,
 ) -> dict[str, Any]:
-    import zlib
-
-    import numpy as np
-
     send = [str(pid) for pid in package.send_player_ids]
     receive = [str(pid) for pid in package.receive_player_ids]
     out: dict[str, Any] = {
@@ -3551,12 +3559,11 @@ def _trade_odds_effect_for_package(
         after = games.score_roster(
             players_df, games.apply_roster_change(current_ids, receive, send), score_field, settings
         )
-        seed = zlib.crc32(f"{league_id}:{lens}".encode()) & 0xFFFFFFFF
         scenario_run = playoff_simulator.build_league_playoff_odds(
             league_id,
             lens=lens,
             players_db_path=PLAYERS_DB_PATH,
-            rng=np.random.default_rng(seed),
+            rng=playoff_simulator.shared_odds_rng(league_id, lens),
             power_overrides={my_rid: my_power + (after["total_score"] - before["total_score"])},
         )
         team = next((t for t in scenario_run.get("teams") or [] if t["roster_id"] == my_rid), None)
@@ -3664,26 +3671,9 @@ def post_trade_odds_effect(
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
     score_field = league_value_settings.valuation_score_field(body.lens)
 
-    # The paired baseline: same fixed seed as every scenario below (not the
-    # shared cache's bucket seed), cached per TTL bucket.
-    def _paired_baseline() -> dict[str, Any]:
-        import zlib
-
-        import numpy as np
-
-        seed = zlib.crc32(f"{league_id}:{body.lens}".encode()) & 0xFFFFFFFF
-        return playoff_simulator.build_league_playoff_odds(
-            league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH, rng=np.random.default_rng(seed)
-        )
-
-    base_run = redis_cache.redis_single_flight_cache(
-        cache_key=redis_cache.build_cache_key(
-            "trade_odds_baseline", league_id, body.lens, playoff_simulator._playoff_odds_cache_bucket()
-        ),
-        ttl_seconds=playoff_simulator.PLAYOFF_ODDS_TTL_SECONDS,
-        compute=_paired_baseline,
-        lock_timeout_seconds=10.0,
-    )
+    # The paired baseline is the shared number itself: scenarios below reuse
+    # its seed, so they differ from it only by the roster change.
+    base_run = _shared_playoff_odds(league_id, body.lens)
     if base_run.get("reason"):
         return not_ready(str(base_run["reason"]))
     frame = league_rankings.build_league_rankings_frame_cached(
@@ -7524,6 +7514,7 @@ if os.environ.get("SIM_ENABLED", "").strip().lower() in {"1", "true", "yes", "on
                 auth_supabase.get_supabase_config(), str(user.get("id") or ""), str(user.get("_access_token") or "")
             ).get("sleeper_username", ""),
             supabase_config=auth_supabase.get_supabase_config,
+            shared_odds=lambda league_id, roster_id, lens: _shared_playoff_odds_row(league_id, lens, roster_id),
         ),
     )
 
@@ -13741,14 +13732,7 @@ def get_gm_plan(
     # back as `reason` with an empty `teams` list — same honest-degradation
     # contract the dedicated endpoint uses, so there's simply no match
     # below and modules.gm_plan omits the fact rather than fabricating one.
-    playoff_odds_result = playoff_simulator.build_league_playoff_odds_cached(
-        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
-    )
-    my_playoff_odds: dict[str, Any] | None = None
-    for team in playoff_odds_result.get("teams") or []:
-        if str(team.get("roster_id") or "") == my_roster_id:
-            my_playoff_odds = team
-            break
+    my_playoff_odds = _shared_playoff_odds_row(league_id, lens, my_roster_id)
 
     trade_idea_records: list[dict[str, Any]] = []
     # Past the deadline: skip idea generation entirely — GM Plan shows the

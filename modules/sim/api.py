@@ -140,6 +140,10 @@ class SimApiDeps:
     supabase_config: Callable[[], dict] | None = None
     backend_for: Callable[[dict[str, Any]], SimBackend] | None = None
     inputs: SimInputs | None = None
+    # The league's ONE shared playoff-odds row for a roster (the service's
+    # function; Season Outlook shows exactly what GM Plan shows):
+    # (league_id, roster_id, lens) -> row or None when odds are not ready.
+    shared_odds: Callable[[str, str, str], dict[str, Any] | None] | None = None
 
 
 class CreateWorldRequest(BaseModel):
@@ -235,7 +239,10 @@ def build_router(deps: SimApiDeps) -> APIRouter:
                 )
             except SimInputsError as exc:
                 return _reason(exc.code)
-            forecast = build_forecast(snapshot)
+            shared = deps.shared_odds(league_id, snapshot.user_team.tid, "Dynasty") if deps.shared_odds else None
+            if not shared:
+                return _reason("odds_unavailable")
+            forecast = build_forecast(snapshot, shared)
         return _reason(
             "", forecast=forecast, notes=list(snapshot.notes), mode=snapshot.mode,
             as_of=datetime.now(timezone.utc).isoformat(timespec="seconds"),

@@ -15,30 +15,39 @@ from modules.sim.types import SimInputsError
 
 SNAP = build_synthetic_snapshot(7)
 SMALL = {"samples": 12, "scenario_samples": 6}
+# The league's ONE shared playoff-odds row (modules.playoff_simulator): percent units.
+SHARED = {
+    "roster_id": SNAP.user_team.tid, "playoff_probability": 62.0, "title_probability": 9.0,
+    "median_final_wins": 9, "median_final_losses": 5, "median_seed": 4, "clinched": False, "eliminated": False,
+}
 
 
-def test_forecast_shape_and_ranges():
-    f = build_forecast(SNAP, **SMALL)
+def _fc(snap=SNAP, **kw):
+    return build_forecast(snap, SHARED, **{**SMALL, **kw})
+
+
+def test_forecast_shape_and_echoes_the_shared_odds():
+    f = _fc()
     assert f["samples"] == 12
     assert f["team"]["team_id"] == SNAP.user_team.tid
-    odds = f["odds"]
-    assert 0 <= odds["title"] <= odds["finals"] <= odds["playoffs"] <= 1
-    rec = f["record"]
-    assert rec["wins_low"] <= rec["wins"] <= rec["wins_high"]
-    w, l = rec["projected"].split("-")
-    assert int(w) + int(l) == int(rec["games"])
-    fin = f["finish"]
-    assert 1 <= fin["low"] <= fin["median"] <= fin["high"] <= fin["teams"]
-    assert len(fin["distribution"]) == fin["teams"]
-    assert abs(sum(d["probability"] for d in fin["distribution"]) - 1) < 0.02
+    # One number: the forecast never computes its own odds, record or finish.
+    assert f["odds"]["playoffs"] == 0.62 and f["odds"]["title"] == 0.09
+    assert "finals" not in f["odds"] and "distribution" not in f["finish"]
+    assert f["record"]["projected"] == "9-5" and f["finish"]["median"] == 4
     assert len(f["swing_factors"]) <= fc.MAX_FACTORS
     for factor in f["swing_factors"]:
         assert factor["kind"] in ("game", "waiver", "trade")
         assert factor["title"] and factor["detail"]
+        assert factor["small"] == (factor["playoff_delta"] is None)
+
+
+def test_forecast_odds_do_not_depend_on_the_replays():
+    # Different replay counts, same league row: identical headline odds.
+    assert _fc(samples=12)["odds"] == _fc(samples=20, scenario_samples=8)["odds"]
 
 
 def test_forecast_is_deterministic():
-    assert build_forecast(SNAP, **SMALL) == build_forecast(SNAP, **SMALL)
+    assert _fc() == _fc()
 
 
 def test_forecast_never_runs_user_transactions():
@@ -54,16 +63,54 @@ def test_game_swing_is_conditional_odds():
     scores = [fc._score(o) for o in outcomes]
     factors = fc._game_factors(SNAP, outcomes, scores)
     for factor in factors:
-        assert factor["kind"] == "game" and factor["playoff_delta"] >= fc.MIN_GAME_SWING
+        assert factor["kind"] == "game"
         assert "playoff odds" in factor["detail"]
+        if factor["small"]:
+            assert factor["playoff_delta"] is None
+        else:
+            assert factor["playoff_delta"] >= fc.MIN_GAME_SWING
+            assert factor["playoff_delta"] >= fc.NOISE_Z * factor["noise"]
 
 
-def test_move_factor_needs_a_real_gain(monkeypatch):
-    base = [fc._score(fc.simulate_season(SNAP, fc.BASELINE, s)) for s in range(1, 9)]
-    scenario = [fc.simulate_season(SNAP, fc.WIRE, s) for s in range(1, 9)]
-    monkeypatch.setattr(fc, "MIN_MOVE_PLAYOFF_GAIN", 2.0)
-    monkeypatch.setattr(fc, "MIN_MOVE_TITLE_GAIN", 2.0)
-    assert fc._move_factor("waiver", base, scenario, SNAP.user_team.tid) is None
+def test_paired_standard_error_scales_with_noise_and_replay_count():
+    same = [1, 0] * 20
+    assert fc.paired_standard_error(same, same) == 0.0
+    # same disagreement rate, fewer replays: bigger error
+    assert fc.paired_standard_error([0] * 10, [1, 0] * 5) > fc.paired_standard_error([0] * 80, [1, 0] * 40)
+    # more replays disagreeing: bigger error than a unanimous shift
+    assert fc.paired_standard_error([0] * 40, [1, 0] * 20) > fc.paired_standard_error([0] * 40, [1] * 40)
+
+
+def _fake_outcome(made_playoffs):
+    class O:
+        user = {"made_playoffs": made_playoffs, "playoff_result": "champion" if made_playoffs else "none"}
+        events = [{"involves_user": True, "type": "waiver", "gain": 1.0,
+                   "add": {"player_id": "p1", "name": "P", "pos": "WR"}}]
+    return O()
+
+
+def test_move_swing_below_noise_is_labeled_small_without_a_number():
+    # 40 paired replays: +2 net berths (5 pts) but 6 replays moved each way, so the paired SE is ~0.06.
+    base = [fc._score(_fake_outcome(i < 20)) for i in range(40)]
+    scen = [_fake_outcome(i < 20) for i in range(40)]
+    for i in (20, 21, 22, 23, 24, 25, 26, 27):
+        scen[i] = _fake_outcome(True)
+    for i in (0, 1, 2, 3, 4, 5):
+        scen[i] = _fake_outcome(False)
+    factor = fc._move_factor("waiver", base, scen, "t")
+    assert factor is not None and factor["small"] is True
+    assert factor["playoff_delta"] is None and factor["title_delta"] is None
+
+
+def test_move_swing_that_clears_noise_keeps_its_number_and_the_bar_scales_with_se():
+    base = [fc._score(_fake_outcome(False)) for _ in range(40)]
+    scen = [_fake_outcome(i < 30) for i in range(40)]  # +75 pts, every replay agrees
+    factor = fc._move_factor("waiver", base, scen, "t")
+    assert factor["small"] is False and factor["playoff_delta"] == 0.75
+    # a +25 pt gain on only 8 replays has a bigger SE, so the same kind of effect turns "small"
+    base_few = [fc._score(_fake_outcome(False)) for _ in range(8)]
+    scen_few = [_fake_outcome(i < 2) for i in range(8)]
+    assert fc._move_factor("waiver", base_few, scen_few, "t")["small"] is True
 
 
 class FakeInputs:
@@ -82,7 +129,7 @@ class FakeInputs:
 @pytest.fixture
 def client(monkeypatch):
     sim_api._FORECAST_CACHE.clear()
-    monkeypatch.setattr(sim_api, "build_forecast", lambda snap: build_forecast(snap, **SMALL))
+    monkeypatch.setattr(sim_api, "build_forecast", lambda snap, shared: build_forecast(snap, shared, **SMALL))
     inputs = FakeInputs()
 
     def require_user(authorization: str | None = Header(default=None)):
@@ -94,6 +141,7 @@ def client(monkeypatch):
         sim_api.SimApiDeps(
             require_user=require_user, is_pro=lambda u: u["id"] == "u1",
             sleeper_username=lambda u: "user1", backend_for=lambda u: InMemoryBackend(), inputs=inputs,
+            shared_odds=lambda league_id, roster_id, lens: None if league_id == "noodds" else SHARED,
         ),
         environ={"SIM_ENABLED": "1"},
     )
@@ -111,7 +159,7 @@ def test_route_free_user_gets_upsell_and_no_work(client):
 def test_route_pro_gets_forecast_and_it_is_cached(client):
     c, inputs = client
     body = c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"}).json()
-    assert body["reason"] == "" and body["forecast"]["odds"]["playoffs"] >= 0
+    assert body["reason"] == "" and body["forecast"]["odds"]["playoffs"] == 0.62
     assert body["as_of"] and body["mode"] == "full" and isinstance(body["notes"], list)
     again = c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"}).json()
     assert again == body and inputs.calls == 1
@@ -137,11 +185,11 @@ def test_single_flight_computes_once_for_concurrent_requests(client, monkeypatch
     release = threading.Event()
     calls = []
 
-    def slow(snap):
+    def slow(snap, shared):
         calls.append(1)
         started.set()
         release.wait(5)
-        return build_forecast(snap, **SMALL)
+        return build_forecast(snap, shared, **SMALL)
 
     monkeypatch.setattr(sim_api, "build_forecast", slow)
     results = []
@@ -174,14 +222,14 @@ def test_single_flight_is_per_user_and_league(client):
 def test_failed_compute_is_not_cached_and_clears_the_flight(client, monkeypatch):
     c, inputs = client
 
-    def boom(snap):
+    def boom(snap, shared):
         raise RuntimeError("engine blew up")
 
     monkeypatch.setattr(sim_api, "build_forecast", boom)
     with pytest.raises(RuntimeError):
         c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"})
     assert not sim_api._FLIGHTS and not sim_api._FORECAST_CACHE
-    monkeypatch.setattr(sim_api, "build_forecast", lambda snap: build_forecast(snap, **SMALL))
+    monkeypatch.setattr(sim_api, "build_forecast", lambda snap, shared: build_forecast(snap, shared, **SMALL))
     assert c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"}).json()["forecast"]
 
 
@@ -204,3 +252,9 @@ def test_sample_plan_shrinks_for_long_horizons_but_keeps_a_floor():
     mid, mid_s = fc.sample_plan(10)
     assert fc.MIN_BASE_SAMPLES < mid < fc.BASE_SAMPLES and mid_s < fc.SCENARIO_SAMPLES
     assert fc.sample_plan(14) == (fc.MIN_BASE_SAMPLES, fc.MIN_SCENARIO_SAMPLES) == fc.sample_plan(40)
+
+
+def test_route_without_shared_odds_says_so(client):
+    c, _ = client
+    body = c.get("/v1/sim/forecast?league_id=noodds", headers={"Authorization": "u1"}).json()
+    assert body["reason"] == "odds_unavailable" and "forecast" not in body

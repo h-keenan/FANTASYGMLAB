@@ -18,28 +18,34 @@ the older auto-GM API and no client calls them any more.
 ### `GET /v1/sim/forecast?league_id=<id>[&roster_id=<id>]`
 Pro-only (Free gets the usual `premium_required` envelope and no sim work runs).
 Snapshots the league, replays the rest of the season 48 to 80 times (fewer when many games remain) with the user on
-their current roster and an auto-set lineup (no user trades or waiver moves), and
-aggregates. Deterministic (fixed seeds); cached in-process for 10 minutes per
+their current roster and an auto-set lineup (no user trades or waiver moves) to find the swing factors. The headline
+numbers (`odds`, `record`, `finish`) are NOT computed here: they are the league's one shared playoff-odds row
+(`modules.playoff_simulator` via the service, see `docs/decisions/one-playoff-odds.md`), the same number GM Plan,
+Dashboard and Trade Odds show. Deterministic (fixed seeds); cached in-process for 10 minutes per
 user and league. Not-ready reasons: `league_unavailable`, `team_not_found`,
-`season_complete`, `players_unavailable`. 503 `server_busy` when the compute pool is full.
+`season_complete`, `players_unavailable`, `odds_unavailable` (the shared odds are not ready, e.g. offseason).
+503 `server_busy` when the compute pool is full.
 ```jsonc
 {"ok": true, "reason": "", "is_premium": true, "upsell": null,
  "mode": "remaining", "as_of": "2026-11-12T12:00:00+00:00", "notes": ["..."],
  "forecast": {
    "samples": 80, "start_week": 10, "regular_season_end": 14, "weeks_remaining": 5,
    "team": {"team_id": "1", "name": "..."}, "current": {"wins": 5, "losses": 4, "ties": 0},
-   "odds": {"playoffs": 0.62, "finals": 0.2, "title": 0.09, "playoff_spots": 6},
-   "record": {"wins": 8.6, "losses": 5.4, "wins_low": 7, "wins_high": 10, "projected": "9-5", "games": 14},
-   "finish": {"median": 4, "low": 2, "high": 7, "teams": 12, "distribution": [{"finish": 1, "probability": 0.04}, ...]},
-   "swing_factors": [  // up to 3, biggest first
+   "odds": {"playoffs": 0.62, "title": 0.09, "playoff_spots": 6, "clinched": false, "eliminated": false},
+   "record": {"wins": 9, "losses": 5, "projected": "9-5", "games": 14},
+   "finish": {"median": 4, "teams": 12},
+   "swing_factors": [  // up to 3, real ones first, biggest first
      {"kind": "game|waiver|trade", "week": 11, "title": "...", "detail": "...",
-      "playoff_delta": 0.35, "title_delta": 0.05, "players": []}
+      "playoff_delta": 0.35, "title_delta": 0.05, "small": false, "noise": 0.04, "players": []},
+     {"kind": "waiver", "title": "...", "detail": "...", "playoff_delta": null, "title_delta": null,
+      "small": true, "noise": 0.08, "players": []}
    ]}}
 ```
-`low`/`high` are the 10th/90th percentiles. Swing factors come only from the sim
-engine: a key game is the playoff odds conditional on winning vs losing it; a
-waiver/trade factor replays the same seeds with the user's auto-GM switched on
-and is shown only when the paired gain clears a noise floor.
+Swing factors come only from the sim engine, and only the difference is reported: a key game is the playoff
+odds conditional on winning vs losing it; a waiver/trade factor replays the same seeds with the user's auto-GM
+switched on. A swing is "real" only when it is at least `NOISE_Z` (2) standard errors of its own estimate
+(paired standard error of the per-replay difference for moves; the two-rate standard error for games). Below that it
+is returned as `small: true` with null deltas and clients show "Small effect", never a number inside the noise.
 
 ## Isolation (the hard rule)
 - Code lives in `modules/sim/`. Real code never depends on it; the only real
