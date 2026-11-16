@@ -18,7 +18,10 @@ import type { PlayerRef } from "@/lib/playerAnatomy";
  */
 export function CompactPlayerCard({ player, detail, trailing, testId = "compact-player-card", onOpen, nonInteractive }: { player: PlayerRef; detail?: string | null; trailing?: ReactNode; testId?: string; onOpen?: () => void; nonInteractive?: string }) {
   const card = (
-    <div className="flex min-w-0 items-center gap-2" style={{ minHeight: 40 }} data-testid={testId}>
+    // Principled narrow-width layout: the identity block (avatar + name + pill) keeps a 10rem floor, and the trailing
+    // chips (grade ring + value) wrap onto a second line instead of squeezing the name to a sliver.
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5" style={{ minHeight: 40 }} data-testid={testId}>
+      <span className="flex min-w-0 flex-1 basis-40 items-center gap-2">
       <PlayerAvatarSlot player={player} tier="dense" nonInteractive="the whole card is the tap target" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 items-center gap-1.5">
@@ -27,7 +30,8 @@ export function CompactPlayerCard({ player, detail, trailing, testId = "compact-
         </span>
         {detail ? <span className="text-xs leading-4" style={{ color: "var(--color-text-muted)" }}>{detail}</span> : null}
       </span>
-      {trailing ? <span className="shrink-0 text-sm font-extrabold tabular-nums">{trailing}</span> : null}
+      </span>
+      {trailing ? <span className="ml-auto shrink-0 text-sm font-extrabold tabular-nums">{trailing}</span> : null}
     </div>
   );
   return (

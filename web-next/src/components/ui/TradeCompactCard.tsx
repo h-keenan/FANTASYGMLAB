@@ -54,8 +54,8 @@ export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode
   return (
     <PickTap label={a.pickLabel ?? ""} id={a.pickId} detail={a.pickDetail} onOpen={a.onOpenPick} nonInteractive={a.nonInteractive}>
       <div className="flex items-center gap-2 text-sm font-bold" style={{ minHeight: 44 }} data-testid="trade-pick-row">
-        <PickAvatar label={a.pickLabel} size={avatarSize("row")} />
-        <span className="min-w-0 break-words">{a.pickLabel}</span>
+        <span className="shrink-0"><PickAvatar label={a.pickLabel} size={avatarSize("row")} /></span>
+        <span className="min-w-0 flex-1 [overflow-wrap:normal]">{a.pickLabel}</span>
       </div>
     </PickTap>
   );
