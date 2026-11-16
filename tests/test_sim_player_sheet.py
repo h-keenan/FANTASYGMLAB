@@ -5,6 +5,7 @@ projection carries no information so the client shows one summary instead of a l
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
 from modules.sim import game_view as view
@@ -13,13 +14,15 @@ from modules.sim.game_eval import Evaluator
 from tests.test_sim_game_engine import drafted
 
 
-def _detail(week_advance=0):
+def _detail(week_advance=0, defense_v=0):
     from modules.sim.game_engine import advance
 
     snap, state, em = drafted(7, user_slot=2)
     for _ in range(week_advance):
         advance(em, snap, state, 7)
     pid = sorted(state.rosters[snap.user_team.tid])[0]
+    if snap.settings.defense_v != defense_v:  # defense_v 1: the weekly projection follows the opponent, so it is no longer flat
+        snap = dataclasses.replace(snap, settings=dataclasses.replace(snap.settings, defense_v=defense_v))
     return snap, state, pid, view.player_detail(snap, state, pid)
 
 
@@ -27,13 +30,19 @@ def test_flat_projection_is_flagged_and_summarised():
     snap, state, pid, d = _detail(2)
     json.dumps(d, allow_nan=False)
     playable = {(w["projection"], w["floor"], w["ceiling"]) for w in d["weeks"] if not w["bye"] and not w["out"]}
-    assert len(playable) == 1  # the engine has no per-week opponent model: every healthy week is the same number
+    assert len(playable) == 1  # defense_v 0: the engine has no per-week opponent model, every healthy week is the same number
     assert d["projection_flat"] is True
     ros = d["ros"]
     ev = Evaluator(snap, state)
     assert ros["mean"] == round(ev.ros_mean(pid), 1) and ros["floor"] <= ros["mean"] <= ros["ceiling"]
     assert ros["weeks_left"] == len(d["weeks"]) and ros["playable_weeks"] <= ros["weeks_left"]
     assert ros["bye_week"] == (snap.bye_of(pid) if any(w["bye"] for w in d["weeks"]) else None)
+
+
+def test_projection_is_not_flat_with_opponent_defenses():
+    snap, state, pid, d = _detail(2, defense_v=1)
+    playable = {w["projection"] for w in d["weeks"] if not w["bye"] and not w["out"]}
+    assert len(playable) > 1 and d["projection_flat"] is False
 
 
 def test_projection_is_not_flat_when_weeks_differ():

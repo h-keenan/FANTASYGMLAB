@@ -609,6 +609,10 @@ def _compact_old_seasons(state, snap) -> None:
     ]
 
 
+def _depth_chart(state, snap, week, p):
+    """Story record only (``incumbent_v``): who took whose starting job and why. The roles that play are resolved from the pool and injuries, never from this."""
+
+
 def _advance_requested(state, snap, week, p):
     """Marker only: the user tapped Advance (lets a replay re-issue it)."""
 
@@ -635,7 +639,7 @@ _HANDLERS = {
     "playoff_seeded": _playoff_seeded, "season_complete": _season_complete,
     "week_advanced": _week_advanced, "advance": _advance_requested,
     "slot_move": _slot_move, "block_set": _block_set, "realism_upgrade": _realism_upgrade, "rookie_draft_started": _rookie_draft_started, "rookie_pick": _rookie_pick,
-    "rookie_draft_complete": _rookie_draft_complete, "season_started": _season_started,
+    "rookie_draft_complete": _rookie_draft_complete, "season_started": _season_started, "depth_chart": _depth_chart,
 }
 
 

@@ -38,6 +38,8 @@ SUBSYSTEMS = {
     "gblock": 21,  # which AI teams shop a trade block in a given week
     "gscout": 20,  # scouting seeds of generated rookies
     "gnames": 22,  # rookie name tables shuffle (names_v 1+)
+    "gdefense": 23,  # NFL defense strengths per season (defense_v 1+)
+    "gnflopp": 24,  # weekly NFL opponent pairing (defense_v 1+)
 }
 
 

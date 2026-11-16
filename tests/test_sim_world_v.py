@@ -48,6 +48,8 @@ def _settings(world: bool, **extra) -> GameSettings:
         d.pop("vorp_v", None)  # ... and before vorp_v
         d.pop("advice_v", None)  # ... and before advice_v
         d.pop("pos_v", None)  # ... and before pos_v
+    d.pop("incumbent_v", None)  # world_v is tested alone: incumbent_v / defense_v have their own tests (tests/test_sim_incumbent_defense.py)
+    d.pop("defense_v", None)
     return GameSettings.from_dict(d)
 
 

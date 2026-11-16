@@ -26,6 +26,8 @@ def _game(seed: int, *, vorp: bool, superflex: bool = False, week: int = 3):
     d = GameSettings.parse({"user_slot": 4, "superflex": superflex}).to_dict()
     if not vorp:
         d.pop("vorp_v", None)
+    d.pop("defense_v", None)  # these price pins predate opponent defenses
+    d.pop("incumbent_v", None)
     snap = build_snapshot(ROWS, BYES, GameSettings.from_dict(d), seed, scoring_model=MODEL)
     state = GameState(snap)
     em = Emitter(state, snap)

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Sequence
 
+from modules.sim import depth_incumbency
 from modules.sim import game_dynasty as dyn
 from modules.sim import game_grades
 from modules.sim.game_actions import ai_manage_reserves, execute_trade
@@ -608,6 +609,59 @@ def _your_game(snap, ev, state, user, games, lineups, played, pts, status_of, ro
     return out
 
 
+def _covering(ev: Evaluator, key: tuple[str, str], pid: str, week: int) -> str | None:
+    """The player filling in for ``pid`` in ``week`` (a vacated starter's role goes to one fill-in), or None."""
+
+    for m in ev.book.groups[key]:
+        r = ev.role(m.pid, week)
+        if r is not None and r.kind == "fill_in" and r.covering == pid:
+            return m.pid
+    return None
+
+
+def _starter_slot(ev: Evaluator, pid: str) -> tuple[tuple[str, str], int] | None:
+    """``(group key, 1-based slot)`` when ``pid`` holds a starting slot of his NFL depth chart, else None."""
+
+    key = ev.book.key(pid) if ev.book is not None else None
+    if key is None:
+        return None
+    n = depth_incumbency.STARTER_SLOTS.get(key[1], 0)
+    order = [m.pid for m in ev.book.groups[key]]
+    return (key, order.index(pid) + 1) if pid in order[:n] else None
+
+
+def _starter_returns(ev: Evaluator, state: GameState, W: int) -> list[dict[str, Any]]:
+    """Before a week is folded: the starters whose injury ends with it, and who covered for them (``incumbent_v``)."""
+
+    out = []
+    for pid, left in sorted(state.out.items()):
+        if left != 1:
+            continue
+        hit = _starter_slot(ev, pid)
+        if hit is None:
+            continue
+        (team, pos), slot = hit
+        cover = _covering(ev, (team, pos), pid, W)
+        if cover:
+            out.append({"nfl_team": team, "pos": pos, "slot": slot, "pid": pid, "replaced_pid": cover, "reason": "returned_from_injury"})
+    return out
+
+
+def _starter_injuries(ev: Evaluator, hurt: Sequence[Sequence], W: int) -> list[dict[str, Any]]:
+    """After an injury event is folded: the starters just hurt and the player who takes the job for now (``incumbent_v``)."""
+
+    out = []
+    for pid, weeks in hurt:
+        hit = _starter_slot(ev, pid)
+        if hit is None:
+            continue
+        (team, pos), slot = hit
+        cover = _covering(ev, (team, pos), pid, W + 1)
+        if cover:
+            out.append({"nfl_team": team, "pos": pos, "slot": slot, "pid": cover, "replaced_pid": pid, "reason": "injury", "weeks": int(weeks)})
+    return out
+
+
 def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> dict[str, Any]:
     """Resolve the week ``state.week`` and return its recap. Always ends with a
     ``week_advanced`` event."""
@@ -650,7 +704,7 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
     cut: dict[str, float] = {}
     if world:
         cut = group_factors(
-            ev.book, snap.players, lambda p: ev.status(p, W) == "healthy", lambda p: ev.role_param(p, W), lambda p, role: session.expected(p, W, role),
+            ev.book, snap.players, lambda p: ev.status(p, W) == "healthy", lambda p: ev.role_param(p, W, matchup=False), lambda p, role: session.expected(p, W, role),
         )
     for pid in snap.pids:
         if ev.status(pid, W) != "healthy":
@@ -718,10 +772,17 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
                 roles[pid] = [round(scale, 4), round(add, 4)]
         if roles:
             extra["roles"] = roles
+    depth: list[dict[str, Any]] = []
+    if S.incumbent_v and ev.roles_on and kind == "regular":  # incumbent_v 1+: starters hurt / back are depth chart changes in the story
+        depth = _starter_returns(ev, state, W)
     em.emit(W, "engine", "week_scored", kind=kind, round=rnd, games=games,
             points={pid: v for pid, v in pts.items()}, alive_next=alive_next, eliminated=eliminated, **extra)
     if hurt:
         em.emit(W, "engine", "injury", items=hurt)
+        if S.incumbent_v and ev.roles_on and kind == "regular":
+            depth += _starter_injuries(ev, hurt, W)
+    if depth:
+        em.emit(W, "engine", "depth_chart", season_no=state.season_no, year=S.start_year + state.season_no - 1, phase="in_season", changes=depth)
 
     # 7. regular season over: seed the playoffs
     seeding = None

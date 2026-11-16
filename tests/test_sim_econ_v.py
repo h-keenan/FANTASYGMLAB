@@ -45,6 +45,8 @@ def _settings(econ: bool, **extra) -> GameSettings:
         d.pop("aging_v", None)  # ... which also predates aging_v (the goldens were captured before both)
         d.pop("stability_v", None)  # ... and stability_v
         d.pop("vorp_v", None)  # ... and vorp_v
+        d.pop("incumbent_v", None)  # ... and incumbent_v / defense_v
+        d.pop("defense_v", None)
     return GameSettings.from_dict(d)
 
 
