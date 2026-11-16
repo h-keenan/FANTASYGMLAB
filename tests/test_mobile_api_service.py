@@ -16627,11 +16627,10 @@ def test_suggested_moves_have_ranges_but_no_lean_without_a_win_probability_or_wh
     assert move["range"]["start"]["high"] == 26.0 and move["range"]["lean"] is None and move["range"]["stance"] is None
 
     locked_actual = [{**_mv_range("safe", "WR", "WR", 12.0, 9, 15), "game_started": True}]
-    locked = svc._suggested_lineup_moves(
+    # A started game cannot be changed, so the move is never advice at all.
+    assert svc._suggested_lineup_moves(
         _moves_side(suggested, locked_actual), {"available": True, "probability": 0.2}
-    )[0]
-    assert locked["locked"] is True and locked["range"]["lean"] is None
-    assert locked["range"]["over"] is None  # a started game's pregame range no longer applies
+    ) == []
 
 
 def test_team_profile_requires_auth(monkeypatch):

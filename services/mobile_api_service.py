@@ -278,6 +278,7 @@ from modules import direction_checkin, trade_cautions, trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
 from modules import start_sit_range
+from modules import lineup_lock
 from modules import this_week
 from modules import game_weather
 from modules import team_defense
@@ -12568,6 +12569,7 @@ def _dashboard_this_week(
     try:
         roster_rows: dict[str, dict[str, Any]] = {}
         bye_ids: set[str] = set()
+        locked_ids: set[str] = set()
         if league_calendar.is_in_season(league) and not roster_df.empty:
             week = league_calendar.current_league_week(league) or 0
             games = None
@@ -12593,11 +12595,14 @@ def _dashboard_this_week(
                     matchup = nfl_schedule.team_matchup_for_week(team, week, season, games=games)
                     if matchup is not None and matchup.get("bye"):
                         bye_ids.add(player_id)
+                    elif matchup is not None and nfl_schedule.game_has_started(matchup) is True:
+                        locked_ids.add(player_id)
         return this_week.build_this_week(
             league=league,
             roster=my_roster,
             roster_rows=roster_rows,
             bye_player_ids=bye_ids,
+            locked_player_ids=locked_ids,
             items=items,
             trade_records=trade_idea_records,
             stance=stance,
@@ -15960,9 +15965,7 @@ def _suggested_lineup_moves(
             if start_points is not None and over_points is not None
             else None
         )
-        move_locked = starter.get("game_started") is True or (
-            over is not None and over.get("game_started") is True
-        )
+        move_locked = lineup_lock.any_locked(starter, over)
         move = {
             "slot": slot,
             "start": start_fields,
@@ -16056,6 +16059,9 @@ def _suggested_lineup_moves(
         total = None if any(g is None for g in gains) else sum(gains)
         return (any(m["locked"] for m in group), total is None, -(total or 0.0))
 
+    # A move that touches a started player is impossible (Sleeper locked him at
+    # kickoff), so it is never advice: only fully changeable groups are returned.
+    groups = [group for group in groups if not any(m["locked"] for m in group)]
     groups.sort(key=group_key)
     return [move for group in groups for move in group]
 

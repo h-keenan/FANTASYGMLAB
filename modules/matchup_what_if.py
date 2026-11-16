@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from modules import lineup_lock
 from modules import matchup_win_probability as wp
 from modules import start_sit_range
 
@@ -42,7 +43,7 @@ def availability(player: Mapping[str, Any]) -> tuple[str | None, str | None]:
 
 
 def _is_locked(player: Mapping[str, Any]) -> bool:
-    return player.get("game_started") is True
+    return lineup_lock.is_locked(player)
 
 
 def _points(player: Mapping[str, Any] | None) -> float | None:

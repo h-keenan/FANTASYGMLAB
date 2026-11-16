@@ -138,6 +138,7 @@ def _lineup_row(
     roster_rows: Mapping[str, Mapping[str, Any]],
     bye_player_ids: Iterable[str],
     week: int | None,
+    locked_player_ids: Iterable[str] = (),
 ) -> dict[str, Any] | None:
     if league_calendar.is_best_ball(league):
         return _row(
@@ -151,12 +152,20 @@ def _lineup_row(
     if starters is None:
         return None
     byes = {str(pid) for pid in bye_player_ids}
+    # A started game cannot be changed: an out/bye starter whose game has
+    # kicked off is never a "fix your lineup" problem (see modules.lineup_lock).
+    locked = {str(pid) for pid in locked_player_ids}
     starter_set = {pid for pid in starters if pid != "0"}
     empty_slots = sum(1 for pid in starters if pid == "0")
     problems: list[tuple[str, str, str, str]] = []  # (player_id, name, position, reason)
+    locked_out = 0
     for pid in starters:
         row = roster_rows.get(pid)
         if pid == "0" or row is None:
+            continue
+        if pid in locked:
+            if not _healthy(row):
+                locked_out += 1
             continue
         name = str(row.get("name") or "A starter")
         position = str(row.get("position") or "")
@@ -172,7 +181,12 @@ def _lineup_row(
             "Set",
             "positive",
             "Your lineup looks set",
-            f"None of your {len(starter_set)} starters is out or on a bye{suffix}.",
+            (
+                f"{locked_out} starter{'s' if locked_out != 1 else ''} left a game that already started. "
+                "Started games are locked, so there is nothing to change."
+                if locked_out
+                else f"None of your {len(starter_set)} starters is out or on a bye{suffix}."
+            ),
             "Review lineup",
             "matchup",
         )
@@ -191,6 +205,7 @@ def _lineup_row(
             and str(r.get("position") or "") == position
             and _healthy(r)
             and other not in byes
+            and other not in locked  # a bench player whose game started can't be swapped in
         ]
         if bench_fill:
             why = f"A starter who can't play scores zero. You have a healthy {position} on your bench who can step in."
@@ -290,6 +305,7 @@ def build_this_week(
     items: Iterable[Mapping[str, Any]],
     trade_records: list[Any] | None,
     stance: str = "",
+    locked_player_ids: Iterable[str] = (),
 ) -> dict[str, Any] | None:
     """The "This week" payload, or None when there is nothing real to show."""
 
@@ -299,7 +315,7 @@ def build_this_week(
     week = league_calendar.current_league_week(league)
     item_list = list(items)
     rows = [
-        _lineup_row(league, roster, roster_rows, bye_player_ids, week),
+        _lineup_row(league, roster, roster_rows, bye_player_ids, week, locked_player_ids),
         _waiver_row(item_list),
         _trade_row(item_list, trade_records, league_calendar.trade_deadline_passed(league), stance),
     ]
