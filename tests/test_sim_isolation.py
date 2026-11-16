@@ -223,9 +223,9 @@ def test_sim_only_addresses_sim_tables():
     from modules.sim import backend, game_store, store
 
     world_tables = {store.WORLDS, store.SNAPSHOTS, store.RESULTS}
-    game_tables = {game_store.GAMES, game_store.EVENTS, game_store.CHECKPOINTS}
+    game_tables = {game_store.GAMES, game_store.EVENTS, game_store.CHECKPOINTS, game_store.FREE_CLAIMS}
     assert world_tables == {"sim_worlds", "sim_snapshots", "sim_results"}
-    assert game_tables == {"sim_games", "sim_events", "sim_week_checkpoints"}
+    assert game_tables == {"sim_games", "sim_events", "sim_week_checkpoints", "sim_free_season_claims"}
     assert backend.ALLOWED_TABLES == world_tables | game_tables
     for name, tables in (("supabase_sim.sql", world_tables), ("supabase_sim_game.sql", game_tables)):
         sql = (REPO / "docs" / name).read_text().lower()

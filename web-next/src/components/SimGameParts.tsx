@@ -568,7 +568,7 @@ export function SimPreviewBanner({ preview }: { preview: SimGamePreview | null |
       {line ? (
         <AccentCard accent="var(--color-premium)" compact as="div">
           <div className="flex items-center gap-2">
-            <ToneBadge label="Free preview" color="var(--color-premium)" size="xs" />
+            <ToneBadge label="1 free season" color="var(--color-premium)" size="xs" />
             <p className="text-xs flex-1 min-w-0" data-testid="sim-preview-line" style={{ color: "var(--color-text-secondary)" }}>
               {line}
             </p>

@@ -660,9 +660,7 @@ def weekly_stats_ttl(season: int, week: int, now: time.struct_time | None = None
     if season_i > active:
         return WEEKLY_STATS_CURRENT_WEEK_TTL_SECONDS
     try:
-        from modules.trade_grade import estimate_nfl_week
-
-        nfl_week = estimate_nfl_week(date(current.tm_year, current.tm_mon, current.tm_mday))
+        nfl_week = season_clock.nfl_week(date(current.tm_year, current.tm_mon, current.tm_mday))
     except Exception:
         nfl_week = 0
     # Calendar estimate 0 = offseason (or post-season): every week is complete.

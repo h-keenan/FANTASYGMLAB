@@ -86,7 +86,7 @@ const home: SimHomeResponse = {
   league: { recent: [], spotlight: null },
 };
 
-const premiumBody = { ok: true, reason: "premium_required", is_premium: false, upsell: { title: "Keep your season going", body: "Pro unlocks the rest of the season." }, preview: { weeks_left: 0, paywall_week: 4, paywalled: true } };
+const premiumBody = { ok: true, reason: "premium_required", is_premium: false, upsell: { title: "Your free season is complete", body: "Pro unlocks more seasons, dynasty mode and mid-season starts." }, preview: { weeks_left: 0, paywall_week: 4, paywalled: true } };
 
 function openFirstGame() {
   return screen.findByRole("button", { name: /Open game/ }).then((b) => fireEvent.click(b));
@@ -269,10 +269,10 @@ describe("SimGameContent", () => {
     mocked.getSimGameOptions.mockResolvedValue(options({ is_premium: false, max_games: 1, preview: { weeks_left: 3, paywall_week: 4, paywalled: false } }));
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
     render(<SimGameContent />);
-    expect(await screen.findByTestId("new-game-block")).toHaveTextContent("Free includes 1 saved game");
+    expect(await screen.findByTestId("new-game-block")).toHaveTextContent("Free includes 1 season in 1 saved game");
     expect(screen.getByRole("button", { name: "New game" })).toBeDisabled();
     expect(screen.getByRole("link", { name: "Go Pro" })).toHaveAttribute("href", "/premium");
-    expect(screen.getByTestId("sim-preview-line")).toHaveTextContent("3 weeks left");
+    expect(screen.getByTestId("sim-preview-line")).toHaveTextContent("1 free season");
   });
 
   it("limit reached: names the count, offers Manage, and deleting from the hub frees New game immediately", async () => {
@@ -324,7 +324,7 @@ describe("SimGameContent", () => {
     expect(within(bar).getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
   });
 
-  it("Free past week 3: Advance becomes Go Pro, never calls the API, and reads still render", async () => {
+  it("Free season complete: Advance becomes Go Pro, never calls the API, and reads still render", async () => {
     mocked.getSimGameOptions.mockResolvedValue(options({ is_premium: false, max_games: 1, preview: { weeks_left: 0, paywall_week: 4, paywalled: true } }));
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
     mocked.getSimGame.mockResolvedValue({ ok: true, reason: "", game: game(), preview: { weeks_left: 0, paywall_week: 4, paywalled: true } });
@@ -334,7 +334,7 @@ describe("SimGameContent", () => {
     expect(screen.queryByRole("button", { name: /Advance to week/ })).not.toBeInTheDocument();
     await openTeamTab();
     expect(await screen.findByText("Quinn Back")).toBeInTheDocument();
-    expect(screen.getByTestId("sim-preview-line")).toHaveTextContent("paused at week 4");
+    expect(screen.getByTestId("sim-preview-line")).toHaveTextContent("free season is complete");
     expect(mocked.advanceSimGame).not.toHaveBeenCalled();
   });
 
@@ -346,7 +346,7 @@ describe("SimGameContent", () => {
     render(<SimGameContent />);
     await openFirstGame();
     fireEvent.click(await screen.findByRole("button", { name: /Advance to week 4/ }));
-    expect(await screen.findByTestId("sim-paywall")).toHaveTextContent("Pro unlocks the rest of the season.");
+    expect(await screen.findByTestId("sim-paywall")).toHaveTextContent("Pro unlocks more seasons");
     expect(mocked.advanceSimGame).toHaveBeenCalledWith("g1", 3);
     expect(screen.getByTestId("sim-home")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Keep looking around" }));

@@ -112,3 +112,36 @@ def test_every_season_definition_goes_through_the_clock():
         now = time.struct_time((d.year, d.month, d.day, 12, 0, 0, 0, 0, -1))
         assert sleeper.default_player_stats_season(now) == current == sc.current_season(d)
         assert sleeper.prior_player_stats_season(now) == current - 1
+
+
+@pytest.mark.parametrize(
+    "today,week",
+    [
+        (date(2026, 9, 9), 0),  # preseason
+        (date(2026, 9, 10), 1),  # Thursday kickoff
+        (date(2026, 9, 14), 1),  # Monday Night Football still week 1
+        (date(2026, 9, 15), 2),  # Tuesday rollover
+        (date(2026, 9, 16), 2),  # Wednesday (waiver day) agrees everywhere
+        (date(2026, 9, 17), 2),
+        (date(2027, 1, 5), 18),
+        (date(2027, 1, 11), 18),
+        (date(2027, 1, 12), 0),  # after week 18 MNF: post
+    ],
+)
+def test_one_week_clock_rolls_on_tuesday_with_eighteen_weeks(today, week):
+    assert sc.nfl_week(today) == week
+    assert sc.clock_from_calendar(today).week == (week or None)
+
+
+def test_rollover_weekday_is_one_constant(monkeypatch):
+    monkeypatch.setattr(sc, "WEEK_ROLLOVER_WEEKDAY", 3)  # owner picks Thursday
+    assert sc.nfl_week(date(2026, 9, 16)) == 1
+    assert sc.nfl_week(date(2026, 9, 17)) == 2
+
+
+def test_rollover_hour_is_eastern():
+    from datetime import datetime, timezone
+
+    # Tue 2026-09-15 08:00 UTC = 04:00 ET: still before the 06:00 ET rollover.
+    assert sc._clock_today(datetime(2026, 9, 15, 8, 0, tzinfo=timezone.utc)) == date(2026, 9, 14)
+    assert sc._clock_today(datetime(2026, 9, 15, 11, 0, tzinfo=timezone.utc)) == date(2026, 9, 15)

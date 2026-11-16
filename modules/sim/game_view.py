@@ -16,7 +16,7 @@ from modules.sim.game_engine import rank_teams, standing_rows
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
 from modules.sim import game_block as blockmod
-from modules.sim.game_types import PREVIEW_PAYWALL_WEEK, GameSnapshot, headshot_id
+from modules.sim.game_types import FREE_SEASONS, GameSettings, GameSnapshot, headshot_id
 from modules.sim.personas import PERSONAS
 from modules.sim.season_label import season_label, season_label_for_year
 from modules.sim.types import FLEX_SLOTS, is_pick_id
@@ -25,26 +25,33 @@ PAGE_MAX = 60
 SORTS = ("projection", "value", "overall", "adp", "age", "name", "last_week", "season")
 
 
-def preview_block(is_pro: bool, state: GameState | None) -> dict[str, Any] | None:
-    """Free-preview status. None for Pro."""
-
-    if is_pro:
-        return None
-    if state is None or state.status == "drafting":
-        left = PREVIEW_PAYWALL_WEEK - 1
-    elif state.status == "complete":
-        left = 0
-    else:
-        left = max(0, PREVIEW_PAYWALL_WEEK - state.week)
-    return {"weeks_left": left, "paywall_week": PREVIEW_PAYWALL_WEEK, "paywalled": left == 0 and bool(state) and state.status in ("in_season", "playoffs")}
-
-
 def paywalled(is_pro: bool, state: GameState) -> bool:
-    """Would a mutating call be refused for this caller right now?"""
+    """Would a mutating call be refused for this caller right now?
+
+    A Free account plays ONE full season (``FREE_SEASONS``): the draft, every week and the playoffs. What comes
+    after (the offseason and any later season) is Pro. Every gated route asks this one function."""
 
     if is_pro:
         return False
-    return state.status in ("in_season", "playoffs") and state.week >= PREVIEW_PAYWALL_WEEK
+    return state.status == "offseason" or state.season_no > FREE_SEASONS
+
+
+DEFAULT_SEASON_WEEKS = GameSettings().total_weeks  # legacy hint for older clients; ``paywalled`` is the truth
+
+
+def preview_block(is_pro: bool, state: GameState | None) -> dict[str, Any] | None:
+    """Free-season status. None for Pro.
+
+    ``free_season`` and ``paywalled`` are the contract. ``weeks_left`` / ``paywall_week`` stay (estimated from the
+    default season length) so a client built for the old "weeks 1-3" preview still parses the block."""
+
+    if is_pro:
+        return None
+    blocked = state is not None and paywalled(False, state)
+    played = 0 if state is None or state.status == "drafting" else max(0, state.week - 1)
+    done = blocked or (state is not None and state.status == "complete")
+    left = 0 if done else max(0, DEFAULT_SEASON_WEEKS - played)
+    return {"free_season": True, "weeks_left": left, "paywall_week": DEFAULT_SEASON_WEEKS + 1, "paywalled": blocked}
 
 
 # ------------------------------------------------------------------ players

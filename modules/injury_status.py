@@ -310,3 +310,137 @@ for _row in ROWS:
 
 def tone_keys() -> Iterable[str]:
     return TONE_BY_STATUS.keys()
+
+
+# --- free-text injury notes ----------------------------------------------------
+# The ONE reader for what an injury note / body-part string says about severity.
+# It used to be a substring scan ("torn", "acl") that priced "MRI rules out a
+# torn ACL" as season-ending. Matching is on whole tokens, per clause, with
+# negation ("no", "rules out", "negative for", "avoided", ...), hedging
+# ("possible", "suspected", "fears", ...) and an explicit "miss N weeks" read.
+
+
+@dataclass(frozen=True)
+class InjuryNoteRead:
+    """What the notes say. season_ending and possibly_season_ending are exclusive."""
+
+    season_ending: bool = False  # stated, unhedged, un-negated
+    possibly_season_ending: bool = False  # a severe term that is hedged, or a bare tear/rupture
+    surgery: bool = False
+    weeks_low: float | None = None  # explicit "miss N-M weeks"
+    weeks_high: float | None = None
+    negated: tuple[str, ...] = ()  # severe terms the note explicitly rules out
+
+    @property
+    def weeks_mid(self) -> float | None:
+        if self.weeks_low is None or self.weeks_high is None:
+            return None
+        return (self.weeks_low + self.weeks_high) / 2.0
+
+
+_SEVERE_TERMS = frozenset({"acl", "achilles"})
+_SEASON_PHRASES = (
+    ("season", "ending"),
+    ("out", "for", "the", "season"),
+    ("out", "for", "season"),
+    ("out", "for", "the", "year"),
+    ("out", "for", "year"),
+    ("rest", "of", "the", "season"),
+    ("rest", "of", "season"),
+    ("done", "for", "the", "season"),
+    ("done", "for", "the", "year"),
+)
+_TEAR_TERMS = frozenset({"torn", "tore", "tear", "tears", "rupture", "ruptured", "ruptures"})
+_MILD_MODIFIERS = frozenset({"partial", "partially", "minor", "slight", "mild", "small", "grade"})
+# token -> None (negates alone) or the token that must follow it ("free agent" never negates).
+_NEGATORS: dict[str, str | None] = {
+    "no": None, "not": None, "without": None, "never": None, "neither": None, "nor": None,
+    "avoid": None, "avoided": None, "avoids": None, "avoiding": None, "denies": None, "denied": None,
+    "isnt": None, "wasnt": None, "doesnt": None, "didnt": None, "dont": None, "unlikely": None,
+    "lacks": None, "excludes": None, "excluded": None,
+    "negative": "for", "free": "of", "cleared": "of", "clear": "of",
+    "rules": "out", "rule": "out", "ruled": "out", "ruling": "out",
+}
+_POST_NEGATORS = (("ruled", "out"), ("intact",), ("ok",), ("fine",))
+_HEDGES = frozenset({
+    "possible", "possibly", "potential", "potentially", "suspected", "suspect", "fear", "fears",
+    "feared", "fearing", "concern", "concerns", "concerned", "worried", "worry", "may", "might",
+    "could", "evaluate", "evaluated", "evaluation", "awaiting", "pending", "unconfirmed",
+    "undergo", "undergoing", "undergoes", "tbd", "if", "whether", "likely", "appears", "apparent",
+})
+_CONFIRMS = frozenset({"confirmed", "confirms", "confirm", "diagnosed", "diagnosis", "revealed", "reveals", "showed", "shows"})
+_CLAUSE_SPLIT = re.compile(r"[.;:!?,\n()]|\s[-–—]\s|\sbut\s|\showever\s|\sthough\s|\swhile\s")
+_WEEKS = re.compile(r"(\d+(?:\.\d+)?)\s*(?:(?:-|–|to)\s*(\d+(?:\.\d+)?))?\s*(?:\+\s*)?weeks?\b")
+_APOSTROPHE = re.compile(r"['’]")
+
+
+def _clause_tokens(clause: str) -> tuple[str, ...]:
+    return tuple(_TOKEN.findall(_APOSTROPHE.sub("", clause)))
+
+
+def _negated(tokens: tuple[str, ...], start: int, end: int) -> bool:
+    """Is the term at tokens[start:end] negated by a nearby cue in its clause?"""
+
+    for i in range(max(0, start - 5), start):
+        if tokens[i] not in _NEGATORS:
+            continue
+        need = _NEGATORS[tokens[i]]
+        # A pair cue must be complete before the term: "ruled out for the season"
+        # is not negation because "out" belongs to the term's own phrase.
+        if need is None or (i + 1 < start and tokens[i + 1] == need):
+            return True
+    tail = tokens[end : end + 4]
+    return any(_contains_phrase(tail, phrase) for phrase in _POST_NEGATORS)
+
+
+def read_injury_notes(*texts: Any) -> InjuryNoteRead:
+    """Severity evidence in free text (body part, notes, ...); never raises."""
+
+    season_ending = possible = surgery = False
+    negated: list[str] = []
+    low = high = None
+    for raw in texts:
+        text = _norm(raw)
+        if not text:
+            continue
+        for match in _WEEKS.finditer(text):
+            a = float(match.group(1))
+            b = float(match.group(2)) if match.group(2) else a
+            lo, hi = (a, b) if a <= b else (b, a)
+            low = lo if low is None else min(low, lo)
+            high = hi if high is None else max(high, hi)
+        for clause in _CLAUSE_SPLIT.split(text):
+            tokens = _clause_tokens(clause)
+            if not tokens:
+                continue
+            hedged = any(t in _HEDGES for t in tokens) and not any(t in _CONFIRMS for t in tokens)
+            hits: list[tuple[str, int, int, bool]] = []  # (term, start, end, strong)
+            for i, tok in enumerate(tokens):
+                if tok in _SEVERE_TERMS:
+                    hits.append((tok, i, i + 1, True))
+                elif tok in _TEAR_TERMS:
+                    around = tokens[max(0, i - 2) : i + 3]
+                    mild = any(t in _MILD_MODIFIERS for t in tokens[max(0, i - 2) : i + 1])
+                    # "torn ACL" is judged by the ACL token; a bare tear is only a weak signal.
+                    if not mild and not any(t in _SEVERE_TERMS for t in around):
+                        hits.append((tok, i, i + 1, False))
+            for phrase in _SEASON_PHRASES:
+                n = len(phrase)
+                for i in range(len(tokens) - n + 1):
+                    if tokens[i : i + n] == phrase:
+                        hits.append((" ".join(phrase), i, i + n, True))
+            for term, start, end, strong in hits:
+                if _negated(tokens, start, end):
+                    negated.append(term)
+                elif strong and not hedged:
+                    season_ending = True
+                else:
+                    possible = True
+            for word in ("surgery", "surgical"):
+                if word in tokens:
+                    i = tokens.index(word)
+                    if not _negated(tokens, i, i + 1):
+                        surgery = True
+    if season_ending:
+        possible = False
+    return InjuryNoteRead(season_ending, possible, surgery, low, high, tuple(dict.fromkeys(negated)))

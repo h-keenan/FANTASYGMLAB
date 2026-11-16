@@ -7,7 +7,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from modules import trade_analyzer_fit, trade_grade, trade_ideas, trade_offer_analyzer
+from modules import season_clock, trade_analyzer_fit, trade_grade, trade_ideas, trade_offer_analyzer
 
 IN_SEASON = trade_grade.SeasonWindow(current_week=7, remaining_weeks=11, in_season=True, source="league")
 OFFSEASON = trade_grade.SeasonWindow(current_week=0, remaining_weeks=17, in_season=False, source="league")
@@ -20,16 +20,18 @@ OFFSEASON = trade_grade.SeasonWindow(current_week=0, remaining_weeks=17, in_seas
     ("today", "week"),
     (
         (date(2026, 7, 30), 0),
-        (date(2026, 9, 8), 1),
+        (date(2026, 9, 9), 0),
+        (date(2026, 9, 10), 1),
         (date(2026, 9, 14), 1),
         (date(2026, 9, 15), 2),
         (date(2026, 10, 21), 7),
         (date(2026, 12, 29), 17),
-        (date(2027, 1, 5), 0),
+        (date(2027, 1, 5), 18),
+        (date(2027, 1, 12), 0),
     ),
 )
 def test_calendar_week_estimate(today, week):
-    assert trade_grade.estimate_nfl_week(today) == week
+    assert season_clock.nfl_week(today) == week
 
 
 def test_league_week_overrides_the_calendar():

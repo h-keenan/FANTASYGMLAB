@@ -128,8 +128,8 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'GmGame'>;
 
 const UPSELL_FALLBACK = {
-  title: 'Keep your season going with Pro',
-  body: 'The draft and your first 3 weeks are free. Pro unlocks the rest of the season, the playoffs and your final grade. Your save picks up right where you stopped.',
+  title: 'Your free season is complete',
+  body: 'Fantasy Sim is free for 1 season: the draft, every week, the playoffs and your final grade. Pro unlocks more seasons, dynasty mode and mid-season starts.',
 };
 
 type FlowState = typeof SIM_FLOW_INITIAL;
@@ -684,7 +684,7 @@ export default function GmGameScreen({ navigation }: Props) {
   }
 
   // hub
-  const block = simNewGameBlock(games.length, options?.max_games ?? 1, options?.is_premium);
+  const block = simNewGameBlock(games.length, options?.max_games ?? 1, options?.is_premium, options?.free_season_used);
   return shell(
     <>
       <SimPreviewBanner preview={preview} />

@@ -61,16 +61,18 @@ The three adjustments, all in the same value units as the scores:
    defaults per status, and the explanation always says it is an estimate:
    Questionable 0.25, Doubtful 1, Out 2, IR / PUP / NFI 4 (the NFL minimum
    stay), and Suspended 3 (Sleeper does not report the length). An
-   `injury_body_part` or `injury_notes` that reads season-ending (ACL,
-   Achilles, torn, rupture, season-ending) charges the rest of the season,
-   and "surgery" raises the estimate to at least 6 weeks. "NA" stays healthy
+   `injury_body_part` or `injury_notes` that states a season-ending injury
+   (ACL, Achilles, season-ending; read by `injury_status.read_injury_notes`,
+   which understands negation such as "MRI rules out a torn ACL") charges
+   the rest of the season. A hedged or bare "torn/rupture" is priced as an
+   unconfirmed range, an explicit "miss N weeks" is used as written, and
+   "surgery" raises the estimate to at least 6 weeks. "NA" stays healthy
    (#1295), and "Sus" goes through the suspension default rather than the
    generic minor bucket (#1302).
 
    The season week is `league_settings["current_week"]` when a caller
-   provides it. Otherwise it is estimated from the calendar: week 1 starts
-   the Tuesday after Labor Day. Both Hub and the Analyzer use the same rule,
-   so they agree on any given day.
+   provides it. Otherwise it comes from `modules.season_clock.nfl_week`, the
+   one product clock (rollover day in `season_clock.WEEK_ROLLOVER_WEEKDAY`).
 """
 
 from __future__ import annotations
@@ -83,7 +85,7 @@ from typing import Any, Iterable, Mapping, Sequence
 import pandas as pd
 
 from modules import injury_status as injury_table
-from modules import model_status
+from modules import model_status, season_clock
 from modules.frame_records import frame_records
 from modules.player_state_authority import is_suspended
 from modules.rankings import (
@@ -220,24 +222,6 @@ class SeasonWindow:
     source: str  # "league" | "calendar"
 
 
-def _labor_day(year: int) -> date:
-    first = date(year, 9, 1)
-    return first + timedelta(days=(7 - first.weekday()) % 7)
-
-
-def estimate_nfl_week(today: date | None = None) -> int:
-    """Calendar estimate of the NFL week (0 = offseason/preseason)."""
-
-    today = today or datetime.now(timezone.utc).date()
-    start = _labor_day(today.year) + timedelta(days=1)
-    if today < start:
-        # January playoffs belong to the previous season, past every
-        # fantasy week, so they read as offseason too.
-        return 0
-    week = (today - start).days // 7 + 1
-    return week if week <= FANTASY_SEASON_WEEKS else 0
-
-
 def season_window(
     league_settings: Mapping[str, Any] | None = None,
     *,
@@ -251,7 +235,7 @@ def season_window(
     except (TypeError, ValueError):
         week = None
     if week is None:
-        week = estimate_nfl_week(today)
+        week = season_clock.nfl_week(today)
         source = "calendar"
     if week <= 0 or week > FANTASY_SEASON_WEEKS:
         return SeasonWindow(0, FANTASY_SEASON_WEEKS, False, source)
@@ -267,16 +251,6 @@ def season_window(
 # 1 - P(plays), the same fact the projections use as a play probability.
 INJURY_STATUS_DEFAULT_WEEKS: dict[str, float] = injury_table.default_weeks_by_key()
 SURGERY_MIN_WEEKS = 6.0
-SEASON_ENDING_TERMS = (
-    "acl",
-    "achilles",
-    "season-ending",
-    "season ending",
-    "out for season",
-    "out for the season",
-    "torn",
-    "rupture",
-)
 
 INJURY_POSTURE_WEIGHTS: dict[str, float] = {
     "contender": 0.95,
@@ -296,6 +270,11 @@ class InjuryAbsence:
     weeks: float
     season_ending: bool
     basis: str
+    # Unconfirmed severity: the notes hint at something season-ending that they do not
+    # establish. `weeks` is then the midpoint and the honest answer is the range.
+    unconfirmed: bool = False
+    weeks_low: float | None = None
+    weeks_high: float | None = None
 
 
 def _text(value: Any) -> str:
@@ -336,16 +315,41 @@ def estimate_injury_absence(
     )
     weeks = cls.weeks_out
     basis = f"default for {label}"
-    detail = " ".join(_text(part).casefold() for part in (body_part, notes, injury_text))
     window = window or season_window()
-    season_ending = not suspended and any(term in detail for term in SEASON_ENDING_TERMS)
+    read = injury_table.read_injury_notes(body_part, notes, injury_text)
+    remaining = float(window.remaining_weeks)
+    season_ending = not suspended and read.season_ending
+    unconfirmed = False
+    low = high = None
     if season_ending:
-        weeks = float(window.remaining_weeks)
+        weeks = remaining
         basis = f"{_text(body_part) or 'injury'} reads season-ending"
-    elif "surgery" in detail and weeks < SURGERY_MIN_WEEKS:
+    elif suspended:
+        pass
+    elif read.weeks_mid is not None:
+        weeks = min(read.weeks_mid, remaining)
+        low, high = min(read.weeks_low, remaining), min(read.weeks_high, remaining)
+        basis = f"notes say {_weeks_range_text(read.weeks_low, read.weeks_high)}"
+    elif read.possibly_season_ending:
+        unconfirmed = True
+        low, high = float(weeks), max(float(weeks), remaining)
+        weeks = (low + high) / 2.0
+        basis = f"{_text(body_part) or 'injury'} possibly season-ending, unconfirmed"
+    elif read.surgery and weeks < SURGERY_MIN_WEEKS:
         weeks = SURGERY_MIN_WEEKS
         basis = "surgery noted"
-    return InjuryAbsence(status_label=label, weeks=float(weeks), season_ending=season_ending, basis=basis)
+    return InjuryAbsence(
+        status_label=label, weeks=float(weeks), season_ending=season_ending, basis=basis,
+        unconfirmed=unconfirmed, weeks_low=low, weeks_high=high,
+    )
+
+
+def _weeks_range_text(low: float, high: float) -> str:
+    def fmt(v: float) -> str:
+        return str(int(v)) if float(v).is_integer() else f"{v:g}"
+
+    unit = "week" if high == 1 else "weeks"
+    return f"{fmt(low)} {unit}" if low == high else f"{fmt(low)}-{fmt(high)} weeks"
 
 
 def _number(value: Any, default: float) -> float:
@@ -456,11 +460,15 @@ class InjuryLine:
         return self.healthy_value - self.cost
 
     def note(self, strategy: str, window: SeasonWindow) -> str:
-        timing = (
-            f"{_weeks_text(self.absence.weeks)} estimated"
-            if not self.absence.season_ending
-            else "likely out for the rest of the season"
-        )
+        if self.absence.season_ending:
+            timing = "likely out for the rest of the season"
+        elif self.absence.unconfirmed:
+            timing = (
+                f"possibly season-ending, unconfirmed (priced between "
+                f"{_weeks_text(self.absence.weeks_low or 0)} and {_weeks_text(self.absence.weeks_high or 0)})"
+            )
+        else:
+            timing = f"{_weeks_text(self.absence.weeks)} estimated"
         when = (
             f"{window.remaining_weeks} fantasy weeks left"
             if window.in_season

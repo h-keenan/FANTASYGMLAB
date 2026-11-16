@@ -424,7 +424,7 @@ export function SimPreviewBanner({ preview }: { preview: SimGamePreview | null |
       {line ? (
         <AccentCard accent={colors.premium} compact>
           <View style={styles.previewRow}>
-            <ToneBadge label="Free preview" color={colors.premium} size="xs" />
+            <ToneBadge label="1 free season" color={colors.premium} size="xs" />
             <AppText style={styles.previewText} testID="sim-preview-line">
               {line}
             </AppText>

@@ -339,14 +339,17 @@ or other user's game / malformed id; 422 bad input `{"ok": false, "error"}`; 503
 
 - Every body carries `"ok"`, `"reason"` (`""` on success), `"is_premium"`,
   `"upsell"` (null unless a paywall reason), and `"preview"`:
-  `null` for Pro, else `{"weeks_left": n, "paywall_week": 4, "paywalled": bool}`.
-- **Pro gate + free preview.** Pro: up to 3 games. Free: 1 game; the draft and
-  advancing weeks 1-3 work; from week 4 every mutating call (advance, lineup,
-  waivers, cut, trades, inbox respond, revert) answers 200
-  `reason: "premium_required"`, `upsell`, `preview.paywalled: true`. Reads
-  (`GET`) always work, so the paused season stays viewable. After upgrading the
-  same save resumes at week 4. `weeks_left = max(0, 4 - current_week)` once the
-  season started, 3 during the draft.
+  `null` for Pro, else `{"free_season": true, "paywalled": bool, "weeks_left": n, "paywall_week": n}` (the last two are
+  only an estimate, kept for older clients).
+- **Pro gate + one free season.** Pro: up to 3 games. Free: ONE full season, per account: the draft, every week, the
+  playoffs and the final grade. More seasons (the dynasty offseason and later seasons), dynasty mode and a start from
+  the league's current week need Pro: those starts answer `premium_required` with the "That start is a Pro feature"
+  upsell and create nothing. Once a Free save reaches the offseason, every write (advance, lineup, waivers, cut,
+  trades, `trades/preview`, inbox respond, revert, `undo-sim`) answers 200 `reason: "premium_required"`, `upsell`,
+  `preview.paywalled: true`. Reads (`GET`) always work. After upgrading the same save resumes. The allowance is the
+  row in `sim_free_season_claims` (insert-only, survives deleting the game), so delete-and-recreate does not restart it;
+  `GET /games/options` reports `free_season_used`. The game cap is enforced in the database: each save takes a
+  `sim_games.slot` (unique per user), so two simultaneous creates cannot both fit under the cap.
 - HTTP 409 `{"ok": false, "reason": "conflict"}` when two writes raced on the
   same game; reload and retry. Writes are all-or-nothing.
 - Small mutating calls (lineup, lineup/auto, waivers, cut, roster/move, trades,
@@ -360,7 +363,7 @@ or other user's game / malformed id; 422 bad input `{"ok": false, "error"}`; 503
 ### Extra `reason` codes (games)
 | reason | meaning |
 | --- | --- |
-| `premium_required` | Free caller past the preview (or no Pro for a 2nd game: `game_limit_reached`) |
+| `premium_required` | Free caller past their one free season, or asking for dynasty / a current-point start (a 2nd game: `game_limit_reached`) |
 | `game_limit_reached` | 1 game (Free) / 3 games (Pro); body has `max_games` |
 | `players_unavailable` | the player pool could not be built |
 | `wrong_phase` | e.g. draft call after the draft, lineup call during the draft; body has `phase` |
@@ -467,8 +470,8 @@ behaviour above, never serialized) plays a new 14-week season from week 1. `"cur
   pairing), `played_weeks_unavailable:<w,..>` (a played week Sleeper did not return: absent from results, the league's own
   record still applies), `records_unavailable` (no league records: the standings are summed from the played weeks),
   `lineups_auto_set:<n>` (a real lineup that does not fit the game's slots, or is incomplete, is auto-set for that team).
-- **Free accounts** are paywalled from week 4 (`PREVIEW_PAYWALL_WEEK`), so a current-point start at week 4+ answers
-  `premium_required` instead of creating a game that opens already paywalled.
+- **Free accounts** cannot start from the league's current point at all (a Pro feature): it answers `premium_required`
+  before any league data is read.
 - **Approximations:** bye-week players and in-progress games of week N are not read (week N is simulated whole);
   waiver priority/FAAB balances and pending claims are not read (priority follows the standings, claims start empty);
   IDP and median-game scoring are not modeled (the league's record still counts them); the playoff bracket is the
