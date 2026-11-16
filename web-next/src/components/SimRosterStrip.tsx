@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 
-import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
+import { Collapse } from "@/components/ui/Presence";
 import { PositionBadge } from "@/components/PositionBadge";
 import { simDraftRosterStrip } from "@/lib/simDraft";
 import { simHeadshotId, type SimGamePlayer, type SimSlot } from "@/lib/simGame";
 
-const AVATAR = 28;
+const AVATAR = 28; // the dense avatar tier
 
 /**
  * "Your roster" inside the draft clock: the league's starting slots in order, filled slots show the drafted player (tap
@@ -32,15 +33,15 @@ export function SimRosterStrip({ roster, slots, rosterLimit, bench, onOpen }: { 
         {strip.slots.map((cell) => (
           <li key={cell.key} className="flex flex-col items-center gap-0.5" style={{ width: 36 }} data-testid={cell.player ? "roster-slot-filled" : "roster-slot-empty"} data-need={cell.need ? "true" : undefined}>
             {cell.player ? (
-              <button type="button" onClick={() => onOpen(cell.player!)} aria-label={`${cell.label}: ${cell.player.name}, ${cell.player.pos}. Open player`} className="flex flex-col items-center gap-0.5" style={{ color: "inherit", minHeight: "var(--touch-target-min)" }}>
-                <PlayerAvatar playerId={simHeadshotId(cell.player)} size={AVATAR} fallbackLabel={cell.player.name.trim().slice(0, 1)} />
+              <div className="flex flex-col items-center gap-0.5" aria-label={`${cell.label}: ${cell.player.name}, ${cell.player.pos}`}>
+                <PlayerAvatarSlot player={{ id: cell.player.id, name: cell.player.name, position: cell.player.pos, team: cell.player.team ?? null, headshotId: simHeadshotId(cell.player) }} tier="dense" onOpen={() => onOpen(cell.player!)} />
                 <PositionBadge position={cell.player.pos} />
-              </button>
+              </div>
             ) : (
               <button type="button" onClick={toggle} aria-label={`${cell.label} slot empty${cell.need ? ", you need one" : ""}`} className="flex flex-col items-center gap-0.5" style={{ color: "inherit", minHeight: "var(--touch-target-min)" }}>
                 <span
                   aria-hidden="true"
-                  className="flex items-center justify-center text-[0.625rem] font-extrabold"
+                  className="flex items-center justify-center text-[0.6875rem] font-extrabold"
                   style={{
                     width: AVATAR,
                     height: AVATAR,
@@ -51,14 +52,14 @@ export function SimRosterStrip({ roster, slots, rosterLimit, bench, onOpen }: { 
                 >
                   +
                 </span>
-                <span className="text-[0.625rem] font-extrabold" style={{ color: cell.need ? "var(--color-warning)" : "var(--color-text-muted)" }}>{cell.label}</span>
+                <span className="text-[0.6875rem] font-extrabold" style={{ color: cell.need ? "var(--color-warning)" : "var(--color-text-muted)" }}>{cell.label}</span>
               </button>
             )}
           </li>
         ))}
       </ul>
-      {open ? (
-        <div className="flex flex-col gap-2 enter-rise" data-testid="roster-strip-full">
+      <Collapse open={open} testId="roster-strip-full">
+        <div className="flex flex-col gap-2">
           {strip.groups.map((g) => (
             <section key={g.pos} aria-label={`${g.pos} players`} className="flex flex-col gap-1">
               <p className="text-xs font-extrabold" style={{ color: g.starters > 0 && g.have < g.starters ? "var(--color-warning)" : "var(--color-text-muted)" }}>
@@ -68,17 +69,17 @@ export function SimRosterStrip({ roster, slots, rosterLimit, bench, onOpen }: { 
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>None yet</p>
               ) : (
                 g.players.map((pl) => (
-                  <button key={pl.id} type="button" onClick={() => onOpen(pl)} className="flex items-center gap-2 text-left" style={{ minHeight: "var(--touch-target-min)", color: "inherit" }} data-testid="roster-strip-player">
-                    <PlayerAvatar playerId={simHeadshotId(pl)} size={AVATAR} fallbackLabel={pl.name.trim().slice(0, 1)} />
+                  <div key={pl.id} className="flex items-center gap-2" data-testid="roster-strip-player">
+                    <PlayerAvatarSlot player={{ id: pl.id, name: pl.name, position: pl.pos, team: pl.team ?? null, headshotId: simHeadshotId(pl) }} tier="dense" onOpen={() => onOpen(pl)} />
                     <span className="min-w-0 flex-1 break-words text-sm font-bold">{pl.name}</span>
                     <PositionBadge position={pl.pos} />
-                  </button>
+                  </div>
                 ))
               )}
             </section>
           ))}
         </div>
-      ) : null}
+      </Collapse>
     </div>
   );
 }

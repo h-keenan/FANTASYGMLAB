@@ -2,9 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
-import PlayerAvatar from './PlayerAvatar';
+import PlayerAvatarSlot from './PlayerAvatarSlot';
 import PositionBadge from './PositionBadge';
-import { MotionIn } from './Motion';
+import { Collapse } from './Presence';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { simDraftRosterStrip } from '../lib/simDraft';
 import { simHeadshotId, type SimGamePlayer, type SimSlot } from '../lib/simGame';
@@ -34,10 +34,10 @@ export function SimRosterStrip({ roster, slots, rosterLimit, bench, onOpen }: { 
       <View style={styles.slots} testID="roster-strip-slots">
         {strip.slots.map((cell) =>
           cell.player ? (
-            <Pressable key={cell.key} onPress={() => onOpen(cell.player!)} accessibilityRole="button" accessibilityLabel={`${cell.label}: ${cell.player.name}, ${cell.player.pos}. Open player`} style={styles.cell} testID="roster-slot-filled">
-              <PlayerAvatar playerId={simHeadshotId(cell.player)} size={AVATAR} fallbackLabel={cell.player.name.trim().slice(0, 1)} />
+            <View key={cell.key} style={styles.cell} accessibilityLabel={`${cell.label}: ${cell.player.name}, ${cell.player.pos}`} testID="roster-slot-filled">
+              <PlayerAvatarSlot player={{ id: cell.player.id, name: cell.player.name, position: cell.player.pos, team: cell.player.team ?? null, headshotId: simHeadshotId(cell.player) }} tier="dense" onOpen={() => onOpen(cell.player!)} />
               <PositionBadge position={cell.player.pos} />
-            </Pressable>
+            </View>
           ) : (
             <Pressable key={cell.key} onPress={toggle} accessibilityRole="button" accessibilityLabel={`${cell.label} slot empty${cell.need ? ', you need one' : ''}`} style={styles.cell} testID="roster-slot-empty">
               <View style={[styles.empty, { borderColor: cell.need ? colors.warning : colors.border }]}>
@@ -48,8 +48,8 @@ export function SimRosterStrip({ roster, slots, rosterLimit, bench, onOpen }: { 
           ),
         )}
       </View>
-      {open ? (
-        <MotionIn>
+      <Collapse open={open}>
+        <>
           <View style={styles.full} testID="roster-strip-full">
             {strip.groups.map((g) => (
               <View key={g.pos} style={styles.group}>
@@ -58,18 +58,18 @@ export function SimRosterStrip({ roster, slots, rosterLimit, bench, onOpen }: { 
                   <AppText style={styles.none}>None yet</AppText>
                 ) : (
                   g.players.map((pl) => (
-                    <Pressable key={pl.id} onPress={() => onOpen(pl)} accessibilityRole="button" accessibilityLabel={`${pl.name}, ${pl.pos}. Open player`} style={styles.line} testID="roster-strip-player">
-                      <PlayerAvatar playerId={simHeadshotId(pl)} size={AVATAR} fallbackLabel={pl.name.trim().slice(0, 1)} />
+                    <View key={pl.id} style={styles.line} testID="roster-strip-player">
+                      <PlayerAvatarSlot player={{ id: pl.id, name: pl.name, position: pl.pos, team: pl.team ?? null, headshotId: simHeadshotId(pl) }} tier="dense" onOpen={() => onOpen(pl)} />
                       <AppText style={styles.name}>{pl.name}</AppText>
                       <PositionBadge position={pl.pos} />
-                    </Pressable>
+                    </View>
                   ))
                 )}
               </View>
             ))}
           </View>
-        </MotionIn>
-      ) : null}
+        </>
+      </Collapse>
     </View>
   );
 }
@@ -84,7 +84,7 @@ function createStyles(colors: ThemeColors) {
     cell: { width: 36, minHeight: 44, alignItems: 'center', gap: 2 },
     empty: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
     plus: { fontSize: 12, fontWeight: '800' },
-    slotLabel: { fontSize: 10, fontWeight: '800' },
+    slotLabel: { fontSize: 12, fontWeight: '800' },
     full: { gap: spacing.sm },
     group: { gap: 4 },
     groupHead: { fontSize: 12, fontWeight: '800' },
