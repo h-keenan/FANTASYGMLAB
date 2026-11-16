@@ -408,6 +408,24 @@ export function simWithout<T extends { id: string }>(items: readonly T[], id: st
   return items.some((i) => i.id === id) ? items.filter((i) => i.id !== id) : (items as T[]);
 }
 
+/** A trade offer that was just answered: kept in the list for a beat (`simKeepResolved`) so its card can collapse into a "Trade done" / "Declined" row. */
+export interface SimResolvedOffer<T> {
+  item: T;
+  kind: "accepted" | "declined";
+  index: number;
+}
+
+/** The server's `items` with each still-resolving offer put back at its old position (unless the server still lists it). */
+export function simKeepResolved<T extends { id: string }>(items: readonly T[], resolved: Readonly<Record<string, SimResolvedOffer<T>>>): T[] {
+  const out = [...items];
+  const ids = new Set(out.map((i) => i.id));
+  const pending = Object.values(resolved)
+    .filter((r) => !ids.has(r.item.id))
+    .sort((a, b) => a.index - b.index);
+  for (const r of pending) out.splice(Math.min(r.index, out.length), 0, r.item);
+  return out;
+}
+
 /** A claim shown the instant the user taps Queue; the server's list replaces it when the call returns. */
 export function simOptimisticClaim(add: SimGamePlayer, drop: SimGamePlayer | null, startSlot: SimSlot | null): SimWaiverClaim {
   return { id: `pending-${add.id}`, add, drop, start_slot: startSlot };

@@ -4728,6 +4728,7 @@ main > header:has(> h1.sr-only:only-child) {
 .rank-chip { display: inline-flex; align-items: center; font-size: 0.6875rem; font-weight: 800; line-height: 1; padding: 0.125rem 0.3rem; border-radius: var(--radius-pill); animation: rank-chip-in var(--motion-base) var(--ease-out) both; }
 .rank-chip[data-dir="up"] { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 16%, transparent); }
 .rank-chip[data-dir="down"] { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 16%, transparent); }
+.rank-chip[data-dir="accent"] { color: var(--color-accent); background: var(--color-accent-soft); }
 @keyframes rank-chip-in { from { opacity: 0; transform: translateY(4px) scale(0.9); } to { opacity: 1; transform: none; } }
 .success-check { display: inline-flex; color: var(--color-success); animation: motion-success var(--motion-slow) var(--ease-out) both; }
 .success-check-ring { stroke-opacity: 0.35; }

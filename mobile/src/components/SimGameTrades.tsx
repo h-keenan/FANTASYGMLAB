@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useReducer, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -61,11 +61,14 @@ import {
   type SimPickAsset,
   type SimTradeAsset,
   type SimTradeVerdict,
+  simKeepResolved,
   simWithout,
+  type SimResolvedOffer,
 } from '../lib/simGame';
 import type { ThemeColors } from '../theme';
 import { playerSurname } from '../lib/playerNameDisplay';
-import { Collapse } from './Presence';
+import { Collapse, PresenceList, PresenceSwap } from './Presence';
+import TradeResolvedRow from './TradeResolvedRow';
 
 /** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
 function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
@@ -97,6 +100,9 @@ function PlayerList({ players }: { players: SimTradeAsset[] }) {
   );
 }
 
+/** How long an answered offer stays as its "Trade done" / "Declined" row before it collapses away. */
+const SIM_RESOLVED_LINGER_MS = 2000;
+
 /** AI-proposed offers: accept or decline. They expire when the week advances. */
 function Inbox({ ctx }: { ctx: SimCtx }) {
   const { gameId, call } = ctx;
@@ -107,6 +113,27 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
   const [failed, setFailed] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // Answered offers stay in the list a beat so the card can collapse into a "Trade done" / "Declined" row (motion audit).
+  const [resolved, setResolved] = useState<Record<string, SimResolvedOffer<SimInboxItem>>>({});
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => timers.current.forEach((t) => clearTimeout(t)), []);
+  function settleOffer(item: SimInboxItem, kind: 'accepted' | 'declined', index: number) {
+    setResolved((prev) => ({ ...prev, [item.id]: { item, kind, index } }));
+    timers.current.push(
+      setTimeout(() => {
+        setResolved((prev) => {
+          const { [item.id]: _gone, ...rest } = prev;
+          return rest;
+        });
+      }, SIM_RESOLVED_LINGER_MS),
+    );
+  }
+  function unsettleOffer(id: string) {
+    setResolved((prev) => {
+      const { [id]: _gone, ...rest } = prev;
+      return rest;
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -125,15 +152,21 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
 
   async function respond(item: SimInboxItem, action: 'accept' | 'decline') {
     setBusyId(item.id);
-    if (action === 'decline') setItems((prev) => (prev ? simWithout(prev, item.id) : prev)); // optimistic: a decline cannot fail the rules
+    const at = Math.max(0, (items ?? []).findIndex((i) => i.id === item.id));
+    if (action === 'decline') {
+      setItems((prev) => (prev ? simWithout(prev, item.id) : prev)); // optimistic: a decline cannot fail the rules
+      settleOffer(item, 'declined', at);
+    }
     const body = await call(() => api.respondSimInbox(gameId, item.id, action));
     setBusyId(null);
     if (body) {
+      if (action === 'accept') settleOffer(item, body.executed ? 'accepted' : 'declined', at);
       setItems(body.items ?? []);
       ctx.notify(action === 'accept' && body.executed ? `Trade done with ${item.from.name}.` : `Declined ${item.from.name}'s offer.`, action === 'accept' ? 'success' : 'muted');
       ctx.bump();
       void ctx.reloadGame();
     } else {
+      unsettleOffer(item.id);
       // offer_invalid and friends: refresh the list so the stale card goes away.
       api
         .getSimInbox(gameId)
@@ -155,26 +188,37 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
     );
   }
   if (!items) return <SkeletonCard rows={4} />;
-  if (items.length === 0) {
+  const shown = simKeepResolved(items, resolved);
+  if (shown.length === 0) {
     return <EmptyState icon="mail-outline" title="No offers right now" subtitle="AI managers send at most a few offers a week. They show up here and expire when you advance." />;
   }
   return (
     <View style={common.stack} accessibilityLabel="Trade offers">
-      {items.map((item, index) => (
-        <MotionIn key={item.id} index={index} count={items.length}><OfferCard item={item} defaultOpen={index === 0} busy={busyId === item.id} canTrade={Boolean(ctx.game.can_trade)} onRespond={respond} /></MotionIn>
-      ))}
+      <PresenceList
+        items={shown}
+        getKey={(item) => item.id}
+        render={(item, index) => (
+          <MotionIn index={index} count={shown.length}><OfferCard item={item} defaultOpen={index === 0} busy={busyId === item.id} canTrade={Boolean(ctx.game.can_trade)} resolved={resolved[item.id]?.kind ?? null} onRespond={respond} /></MotionIn>
+        )}
+      />
     </View>
   );
 }
 
 /** One AI offer as a compact card: who, what moves and when it expires; tap to expand the players and the Accept / Decline buttons. */
-function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: SimInboxItem; defaultOpen: boolean; busy: boolean; canTrade: boolean; onRespond: (item: SimInboxItem, action: 'accept' | 'decline') => void }) {
+function OfferCard({ item, defaultOpen, busy, canTrade, resolved, onRespond }: { item: SimInboxItem; defaultOpen: boolean; busy: boolean; canTrade: boolean; resolved: 'accepted' | 'declined' | null; onRespond: (item: SimInboxItem, action: 'accept' | 'decline') => void }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [open, setOpen] = useState(defaultOpen);
   const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : playerSurname(p.name))).join(', ');
   return (
     <FadeInView>
+      <PresenceSwap swapKey={resolved ?? 'open'}>
+      {resolved ? (
+        <AccentCard accent={resolved === 'accepted' ? colors.success : colors.glassBorder} compact>
+          <TradeResolvedRow kind={resolved} label={resolved === 'accepted' ? `Trade done with ${item.from.name}` : `Declined ${item.from.name}'s offer`} />
+        </AccentCard>
+      ) : (
       <AccentCard accent={colors.accent} compact>
         <Pressable
           onPress={() => setOpen((v) => !v)}
@@ -218,6 +262,8 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
           </View>
         </Collapse>
       </AccentCard>
+      )}
+      </PresenceSwap>
     </FadeInView>
   );
 }

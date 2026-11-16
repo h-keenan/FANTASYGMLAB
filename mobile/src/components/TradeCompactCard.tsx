@@ -11,7 +11,8 @@ import FairnessMeterRow from './FairnessMeterRow';
 import { SkeletonTradeCard } from './Skeleton';
 import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from '../lib/playerAnatomy';
 import { radii, spacing, type ThemeColors } from '../theme';
-import { Collapse } from './Presence';
+import { Collapse, PresenceSwap } from './Presence';
+import TradeResolvedRow from './TradeResolvedRow';
 
 export interface TradeCardAsset {
   key: string;
@@ -82,6 +83,7 @@ export default function TradeCompactCard({
   getLabel = 'You get',
   testID = 'trade-compact-card',
   meter: meterOverride,
+  resolved,
 }: {
   title: ReactNode;
   give: TradeCardAsset[];
@@ -98,6 +100,8 @@ export default function TradeCompactCard({
   testID?: string;
   /** Replaces the computed fairness meter; null hides it (a card whose verdict is stated elsewhere, e.g. their counter). */
   meter?: FairnessMeter | null;
+  /** The card was answered (accepted / declined): it collapses into one `TradeResolvedRow` instead of vanishing. */
+  resolved?: { kind: 'accepted' | 'declined'; label: string } | null;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -115,6 +119,8 @@ export default function TradeCompactCard({
   );
   return (
     <View style={styles.card} testID={testID}>
+      <PresenceSwap swapKey={resolved ? 'resolved' : 'open'} style={{ gap: spacing.sm }}>
+      {resolved ? <TradeResolvedRow kind={resolved.kind} label={resolved.label} /> : <>
       <View>{typeof title === 'string' ? <AppText style={styles.title}>{title}</AppText> : title}</View>
       {meta.length > 0 ? <AppText style={styles.meta}>{meta.join(' · ')}</AppText> : null}
       {side(giveLabel, give)}
@@ -130,6 +136,8 @@ export default function TradeCompactCard({
           </Collapse>
         </>
       ) : null}
+      </>}
+      </PresenceSwap>
     </View>
   );
 }

@@ -15,6 +15,7 @@ import { SimDraftHero } from "@/components/SimDraftHero";
 import { SimIconButton, SimPlayerChip, SimPlayerLine, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
+import { PulseChip } from "@/components/Motion";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { SimDraftBar } from "@/components/SimDraftBar";
 import { api } from "@/lib/api";
@@ -62,6 +63,8 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const pickInFlight = useRef(false);
   const [confirmAuto, setConfirmAuto] = useState(false);
   const [freshPickNos, setFreshPickNos] = useState<number[]>([]);
+  // The players that just landed on YOUR roster (kept until the next pick), and whether the sim picked them.
+  const [landed, setLanded] = useState<{ ids: string[]; auto: boolean }>({ ids: [], auto: false });
   const [attempt, setAttempt] = useState(0);
   const [fullBoard, setFullBoard] = useState(false);
   const queueLoaded = useRef(false);
@@ -133,8 +136,10 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   }, [queue.ids, gameId, call]);
 
   const applyResult = useCallback(
-    (body: { picks?: SimDraftPick[]; draft?: Partial<SimDraftState>; completed?: boolean; recap?: SimDraftRecap | null; game?: typeof game }) => {
+    (body: { picks?: SimDraftPick[]; draft?: Partial<SimDraftState>; completed?: boolean; recap?: SimDraftRecap | null; game?: typeof game }, auto = false) => {
       const made = body.picks ?? [];
+      const mine = new Set((body.draft?.your_roster ?? []).map((p) => p.id));
+      setLanded({ ids: made.filter((m) => mine.has(m.player.id)).map((m) => m.player.id), auto });
       setDraft((prev) => {
         if (!prev) return prev;
         const merged = { ...prev, ...(body.draft ?? {}) } as SimDraftState;
@@ -182,7 +187,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     setBusy("auto");
     const body = await call(() => api.simDraftAuto(gameId));
     setBusy(null);
-    if (body) applyResult(body);
+    if (body) applyResult(body, true);
   }
 
   const teamNames = useMemo(() => {
@@ -326,9 +331,14 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
           {draft.your_roster.length === 0 ? (
             <EmptyState title="No picks yet" subtitle="Your drafted players show up here." />
           ) : (
-            draft.your_roster.map((player) => (
-              <SimPlayerLine key={player.id} player={player} onOpen={ctx.openPlayer} />
-            ))
+            draft.your_roster.map((player) => {
+              const justLanded = landed.ids.includes(player.id);
+              return (
+                <div key={player.id} className={justLanded ? "enter-pop" : undefined} data-landed={justLanded ? "true" : undefined}>
+                  <SimPlayerLine player={player} onOpen={ctx.openPlayer} trailing={justLanded && landed.auto ? <PulseChip label="Auto-picked" /> : undefined} />
+                </div>
+              );
+            })
           )}
         </section>
       );

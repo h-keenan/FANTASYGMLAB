@@ -9,7 +9,8 @@ import { PickAvatar } from "@/components/PickAvatar";
 import { FairnessMeterRow } from "@/components/ui/FairnessMeterRow";
 import { SkeletonTradeCard } from "@/components/Skeleton";
 import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
-import { Collapse } from "@/components/ui/Presence";
+import { Collapse, PresenceSwap } from "@/components/ui/Presence";
+import { TradeResolvedRow } from "@/components/ui/TradeResolvedRow";
 
 export interface TradeCardAsset {
   key: string;
@@ -92,6 +93,7 @@ export function TradeCompactCard({
   getLabel = "You get",
   meta = [],
   meter: meterOverride,
+  resolved,
 }: {
   title: ReactNode;
   give: TradeCardAsset[];
@@ -111,6 +113,8 @@ export function TradeCompactCard({
   meta?: string[];
   /** Replaces the computed fairness meter; null hides it (a card whose verdict is stated elsewhere, e.g. their counter). */
   meter?: FairnessMeter | null;
+  /** The card was answered (accepted / declined): it collapses into one `TradeResolvedRow` instead of vanishing. */
+  resolved?: { kind: "accepted" | "declined"; label: string } | null;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const bodyId = useId();
@@ -119,6 +123,8 @@ export function TradeCompactCard({
   const hasBody = children != null && children !== false;
   return (
     <section className="glass-surface flex min-w-0 flex-col gap-2 p-3" data-testid={testId} style={{ borderRadius: "var(--radius-panel)" }}>
+      <PresenceSwap swapKey={resolved ? "resolved" : "open"} className="flex min-w-0 flex-col gap-2">
+      {resolved ? <TradeResolvedRow kind={resolved.kind} label={resolved.label} /> : <>
       <div className="min-w-0 text-sm font-extrabold">{title}</div>
       {meta.length > 0 ? <div className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="trade-card-meta">{meta.join(" · ")}</div> : null}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -143,6 +149,8 @@ export function TradeCompactCard({
           </Collapse>
         </>
       ) : null}
+      </>}
+      </PresenceSwap>
     </section>
   );
 }

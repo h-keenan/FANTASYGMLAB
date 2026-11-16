@@ -90,6 +90,7 @@ import {
   type SimLineupSlot,
   simApplyDelta,
   simOptimisticClaim,
+  simKeepResolved,
   simWithout,
 } from "./simGame";
 
@@ -814,6 +815,17 @@ describe("action deltas and optimistic updates", () => {
     expect(simApplyDelta(game(), { ...delta, week: 5 }).pending?.claims).toBe(0);
     expect(simApplyDelta(game(), { ...delta, status: "playoffs" }).pending?.claims).toBe(0);
     expect(simApplyDelta(game(), undefined).pending?.claims).toBe(0);
+  });
+
+  it("keeps an answered offer in place until its resolved row has played", () => {
+    const a = { id: "a" };
+    const b = { id: "b" };
+    const c = { id: "c" };
+    const resolved = { b: { item: b, kind: "accepted" as const, index: 1 } };
+    expect(simKeepResolved([a, c], resolved)).toEqual([a, b, c]);
+    expect(simKeepResolved([a, b, c], resolved)).toEqual([a, b, c]);
+    expect(simKeepResolved([a], resolved)).toEqual([a, b]);
+    expect(simKeepResolved([a, c], {})).toEqual([a, c]);
   });
 
   it("removes an item optimistically and leaves the list alone when it is not there", () => {
