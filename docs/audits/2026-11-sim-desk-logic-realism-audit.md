@@ -6,7 +6,7 @@ finding below is either new or a measurement of something earlier docs only asse
 
 Evidence rules: every Desk finding has an executable repro in `scripts/audits/desk_logic_repros.py` (pure functions, no network, no `data/players.db`).
 Every sim number comes from headless runs on the committed 2025 panel pool (never `data/players.db`): `python -m modules.sim.calibration.realism_sweep seasons|dynasty|real`
-and the new `scripts/audits/sim_dynasty_run.py` + `sim_dynasty_report.py` (4 dynasties x 10 seasons, 12 teams, 3 rookie rounds, 6,720 team-weeks of
+and the new `modules/sim/calibration/dynasty_run.py` + `dynasty_distributions.py` (4 dynasties x 10 seasons, 12 teams, 3 rookie rounds, 6,720 team-weeks of
 box scores). Real baselines marked "panel" come from `modules/sim/calibration/data/panel.json.gz` (5 seasons); baselines marked "memory" are
 from general NFL / fantasy knowledge and are not checked in this repo.
 
@@ -178,7 +178,7 @@ Reading the table. The sim's single-season shape (score variance, blowouts, pari
 class safety all drift with the number of seasons. A QB ADP correlation of 0.36 against 0.56 means the sim's QB1-to-QB12 order is closer to random than real life. That one is a harness effect: the panel pool carries 33 QBs, so the
 QB wire is empty and the QB field is thin (`2026-11-sim-realism-audit-3.md`, finding 13); treat QB rows as a lower bound on realism until the harness uses a full QB pool.
 
-Caveats on measurement: (a) in `sim_dynasty_run.py` the user team never sets a lineup, so it wins 35 percent vs 51 percent for AI teams, and no user titles in 40 seasons is expected from that, not a bug (`GameSettings.auto_lineup` is the product's remedy); AI-only lines are used for parity.
+Caveats on measurement: (a) in `dynasty_run.py` the user team never sets a lineup, so it wins 35 percent vs 51 percent for AI teams, and no user titles in 40 seasons is expected from that, not a bug (`GameSettings.auto_lineup` is the product's remedy); AI-only lines are used for parity.
 (b) The harness pool is PPR points, so scoring-format variants (std, half, TE premium) show almost no team-score change; the product converts at `RealSimInputs.player_pool` (earlier audit, finding 8).
 
 ## Sim correctness
@@ -249,8 +249,8 @@ aging and retirement (`2026-11-sim-aging-retirement.md`), long-dynasty QB waves 
 PYTHONPATH=. python scripts/audits/desk_logic_repros.py
 
 # Sim distributions: four 10-season dynasties, then the report
-for s in 1 2 3 4; do PYTHONPATH=. python scripts/audits/sim_dynasty_run.py 10 $s /tmp/sim_audit/dyn$s.pkl & done; wait
-PYTHONPATH=. python scripts/audits/sim_dynasty_report.py /tmp/sim_audit
+for s in 1 2 3 4; do PYTHONPATH=. python modules/sim/calibration/dynasty_run.py 10 $s /tmp/sim_audit/dyn$s.pkl & done; wait
+PYTHONPATH=. python modules/sim/calibration/dynasty_distributions.py /tmp/sim_audit
 
 # Existing harness
 python -m modules.sim.calibration.realism_sweep seasons --seeds 3

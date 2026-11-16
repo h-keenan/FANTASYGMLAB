@@ -1,7 +1,7 @@
-"""Distributions from sim_dynasty_run.py output.
+"""Distributions from dynasty_run.py output.
 
-    for s in 1 2 3 4; do PYTHONPATH=. python scripts/audits/sim_dynasty_run.py 10 $s OUT/dyn$s.pkl; done
-    PYTHONPATH=. python scripts/audits/sim_dynasty_report.py OUT
+    for s in 1 2 3 4; do PYTHONPATH=. python modules/sim/calibration/dynasty_run.py 10 $s OUT/dyn$s.pkl; done
+    PYTHONPATH=. python modules/sim/calibration/dynasty_distributions.py OUT
 
 Team-week score, blowouts, slot shares, parity, win% persistence, asset-value drift, age curves.
 The user team never sets a lineup in this harness (it is the weakest team), read AI-only lines for parity.
