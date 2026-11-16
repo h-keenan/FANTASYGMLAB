@@ -76,8 +76,15 @@ describe("shared Tabs", () => {
     spy.mockRestore();
   });
 
-  it("can opt out of the sticky strip", () => {
+  it("can opt out of the sticky strip, and then sizes each panel to its own content (no empty gap)", () => {
+    const spy = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.getAttribute("role") === "tabpanel" ? (this.textContent?.includes("Overview") ? 200 : 80) : 0;
+    });
     render(<Tabs id="nosticky" tabs={make()} sticky={false} />);
     expect(document.querySelector(".tabs-sticky")).toBeNull();
+    expect(document.querySelector(".tabs-strip")).not.toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
+    expect(screen.getByRole("tabpanel").style.minHeight).toBe("");
+    spy.mockRestore();
   });
 });

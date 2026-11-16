@@ -69,13 +69,14 @@ export function Tabs({
     previous.current = current;
   }, [current]);
 
-  // No layout jump between tabs: the panel keeps the tallest height this open sheet has shown as its minimum, so a
-  // short tab after a long one does not pull the sheet (and the strip) up under the finger.
+  // No layout jump between tabs while the strip is pinned: the panel keeps the tallest height this open sheet has shown
+  // as its minimum, so a short tab after a long one does not pull the strip up under the finger. An unpinned strip has
+  // nothing to jump, so its panel is sized by its own content (no empty gap under a short tab; coridian_ 2026-11-16).
   const panelRef = useRef<HTMLDivElement>(null);
   const [minHeight, setMinHeight] = useState(0);
   useLayoutEffect(() => {
     const el = panelRef.current;
-    if (!el) return;
+    if (!el || !sticky) return;
     const measured = el.scrollHeight;
     setMinHeight((prev) => {
       const next = nextPanelMinHeight(prev, measured);
@@ -113,7 +114,7 @@ export function Tabs({
   const tab = tabs.find((t) => t.key === current);
   return (
     <div className="flex flex-col gap-3" data-testid="tabs">
-      <div ref={stripRef} className={sticky ? "tabs-sticky" : undefined} data-sticky={sticky ? "true" : undefined}>
+      <div ref={stripRef} className={sticky ? "tabs-strip tabs-sticky" : "tabs-strip"} data-sticky={sticky ? "true" : undefined}>
       <PillRow
         slim
         variant="scroll"
@@ -127,7 +128,7 @@ export function Tabs({
       <div
         key={current}
         ref={panelRef}
-        style={minHeight > 0 ? { minHeight } : undefined}
+        style={sticky && minHeight > 0 ? { minHeight } : undefined}
         role="tabpanel"
         id={`${id}-${uid}-panel-${current}`}
         aria-labelledby={`${id}-${uid}-tab-${current}`}
