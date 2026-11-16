@@ -68,7 +68,7 @@ export const RAW_ALLOWLIST = {
   "web-next/src/components/GmOrb.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "web-next/src/components/GuessThePlayerCard.tsx": "exempt: the guessing game hides the player identity until answered",
   "web-next/src/components/GuessThePlayerNameMatchCard.tsx": "exempt: the guessing game hides the player identity until answered",
-  "web-next/src/components/LeagueRecapsContent.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
+  "web-next/src/components/LeagueHistoryTab.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "web-next/src/components/LiveFeedPanel.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "web-next/src/components/MatchupLineup.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "web-next/src/components/NewsContent.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",

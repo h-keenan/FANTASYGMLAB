@@ -5363,6 +5363,53 @@ def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
     }
 
 
+_RANKED_POOL_MEMO = derived_cache.Memo(
+    "ranked_pool", max_entries=24, copier=lambda frame: derived_cache.tag_frame(frame.copy(), derived_cache.frame_key(frame))
+)
+
+
+def _ranked_pool(
+    valued: pd.DataFrame,
+    scoring_context: "canonical_player_ranking.ScoringRankContext",
+    score_field: str,
+    *,
+    rated: bool,
+) -> pd.DataFrame:
+    """``attach_canonical_ranks`` (and, with ``rated``, the full-pool 0-99 OVR column plus the stat-percentile annotation) over
+    the whole valued pool: the shared front half of /rankings, /players/search and /players/{id}/rank. Each of those used to
+    re-rank, re-rate and re-annotate the entire pool on every request (about 80 ms of a 118 ms warm /rankings, and the same
+    again for every search keystroke); this is a pure function of the tagged valued frame, the scoring context and the score
+    field, so it is computed once per content key and each caller gets a private tagged copy. An untagged frame computes directly."""
+
+    def build() -> pd.DataFrame:
+        ranked = canonical_player_ranking.attach_canonical_ranks(
+            valued,
+            scoring_format=scoring_context.scoring_format,
+            score_field=score_field,
+            context=scoring_context,
+        )
+        if rated:
+            ranked["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(ranked, score_column=score_field)
+            ranked = player_quick_view.annotate_rankings_stat_pool(ranked)
+        return ranked
+
+    base_key = derived_cache.frame_key(valued)
+    if not base_key:
+        return build()
+    try:
+        key = derived_cache.fingerprint(
+            "ranked_pool", base_key, scoring_context.scoring_format, scoring_context.supported, scoring_context.source,
+            scoring_context.fallback_label, scoring_context.unsupported_reason, score_field, rated,
+        )
+    except derived_cache.Unfingerprintable:
+        return build()
+
+    def build_tagged() -> pd.DataFrame:
+        return derived_cache.tag_frame(build(), key)
+
+    return _RANKED_POOL_MEMO.get_or_compute(key, build_tagged)
+
+
 @app.get("/v1/leagues/{league_id}/rankings")
 def get_league_rankings(
     league_id: str = Depends(require_league_access),
@@ -5401,28 +5448,10 @@ def get_league_rankings(
 
     score_field = league_value_settings.valuation_score_field(lens)
     scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
-    ranked = canonical_player_ranking.attach_canonical_ranks(
-        valued,
-        scoring_format=scoring_context.scoring_format,
-        score_field=score_field,
-        context=scoring_context,
-    )
-
-    # Computed on the full ranked pool (every eligible player at every
-    # position), before the limit=N truncation below narrows it to the page
-    # the client asked for — narrowing first would shrink/bias each
-    # position's percentile pool by whatever the requested limit happened to
-    # cut off. See player_quick_view.overall_ratings_for_pool.
-    ranked["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(
-        ranked, score_column=score_field
-    )
-
-    # Same "compute on the full pool before truncation" placement as the
-    # overall-rating column above — Players' Madden-style stat sort/
-    # percentile toggle needs raw stats + percentiles for every stat column,
-    # not just the composite score. See
-    # player_quick_view.annotate_rankings_stat_pool.
-    ranked = player_quick_view.annotate_rankings_stat_pool(ranked)
+    # Ranked, OVR-rated and stat-annotated on the FULL pool, before the limit=N truncation below narrows it to the page the client
+    # asked for (narrowing first would shrink/bias each position's percentile pool by whatever the limit cut off). See
+    # player_quick_view.overall_ratings_for_pool and annotate_rankings_stat_pool; memoized per valued-pool content (_ranked_pool).
+    ranked = _ranked_pool(valued, scoring_context, score_field, rated=True)
 
     ranked = ranked.sort_values(score_field, ascending=False).head(limit)
     players = []
@@ -5501,12 +5530,7 @@ def get_player_rank_in_league(
 
     score_field = league_value_settings.valuation_score_field(lens)
     scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
-    ranked = canonical_player_ranking.attach_canonical_ranks(
-        valued,
-        scoring_format=scoring_context.scoring_format,
-        score_field=score_field,
-        context=scoring_context,
-    )
+    ranked = _ranked_pool(valued, scoring_context, score_field, rated=False)
 
     matches = ranked[ranked["player_id"] == player_id]
     if matches.empty:
@@ -5572,14 +5596,7 @@ def search_league_players(
 
     score_field = league_value_settings.valuation_score_field(lens)
     scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
-    ranked = canonical_player_ranking.attach_canonical_ranks(
-        valued,
-        scoring_format=scoring_context.scoring_format,
-        score_field=score_field,
-        context=scoring_context,
-    )
-    ranked["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(ranked, score_column=score_field)
-    ranked = player_quick_view.annotate_rankings_stat_pool(ranked)
+    ranked = _ranked_pool(valued, scoring_context, score_field, rated=True)
     if available_only:
         # Filter AFTER ranking/rating so ranks and OVR stay league-global, the
         # same numbers /rankings shows for this player.

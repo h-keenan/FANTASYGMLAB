@@ -24,7 +24,7 @@
   "/gm-plan/[leagueId]": 1058,
   "/gm-targets/[leagueId]": 929,
   "/guess-the-player-leaderboard/[leagueId]": 932,
-  "/league-rankings/[leagueId]": 1001,
+  "/league-rankings/[leagueId]": 963,
   "/league-recaps/[leagueId]": 979,
   "/legal/[pageKey]": 928,
   "/live-draft/[leagueId]": 998,

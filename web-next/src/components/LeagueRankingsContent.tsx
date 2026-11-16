@@ -25,7 +25,6 @@ import {
   type RankBoardKey,
   boardScoreText,
 } from "@/lib/leagueRankingsPresentation";
-import { ManagerProfileSheet } from "@/components/ManagerProfileSheet";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { TeamAvatar } from "@/components/TeamAvatar";
@@ -38,6 +37,13 @@ import { rankBoardAnchor } from "@/lib/insightLinks";
 import { PageTitle } from "@/components/PageTitle";
 import { SkeletonText } from "@/components/Skeleton";
 import { ProgressFill } from "@/components/Motion";
+
+import dynamic from "next/dynamic";
+
+// Perf pass 2026-11: the manager sheet only mounts after a tap on a team, so it is its own chunk instead of first-load JS.
+const ManagerProfileSheet = dynamic(() => import("@/components/ManagerProfileSheet").then((m) => m.ManagerProfileSheet), {
+  loading: () => null,
+});
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
