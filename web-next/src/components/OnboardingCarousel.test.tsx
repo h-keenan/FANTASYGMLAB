@@ -12,7 +12,6 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       setExperienceLevel: vi.fn().mockResolvedValue({ ok: true }),
-      setExperienceGoal: vi.fn().mockResolvedValue({ ok: true }),
     },
   };
 });
@@ -66,7 +65,6 @@ describe("OnboardingCarousel", () => {
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("beginner"));
-    expect(api.setExperienceGoal).not.toHaveBeenCalled();
 
     // Step 2: one value line over a screenshot with its benefit.
     expect(await screen.findByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
@@ -77,14 +75,13 @@ describe("OnboardingCarousel", () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("lets a brand-new fantasy player pick the most beginner level, and never writes a goal", async () => {
+  it("lets a brand-new fantasy player pick the most beginner level, and is one decision", async () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /new to fantasy football/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("new_to_fantasy"));
-    expect(api.setExperienceGoal).not.toHaveBeenCalled();
   });
 
   it("says why Continue is disabled until a level is picked", () => {

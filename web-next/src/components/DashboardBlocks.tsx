@@ -11,7 +11,7 @@ import { LinkModule } from "@/components/ui/ModuleTemplates";
 import {
   deadlineChip,
   tradeIdeasLine,
-  tradesGoalLine,
+  tradesStanceLine,
   TRADES_BLOCK_COPY,
   type DashboardAttentionEntry,
 } from "@/lib/dashboardLayout";
@@ -97,7 +97,7 @@ export function DashboardTradesBlock({
   leagueId,
   leagueName,
   isBeginner,
-  goal,
+  stance,
   deadlineInAttention = false,
 }: {
   data: DashboardResponse;
@@ -105,7 +105,8 @@ export function DashboardTradesBlock({
   leagueId: string;
   leagueName: string;
   isBeginner: boolean;
-  goal: string | null | undefined;
+  /** The league's GM stance (Team Situation): competing | rebuilding | balanced, "" or null when unset. */
+  stance?: string | null;
   /** "Needs attention" already lists a near deadline: don't repeat it here. */
   deadlineInAttention?: boolean;
 }) {
@@ -113,7 +114,7 @@ export function DashboardTradesBlock({
   const id = encodeURIComponent(leagueId);
   const deadlinePassed = Boolean(data.trade_window?.trade_deadline_passed);
   const pending = Boolean(data.trade_ideas_deferred) && tradeItems.length === 0;
-  const goalLine = isBeginner ? tradesGoalLine(goal) : "";
+  const stanceLine = isBeginner ? tradesStanceLine(stance) : "";
   // The one home for the deadline: here, not also as a chip.
   const deadline = deadlineInAttention ? null : deadlineChip(data.trade_window);
   const stateTone = deadlinePassed ? "muted" : tradeItems.length > 0 ? "action" : "muted";
@@ -130,7 +131,14 @@ export function DashboardTradesBlock({
         ]}
       />
       {isBeginner ? (
-        <BeginnerHelp popover label="trade ideas" text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ""}`} />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <BeginnerHelp popover label="trade ideas" text={TRADES_BLOCK_COPY.beginnerExplainer} />
+          {stanceLine ? (
+            <Link href={`/gm-plan/${id}${query}`} className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="dashboard-stance-line">
+              {stanceLine} <span className="font-bold" style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.changeStance}</span>
+            </Link>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

@@ -6,7 +6,6 @@ import {
   BEGINNER_HELP,
   BEGINNER_LABELS,
   experienceCopy,
-  normalizeExperienceGoal,
   normalizeExperienceLevel,
 } from './experienceCopy.ts';
 
@@ -68,14 +67,4 @@ test('normalizeExperienceLevel only accepts the three real values', () => {
   assert.equal(normalizeExperienceLevel('expert'), null);
   assert.equal(normalizeExperienceLevel(null), null);
   assert.equal(normalizeExperienceLevel(undefined), null);
-});
-
-test('normalizeExperienceGoal only accepts the three real values', () => {
-  assert.equal(normalizeExperienceGoal('win_now'), 'win_now');
-  assert.equal(normalizeExperienceGoal('rebuilding'), 'rebuilding');
-  assert.equal(normalizeExperienceGoal('exploring'), 'exploring');
-  assert.equal(normalizeExperienceGoal(''), null);
-  assert.equal(normalizeExperienceGoal('championship'), null);
-  assert.equal(normalizeExperienceGoal(null), null);
-  assert.equal(normalizeExperienceGoal(undefined), null);
 });

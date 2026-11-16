@@ -7,7 +7,6 @@ import {
   BEGINNER_HELP,
   BEGINNER_LABELS,
   experienceCopy,
-  normalizeExperienceGoal,
   normalizeExperienceLevel,
 } from "./experienceCopy";
 
@@ -81,16 +80,6 @@ describe("experienceCopy", () => {
     expect(normalizeExperienceLevel(null)).toBeNull();
   });
 
-  it("normalizes the optional goal chip, same null-for-anything-else rule", () => {
-    expect(normalizeExperienceGoal("win_now")).toBe("win_now");
-    expect(normalizeExperienceGoal("rebuilding")).toBe("rebuilding");
-    expect(normalizeExperienceGoal("exploring")).toBe("exploring");
-    expect(normalizeExperienceGoal("")).toBeNull();
-    expect(normalizeExperienceGoal("championship")).toBeNull();
-    expect(normalizeExperienceGoal(undefined)).toBeNull();
-    expect(normalizeExperienceGoal(null)).toBeNull();
-  });
-
   it("stays byte-identical to mobile's copy map", () => {
     const extract = (source: string, name: string) => {
       const start = source.indexOf(`export const ${name} = {`);
@@ -105,6 +94,5 @@ describe("experienceCopy", () => {
     expect(extract(mobile, "BEGINNER_LABELS")).toBe(extract(web, "BEGINNER_LABELS"));
     expect(extract(mobile, "PLAIN_COPY")).toBe(extract(web, "PLAIN_COPY"));
     expect(extract(mobile, "EXPERIENCE_LEVEL_OPTIONS")).toBe(extract(web, "EXPERIENCE_LEVEL_OPTIONS"));
-    expect(extract(mobile, "EXPERIENCE_GOAL_OPTIONS")).toBe(extract(web, "EXPERIENCE_GOAL_OPTIONS"));
   });
 });

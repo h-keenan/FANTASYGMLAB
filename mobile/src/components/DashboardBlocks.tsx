@@ -23,7 +23,7 @@ import { leagueAverageAge } from '../lib/teamStatus';
 import {
   deadlineChip,
   tradeIdeasLine,
-  tradesGoalLine,
+  tradesStanceLine,
   TRADES_BLOCK_COPY,
   type DashboardAttentionEntry,
 } from '../lib/dashboardLayout';
@@ -105,7 +105,7 @@ export function DashboardTradesBlock({
   leagueId,
   leagueName,
   isBeginner,
-  goal,
+  stance,
   deadlineInAttention = false,
   onNavigate,
 }: {
@@ -114,7 +114,8 @@ export function DashboardTradesBlock({
   leagueId: string;
   leagueName: string;
   isBeginner: boolean;
-  goal: string | null | undefined;
+  /** The league's GM stance (Team Situation): competing | rebuilding | balanced, '' or null when unset. */
+  stance?: string | null;
   /** "Needs attention" already lists a near deadline: don't repeat it here. */
   deadlineInAttention?: boolean;
   onNavigate: Navigate;
@@ -123,7 +124,7 @@ export function DashboardTradesBlock({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const deadlinePassed = Boolean(data.trade_window?.trade_deadline_passed);
   const pending = Boolean(data.trade_ideas_deferred) && tradeItems.length === 0;
-  const goalLine = isBeginner ? tradesGoalLine(goal) : '';
+  const stanceLine = isBeginner ? tradesStanceLine(stance) : '';
   // The one home for the deadline: here, not also as a chip.
   const deadline = deadlineInAttention ? null : deadlineChip(data.trade_window);
   const stateTone = deadlinePassed || tradeItems.length === 0 ? ('muted' as const) : ('action' as const);
@@ -139,8 +140,18 @@ export function DashboardTradesBlock({
           { key: 'link', text: TRADES_BLOCK_COPY.link, tone: 'accent' as const },
         ]}
       />
-      {isBeginner ? (
-        <BeginnerHelp text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ''}`} />
+      {isBeginner ? <BeginnerHelp text={TRADES_BLOCK_COPY.beginnerExplainer} /> : null}
+      {stanceLine ? (
+        <Pressable
+          onPress={() => onNavigate('GmPlan', { leagueId, leagueName })}
+          accessibilityRole="link"
+          accessibilityLabel={`${stanceLine} ${TRADES_BLOCK_COPY.changeStance}`}
+          testID="dashboard-stance-line"
+        >
+          <AppText style={styles.stanceLine}>
+            {stanceLine} <AppText style={styles.stanceLink}>{TRADES_BLOCK_COPY.changeStance}</AppText>
+          </AppText>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -240,6 +251,8 @@ export function DashboardMore({ children }: { children: React.ReactNode }) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     block: { gap: spacing.md },
+    stanceLine: { fontSize: 13, color: colors.textSecondary },
+    stanceLink: { fontSize: 13, fontWeight: '700', color: colors.accent },
     attentionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
     attentionDivider: { borderTopWidth: 1, borderTopColor: colors.border },
     attentionBadge: { width: 88, alignItems: 'flex-start' },

@@ -9,6 +9,7 @@ import {
   buildNowChips,
   deadlineChip,
   isTradeItem,
+  tradesStanceLine,
   itemsAfterAttention,
   normalizeAlertTitle,
   nextMoveRowFilter,
@@ -101,4 +102,13 @@ test('the same alert never shows in Needs attention and This week', () => {
     attention,
   );
   assert.deepEqual(kept.map((i) => i.headline), ['Other']);
+});
+
+test('tradesStanceLine names the real GM stance and stays silent when none is set', () => {
+  assert.match(tradesStanceLine('rebuilding'), /future value/);
+  assert.match(tradesStanceLine('competing'), /this season/);
+  assert.match(tradesStanceLine('balanced'), /balance/);
+  assert.equal(tradesStanceLine(''), '');
+  assert.equal(tradesStanceLine(null), '');
+  assert.equal(tradesStanceLine('win_now'), '');
 });

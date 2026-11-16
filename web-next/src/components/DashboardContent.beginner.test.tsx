@@ -3,7 +3,7 @@ import { beforeEach } from "vitest";
 import { describe, expect, it, vi } from "vitest";
 
 import { DashboardContent } from "./DashboardContent";
-import type { DashboardResponse } from "@/lib/api";
+import { api, type DashboardResponse } from "@/lib/api";
 import { experienceCopy } from "@/lib/experienceCopy";
 
 // The Alerts section fetches on its own and needs the auth context; it has its own test (DashboardAlerts.test.tsx).
@@ -11,7 +11,7 @@ vi.mock("@/components/DashboardAlerts", () => ({ DashboardAlerts: () => <div dat
 
 vi.mock("@/context/ExperienceLevelContext", () => ({
   useExperienceCopy: () => experienceCopy("beginner"),
-  useExperienceLevel: () => ({ level: "beginner", goal: "win_now" }),
+  useExperienceLevel: () => ({ level: "beginner" }),
 }));
 
 const FIXTURE: DashboardResponse = {
@@ -87,11 +87,14 @@ describe("DashboardContent for a beginner", () => {
     expect(screen.getByText(/No move is needed right now/)).toBeInTheDocument();
   });
 
-  it("explains trades to a beginner, with a line for their season goal", () => {
+  it("explains trades to a beginner, and names the league's real GM stance with a link to change it", async () => {
+    vi.spyOn(api, "getTeamStance").mockResolvedValue({ ok: true, stance: "rebuilding" });
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
     expandHelp();
     const block = screen.getByTestId("dashboard-trades-block");
     expect(block.textContent).toMatch(/who you give, who you get/);
-    expect(block.textContent).toMatch(/Tuned for winning this season/);
+    const line = await screen.findByTestId("dashboard-stance-line");
+    expect(line.textContent).toMatch(/building future value/);
+    expect(line.getAttribute("href")).toBe("/gm-plan/abc?name=Dynasty%20Overlords");
   });
 });

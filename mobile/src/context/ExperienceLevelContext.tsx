@@ -4,17 +4,13 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { api } from '../lib/api';
 import {
   experienceCopy,
-  normalizeExperienceGoal,
   normalizeExperienceLevel,
   type ExperienceCopy,
-  type ExperienceGoal,
-  type ExperienceGoalSetting,
   type ExperienceLevel,
   type ExperienceLevelSetting,
 } from '../lib/experienceCopy';
 
 const KEY = 'fgl:experience-level';
-const GOAL_KEY = 'fgl:experience-goal';
 
 interface ExperienceLevelContextValue {
   level: ExperienceLevelSetting;
@@ -24,20 +20,13 @@ interface ExperienceLevelContextValue {
   /** For AuthContext only: apply the durable /v1/preferences value (null
    * for an unanswered account, or after sign-out) without writing it back. */
   syncLevelFromServer: (level: ExperienceLevelSetting) => void;
-  goal: ExperienceGoalSetting;
-  /** Applies immediately, caches locally, and saves to /v1/preferences
-   * (best-effort). `null` clears it back to unset. */
-  setGoal: (goal: ExperienceGoal | null) => void;
-  /** For AuthContext only: apply the durable /v1/preferences value without
-   * writing it back. */
-  syncGoalFromServer: (goal: ExperienceGoalSetting) => void;
 }
 
 const ExperienceLevelContext = createContext<ExperienceLevelContextValue | undefined>(undefined);
 
 /**
  * The account's onboarding experience level ("new_to_fantasy" | "beginner" |
- * "advanced" | null) and optional season goal — mirrors web-next's
+ * "advanced" | null) — mirrors web-next's
  * ExperienceLevelContext. Screens never branch on level directly; they call
  * useExperienceCopy(), which goes through the central copy map in
  * lib/experienceCopy.ts. Copy only, never features, and null behaves
@@ -46,7 +35,6 @@ const ExperienceLevelContext = createContext<ExperienceLevelContextValue | undef
  */
 export function ExperienceLevelProvider({ children }: { children: React.ReactNode }) {
   const [level, setLevelState] = useState<ExperienceLevelSetting>(null);
-  const [goal, setGoalState] = useState<ExperienceGoalSetting>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,13 +45,6 @@ export function ExperienceLevelProvider({ children }: { children: React.ReactNod
         if (cached) setLevelState(cached);
       })
       .catch(() => {});
-    AsyncStorage.getItem(GOAL_KEY)
-      .then((raw) => {
-        if (cancelled) return;
-        const cached = normalizeExperienceGoal(raw);
-        if (cached) setGoalState(cached);
-      })
-      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -71,10 +52,6 @@ export function ExperienceLevelProvider({ children }: { children: React.ReactNod
 
   const writeCache = (next: ExperienceLevelSetting) => {
     (next ? AsyncStorage.setItem(KEY, next) : AsyncStorage.removeItem(KEY)).catch(() => {});
-  };
-
-  const writeGoalCache = (next: ExperienceGoalSetting) => {
-    (next ? AsyncStorage.setItem(GOAL_KEY, next) : AsyncStorage.removeItem(GOAL_KEY)).catch(() => {});
   };
 
   const setLevel = (next: ExperienceLevel) => {
@@ -88,20 +65,9 @@ export function ExperienceLevelProvider({ children }: { children: React.ReactNod
     writeCache(next);
   };
 
-  const setGoal = (next: ExperienceGoal | null) => {
-    setGoalState(next);
-    writeGoalCache(next);
-    api.setExperienceGoal(next).catch(() => {});
-  };
-
-  const syncGoalFromServer = (next: ExperienceGoalSetting) => {
-    setGoalState(next);
-    writeGoalCache(next);
-  };
-
   const value = useMemo<ExperienceLevelContextValue>(
-    () => ({ level, setLevel, syncLevelFromServer, goal, setGoal, syncGoalFromServer }),
-    [level, goal],
+    () => ({ level, setLevel, syncLevelFromServer }),
+    [level],
   );
 
   return <ExperienceLevelContext.Provider value={value}>{children}</ExperienceLevelContext.Provider>;
@@ -114,11 +80,6 @@ const FALLBACK: ExperienceLevelContextValue = {
     api.setExperienceLevel(next).catch(() => {});
   },
   syncLevelFromServer: () => {},
-  goal: null,
-  setGoal: (next) => {
-    api.setExperienceGoal(next).catch(() => {});
-  },
-  syncGoalFromServer: () => {},
 };
 
 export function useExperienceLevel(): ExperienceLevelContextValue {

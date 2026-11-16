@@ -4280,15 +4280,6 @@ export const api = {
       jsonBody: { experience_level: level },
     }),
 
-  /** The optional "what's your goal this season?" chip, alongside
-   * experience level. `null` clears it back to unset (sent to the backend
-   * as "", its explicit-clear sentinel). */
-  setExperienceGoal: (goal: "win_now" | "rebuilding" | "exploring" | null) =>
-    authorizedRequest<DevicePreferencesResponse>("/v1/preferences", {
-      method: "POST",
-      jsonBody: { experience_goal: goal ?? "" },
-    }),
-
   // Stripe web billing runs on Supabase Edge Functions (lib/billingClient.ts;
   // rollback to the deprecated FastAPI routes via NEXT_PUBLIC_BILLING_BACKEND=fastapi).
   getBillingPlans: () => authorizedBillingRequest<BillingPlansResponse>("billing-plans"),
