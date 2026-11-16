@@ -159,3 +159,50 @@ jobs:
         # delete continue-on-error. See docs/perf-budget.md.
         continue-on-error: true
         run: node ../scripts/perf/check_perf_budget.mjs
+
+  route-overflow:
+    # No main route may scroll sideways on a phone: loads every route at 390px (Chromium, mobile emulation) against the
+    # dev server with the module-scan fixtures and fails when document.scrollWidth > innerWidth, naming the elements that
+    # hold the too-wide content. The app shell's overflow-x: clip backstop is switched off while measuring, so the check
+    # still catches the real bug. Local run: OVERFLOW=1 WIDTHS=390 node scripts/sim_layout_playwright/module_scan.mjs
+    needs: [classify]
+    if: needs.classify.outputs.web_next_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web-next/package-lock.json
+      - name: Install dependencies
+        working-directory: web-next
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright-core@1.65.1
+          npx playwright-core install --with-deps chromium
+          echo "PW_CORE=$RUNNER_TEMP/pw/node_modules/playwright-core/index.mjs" >> "$GITHUB_ENV"
+      - name: Start web-next dev server
+        working-directory: web-next
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: x
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        run: |
+          nohup npx next dev -p 3231 > "$RUNNER_TEMP/next.log" 2>&1 &
+          for _ in $(seq 1 90); do curl -s -o /dev/null -m 120 http://localhost:3231/news && break; sleep 2; done
+      - name: No route scrolls sideways at 390px
+        env:
+          BROWSER: chromium
+          BASE: http://localhost:3231
+          OUT: ${{ runner.temp }}/route-overflow
+          WIDTHS: "390"
+          OVERFLOW: "1"
+        run: node scripts/sim_layout_playwright/module_scan.mjs
+      - name: Server log on failure
+        if: failure()
+        run: tail -n 80 "$RUNNER_TEMP/next.log" || true

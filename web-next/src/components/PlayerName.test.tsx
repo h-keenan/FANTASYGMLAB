@@ -20,6 +20,12 @@ afterEach(() => {
 });
 
 describe("PlayerName", () => {
+  it("is its own positioning context so the sr-only full name never escapes a horizontal scroller", () => {
+    setWidths(100, 140);
+    const { container } = render(<PlayerName name="Saquon Barkley" />);
+    expect(container.firstElementChild?.className).toMatch(/(^|\s)relative(\s|$)/);
+  });
+
   it("renders the full name when it fits", () => {
     setWidths(100, 140);
     render(<PlayerName name="Saquon Barkley" />);

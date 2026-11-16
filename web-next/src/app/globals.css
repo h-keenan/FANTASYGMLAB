@@ -4536,6 +4536,13 @@ main > header:has(> h1.sr-only:only-child) {
 .sim-root {
   overflow-x: clip;
 }
+/* Same backstop for the whole app column (header, page content, footer): one stray wide child can never make the phone document
+   scroll sideways. clip, NOT hidden: no scroll container is created, so sticky headers / tab strips / the bottom stack keep
+   working. The real fixes live in the offending components: the route-overflow check (module_scan.mjs OVERFLOW=1, the
+   "Route overflow" CI job) switches this clip off before measuring, so it still fails on any route that would scroll sideways. */
+.app-shell {
+  overflow-x: clip;
+}
 
 /* Phone shell header (ShellHeader): the one standard page header under the shell flag. */
 .shell-header {

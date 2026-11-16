@@ -64,7 +64,9 @@ export function PlayerName({
   return (
     <Tag
       ref={ref}
-      className={`block min-w-0 max-w-full ${stage.wrap ? "whitespace-normal [overflow-wrap:normal] leading-tight" : "whitespace-nowrap"} ${className}`.trim()}
+      // relative: the sr-only full-name span is position:absolute; without a positioned ancestor of its own it escapes an
+      // overflow-x scroller (the News roster strip) and stretches the whole document sideways on a phone.
+      className={`relative block min-w-0 max-w-full ${stage.wrap ? "whitespace-normal [overflow-wrap:normal] leading-tight" : "whitespace-nowrap"} ${className}`.trim()}
       style={style}
       title={label}
       data-player-name={stage.short ? "short" : "full"}
