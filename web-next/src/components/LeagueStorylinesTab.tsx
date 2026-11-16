@@ -357,4 +357,3 @@ export function StorylinesTab({
     </div>
   );
 }
-
