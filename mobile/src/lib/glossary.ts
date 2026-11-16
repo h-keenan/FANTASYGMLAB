@@ -1,4 +1,5 @@
 import { BEGINNER_HELP } from './experienceCopy.ts';
+import { TERMS } from './terms.ts';
 
 /**
  * The one glossary of fantasy/analytics jargon, with one-sentence
@@ -29,13 +30,13 @@ import { BEGINNER_HELP } from './experienceCopy.ts';
  */
 
 export const GLOSSARY = {
-  powerRank: { label: "Power Rank", definition: BEGINNER_HELP.powerRank },
+  powerRank: { label: TERMS.thisSeason, definition: BEGINNER_HELP.powerRank },
   rosterPower: {
     label: "Roster Power",
     definition:
-      "The strength score behind Power Rank: your best possible starting lineup at full value plus a small credit for your top bench players.",
+      "The strength score behind This season: your best possible starting lineup at full value plus a small credit for your top bench players.",
   },
-  franchiseRank: { label: "Franchise Rank", definition: BEGINNER_HELP.franchiseRank },
+  franchiseRank: { label: TERMS.longTerm, definition: BEGINNER_HELP.franchiseRank },
   starterStrength: { label: "Starter Strength", definition: BEGINNER_HELP.starterStrength },
   benchStrength: {
     label: "Bench Strength",
@@ -52,7 +53,7 @@ export const GLOSSARY = {
   draftPicks: {
     label: "Draft Picks",
     definition:
-      "Future rookie draft picks (like a 2027 1st) count as tradable dynasty assets with their own value, shown alongside your players in trades and Franchise Rank.",
+      "Future rookie draft picks (like a 2027 1st) count as tradable dynasty assets with their own value, shown alongside your players in trades and in your Long term rank.",
   },
   superflex: {
     label: "Superflex",

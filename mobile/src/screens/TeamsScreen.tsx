@@ -1,3 +1,4 @@
+import { TERMS } from '../lib/terms';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
@@ -82,9 +83,9 @@ const METRIC_CONFIG: Record<
   franchise: {
     title: 'Franchise Rankings',
     pillLabel: 'FRANCHISE',
-    infoLabel: 'How Franchise Rank works',
+    infoLabel: 'How the Long term rank works',
     infoText:
-      'Teams are ordered by Franchise Rank — long-term roster value (youth, talent, draft capital), not just this season’s record. Your team is marked You and highlighted below.',
+      'Teams are ordered by Long term rank — long-term roster value (youth, talent, draft capital), not just this season’s record. Your team is marked You and highlighted below.',
     rank: (team) => team.franchise_rank,
     tied: (team) => team.franchise_rank_tied,
   },
@@ -139,8 +140,8 @@ const METRIC_CONFIG: Record<
  * page-local control.
  */
 const METRIC_TABS: Array<{ key: RankingMetric; label: string }> = [
-  { key: 'power', label: 'Power' },
-  { key: 'franchise', label: 'Franchise' },
+  { key: 'power', label: TERMS.thisSeason },
+  { key: 'franchise', label: TERMS.longTerm },
   { key: 'draft_capital', label: 'Draft' },
   { key: 'starter', label: 'Starters' },
   { key: 'bench', label: 'Bench' },
@@ -472,8 +473,8 @@ function RankingsPanel({
         <FilterDropdownButton<string>
           label="Rank by"
           options={METRIC_TABS.map((o) => o.label)}
-          value={METRIC_TABS.find((o) => o.key === metric)?.label ?? 'Power'}
-          allValue="Power"
+          value={METRIC_TABS.find((o) => o.key === metric)?.label ?? TERMS.thisSeason}
+          allValue={TERMS.thisSeason}
           onChange={(label) => setMetric(METRIC_TABS.find((o) => o.label === label)?.key ?? 'power')}
         />
       </View>
@@ -682,7 +683,7 @@ function YourStandingCard({
 }) {
   const powerPercent = percentileFromRank(me.power_rank, total);
   const minis: Array<{ label: string; rank: number | null; tied: boolean }> = [
-    { label: 'Franchise', rank: me.franchise_rank, tied: me.franchise_rank_tied },
+    { label: TERMS.longTerm, rank: me.franchise_rank, tied: me.franchise_rank_tied },
     { label: 'Draft Capital', rank: me.draft_capital_rank, tied: me.draft_capital_rank_tied },
     { label: 'Starters', rank: me.starter_rank, tied: me.starter_rank_tied },
     { label: 'Bench', rank: me.bench_rank, tied: me.bench_rank_tied },

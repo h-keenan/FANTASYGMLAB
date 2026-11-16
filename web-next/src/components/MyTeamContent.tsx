@@ -1,3 +1,4 @@
+import { TERMS } from "@/lib/terms";
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { GlossaryNote } from "@/components/GlossaryNote";
@@ -215,20 +216,21 @@ export function MyTeamContent({
     : "—";
   const snapshotItems: StatStripItem[] = [
     { glyph: "record", insight: "record", label: "Record", value: record, fill: teamRanking ? winShare(teamRanking.wins, teamRanking.losses, teamRanking.ties) : null },
-    { glyph: "power", insight: "power", label: "Power Rank", value: formatRank(teamRanking?.power_rank ?? null, teamRanking?.power_rank_tied ?? false), fill: rankFill(teamRanking?.power_rank, leagueSize) },
+    { glyph: "power", insight: "power", why: "power_rank", label: TERMS.thisSeason, value: formatRank(teamRanking?.power_rank ?? null, teamRanking?.power_rank_tied ?? false), fill: rankFill(teamRanking?.power_rank, leagueSize) },
     ...(showFranchiseConstruction
       ? [
           {
             glyph: "franchise" as const,
             insight: "franchise" as const,
-            label: "Franchise Rank",
+            why: "franchise_rank" as const,
+            label: TERMS.longTerm,
             value: formatRank(teamRanking?.franchise_rank ?? null, teamRanking?.franchise_rank_tied ?? false),
             fill: rankFill(teamRanking?.franchise_rank, leagueSize),
           },
         ]
       : []),
-    { glyph: "starter", insight: "starter", label: "Starter Strength", value: formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false), fill: rankFill(teamRanking?.starter_rank, leagueSize) },
-    { glyph: "bench", insight: "bench", label: "Bench Strength", value: formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false), fill: rankFill(teamRanking?.bench_rank, leagueSize) },
+    { glyph: "starter", insight: "starter", why: "starter_strength", label: "Starter Strength", value: formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false), fill: rankFill(teamRanking?.starter_rank, leagueSize) },
+    { glyph: "bench", insight: "bench", why: "bench_strength", label: "Bench Strength", value: formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false), fill: rankFill(teamRanking?.bench_rank, leagueSize) },
     { glyph: "age", insight: "age", label: "Avg Age", value: teamRanking?.average_age != null ? teamRanking.average_age.toFixed(1) : "—" },
   ];
 

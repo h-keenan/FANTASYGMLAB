@@ -17,7 +17,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * The contextual league actions on Player Quick View (web twin:
  * PlayerLeagueActions.tsx): "Add to Trade" for any rostered player, "Find
  * trades" for the user's own, "Build an offer" (first, one primary button) for
- * a player on ANOTHER team, and "Add to GM Targets" (☆/★) for players not
+ * a player on ANOTHER team, and "Add to Watchlist" (☆/★) for players not
  * on the user's roster. Roster membership comes from the same
  * useRosterOwnership hook Player Detail uses; until it answers only nothing
  * shows, never a guess. `onNavigate` lets the sheet close itself first.
@@ -84,11 +84,11 @@ export default function PlayerLeagueActions({
         const result = await api.addGmTarget(leagueId, player.player_id, 'player_quick_view');
         if (result.ok) setWatching(true);
         else if (result.reason === 'at_cap') {
-          notify.alert('GM Targets is full', `You've hit the cap for this league (${result.cap ?? 'limit reached'}). Remove a target before adding another.`);
-        } else notify.alert('Could not update GM Targets', 'Please try again in a moment.');
+          notify.alert('Watchlist is full', `You've hit the cap for this league (${result.cap ?? 'limit reached'}). Remove a target before adding another.`);
+        } else notify.alert('Could not update Watchlist', 'Please try again in a moment.');
       }
     } catch {
-      notify.alert('Could not update GM Targets', 'Please try again in a moment.');
+      notify.alert('Could not update Watchlist', 'Please try again in a moment.');
     } finally {
       setBusy(false);
     }
@@ -144,7 +144,7 @@ export default function PlayerLeagueActions({
           disabled={busy}
           accessibilityRole="button"
         >
-          <AppText style={styles.chipText}>{watching ? '★ Watching' : '☆ Add to GM Targets'}</AppText>
+          <AppText style={styles.chipText}>{watching ? '★ Watching' : '☆ Add to Watchlist'}</AppText>
         </PressableScale>
       ) : null}
     </View>

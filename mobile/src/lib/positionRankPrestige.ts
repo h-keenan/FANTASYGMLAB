@@ -2,7 +2,7 @@
  * Crown-worthy prestige banding for a player's LEAGUE-WIDE/POOL position
  * rank (e.g. the "RB1"/"WR3" badge) — never a team-roster-relative rank.
  * This app has no team-roster-relative position rank anywhere (confirmed by
- * audit): `RankedPlayer.position_rank` (PlayersScreen, GM Targets, Compare)
+ * audit): `RankedPlayer.position_rank` (PlayersScreen, Watchlist, Compare)
  * is the league-global canonical rank, and `WaiverPlayer.position_rank`
  * (Waivers) is wire-relative to the free-agent pool — neither is "this
  * player's rank on your own fantasy roster."

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { NavProMarker } from "@/components/NavProMarker";
 import { TabGlyph } from "@/components/TabGlyph";
 import { PillOrb } from "@/components/ui/PillOrb";
 import {
@@ -16,6 +17,7 @@ import {
   pillScrollTarget,
   pillTabText,
   pillOrbBadge,
+  tabShowsPro,
   PILL_ORB_LABEL,
   type BottomTab,
   type PillContext,
@@ -47,6 +49,7 @@ export function BottomTabBar({
   ariaLabel,
   testId = "bottom-tab-bar",
   context: rawContext,
+  showPro = false,
 }: {
   tabs: BottomTab[];
   active: string;
@@ -54,6 +57,8 @@ export function BottomTabBar({
   ariaLabel: string;
   testId?: string;
   context?: PillContext | null;
+  /** The person is known not to be on Pro: paid tabs (`pro`) wear the Pro marker before the tap, same as the More rows. */
+  showPro?: boolean;
 }) {
   const current = activeBottomTab(tabs, active);
   const context = normalizePillContext(rawContext);
@@ -125,6 +130,11 @@ export function BottomTabBar({
                     {badge}
                   </span>
                 ) : null}
+                {tabShowsPro(tab, showPro) ? (
+                  <span className="bottom-tab-pro" aria-hidden="true">
+                    <NavProMarker />
+                  </span>
+                ) : null}
               </>
             );
             const pick = () => {
@@ -134,7 +144,7 @@ export function BottomTabBar({
             const common = {
               className: "bottom-tab",
               "aria-current": tab.key === current ? ("page" as const) : undefined,
-              "aria-label": bottomTabAriaLabel(tab),
+              "aria-label": bottomTabAriaLabel(tab, showPro),
               "data-tab": tab.key,
             };
             return (
@@ -159,6 +169,7 @@ export function BottomTabBar({
           context={layer.context}
           leaving={layer.leaving}
           hidden={mode === "menu"}
+          showPro={showPro}
           orb={
             <PillOrb
               label={orbLabel}
@@ -195,6 +206,7 @@ export function PillContextLayer({
   leaving,
   hidden,
   orb,
+  showPro = false,
 }: {
   context: PillContext;
   /** The page left: play the exit (the segment slides out); the host removes it when it ends. */
@@ -202,6 +214,8 @@ export function PillContextLayer({
   hidden: boolean;
   /** The site shell's orb, leading the segment. Omitted in the Fantasy Sim bar, whose persistent orb sits outside the layers. */
   orb?: React.ReactNode;
+  /** The person is known not to be on Pro: paid page tabs wear the Pro marker. */
+  showPro?: boolean;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const idx = pillActiveIndex(context);
@@ -257,6 +271,7 @@ export function PillContextLayer({
         {context.tabs.map((t) => {
           const on = t.key === context.activeKey;
           const badge = bottomTabBadgeText(t.badge);
+          const pro = tabShowsPro(t, showPro);
           return (
             <PillTabEl
               key={t.key}
@@ -266,7 +281,7 @@ export function PillContextLayer({
               aria-selected={on}
               tabIndex={on ? 0 : -1}
               data-tab={t.key}
-              aria-label={t.short ? t.label : undefined}
+              aria-label={pro ? `${t.label}, Pro feature` : t.short ? t.label : undefined}
               onClick={() => context.onSelect(t.key)}
               onKeyDown={(e: React.KeyboardEvent) => {
                 const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -279,6 +294,11 @@ export function PillContextLayer({
               }}
             >
               <span className="pill-tab-text">{pillTabText(t)}</span>
+              {pro ? (
+                <span className="pill-tab-pro" aria-hidden="true">
+                  <NavProMarker />
+                </span>
+              ) : null}
               {badge ? <span className="pill-tab-badge" aria-label={`${badge} new`}>{badge}</span> : null}
             </PillTabEl>
           );

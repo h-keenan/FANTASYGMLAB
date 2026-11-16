@@ -43,6 +43,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/LoadingScreen", () => ({
   LoadingScreen: () => <div>LoadingScreen</div>,
 }));
+vi.mock("@/lib/landingFrontDoor", () => ({ LANDING_FRONT_DOOR: "email" })); // these tests cover the email sign-in front door; the connect default is in landingFrontDoor.test.ts
 vi.mock("@/components/SignInForm", () => ({
   SignInForm: () => <div>SignInForm</div>,
 }));

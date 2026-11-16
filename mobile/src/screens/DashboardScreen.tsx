@@ -1,3 +1,4 @@
+import { TERMS } from '../lib/terms';
 import FirstValueOfferCard from '../components/FirstValueOfferCard';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -65,6 +66,7 @@ import LeaguePulseCard from '../components/LeaguePulseCard';
 import { leaguePulseHighlights } from '../lib/leaguePulse';
 import TodayHero from '../components/TodayHero';
 import StartHereCard from '../components/StartHereCard';
+import NextSteps from '../components/NextSteps';
 import { useAuth } from '../context/AuthContext';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
@@ -585,6 +587,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
         }
       />
 
+      {/* GM Plan lives in More (the orb), so Today carries it as a standing next step. */}
+      <NextSteps title="Plan ahead" steps={['gm-plan', 'waivers', 'trade-hub']} leagueId={leagueId} leagueName={leagueName} />
+
       {/* Secondary modules stay collapsed behind "More" so the actionable ones
           above are reachable without scrolling past them. */}
       <DashboardMore>
@@ -794,8 +799,8 @@ export function DashboardStatStrip({
   // advanced/unset accounts, so the strip stays compact.
   const termHelp: Array<[string, string | null]> = copy.isBeginner
     ? [
-        ['Power Rank', copy.help('powerRank')],
-        ['Franchise Rank', copy.help('franchiseRank')],
+        [TERMS.thisSeason, copy.help('powerRank')],
+        [TERMS.longTerm, copy.help('franchiseRank')],
         [averageAgeLabel, copy.help('averageAge')],
       ]
     : [];
@@ -811,14 +816,16 @@ export function DashboardStatStrip({
             onPress: open('record'),
           },
           {
-            label: 'Power Rank',
+            label: TERMS.thisSeason,
+            why: 'power_rank',
             icon: 'trophy-outline',
             value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
             fill: rankFill(snapshot.power_rank, leagueSize),
             onPress: open('power'),
           },
           {
-            label: 'Franchise',
+            label: TERMS.longTerm,
+            why: 'franchise_rank',
             icon: 'shield-outline',
             value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
             fill: rankFill(snapshot.franchise_rank, leagueSize),

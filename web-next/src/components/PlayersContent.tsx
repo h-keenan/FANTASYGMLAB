@@ -55,7 +55,7 @@ import { PageTitle } from "@/components/PageTitle";
  * mobile's PlayersScreen.tsx, the named reference implementation: search by
  * name, filter by position/age/status/health, browse the full ranked
  * player pool for this league's active valuation lens (GET
- * .../leagues/{id}/rankings, the same endpoint GM Targets/Player Compare/
+ * .../leagues/{id}/rankings, the same endpoint Watchlist/Player Compare/
  * Trade Analyzer already read — see RankedPlayer's own docstring in
  * lib/api.ts calling this out as the shape a future Players page should
  * reuse rather than hand-roll a second one).

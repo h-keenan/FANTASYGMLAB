@@ -6,6 +6,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 import AppText from './AppText';
 import { PulseOnIncrease } from './Motion';
 import TabIcon from './TabIcon';
+import ToneBadge from './ToneBadge';
 import { SkeletonTabs } from './Skeleton';
 import { pageTabFamily, type PageTabFamilyKey } from '../lib/pageFamilies';
 import type { TabIconName } from '../lib/tabIcons';
@@ -21,6 +22,8 @@ export interface SegmentedTabOption<T extends string> {
   icon?: React.ReactNode;
   /** Small count pill beside the label. */
   count?: number;
+  /** Paid tab: wears the gold Pro marker when `showPro` is set (the person is known not to be on Pro). */
+  pro?: boolean;
 }
 
 /**
@@ -39,6 +42,7 @@ export default function SegmentedTabBar<T extends string>({
   scrollable = false,
   slim = false,
   snap = false,
+  showPro = false,
 }: {
   options: Array<SegmentedTabOption<T>>;
   active: T;
@@ -50,6 +54,8 @@ export default function SegmentedTabBar<T extends string>({
   slim?: boolean;
   /** Scrollable only: the active segment is centred whenever it changes (a long, growing strip such as weeks). Twin of web PillRow `snap`. */
   snap?: boolean;
+  /** The person is known not to be on Pro: options marked `pro` show the Pro marker before the tap. */
+  showPro?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -99,7 +105,7 @@ export default function SegmentedTabBar<T extends string>({
             onLayout={onSegmentLayout(option.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
-            accessibilityLabel={option.label}
+            accessibilityLabel={showPro && option.pro ? `${option.label}, Pro feature` : option.label}
           >
             {option.glyph ? (
               <View style={styles.icon}>
@@ -112,6 +118,7 @@ export default function SegmentedTabBar<T extends string>({
               <AppText style={[styles.label, dense && styles.labelDense, isActive && styles.labelActive]} numberOfLines={1}>
                 {option.label}
               </AppText>
+              {showPro && option.pro ? <ToneBadge label="Pro" color={colors.premium} size="xs" /> : null}
               {option.count ? (
                 <View style={[styles.countPill, Boolean(option.glyph || option.icon) && styles.countPillOverlay]} accessibilityLabel={`${option.count} new`}>
                   <PulseOnIncrease value={option.count}><AppText style={styles.countText}>{option.count}</AppText></PulseOnIncrease>

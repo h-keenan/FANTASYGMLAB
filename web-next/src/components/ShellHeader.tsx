@@ -12,6 +12,7 @@ import { headerShowsTitle, headerTemplateFor, ribbonCollapsed, type HeaderChip }
 import { useHeaderChips } from "@/lib/headerContext";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
 import { shellLeagueContext, shellParent } from "@/lib/shellNav";
+import { TERMS } from "@/lib/terms";
 import { useSavedLeagues } from "@/lib/useSavedLeagues";
 import { useSearchParams } from "@/lib/useSearchParams";
 import { useShellNav } from "@/lib/useShellNav";
@@ -64,7 +65,7 @@ export function ShellHeader({ actions }: { actions: ReactNode }) {
 
   if (!barVisible) return null;
   const segment = (pathname || "").split("/").filter(Boolean)[0] ?? "";
-  const title = segment ? PAGE_TITLE_BY_SEGMENT[segment] ?? "" : "Home";
+  const title = segment ? PAGE_TITLE_BY_SEGMENT[segment] ?? "" : TERMS.yourLeagues;
   const parent = shellParent(pathname, { leagueId, leagueName: paramName });
   const template = headerTemplateFor(pathname);
   const showTitle = headerShowsTitle(pathname);

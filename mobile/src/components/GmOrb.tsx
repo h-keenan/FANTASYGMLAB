@@ -39,6 +39,8 @@ import { setLastLeague } from '../lib/lastLeague';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { accentColor } from '../lib/destinationAccent';
 import { queryKeys } from '../lib/queryKeys';
+import { TERMS } from '../lib/terms';
+import { splitMoreByBar } from '../lib/pageFamilies';
 import { HOME_SUBTITLE, navPage, navPagesIn, type NavCatalogPage } from '../lib/navCatalog';
 import { ROUTE_BY_PAGE, searchOrbDestinations, type OrbSearchHit } from '../lib/orbTabs';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
@@ -77,6 +79,8 @@ interface Destination {
   /** Paid destination: shows a gold PRO tag to anyone not on Pro, so the lock
    * is visible before the tap (UX audit 2026-11-03, 4.2). */
   pro?: boolean;
+  /** The nav-catalog page key (lib/navCatalog.ts) when the row is a catalog page. */
+  pageKey?: string;
 }
 
 // One icon per catalog page (the pages themselves, their order, labels,
@@ -112,6 +116,7 @@ function destinationFor(colors: ThemeColors, page: NavCatalogPage): Destination 
     color: accentColor(colors, page.label),
     subtitle: page.subtitle,
     pro: page.pro,
+    pageKey: page.key,
   };
 }
 
@@ -121,6 +126,15 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
 
 function gmToolsDestinations(colors: ThemeColors): Destination[] {
   return navPagesIn('tools').map((page) => destinationFor(colors, page));
+}
+
+/** The league part of the menu: pages the bar/orb families do NOT show first, then every page that is a tab of a family as one "Sections" group (derived from lib/pageFamilies.ts, so it cannot drift). */
+function leagueMoreGroups(colors: ThemeColors): { title: string; rows: Destination[] }[] {
+  const { lead, sections } = splitMoreByBar([...coreLeagueDestinations(colors), ...gmToolsDestinations(colors)].map((d) => ({ d, key: d.pageKey ?? '' })));
+  return [
+    { title: 'League tools', rows: lead.map((x) => x.d) },
+    { title: 'Sections', rows: sections.map((x) => x.d) },
+  ].filter((g) => g.rows.length > 0);
 }
 
 // Not a stack route: the Premium row's subscriber variant opens the store's
@@ -135,7 +149,7 @@ const MANAGE_SUBSCRIPTION_ROUTE = '__manage_subscription__';
 function generalDestinations(colors: ThemeColors, storeSubscriber = false, founder = false): Destination[] {
   return [
     // The league switcher; Account (below) owns settings.
-    { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: HOME_SUBTITLE },
+    { label: TERMS.yourLeagues, route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: HOME_SUBTITLE },
     destinationFor(colors, navPage('portfolio')),
     destinationFor(colors, navPage('gm-game')),
     ...(founder
@@ -879,37 +893,21 @@ export default function GmOrb() {
                         near the top" ask (§3) without a separate chip: the very
                         first thing in the list is already labeled with the
                         active league's name. */}
-                    <NavSection label={league.leagueName || 'League'}>
-                      {coreLeagueDestinations(colors).map((destination) => (
-                        <NavRow
-                          key={destination.route}
-                          destination={destination}
-                          isCurrent={destination.route === currentRouteName}
-                          unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
-                          showPro={showProTags}
-                          onPress={() => go(destination)}
-                        />
-                      ))}
-                    </NavSection>
-
-                    <NavSection label="GM Tools">
-                      {gmToolsDestinations(colors).map((destination) => (
-                        <NavRow
-                          key={destination.route}
-                          destination={destination}
-                          isCurrent={destination.route === currentRouteName}
-                          hasNew={
-                            destination.route === 'Trades'
-                              ? tradeHubHasNew
-                              : destination.route === 'Recap'
-                                ? recapReady
-                                : false
-                          }
-                          showPro={showProTags}
-                          onPress={() => go(destination)}
-                        />
-                      ))}
-                    </NavSection>
+                    {leagueMoreGroups(colors).map((group) => (
+                      <NavSection key={group.title} label={group.title === 'League tools' ? league.leagueName || group.title : group.title}>
+                        {group.rows.map((destination) => (
+                          <NavRow
+                            key={destination.route}
+                            destination={destination}
+                            isCurrent={destination.route === currentRouteName}
+                            unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
+                            hasNew={destination.route === 'Trades' ? tradeHubHasNew : destination.route === 'Recap' ? recapReady : false}
+                            showPro={showProTags}
+                            onPress={() => go(destination)}
+                          />
+                        ))}
+                      </NavSection>
+                    ))}
                   </>
                 ) : (
                   <AppText style={styles.sectionNote}>

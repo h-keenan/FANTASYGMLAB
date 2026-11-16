@@ -185,9 +185,9 @@ describe("TradeAnalyzerContent", () => {
 
   it("renders the Trade Hub / Trade Finder / Trade Analyzer tri-tab switcher", () => {
     renderPage();
-    expect(screen.getByRole("tab", { name: "Hub" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Ideas" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Finder" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Analyzer", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Grade a trade", selected: true })).toBeInTheDocument();
   });
 
   it("opens the sheet from a side, scoped to that side's pool, and adds the selection with one Apply", () => {

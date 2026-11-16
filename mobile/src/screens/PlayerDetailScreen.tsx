@@ -1156,13 +1156,13 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         if (result.ok) {
           setWatching(true);
         } else if (result.reason === 'at_cap') {
-          notify.alert('GM Targets is full', `You've hit the cap for this league (${result.cap ?? 'limit reached'}). Remove a target before adding another.`);
+          notify.alert('Watchlist is full', `You've hit the cap for this league (${result.cap ?? 'limit reached'}). Remove a target before adding another.`);
         } else {
-          notify.alert('Could not update GM Targets', 'Please try again in a moment.');
+          notify.alert('Could not update Watchlist', 'Please try again in a moment.');
         }
       }
     } catch {
-      notify.alert('Could not update GM Targets', 'Please try again in a moment.');
+      notify.alert('Could not update Watchlist', 'Please try again in a moment.');
     } finally {
       setWatchBusy(false);
     }
@@ -1308,7 +1308,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             disabled={watchBusy}
           >
             <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
-              {watching ? '★ Watching' : '☆ Add to GM Targets'}
+              {watching ? '★ Watching' : '☆ Add to Watchlist'}
             </AppText>
           </PressableScale>
           {watching ? (

@@ -94,8 +94,6 @@ export function Hero({
 }
 
 const SHORT: Record<string, string> = {
-  'Power Rank': 'Power',
-  'Franchise Rank': 'Franchise',
   'Starter Strength': 'Starters',
   'Bench Strength': 'Bench',
   'Avg Age': 'Age',
@@ -103,7 +101,7 @@ const SHORT: Record<string, string> = {
   'Injured starters': 'Injured',
 };
 
-/** "Power Rank" -> "Power": the summary line uses the short noun. */
+/** "Starter Strength" -> "Starters": the summary line uses the short noun. */
 export function shortLabel(label: string): string {
   return SHORT[label] ?? label;
 }

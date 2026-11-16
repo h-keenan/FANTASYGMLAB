@@ -3401,7 +3401,7 @@ export interface TradeIdea {
   // (sending a Starter At Risk — established value, opportunity already
   // softening), or "" — real signals already on the idea, not new scoring.
   impact_tag: string;
-  // player_ids from package.receive that are on the caller's GM Targets
+  // player_ids from package.receive that are on the caller's Watchlist
   // watchlist — lets the card call out "lands your target" without a
   // second lookup, since package.receive already has the matching name.
   landed_gm_target_player_ids: string[];

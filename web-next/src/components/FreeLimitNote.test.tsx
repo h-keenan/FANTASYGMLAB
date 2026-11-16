@@ -12,14 +12,14 @@ describe("FreeLimitNote", () => {
   });
 
   it("shows the server's limit with an Upgrade link for a Free account", () => {
-    render(<FreeLimitNote kind="cap" noun="GM Targets" limit={3} used={2} isPremium={false} />);
-    expect(screen.getByText("Free: 2 of 3 GM Targets")).toBeInTheDocument();
+    render(<FreeLimitNote kind="cap" noun="Watchlist" limit={3} used={2} isPremium={false} />);
+    expect(screen.getByText("Free: 2 of 3 Watchlist")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Upgrade/ })).toHaveAttribute("href", "/premium");
   });
 
   it("asks a guest to create an account first", () => {
     auth.isGuest = true;
-    render(<FreeLimitNote kind="cap" noun="GM Targets" limit={3} used={0} isPremium={false} />);
+    render(<FreeLimitNote kind="cap" noun="Watchlist" limit={3} used={0} isPremium={false} />);
     expect(screen.getByRole("link", { name: /Create an account/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Upgrade/ })).not.toBeInTheDocument();
   });

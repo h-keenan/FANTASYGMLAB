@@ -1,3 +1,4 @@
+import { TERMS } from "@/lib/terms";
 import type { TabIconName } from "@/lib/tabIcons";
 import { ModuleMore } from "@/components/ui/ModuleMore";
 import Link from "next/link";
@@ -19,7 +20,7 @@ export const GM_PLAN_TABS = [
   { label: "Overview", value: "overview", glyph: "overview" },
   { label: "Trades", value: "trades", glyph: "trades" },
   { label: "Core", value: "core", glyph: "core" },
-  { label: "Watching", value: "watching", glyph: "watching" },
+  { label: TERMS.watchlist, value: "watching", glyph: "watching" },
 ] as const;
 export type GmPlanTab = (typeof GM_PLAN_TABS)[number]["value"];
 
@@ -257,7 +258,7 @@ function SnapshotCell({ tile }: { tile: PlanSnapshotTile }) {
 /** Plan Snapshot: Playoff Odds / Roster Power / Draft Capital lead, then the rest. */
 export function PlanSnapshotGrid({ tiles, analysisHref }: { tiles: PlanSnapshotTile[]; analysisHref?: string }) {
   if (tiles.length === 0) return null;
-  const short: Record<string, string> = { power: "Power", capital: "Capital", odds: "Odds", record: "Record", starter: "Starters", bench: "Bench", age: "Age" };
+  const short: Record<string, string> = { power: TERMS.thisSeason, capital: "Capital", odds: "Odds", record: "Record", starter: "Starters", bench: "Bench", age: "Age" };
   return (
     <CompactModule
       id="gmplan.snapshot"

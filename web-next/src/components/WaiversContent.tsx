@@ -1,3 +1,4 @@
+import { TERMS } from "@/lib/terms";
 import { PageTabBar } from "@/components/PageTabBar";
 import type { TabIconName } from "@/lib/tabIcons";
 import { isEspnLeagueId } from "@/lib/leaguePlatform";
@@ -68,7 +69,7 @@ import { Collapse } from "@/components/ui/Presence";
  * no ranking, confidence or FAAB logic here, only presentation. Reason
  * chips come only from already-computed signals (waiverReasonChips).
  *
- * The Watchlist tab is the user's GM Targets (getGmTargets) filtered to
+ * The Watchlist tab is the user's Watchlist (getGmTargets) filtered to
  * players who are currently free agents in this league. There is no in-app
  * claim/add API, so the disclosure below is kept (short line + ⓘ).
  */
@@ -469,7 +470,7 @@ export function WaiversContent({
   highlightPlayerId?: string;
   /** `?tab=` deep link (the GM orb's "Waivers > Explore"); wins over the player-based default. */
   initialTab?: WaiverTab;
-  /** Needed only for the Watchlist tab (GM Targets lookup). */
+  /** Needed only for the Watchlist tab (Watchlist lookup). */
   leagueId?: string;
 }) {
   // A GM Plan/Dashboard deep link to a player who isn't on the Recommended
@@ -502,7 +503,7 @@ export function WaiversContent({
   const notice = data.reason ? waiversReasonMessage(data.reason) : null;
   const limitedNote = limitedDataNote(data.model_status);
 
-  // GM Targets are only fetched when the Watchlist tab is first opened.
+  // Watchlist are only fetched when the Watchlist tab is first opened.
   useEffect(() => {
     if (tab !== "watchlist" || targetIds !== null || !leagueId) return;
     let cancelled = false;
@@ -837,7 +838,7 @@ export function WaiversContent({
                 in Priority Adds above. Kickers and defenses are never stash candidates.
               </InfoTip>
               <TileRow title="Top Stash Candidates" players={data.stash_candidates} highlightPlayerId={highlightPlayerId} />
-              <TileRow title="Bench Depth" players={data.watchlist_candidates} highlightPlayerId={highlightPlayerId} />
+              <TileRow title={TERMS.depthAdds} players={data.watchlist_candidates} highlightPlayerId={highlightPlayerId} />
               <TileRow title="FAAB Shortlist" players={data.faab_targets} highlightPlayerId={highlightPlayerId} />
             </>
           )}
@@ -877,16 +878,16 @@ export function WaiversContent({
       {tab === "watchlist" ? (
         <section className="flex flex-col gap-3" aria-labelledby="watchlist-heading">
           <SectionHeading>
-            <span id="watchlist-heading">Your GM Targets on the wire</span>
+            <span id="watchlist-heading">Your Watchlist on the wire</span>
           </SectionHeading>
           {targetsFailed || !leagueId ? (
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Couldn&apos;t load your GM Targets.
+              Couldn&apos;t load your Watchlist.
             </p>
           ) : targetIds === null ? (
-            <SkeletonList label="GM Targets" count={3} />
+            <SkeletonList label={TERMS.watchlist} count={3} />
           ) : watchlistPlayers.length === 0 ? (
-            <EmptyState title="None of your GM Targets are free agents right now." />
+            <EmptyState title="None of your Watchlist are free agents right now." />
           ) : (
             <div className="glass-surface flex flex-col px-3">
               {watchlistPlayers.map((player) => (
@@ -900,7 +901,7 @@ export function WaiversContent({
               className="text-sm font-bold self-start"
               style={{ color: "var(--color-accent)" }}
             >
-              Manage GM Targets →
+              Manage Watchlist →
             </Link>
           ) : null}
         </section>

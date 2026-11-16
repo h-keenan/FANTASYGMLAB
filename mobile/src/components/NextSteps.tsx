@@ -13,9 +13,9 @@ import { spacing } from '../theme';
  * (Alerts, Matchup). Mirrors web-next's components/NextSteps.tsx: keep the
  * step list and copy identical.
  */
-export type NextStepKey = 'matchup' | 'waivers' | 'trade-hub' | 'trade-finder' | 'trade-analyzer' | 'my-team' | 'alerts';
+export type NextStepKey = 'matchup' | 'waivers' | 'trade-hub' | 'trade-finder' | 'trade-analyzer' | 'my-team' | 'alerts' | 'gm-plan';
 
-type StepRoute = 'Matchup' | 'Waivers' | 'Trades' | 'MyTeam' | 'Alerts';
+type StepRoute = 'Matchup' | 'Waivers' | 'Trades' | 'MyTeam' | 'Alerts' | 'GmPlan';
 
 export const NEXT_STEPS: Record<
   NextStepKey,
@@ -28,6 +28,7 @@ export const NEXT_STEPS: Record<
   'trade-analyzer': { label: 'Analyze a trade', route: 'Trades', params: { initialTab: 'make' } },
   'my-team': { label: 'Review your roster', route: 'MyTeam' },
   alerts: { label: 'See news on your players', route: 'Alerts' },
+  'gm-plan': { label: 'Open your GM Plan', route: 'GmPlan' },
 };
 
 export default function NextSteps({

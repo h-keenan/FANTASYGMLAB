@@ -35,8 +35,9 @@ describe("AppShellBar", () => {
     nav.leagueId = undefined;
     render(<AppShellBar />);
     const bar = screen.getByRole("navigation", { name: "Main sections" });
-    expect(within(bar).getAllByRole("link").map((l) => l.textContent)).toEqual(["Home", "Portfolio", "Fantasy Sim", "News"]);
-    expect(within(bar).getByRole("link", { name: "Portfolio" })).toHaveAttribute("aria-current", "page");
+    expect(within(bar).getAllByRole("link").map((l) => l.textContent)).toEqual(["Your leagues", "PortfolioProPro feature", "Fantasy Sim", "News"]); // Portfolio is Pro: the marker shows to a Free person
+    expect(within(bar).getByTestId("nav-pro-marker")).toBeInTheDocument();
+    expect(within(bar).getByRole("link", { name: "Portfolio, Pro feature" })).toHaveAttribute("aria-current", "page");
     nav.pathname = "/dashboard/league-1";
     nav.leagueId = "league-1";
   });
@@ -45,8 +46,12 @@ describe("AppShellBar", () => {
     render(<AppShellBar />);
     fireEvent.click(screen.getByRole("button", { name: "More" }));
     const menu = screen.getByRole("navigation", { name: "All pages" });
-    expect(within(menu).getByRole("region", { name: "League" })).toBeInTheDocument();
-    expect(within(menu).getByRole("region", { name: "GM tools" })).toBeInTheDocument();
+    // Pages the bar does not show lead; the ones it does fold into one "Sections" group (derived from pageFamilies).
+    const lead = within(menu).getByRole("region", { name: "League tools" });
+    expect(within(lead).getByRole("link", { name: /GM Plan/ })).toBeInTheDocument();
+    expect(within(lead).queryByRole("link", { name: /Waivers/ })).toBeNull();
+    const sections = within(menu).getByRole("region", { name: "Sections" });
+    expect(within(sections).getByRole("link", { name: /Waivers/ })).toBeInTheDocument();
     expect(within(menu).getByRole("link", { name: /Today/ })).toBeInTheDocument();
     expect(within(menu).getByRole("link", { name: /Fantasy Sim/ })).toBeInTheDocument();
     expect(within(menu).getAllByTestId("nav-pro-marker").length).toBeGreaterThan(0);

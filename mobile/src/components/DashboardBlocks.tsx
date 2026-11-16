@@ -1,3 +1,4 @@
+import { TERMS } from '../lib/terms';
 import { openInsight } from '../lib/insightNav';
 import ModuleMore from './ModuleMore';
 import type { InsightKey } from '../lib/insightLinks';
@@ -183,8 +184,8 @@ export function DashboardTeamStats({
     onPress,
   });
   const items: StatStripItem[] = [
-    rank('Power Rank', 'trophy-outline', snapshot.power_rank, !!snapshot.power_rank_tied, open('power')),
-    rank('Franchise Rank', 'shield-outline', snapshot.franchise_rank, !!snapshot.franchise_rank_tied, open('franchise')),
+    rank(TERMS.thisSeason, 'trophy-outline', snapshot.power_rank, !!snapshot.power_rank_tied, open('power')),
+    rank(TERMS.longTerm, 'shield-outline', snapshot.franchise_rank, !!snapshot.franchise_rank_tied, open('franchise')),
     rank('Starter Strength', 'link-outline', snapshot.starter_rank, !!snapshot.starter_rank_tied, open('starter')),
     rank('Bench Strength', 'layers-outline', snapshot.bench_rank, !!snapshot.bench_rank_tied, open('bench')),
     {

@@ -15,6 +15,8 @@ export type BottomTab = {
   badge?: number;
   /** Route for tabs that navigate (the site shell); in-page tabs leave it off. */
   href?: string;
+  /** Paid tab: the bar shows the Pro marker (to anyone not on Pro) before the tap, same as the More rows. */
+  pro?: boolean;
 };
 
 /** 44px is the smallest tap target the bar may render. */
@@ -26,12 +28,16 @@ export function bottomTabBadgeText(count: number | null | undefined): string | n
   return count > 9 ? "9+" : String(Math.floor(count));
 }
 
-/** Accessible name: the label plus the count in words, so a badge is never icon-only. */
-export function bottomTabAriaLabel(tab: Pick<BottomTab, "label" | "badge">): string {
+/** Accessible name: the label plus the count in words, so a badge is never icon-only. `showPro` adds ", Pro feature" for a paid tab. */
+export function bottomTabAriaLabel(tab: Pick<BottomTab, "label" | "badge" | "pro">, showPro = false): string {
   const text = bottomTabBadgeText(tab.badge);
-  if (!text) return tab.label;
-  const n = Math.floor(tab.badge ?? 0);
-  return `${tab.label}, ${n} new`;
+  const base = text ? `${tab.label}, ${Math.floor(tab.badge ?? 0)} new` : tab.label;
+  return showPro && tab.pro ? `${base}, Pro feature` : base;
+}
+
+/** Whether a tab wears the Pro marker: it is paid and the person is known not to be on Pro (pass `useIsPro() === false`). */
+export function tabShowsPro(tab: Pick<BottomTab, "pro"> | Pick<PillContextTab, "pro">, notPro: boolean): boolean {
+  return Boolean(tab.pro && notPro);
 }
 
 /** The Fantasy Sim game's bottom tabs. The offseason has no Players tab and calls Home "Offseason". */
@@ -117,7 +123,7 @@ export function simOrbAriaLabel(currentLabel: string, inbox: number | null | und
 // ---- Smart pill: page context (web components/BottomPillContext.tsx + BottomTabBar; mobile components/BottomPill.tsx) ----
 
 /** One page-level tab shown in the pill's page segment (the page-family tabs: Lineup | Players | Waivers | Matchup). */
-export type PillContextTab = { key: string; label: string; /** Short form for the tight pill ("Hist."); the full label stays the accessible name. */ short?: string; glyph?: TabIconName; badge?: number; /** Web: the tab is a route, rendered as a link (client navigation, opens in a new tab on demand). onSelect still fires. */ href?: string };
+export type PillContextTab = { key: string; label: string; /** Paid tab: wears the Pro marker for anyone not on Pro. */ pro?: boolean; /** Short form for the tight pill ("Hist."); the full label stays the accessible name. */ short?: string; glyph?: TabIconName; badge?: number; /** Web: the tab is a route, rendered as a link (client navigation, opens in a new tab on demand). onSelect still fires. */ href?: string };
 
 /** The one primary action of a page (Auto-set, New trade, Claim). Rendered as the accent chip at the end of the segment. */
 export type PillContextAction = { key: string; label: string; glyph?: TabIconName; disabled?: boolean; busy?: boolean; onPress: () => void; /** Web: render as a link to this route (onPress still fires). */ href?: string };

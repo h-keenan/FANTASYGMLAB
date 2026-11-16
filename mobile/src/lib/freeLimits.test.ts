@@ -6,8 +6,8 @@ import { GLOSSARY } from './glossary.ts';
 import { BEGINNER_HELP } from './experienceCopy.ts';
 
 test('cap note shows used of the server limit', () => {
-  const note = freeLimitNote({ kind: 'cap', noun: 'GM Targets', limit: 3, used: 2, isPremium: false });
-  assert.equal(note?.text, 'Free: 2 of 3 GM Targets');
+  const note = freeLimitNote({ kind: 'cap', noun: 'Watchlist', limit: 3, used: 2, isPremium: false });
+  assert.equal(note?.text, 'Free: 2 of 3 Watchlist');
   assert.equal(note?.cta, 'upgrade');
 });
 

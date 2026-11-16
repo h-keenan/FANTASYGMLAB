@@ -27,9 +27,9 @@ import {
  * - "Find trades" (players on my roster): Trade Finder with this player
  *   selected and the search already run. Trade Finder's own Premium gate
  *   applies, exactly as for a manual search.
- * - "Add to GM Targets" (players not on my roster): the same watch toggle
+ * - "Add to Watchlist" (players not on my roster): the same watch toggle
  *   as mobile's Player Detail (☆ Add / ★ Watching), on the existing GM
- *   Targets endpoints, with the same "GM Targets is full" message.
+ *   Targets endpoints, with the same "Watchlist is full" message.
  *
  * Ownership comes from GET .../my-roster plus .../rosters (the same pair
  * mobile's useRosterOwnership reads). Until it answers, or if my-roster fails,
@@ -48,7 +48,7 @@ export function PlayerLeagueActions({
   leagueId: string;
   leagueName: string;
   playerId: string;
-  /** GM Targets provenance, e.g. "player_quick_view" (mobile sends
+  /** Watchlist provenance, e.g. "player_quick_view" (mobile sends
    * "player_detail"). */
   sourceSurface: string;
   hideAddToTrade?: boolean;
@@ -125,14 +125,14 @@ export function PlayerLeagueActions({
           setWatching(true);
         } else if (result.reason === "at_cap") {
           setWatchMessage(
-            `GM Targets is full (${result.cap ?? "limit reached"}). Remove a target before adding another.`,
+            `Watchlist is full (${result.cap ?? "limit reached"}). Remove a target before adding another.`,
           );
         } else {
-          setWatchMessage("Could not update GM Targets. Please try again in a moment.");
+          setWatchMessage("Could not update Watchlist. Please try again in a moment.");
         }
       }
     } catch {
-      setWatchMessage("Could not update GM Targets. Please try again in a moment.");
+      setWatchMessage("Could not update Watchlist. Please try again in a moment.");
     } finally {
       setWatchBusy(false);
     }
@@ -191,7 +191,7 @@ export function PlayerLeagueActions({
           disabled={watchBusy}
           aria-pressed={watching}
         >
-          {watching ? "★ Watching" : "☆ Add to GM Targets"}
+          {watching ? "★ Watching" : "☆ Add to Watchlist"}
         </button>
       ) : null}
       {watchMessage ? (

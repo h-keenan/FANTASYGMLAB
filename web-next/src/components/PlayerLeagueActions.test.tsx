@@ -137,18 +137,18 @@ describe("PlayerLeagueActions", () => {
     expect(screen.queryByRole("link", { name: "Build an offer" })).toBeNull();
   });
 
-  it("offers Find trades (not GM Targets) for a player on my roster", async () => {
+  it("offers Find trades (not Watchlist) for a player on my roster", async () => {
     renderActions("mine-1");
     await act(async () => {});
     expect(screen.getByRole("link", { name: "Find trades" })).toHaveAttribute(
       "href",
       "/trade-finder/L1?name=Dynasty+Overlords&playerId=mine-1",
     );
-    expect(screen.queryByRole("button", { name: /GM Targets/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Watchlist/ })).toBeNull();
     expect(api.getGmTargets).not.toHaveBeenCalled();
   });
 
-  it("offers Add to GM Targets (not Find trades) for someone else's player, and toggles it", async () => {
+  it("offers Add to Watchlist (not Find trades) for someone else's player, and toggles it", async () => {
     vi.mocked(api.addGmTarget).mockResolvedValue({ ok: true, reason: "" });
     vi.mocked(api.removeGmTarget).mockResolvedValue({ ok: true, reason: "" });
     renderActions("other-1");
@@ -156,7 +156,7 @@ describe("PlayerLeagueActions", () => {
     expect(screen.queryByRole("link", { name: "Find trades" })).toBeNull();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "☆ Add to GM Targets" }));
+      fireEvent.click(screen.getByRole("button", { name: "☆ Add to Watchlist" }));
     });
     expect(api.addGmTarget).toHaveBeenCalledWith("L1", "other-1", "player_quick_view");
     const watching = screen.getByRole("button", { name: "★ Watching" });
@@ -166,7 +166,7 @@ describe("PlayerLeagueActions", () => {
       fireEvent.click(watching);
     });
     expect(api.removeGmTarget).toHaveBeenCalledWith("L1", "other-1");
-    expect(screen.getByRole("button", { name: "☆ Add to GM Targets" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "☆ Add to Watchlist" })).toBeInTheDocument();
   });
 
   it("shows an already-watched player as Watching", async () => {
@@ -179,15 +179,15 @@ describe("PlayerLeagueActions", () => {
     expect(screen.getByRole("button", { name: "★ Watching" })).toBeInTheDocument();
   });
 
-  it("explains a full GM Targets list", async () => {
+  it("explains a full Watchlist list", async () => {
     vi.mocked(api.addGmTarget).mockResolvedValue({ ok: false, reason: "at_cap", cap: 25 });
     renderActions("other-1");
     await act(async () => {});
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "☆ Add to GM Targets" }));
+      fireEvent.click(screen.getByRole("button", { name: "☆ Add to Watchlist" }));
     });
-    expect(screen.getByRole("status")).toHaveTextContent("GM Targets is full (25)");
-    expect(screen.getByRole("button", { name: "☆ Add to GM Targets" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Watchlist is full (25)");
+    expect(screen.getByRole("button", { name: "☆ Add to Watchlist" })).toBeInTheDocument();
   });
 
   it("shows no trade actions when the roster can't be loaded", async () => {
@@ -196,6 +196,6 @@ describe("PlayerLeagueActions", () => {
     await act(async () => {});
     expect(screen.queryByRole("link", { name: "Add to Trade" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Find trades" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /GM Targets/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Watchlist/ })).toBeNull();
   });
 });

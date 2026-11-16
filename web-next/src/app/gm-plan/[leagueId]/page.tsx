@@ -64,7 +64,7 @@ export default function GmPlanPage() {
     let cancelled = false;
 
     // Revision 20 (2026-10-18): GM Plan absorbed Team Situation (stance +
-    // Protected Players) and GM Targets (the Watching list) — see
+    // Protected Players) and Watchlist (the Watching list) — see
     // GmPlanContent's own docstring. One page now needs all five of these,
     // same five calls the two standalone pages made between them before.
     Promise.all([

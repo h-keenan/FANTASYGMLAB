@@ -22,6 +22,7 @@ export function familyPillContext(
     key: tab.key,
     label: tab.label,
     short: tab.short,
+    pro: tab.pro,
     glyph: tab.glyph as TabIconName,
     badge: opts.counts?.[tab.key],
     // Trade History is account-wide: it takes the league as `?league=` so the shell keeps the league context.

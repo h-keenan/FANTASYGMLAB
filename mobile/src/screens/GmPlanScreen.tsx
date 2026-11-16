@@ -1,3 +1,4 @@
+import { TERMS } from '../lib/terms';
 import { useUndoableRemoval } from '../components/UndoToast';
 import ModuleMore from '../components/ModuleMore';
 import Button from '../components/Button';
@@ -73,7 +74,7 @@ const TABS: Array<{ key: Tab; label: string; glyph: TabIconName }> = [
   { key: 'overview', label: 'Overview', glyph: 'overview' },
   { key: 'trades', label: 'Trades', glyph: 'trades' },
   { key: 'core', label: 'Core', glyph: 'core' },
-  { key: 'watching', label: 'Watching', glyph: 'watching' },
+  { key: 'watching', label: TERMS.watchlist, glyph: 'watching' },
 ];
 
 const TILE_ICON: Record<PlanSnapshotTile['key'], IconName> = {
@@ -92,11 +93,11 @@ const TILE_ICON: Record<PlanSnapshotTile['key'], IconName> = {
  * shared GmStanceContext, plus the real trade-deadline banner), the Plan
  * Snapshot tiles and the top trade ideas; Trades adds the rest of the
  * season-arc roadmap; Core is the protected (untouchable) players; Watching
- * is the GM Targets list. Everything traces to a real signal; a tile or
+ * is the Watchlist list. Everything traces to a real signal; a tile or
  * section with no data is omitted or says so honestly. Mirrors web-next's
  * GmPlanContent.
  */
-const SNAPSHOT_SHORT: Record<string, string> = { power: 'Power', capital: 'Capital', odds: 'Odds', record: 'Record', starter: 'Starters', bench: 'Bench', age: 'Age' };
+const SNAPSHOT_SHORT: Record<string, string> = { power: TERMS.thisSeason, capital: 'Capital', odds: 'Odds', record: 'Record', starter: 'Starters', bench: 'Bench', age: 'Age' };
 
 export default function GmPlanScreen({ route, navigation }: Props) {
   const { openPlayer: openQuickView } = usePlayerQuickView();
@@ -116,7 +117,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const [snapshot, setSnapshot] = useState<PlanSnapshotTile[]>([]);
   const [roster, setRoster] = useState<LineupPlayer[]>([]);
   const [targets, setTargets] = useState<GmTarget[]>([]);
-  // The server's GM Targets cap for Free (GET .../gm-targets), for the note.
+  // The server's Watchlist cap for Free (GET .../gm-targets), for the note.
   const [targetsMeta, setTargetsMeta] = useState<{ freeLimit?: number; isPremium?: boolean }>({});
   const [ranked, setRanked] = useState<Map<string, RankedPlayer>>(new Map());
   const [busyPlayerId, setBusyPlayerId] = useState<string | null>(null);
@@ -184,7 +185,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const targetsNote = (
     <FreeLimitNote
       kind="cap"
-      noun="GM Targets"
+      noun={TERMS.watchlist}
       limit={targetsMeta.freeLimit}
       used={targets.length}
       isPremium={targetsMeta.isPremium}
@@ -597,7 +598,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
 
         {tab === 'watching' ? (
           <>
-            <SectionHeading title="Watching" icon="eye-outline" caption="Considering or monitoring; not trade-protected." />
+            <SectionHeading title={TERMS.watchlist} icon="eye-outline" caption="Considering or monitoring; not trade-protected." />
             {targetsNote}
             {watching.length === 0 ? (
               <EmptyState

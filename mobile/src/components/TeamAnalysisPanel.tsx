@@ -1,3 +1,4 @@
+import { TERMS } from '../lib/terms';
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -202,7 +203,7 @@ function buildRankMetrics(
     // flash: Roster Power = overall roster strength/firepower.
     { key: 'power', label: 'Roster Power', icon: 'flash', rank: team.power_rank, tied: team.power_rank_tied, onPress: callbacks.onOpenTeams },
     // star: Franchise = long-term franchise value, not a single-season read.
-    { key: 'franchise', label: 'Franchise', icon: 'star', rank: team.franchise_rank, tied: team.franchise_rank_tied, onPress: callbacks.onOpenFranchise },
+    { key: 'franchise', label: TERMS.longTerm, icon: 'star', rank: team.franchise_rank, tied: team.franchise_rank_tied, onPress: callbacks.onOpenFranchise },
     // file-tray-stacked: Draft Capital = the stack of picks a team holds.
     { key: 'draft', label: 'Draft Capital', icon: 'file-tray-stacked-outline', rank: team.draft_capital_rank, tied: team.draft_capital_rank_tied, onPress: callbacks.onOpenDraftCenter },
     // american-football: Starters = the active lineup on the field.

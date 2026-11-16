@@ -63,17 +63,17 @@ describe("template components: collapsed form carries data", () => {
         id="t.stats"
         title="My Team"
         items={[
-          { glyph: "power", label: "Power Rank", value: "#3", fill: 0.8 },
+          { glyph: "power", label: "This season", value: "#3", fill: 0.8 },
           { glyph: "starter", label: "Starter Strength", value: "#5", fill: 0.5 },
           { glyph: "age", label: "Avg Age", value: "26.1" },
         ]}
       />,
     );
-    expect(screen.getByRole("group", { name: "My Team: Power #3 · Starters #5 · Age 26.1" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "My Team: This season #3 · Starters #5 · Age 26.1" })).toBeInTheDocument();
     expect(screen.getAllByTestId("stat-strip-tile")).toHaveLength(3);
     expect(screen.queryByTestId("stat-strip-bars")).toBeNull();
     fireEvent.click(screen.getByTestId("stat-strip-toggle"));
-    expect(screen.getByTestId("stat-strip-bars")).toHaveTextContent("Power Rank");
+    expect(screen.getByTestId("stat-strip-bars")).toHaveTextContent("This season");
     expect(screen.getAllByRole("progressbar")).toHaveLength(2);
     expect(screen.getByTestId("stat-strip-bars")).toHaveTextContent("26.1");
   });

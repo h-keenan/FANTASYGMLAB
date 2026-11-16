@@ -786,8 +786,8 @@ export function DesignSystemContent() {
               columns={4}
               items={[
                 { glyph: "record", label: "Record", value: "8-4" },
-                { glyph: "power", label: "Power Rank", value: "#2", tone: "positive" },
-                { glyph: "franchise", label: "Franchise Rank", value: "#1", tone: "premium" },
+                { glyph: "power", label: "This season", value: "#2", tone: "positive" },
+                { glyph: "franchise", label: "Long term", value: "#1", tone: "premium" },
                 { glyph: "age", label: "Avg Age", value: "26.4" },
               ]}
             />

@@ -345,6 +345,10 @@
   scale: var(--press-scale);
   opacity: var(--press-opacity);
 }
+/* WhyCorner: the 44px "why" target pinned inside a tappable tile (the tile link keeps the rest of the surface). */
+.ui-why-corner { position: absolute; top: 0; right: 0; width: var(--touch-target-min); height: var(--touch-target-min); display: flex; align-items: flex-start; justify-content: flex-end; pointer-events: none; }
+.ui-why-corner-btn { pointer-events: auto; width: 20px; height: 20px; margin: 4px; align-items: center; justify-content: center; border-radius: 999px; font-size: 0.6875rem; font-weight: 800; line-height: 1; color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
+.ui-why-corner-btn::after { inset: -12px -4px -12px -12px; }
 .ui-why-body {
   display: flex;
   flex-direction: column;
@@ -787,6 +791,9 @@
 }
 .bottom-tab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
 .bottom-tab[aria-current="page"] .bottom-tab-badge { left: auto; right: 6px; }
+/* The Pro marker on a paid tab (Portfolio): over the icon's top-right corner, so the label-less tab keeps its 44px width. */
+.bottom-tab-pro { position: absolute; top: 0; right: 0; pointer-events: none; }
+.bottom-tab[aria-current="page"] .bottom-tab-pro { position: static; margin-left: 2px; }
 .bottom-tab-badge {
   position: absolute;
   top: 3px;
@@ -887,6 +894,7 @@
   -webkit-tap-highlight-color: transparent; transition: color 180ms ease;
 }
 .pill-tab[aria-selected="true"] { color: var(--color-text-primary); }
+.pill-tab-pro { display: inline-flex; margin-left: 4px; pointer-events: none; }
 .pill-tab-badge { margin-left: 4px; padding: 1px 5px; border-radius: 999px; font-size: 0.625rem; background: var(--color-accent); color: var(--color-on-accent, #001018); }
 .pill-primary {
   flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; min-height: var(--bar-button-min-height); margin: 0 0 0 4px; padding: 0 14px;

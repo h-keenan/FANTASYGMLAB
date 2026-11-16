@@ -2415,7 +2415,7 @@ export interface RankedPlayerStat {
 
 /** League-adjusted player rankings (GET .../rankings) — mirrors mobile's
  * RankedPlayer (mobile/src/lib/api.ts) exactly, the reference shape for
- * this endpoint. GM Targets (Revision 11) is this app's first caller; a
+ * this endpoint. Watchlist (Revision 11) is this app's first caller; a
  * future Players/Player Detail page should reuse this same type rather
  * than hand-rolling a second one. */
 export interface RankedPlayer {
@@ -2494,7 +2494,7 @@ export interface LeagueIdpValuesResponse {
   method?: string;
 }
 
-/** A saved GM Targets watchlist row (GET/POST/DELETE/PATCH .../gm-targets) —
+/** A saved Watchlist watchlist row (GET/POST/DELETE/PATCH .../gm-targets) —
  * preference data only (identity + the one user-set `untouchable` flag);
  * name/position/team/rank are joined client-side from LeagueRankingsResponse,
  * the same client-side-join contract mobile's GmTargetsScreen.tsx already
@@ -4621,7 +4621,7 @@ export const api = {
     return authorizedRequest<PlayerNewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?${query.toString()}`);
   },
 
-  // League-adjusted player rankings — GM Targets (Revision 11) joins this
+  // League-adjusted player rankings — Watchlist (Revision 11) joins this
   // against getGmTargets' bare preference rows for name/position/team/rank/
   // injury, the same client-side join mobile's GmTargetsScreen.tsx does.
   getLeagueIdpValues: (leagueId: string, options: { includeBelow?: boolean } = {}) =>
@@ -4649,14 +4649,14 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?ids=${encodeURIComponent(ids.join(","))}&lens=${encodeURIComponent(lens)}`,
     ),
 
-  // GM Targets (Revision 11) — the GM_TOOLS watchlist. Reads/writes the
+  // Watchlist (Revision 11) — the GM_TOOLS watchlist. Reads/writes the
   // exact same durable table (modules/gm_targets.py) and endpoints mobile's
   // GmTargetsScreen.tsx already calls; no new backend logic for this page.
   getGmTargets: (leagueId: string) =>
     authorizedRequest<GmTargetsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`),
   // Team Situation (Revision 19) is the one other caller of this add path —
   // protecting a player not yet watched adds it first (source_surface
-  // "team_stance"), same as mobile's TeamStanceScreen.tsx. GM Targets' own
+  // "team_stance"), same as mobile's TeamStanceScreen.tsx. Watchlist' own
   // page still has no in-page add flow (see GmTargetsContent's docstring).
   addGmTarget: (leagueId: string, playerId: string, sourceSurface = "gm_targets") =>
     authorizedRequest<GmTargetMutationResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`, {

@@ -1,5 +1,6 @@
 "use client";
 
+import { TERMS } from "@/lib/terms";
 import { useHeaderContext } from "@/lib/headerContext";
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
@@ -167,7 +168,7 @@ function YourStandingCard({ teams, myRosterId }: { teams: TeamRanking[]; myRoste
   const powerPercent = percentileFromRank(me.power_rank, total);
   const ring = powerPercent === null ? null : Math.round(powerPercent);
   const minis: { key: RankBoardKey; label: string }[] = [
-    { key: "franchise", label: "Franchise" },
+    { key: "franchise", label: TERMS.longTerm },
     { key: "draft_capital", label: "Draft Capital" },
     { key: "starter", label: "Starters" },
     { key: "bench", label: "Bench" },

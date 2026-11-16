@@ -9,7 +9,7 @@ FREE_INCLUDES = (
     ("League import", "Load Sleeper leagues and keep the main roster tools useful."),
     ("Dashboard overview", "Today's Game Plan, limited Next Moves, and basic team needs."),
     ("What Changed", "Session history of meaningful recommendation transitions."),
-    ("GM Targets (limited)", "Save up to three players you're actively considering."),
+    ("Watchlist (limited)", "Save up to three players you're actively considering."),
     ("Share Recommendation", "Download branded share cards from Trade Hub, Waivers, and Player Quick View."),
     ("Players explorer", "Filter the dynasty market and open Player Quick View."),
     ("Trade preview", "Top generated trade ideas so the page has immediate value."),
@@ -37,7 +37,7 @@ PREMIUM_INCLUDED_NOW = (
         "Durable cross-session history of material GM priority changes beyond the current session.",
     ),
     (
-        "GM Targets (full board)",
+        "Watchlist (full board)",
         "Save up to fifty players per league with PQV Add/Remove and workflow handoffs.",
     ),
     (
@@ -73,8 +73,8 @@ MOBILE_PREMIUM_BENEFIT_LINES: tuple[dict[str, str], ...] = (
         "line": "Every Trade Hub idea, not just the first 2",
     },
     {
-        "title": "GM Targets (full board)",
-        "line": "GM Targets watchlist up to 50 players (Free is capped at 3)",
+        "title": "Watchlist (full board)",
+        "line": "Watchlist up to 50 players (Free is capped at 3)",
     },
     {
         "title": "Portfolio",
@@ -123,7 +123,7 @@ def premium_comparison() -> list[dict[str, str]]:
         },
         {
             "key": "gm_targets",
-            "label": "GM Targets",
+            "label": "Watchlist",
             "free": f"{gm_targets.MAX_TARGETS_FREE} players",
             "pro": f"{gm_targets.MAX_TARGETS_PREMIUM} players",
         },

@@ -47,7 +47,7 @@ export function familyRoute(tab: PageTabDef, leagueId: string, leagueName: strin
   }
 }
 
-export type FamilyTabOption = { key: string; label: string; glyph: TabIconName };
+export type FamilyTabOption = { key: string; label: string; glyph: TabIconName; /** Paid tab: wears the Pro marker for anyone not on Pro. */ pro?: boolean };
 
 /** The strip's options for a league: all tabs for Sleeper, only openable ones for imported leagues. */
 export function familyTabOptions(family: PageTabFamilyKey, leagueId: string): FamilyTabOption[] {
@@ -59,7 +59,7 @@ export function familyTabOptions(family: PageTabFamilyKey, leagueId: string): Fa
       if (family === 'trades') return tab.key === 'trade_analyzer';
       return espnRouteSupported(familyRoute(tab, leagueId, '').name);
     })
-    .map((tab) => ({ key: tab.key, label: tab.label, glyph: tab.glyph as TabIconName }));
+    .map((tab) => ({ key: tab.key, label: tab.label, glyph: tab.glyph as TabIconName, pro: tab.pro }));
 }
 
 /** Every family tab key, for tests. */
