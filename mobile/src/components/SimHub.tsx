@@ -16,7 +16,7 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { simGameLiteLine, simSetupBody, type SimGameCreateBody, type SimGameLite, type SimGameOptionsResponse, type SimSetupState } from '../lib/simGame';
 import { simHubRow } from '../lib/simHub';
-import { simHubGameName, simHubMode, simHubPresetChips, simHubPresets, type SimPresetId } from '../lib/simHubPresets';
+import { simHubEmptyHint, simHubGameName, simHubMode, simHubPresetChips, simHubPresets, type SimPresetId } from '../lib/simHubPresets';
 import type { SimGradeInput } from '../lib/simGrade';
 import { spacing, type ThemeColors } from '../theme';
 
@@ -69,9 +69,9 @@ export default function SimHub({
       </View>
       {block ? (
         <View style={styles.tight}>
-          <AppText style={styles.muted} testID="new-game-block">{block}</AppText>
+          <AppText style={styles.body} testID="new-game-block">{block}</AppText>
           <View style={styles.wrapRow}>
-            {isPremium === false ? <Button label="Go Pro" variant="premiumOutline" size="sm" onPress={onGoPro} /> : null}
+            {isPremium === false ? <Button label="Go Pro" variant="premium" size="sm" onPress={onGoPro} /> : null}
             <Button label="Manage games / delete one" variant="secondary" size="sm" onPress={onManage} />
           </View>
         </View>
@@ -91,7 +91,7 @@ export default function SimHub({
       <View style={styles.stack}>
         <AppText style={styles.kicker}>{`Your games${games.length ? ` · ${games.length}` : ''}`}</AppText>
         {games.length === 0 ? (
-          <EmptyState icon="american-football-outline" title="No games yet" subtitle="Tap New game and pick Quick. It takes about 10 minutes." />
+          <EmptyState icon="american-football-outline" title="No games yet" subtitle={simHubEmptyHint(simHubPresets(options))} />
         ) : (
           <>
             {managing ? <AppText style={styles.muted}>Tap the trash can on a game to delete it.</AppText> : null}

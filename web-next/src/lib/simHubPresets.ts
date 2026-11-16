@@ -72,6 +72,13 @@ export function simHubPresetChips(preset: SimPreset): string[] {
   return chips;
 }
 
+/** Empty-state line that names the presets the New game sheet will show ("Quick, Standard or Deep dynasty"), so "pick Quick" is never a word the user has not seen. */
+export function simHubEmptyHint(presets: ReadonlyArray<Pick<SimPreset, "label">>): string {
+  const labels = presets.map((p) => p.label);
+  const named = labels.length <= 1 ? (labels[0] ?? "Quick") : `${labels.slice(0, -1).join(", ")} or ${labels[labels.length - 1]}`;
+  return `Tap New game and choose ${named}. Quick is one season and takes about 10 minutes.`;
+}
+
 export type SimHubMode = "first" | "returning";
 
 /** Which hub layout to draw: no saves (explainer open, nudge to New game) or returning (saved list first). */

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CONNECT_FIND_USERNAME,
+  connectPlatformNotice,
   CONNECT_PRIMARY_LABEL,
   CONNECT_TRUST_LINE,
   connectCtaLabel,
@@ -59,5 +61,12 @@ describe("connect flow", () => {
     ]);
     expect(s).toEqual({ open: { leagueId: "b26", leagueName: "B", warming: true }, savedCount: 1, atCap: true, failedReason: "league_not_found" });
     expect(summarizeSaves([{ leagueId: "x", leagueName: "X", ok: false, reason: "at_cap" }]).open).toBeNull();
+  });
+});
+
+describe("connect help copy", () => {
+  it("says where the Sleeper username lives and states a non-Sleeper limit up front", () => {
+    expect(CONNECT_FIND_USERNAME).toContain("not your email");
+    expect(connectPlatformNotice("ESPN")).toContain("aren't available for ESPN leagues yet");
   });
 });

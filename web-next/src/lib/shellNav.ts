@@ -73,7 +73,7 @@ export function shellTabs(ctx: ShellContext): BottomTab[] {
 
 const LEAGUE_SEGMENT_TAB: Record<string, string> = {
   dashboard: "today",
-  alerts: "today",
+  alerts: "more", // the bell lives in the header; Alerts is a More destination, never Today
   "my-team": "team",
   matchup: "team",
   players: "team",

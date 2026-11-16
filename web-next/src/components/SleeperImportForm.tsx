@@ -25,8 +25,10 @@ import {
   CONNECT_PLACEHOLDER,
   CONNECT_PRIMARY_LABEL,
   CONNECT_TRUST_LINE,
+  CONNECT_FIND_USERNAME,
   CONNECT_WHAT_IS_SLEEPER,
   connectCtaLabel,
+  connectPlatformNotice,
   connectWays,
   defaultLeagueSelection,
   groupLeaguesBySeason,
@@ -67,6 +69,8 @@ type LeaguePlatform = "sleeper" | "espn" | "fleaflicker" | "mfl";
  * steps. ESPN / Fleaflicker / MFL, an account and the sample league are compact rows under "More ways to connect",
  * so every previous capability is still one tap away. Mobile twin: the Add league sheet in screens/HomeScreen.tsx.
  */
+const PLATFORM_LABELS = { espn: "ESPN", fleaflicker: "Fleaflicker", mfl: "MFL" } as const;
+
 export function SleeperImportForm({
   onLeagueChosen,
   sampleCtaBelow = false,
@@ -97,6 +101,10 @@ export function SleeperImportForm({
           <button type="button" onClick={() => setPlatform("sleeper")} className="tap-link self-start text-sm font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}>
             ← Use my Sleeper username
           </button>
+          {/* State the limit before they type anything (same sentence Today shows as platform_notice). */}
+          <p className="m-0 text-xs" data-testid="platform-notice" style={{ color: "var(--color-text-secondary)" }}>
+            {connectPlatformNotice(PLATFORM_LABELS[platform])}
+          </p>
           {/* key: switching platform resets the form (league id, preview, team pick). */}
           <EspnImportForm key={platform} platform={platform} onLeagueChosen={onLeagueChosen} />
         </div>
@@ -455,6 +463,7 @@ function SleeperUsernameImport({
         {whatIsOpen ? (
           <div className="glass-input flex flex-col gap-1 px-3 py-3 text-xs motion-in" data-motion="in" style={{ borderLeft: "var(--border-width-semantic) solid var(--color-accent)", color: "var(--color-text-secondary)" }}>
             <p className="m-0">{CONNECT_WHAT_IS_SLEEPER}</p>
+            <p className="m-0">{CONNECT_FIND_USERNAME}</p>
             <p className="m-0">
               Don&apos;t have a Sleeper league yet?{" "}
               <a href="https://sleeper.com" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: "var(--color-accent)" }}>

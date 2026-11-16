@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useId } from "react";
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, Ref } from "react";
 
 /**
@@ -101,25 +102,45 @@ export function Button({
   size,
   fullWidth,
   loading = false,
+  disabledReason,
   className = "",
   style,
   type = "button",
   children,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & ButtonLook & { loading?: boolean; ref?: Ref<HTMLButtonElement> }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> &
+  ButtonLook & {
+    loading?: boolean;
+    /** Why the button is disabled ("Pick one to continue"). Shown as a short line under the button while it is disabled. */
+    disabledReason?: string;
+    ref?: Ref<HTMLButtonElement>;
+  }) {
   const look = buttonLook({ variant, size, fullWidth }, Boolean(rest.disabled), className, style);
-  return (
+  const reasonId = useId();
+  const showReason = Boolean(rest.disabled && disabledReason);
+  const button = (
     <button
       type={type}
       {...look}
       {...rest}
       disabled={Boolean(rest.disabled) || loading}
       aria-busy={loading || undefined}
+      aria-describedby={showReason ? reasonId : rest["aria-describedby"]}
       style={loading ? { ...look.style, opacity: "var(--opacity-disabled)", cursor: "progress" } : look.style}
     >
       {loading ? <ButtonSpinner /> : null}
       {children}
     </button>
+  );
+  if (!showReason) return button;
+  // The wrapper takes the button's layout role (flex-1 / width) so the reason sits directly under it.
+  return (
+    <span className={`flex flex-col gap-1 ${fullWidth ? "w-full" : "self-start"} ${className.includes("flex-1") ? "flex-1" : ""}`.trim()}>
+      {button}
+      <span id={reasonId} className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
+        {disabledReason}
+      </span>
+    </span>
   );
 }
 

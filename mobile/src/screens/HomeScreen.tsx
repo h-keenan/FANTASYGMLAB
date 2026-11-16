@@ -47,7 +47,9 @@ import TeamAvatar from '../components/TeamAvatar';
 import {
   CONNECT_MORE_LABEL,
   CONNECT_TRUST_LINE,
+  CONNECT_FIND_USERNAME,
   connectCtaLabel,
+  connectPlatformNotice,
   connectWays,
   defaultLeagueSelection,
   leagueMeta,
@@ -730,6 +732,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 <PressableScale accessibilityRole="button" onPress={() => setAddPlatform('sleeper')} hitSlop={8} style={styles.noLeagueToggle}>
                   <AppText style={styles.noLeagueToggleText}>← Use my Sleeper username</AppText>
                 </PressableScale>
+                <ModalFormHint>{connectPlatformNotice(addPlatform === 'espn' ? 'ESPN' : addPlatform === 'fleaflicker' ? 'Fleaflicker' : 'MFL')}</ModalFormHint>
                 <EspnLeagueImport
                   key={addPlatform}
                   platform={addPlatform}
@@ -747,6 +750,7 @@ export default function HomeScreen({ navigation, route }: Props) {
             ) : (
             <>
             <ModalFormHint>{CONNECT_TRUST_LINE}</ModalFormHint>
+            <ModalFormHint>{CONNECT_FIND_USERNAME}</ModalFormHint>
             <Input
               value={addQuery}
               onChangeText={setAddQuery}

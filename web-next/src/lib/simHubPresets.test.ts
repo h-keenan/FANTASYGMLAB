@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { simSetupBody, type SimGameOptionsResponse } from "@/lib/simGame";
-import { simHubGameName, simHubMode, simHubPresetChips, simHubPresets } from "@/lib/simHubPresets";
+import { simHubEmptyHint, simHubGameName, simHubMode, simHubPresetChips, simHubPresets } from "@/lib/simHubPresets";
 
 const withDynasty = {
   ok: true,
@@ -44,5 +44,12 @@ describe("simHubPresets", () => {
   it("names a saved game by its shape", () => {
     expect(simHubGameName({ settings: { teams: 10, mode: "dynasty" } })).toBe("Dynasty · 10 teams");
     expect(simHubGameName({ settings: {} })).toBe("Redraft · 12 teams");
+  });
+});
+
+describe("simHubEmptyHint", () => {
+  it("names every preset the sheet will show", () => {
+    expect(simHubEmptyHint(simHubPresets(withDynasty))).toContain("Quick, Standard or Deep dynasty");
+    expect(simHubEmptyHint(simHubPresets(null))).toContain("choose Quick.");
   });
 });

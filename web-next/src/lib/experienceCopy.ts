@@ -197,6 +197,11 @@ export const PLAIN_COPY = {
     "Dynasty is the long-term fantasy format where you keep your players year to year. If you're completely new to fantasy football, choose New to fantasy football.",
   experienceGoalPrompt: "What's your goal this season?",
   experienceGoalOptionalNote: "Optional — skip if you're not sure yet.",
+  onboardingLevelQuestion: "Which sounds most like you?",
+  onboardingLevelBody: "Sets how much explanation shows up. Change it anytime in Account.",
+  onboardingPickOne: "Pick one to continue",
+  showExplanationsAction: "Show explanations",
+  showExplanationsDone: "Explanations are on. Change this anytime in Account.",
 } as const;
 
 const VERDICT_HELP_KEY: Record<string, BeginnerHelpKey> = {

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, StyleProp, StyleSheet, ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleProp, View, StyleSheet, ViewStyle } from 'react-native';
 import PressableScale from './PressableScale';
 
 import AppText from './AppText';
@@ -21,6 +21,7 @@ export default function Button({
   variant = 'primary',
   disabled = false,
   loading = false,
+  disabledReason,
   size = 'md',
   style,
 }: {
@@ -29,6 +30,8 @@ export default function Button({
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline' | 'premium' | 'premiumOutline' | 'accentOutline';
   disabled?: boolean;
   loading?: boolean;
+  /** Why the button is disabled ("Pick one to continue"). Shown as a short line under it while disabled. Mirrors web. */
+  disabledReason?: string;
   /** `sm` mirrors web's size="sm" (compact padding, 12px label). */
   size?: 'sm' | 'md';
   style?: StyleProp<ViewStyle>;
@@ -72,6 +75,14 @@ export default function Button({
       )}
     </PressableScale>
   );
+  if (disabled && disabledReason) {
+    return (
+      <View style={[styles.reasonWrap, style]}>
+        {button}
+        <AppText style={styles.reason}>{disabledReason}</AppText>
+      </View>
+    );
+  }
   if (variant !== 'premium') return button;
   // The glow wraps the button; layout props (alignSelf/margin/flex) go on the wrapper so it sizes the same.
   return (
@@ -112,6 +123,8 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     dangerOutlineDisabled: { borderColor: colors.borderStrong },
     accentOutlineDisabled: { borderColor: colors.borderStrong },
     disabled: { opacity: disabledOpacity },
+    reasonWrap: { gap: spacing.xs },
+    reason: { fontSize: 13.5, color: colors.textTertiary, textAlign: 'center' },
     text: { fontSize: 16.5, fontWeight: '700' },
     textSm: { fontSize: 14.5 },
   });
