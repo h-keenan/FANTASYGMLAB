@@ -30,6 +30,7 @@ import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { trackScreen } from '../lib/analytics';
 import { isLegacyRedirectRoute } from '../lib/homeRedirects';
 import { createLazyLoader, preloadInSequence, type LazyLoader } from '../lib/lazyModule';
+import { TRANSITION_MS } from '../lib/motion';
 
 
 // Screens are required on first render instead of at launch: every static
@@ -362,6 +363,8 @@ export default function RootNavigator() {
             // would show the previous screen through itself mid-transition.
             contentStyle: { backgroundColor: 'transparent' },
             animation: 'fade',
+            // Token scale (TRANSITION_MS.page, 240ms) instead of the platform default.
+            animationDuration: TRANSITION_MS.page,
           }}
         >
           <AppStack.Screen

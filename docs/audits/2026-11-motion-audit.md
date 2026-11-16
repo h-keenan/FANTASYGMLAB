@@ -14,7 +14,7 @@ Press feedback everywhere (`PRESS`), `MotionIn` entrances, `CountUp` (recap and 
 | Standings after a week | rows swapped places instantly; rank change only visible as a number | fixed: `useFlipList` / `ReorderRow` + `RankChip` |
 | Success notices ("Trade done", claim landed) | static glyph; `.motion-success` existed but had no users | fixed: `SuccessCheck` in `SimNotice` |
 | Number tweens | uncapped: every `TickNumber` could run its own rAF loop | fixed: `acquireTween` cap of 12 |
-| Route changes (page to page) | hard cut; the new page's skeleton is the only continuity | open (see ranked list) |
+| Route changes (page to page) | hard cut; the new page's skeleton is the only continuity | fixed: `app/template.tsx` opacity fade (web), `animationDuration` on the token scale (app) |
 | Tab content inside a page (Roster/Top moves/Trade in the sample) | content swapped instantly | fixed in the sample league (`PresenceSwap`, web + app); route-based family tabs are a route transition, still open |
 | Fairness meter and Toggle knob (web) | glided `left`/`width` (layout) | fixed: transform only, allowlist entries removed |
 | Trade accepted / declined state on a trade card | card is replaced by a notice; no state morph | open |
