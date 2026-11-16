@@ -60,9 +60,9 @@ interface TabTarget {
 /* prettier-ignore */
 const TAB_TARGETS: Readonly<Record<string, Readonly<Record<string, TabTarget>>>> = {
   'trade-hub': {
-    Hub: { params: { initialTab: 'block' } },
+    Ideas: { params: { initialTab: 'block' } },
     Finder: { params: { initialTab: 'search' } },
-    Analyzer: { params: { initialTab: 'make' } },
+    'Grade a trade': { params: { initialTab: 'make' } },
     History: { route: 'TradeHistory', needsLeague: false },
   },
   'league-rankings': {
@@ -78,7 +78,7 @@ const TAB_TARGETS: Readonly<Record<string, Readonly<Record<string, TabTarget>>>>
     Overview: { params: { initialTab: 'overview' } },
     Trades: { params: { initialTab: 'trades' } },
     Core: { params: { initialTab: 'core' } },
-    Watching: { params: { initialTab: 'watching' } },
+    Watchlist: { params: { initialTab: 'watching' } },
     'Season Outlook': { route: 'FantasySim' },
   },
   waivers: {

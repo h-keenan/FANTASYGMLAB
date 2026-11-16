@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { PortfolioExposureView } from "@/components/PortfolioExposureView";
+import { PortfolioFreeStanding } from "@/components/PortfolioFreeStanding";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
 import { FillBar, formatRank } from "@/components/SnapshotTile";
@@ -511,12 +512,17 @@ export function PortfolioContent({
 
   if (!data.is_premium) {
     return (
-      <PremiumUpsellCard
-        kicker="Portfolio"
-        upsell={data.upsell}
-        fallbackTitle="See every league at a glance"
-        fallbackBody="Portfolio is a Pro feature — free accounts keep one saved league, so there's nothing to aggregate yet. Upgrade to Pro to save every league you're in and see your record, rank, and top need or opportunity across all of them in one place."
-      />
+      <main className="page-shell">
+        <PageTitle page="Portfolio" />
+        <PortfolioFreeStanding />
+        <PremiumUpsellCard
+          bare
+          kicker="Portfolio"
+          upsell={data.upsell}
+          fallbackTitle="See every league at a glance"
+          fallbackBody="Portfolio is a Pro feature — free accounts keep one saved league, so there's nothing to aggregate yet. Upgrade to Pro to save every league you're in and see your record, rank, and top need or opportunity across all of them in one place."
+        />
+      </main>
     );
   }
 

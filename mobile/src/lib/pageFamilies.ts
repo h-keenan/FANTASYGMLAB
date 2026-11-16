@@ -20,6 +20,8 @@ export type PageTabDef = {
   glyph: string;
   /** Web route segment / nav-catalog page key that opens this tab. */
   segment: string;
+  /** Paid tab: the pill shows the Pro marker (to anyone not on Pro) before the tap. */
+  pro?: boolean;
 };
 
 export type PageTabFamily = {
@@ -34,9 +36,9 @@ export type PageTabFamily = {
 /* prettier-ignore */
 export const PAGE_TAB_FAMILIES: readonly PageTabFamily[] = [
   { key: "trades", label: "Trades section", shellTab: "trades", tabs: [
-    { key: "trade_hub", label: "Hub", glyph: "hub", segment: "trade-hub" },
-    { key: "trade_finder", label: "Finder", glyph: "finder", segment: "trade-finder" },
-    { key: "trade_analyzer", label: "Analyzer", glyph: "analyzer", segment: "trade-analyzer" },
+    { key: "trade_hub", label: "Ideas", glyph: "hub", segment: "trade-hub" },
+    { key: "trade_finder", label: "Finder", glyph: "finder", segment: "trade-finder", pro: true },
+    { key: "trade_analyzer", label: "Grade a trade", short: "Grade", glyph: "analyzer", segment: "trade-analyzer" },
     { key: "trade_history", label: "History", short: "Hist.", glyph: "history", segment: "trade-history" },
   ] },
   { key: "team", label: "Team section", shellTab: "team", tabs: [
@@ -69,4 +71,24 @@ export function pageTabForSegment(segment: string | null | undefined): { family:
 /** Tab keys that exist in a family, so a page passing an unknown `active` still renders with the first tab lit. */
 export function activePageTab(family: PageTabFamily, active: string): string {
   return family.tabs.some((t) => t.key === active) ? active : (family.tabs[0]?.key ?? "");
+}
+
+/** The nav-catalog page that is the Today tab of the bottom bar (it is not a family member). */
+const TODAY_PAGE = "dashboard";
+
+/** Nav-catalog page keys the bottom bar / pill already offers: Today plus every page that is a tab of a family. */
+export function barPageKeys(): ReadonlySet<string> {
+  const keys = new Set<string>([TODAY_PAGE]);
+  for (const family of PAGE_TAB_FAMILIES) for (const tab of family.tabs) keys.add(tab.segment);
+  return keys;
+}
+
+/**
+ * Splits the More sheet's pages: `lead` are the pages the bar does NOT show (Alerts, GM Plan, Draft Center, ...), listed
+ * first; `sections` are the duplicates of the bar, folded into one "Sections" group. Derived from PAGE_TAB_FAMILIES, so a
+ * page added to a family moves itself and the two lists cannot drift.
+ */
+export function splitMoreByBar<T extends { key: string }>(pages: readonly T[]): { lead: T[]; sections: T[] } {
+  const bar = barPageKeys();
+  return { lead: pages.filter((p) => !bar.has(p.key)), sections: pages.filter((p) => bar.has(p.key)) };
 }

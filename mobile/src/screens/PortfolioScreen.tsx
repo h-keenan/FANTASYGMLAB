@@ -14,6 +14,7 @@ import FadeInView from '../components/FadeInView';
 import EmptyState from '../components/EmptyState';
 import PercentileBar from '../components/PercentileBar';
 import PremiumLock from '../components/PremiumLock';
+import PortfolioFreeStanding from '../components/PortfolioFreeStanding';
 import GridBackground from '../components/GridBackground';
 import BriefingItemPlayers from '../components/BriefingItemPlayers';
 import TeamAvatar from '../components/TeamAvatar';
@@ -268,6 +269,7 @@ export default function PortfolioScreen() {
       <View style={[styles.root, { paddingTop: headerHeight }]}>
         <GridBackground />
         <View style={styles.lockWrap}>
+          <PortfolioFreeStanding />
           <PremiumLock
             feature="portfolio"
             title={index.upsell?.title ?? 'Portfolio is a Pro feature'}

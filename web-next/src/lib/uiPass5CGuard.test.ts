@@ -19,7 +19,7 @@ describe("ui pass 5 (C)", () => {
     const hits: string[] = [];
     for (const file of walk(APP)) {
       readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-        if (/Alert\.alert\(\s*['"`](Could not|Select a league first|Name required|GM Targets is full)/.test(line)) hits.push(`${path.relative(APP, file)}:${i + 1}`);
+        if (/Alert\.alert\(\s*['"`](Could not|Select a league first|Name required|Watchlist is full)/.test(line)) hits.push(`${path.relative(APP, file)}:${i + 1}`);
       });
     }
     expect(hits).toEqual([]);

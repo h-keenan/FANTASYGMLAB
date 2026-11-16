@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { NAV_PAGES } from "./navCatalog";
-import { activePageTab, pageTabFamily, pageTabForSegment, PAGE_TAB_FAMILIES } from "./pageFamilies";
+import { splitMoreByBar, activePageTab, pageTabFamily, pageTabForSegment, PAGE_TAB_FAMILIES } from "./pageFamilies";
 import { shellActiveTab } from "./shellNav";
 
 describe("page tab families", () => {
   it("lists the consolidated tabs in order", () => {
-    expect(pageTabFamily("trades").tabs.map((t) => t.label)).toEqual(["Hub", "Finder", "Analyzer", "History"]);
+    expect(pageTabFamily("trades").tabs.map((t) => t.label)).toEqual(["Ideas", "Finder", "Grade a trade", "History"]);
     expect(pageTabFamily("team").tabs.map((t) => t.label)).toEqual(["Roster", "Players", "Waivers", "Matchup"]);
     expect(pageTabFamily("league").tabs.map((t) => t.label)).toEqual(["Rankings", "Recaps", "Games"]);
   });
@@ -31,5 +31,16 @@ describe("page tab families", () => {
   it("falls back to the first tab for an unknown key", () => {
     expect(activePageTab(pageTabFamily("team"), "nope")).toBe("roster");
     expect(activePageTab(pageTabFamily("team"), "matchup")).toBe("matchup");
+  });
+
+  it("marks the Finder tab Pro and nothing else in the Trades strip", () => {
+    expect(pageTabFamily("trades").tabs.filter((t) => t.pro).map((t) => t.key)).toEqual(["trade_finder"]);
+  });
+
+  it("More leads with the pages the bar does not show and folds the rest into Sections", () => {
+    const { lead, sections } = splitMoreByBar(NAV_PAGES);
+    expect(lead.map((p) => p.key).filter((k) => ["alerts", "gm-plan", "draft-center", "live-draft", "commissioner"].includes(k))).toHaveLength(5);
+    expect(sections.map((p) => p.key)).toEqual(expect.arrayContaining(["dashboard", "my-team", "waivers", "trade-hub", "league-rankings"]));
+    expect(lead.length + sections.length).toBe(NAV_PAGES.length);
   });
 });

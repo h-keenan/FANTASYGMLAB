@@ -1190,7 +1190,7 @@ only). The client adds the Grade stat only when a grade exists (`gradeStat` in `
   its body (`lib/waiversHeader.ts`). The tab strip and filter row stay visible above the list.
 
 ## One-field connect (2026-11-14, UI pass 3 sheet 1 topic 2 V1)
-With `NEXT_PUBLIC_LANDING_FRONT_DOOR=connect` (default `email`, see `lib/landingFrontDoor.ts`) the landing hero for a signed-out visitor IS the connect form: a Sleeper username, one **Connect** button, one trust line
+By default (`connect`; `NEXT_PUBLIC_LANDING_FRONT_DOOR=email` switches back, see `lib/landingFrontDoor.ts`) the landing hero for a signed-out visitor IS the connect form: a Sleeper username, one **Connect** button, one trust line
 ("Read-only. We never ask for your Sleeper password or change your lineup."), then the instant league list. Copy, defaults and
 save rules are the byte-identical twin `lib/connectFlow.ts`.
 

@@ -1,3 +1,4 @@
+import { TERMS } from "@/lib/terms";
 import { ModuleMore } from "@/components/ui/ModuleMore";
 import type { MouseEvent } from "react";
 
@@ -6,6 +7,7 @@ import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { SinceLastVisitStrip } from "@/components/SinceLastVisitStrip";
 import { DirectionCheckinCard } from "@/components/DirectionCheckinCard";
 import { FirstValueOfferCard } from "@/components/FirstValueOfferCard";
+import { NextSteps } from "@/components/NextSteps";
 import { StartHereCard } from "@/components/StartHereCard";
 import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
 import { GlossaryNote } from "@/components/GlossaryNote";
@@ -218,7 +220,7 @@ export function DashboardContent({
       />
 
       {snapshot && teamStats ? (
-        // My Team: a StatStripModule. Collapsed it reads "Power #3 · Franchise #5 · Starters #2 · Bench #7"; the tiles
+        // My Team: a StatStripModule. Collapsed it reads "This season #3 · Long term #5 · Starters #2 · Bench #7"; the tiles
         // (each an insight link) and the glossary open on tap. The marker below is the "dashboard rendered" signal.
         <section aria-label="Team summary" data-fgl-dashboard-complete="true">
           <StatStripModule
@@ -234,8 +236,8 @@ export function DashboardContent({
                   label="My Team stats"
                   lines={[
                     copy.help("dashboardSnapshot"),
-                    copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null,
-                    copy.help("franchiseRank") ? `Franchise Rank: ${copy.help("franchiseRank")}` : null,
+                    copy.help("powerRank") ? `${TERMS.thisSeason}: ${copy.help("powerRank")}` : null,
+                    copy.help("franchiseRank") ? `${TERMS.longTerm}: ${copy.help("franchiseRank")}` : null,
                     copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null,
                     copy.help("starterStrength") ? `Starter Strength: ${copy.help("starterStrength")}` : null,
                     copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null,
@@ -249,6 +251,9 @@ export function DashboardContent({
       ) : null}
 
       <GuillotineCard data={guillotine} />
+
+      {/* GM Plan lives in More (the bar does not show it), so Today carries it as a standing next step. */}
+      {sample ? null : <NextSteps title="Plan ahead" steps={["gm-plan", "waivers", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />}
 
       {watchItems.length > 0 ? (
         <CompactModule
@@ -294,9 +299,11 @@ function buildTeamStats(
 ): { main: StatStripItem[] } {
   const injured = snapshot.injured_starters && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
   const ofTeams = context.teamCount ? `of ${context.teamCount} teams` : undefined;
+  const WHY_BY_GLYPH = { power: "power_rank", franchise: "franchise_rank", starter: "starter_strength", bench: "bench_strength" } as const;
   const rank = (glyph: "power" | "franchise" | "starter" | "bench", label: string, value: number | null, tied: boolean, note?: string): StatStripItem => ({
     glyph,
     insight: glyph,
+    why: WHY_BY_GLYPH[glyph],
     label,
     value: formatRank(value, tied),
     tone: value === 1 ? "premium" : "neutral",
@@ -304,8 +311,8 @@ function buildTeamStats(
     fill: rankFill(value, context.teamCount),
   });
   const main: StatStripItem[] = [
-    rank("power", "Power Rank", snapshot.power_rank, snapshot.power_rank_tied, ofTeams),
-    rank("franchise", "Franchise Rank", snapshot.franchise_rank, snapshot.franchise_rank_tied, ofTeams),
+    rank("power", TERMS.thisSeason, snapshot.power_rank, snapshot.power_rank_tied, ofTeams),
+    rank("franchise", TERMS.longTerm, snapshot.franchise_rank, snapshot.franchise_rank_tied, ofTeams),
     rank("starter", "Starter Strength", snapshot.starter_rank, snapshot.starter_rank_tied, ofTeams),
     rank("bench", "Bench Strength", snapshot.bench_rank, snapshot.bench_rank_tied, ofTeams),
     {

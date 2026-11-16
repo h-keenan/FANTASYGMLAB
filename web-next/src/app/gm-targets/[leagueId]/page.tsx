@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 /**
- * Revision 20 (2026-10-18): GM Targets merged into GM Plan (see
+ * Revision 20 (2026-10-18): Watchlist merged into GM Plan (see
  * GmPlanContent's own docstring) — this route now only exists so a stale
  * bookmark/link still lands somewhere real instead of a 404.
  */

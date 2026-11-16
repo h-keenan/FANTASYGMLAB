@@ -66,11 +66,11 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
     ] },
   { key: "players", label: "Players", subtitle: "Search, rankings, and player insights", group: "core", leagueScoped: true },
 
-  { key: "trade-hub", label: "Trade Hub", subtitle: "Trade ideas, trade finder, and trade analyzer", group: "tools", leagueScoped: true,
+  { key: "trade-hub", label: "Trade Hub", subtitle: "Trade ideas, the finder, and a way to grade any deal", group: "tools", leagueScoped: true,
     tabs: [
-      { label: "Hub", subtitle: "Trade ideas built for your roster", keywords: ["trade ideas", "trade block", "offers"] },
+      { label: "Ideas", subtitle: "Trade ideas built for your roster", keywords: ["hub", "trade hub", "trade ideas", "trade block", "offers"] },
       { label: "Finder", subtitle: "Shop a player or pick and see what partners pay", keywords: ["trade finder", "shop", "search", "partners"], pro: true },
-      { label: "Analyzer", subtitle: "Grade any deal against your lineup", keywords: ["trade analyzer", "calculator", "make a trade", "grade", "evaluate"] },
+      { label: "Grade a trade", subtitle: "Is this offer fair? Grade any deal against your lineup", keywords: ["analyzer", "trade analyzer", "calculator", "make a trade", "grade", "evaluate", "fair", "offer"] },
       { label: "History", subtitle: "Trades you have shared and confirmed", keywords: ["trade history", "past trades"] },
     ] },
   { key: "gm-plan", label: "GM Plan", subtitle: "Your roadmap, stance, and protected/watched players", group: "tools", leagueScoped: true,
@@ -78,8 +78,8 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
       { label: "Overview", subtitle: "Stance, roadmap, and plan snapshot", keywords: ["stance", "roadmap", "rebuild", "compete"] },
       { label: "Trades", subtitle: "Trade moves your plan calls for", keywords: ["trade window"] },
       { label: "Core", subtitle: "Players your plan is built around", keywords: ["protected", "keep"] },
-      { label: "Watching", subtitle: "Players you are targeting", keywords: ["targets", "gm targets", "watchlist"] },
-      { label: "Season Outlook", subtitle: "Playoff odds and projected finish", keywords: ["forecast", "playoff odds", "championship odds", "title odds", "projection", "projected record", "simulation", "fantasy sim", "rest of season"], pro: true },
+      { label: "Watchlist", subtitle: "Players you are targeting", keywords: ["watching", "targets", "gm targets"] },
+      { label: "Season Outlook", subtitle: "GM Plan forecast: playoff odds and projected finish", keywords: ["forecast", "playoff odds", "championship odds", "title odds", "projection", "projected record", "simulation", "fantasy sim", "rest of season"], pro: true },
     ] },
   { key: "draft-center", label: "Draft Center", subtitle: "Picks, order, and draft tools", group: "tools", leagueScoped: true, pro: true,
     tabs: [
@@ -94,7 +94,7 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
     ] },
   { key: "games", label: "Games", subtitle: "Season simulator and weekly pick'em", group: "tools", leagueScoped: true,
     tabs: [
-      { label: "Season Outlook", subtitle: "What-if season simulator", keywords: ["simulator", "simulation", "playoff odds", "what if"] },
+      { label: "Season Outlook", subtitle: "Games: the what-if season simulator for your real league", keywords: ["simulator", "simulation", "playoff odds", "what if"] },
       { label: "Pick'em", subtitle: "Weekly pick'em in your league", keywords: ["pickem", "picks", "weekly"] },
     ] },
   { key: "commissioner", label: "Commissioner", subtitle: "League integrity: lineups, tanking signals, trades", group: "tools", leagueScoped: true, pro: true },
@@ -105,9 +105,9 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
   { key: "community", label: "Community", subtitle: "Craziest trades this week, anonymized", group: "general", leagueScoped: false },
 ];
 
-/** Subtitle for the Home row: it is the league switcher, not account settings
+/** Subtitle for the "Your leagues" row (was "Home"): it is the league switcher, not account settings
  * (that is Account), so the two no longer both claim "manage account". */
-export const HOME_SUBTITLE = "Your leagues";
+export const HOME_SUBTITLE = "Switch or add a league";
 
 export function navPagesIn(group: NavGroup): readonly NavCatalogPage[] {
   return NAV_PAGES.filter((page) => page.group === group);

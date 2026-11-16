@@ -24,7 +24,7 @@ export interface FreeLimitNoteModel {
 }
 
 export interface FreeLimitInput {
-  /** Plural noun, e.g. "GM Targets", "trade ideas". */
+  /** Plural noun, e.g. "Watchlist", "trade ideas". */
   noun: string;
   /** The server's Free limit. Missing/non-positive: no note. */
   limit: number | null | undefined;

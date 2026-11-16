@@ -2,7 +2,7 @@
  * Team Situation (Revision 19) presentation helpers — pure formatting only.
  * The "Protected Players" checklist has no storage of its own (see
  * modules/team_stance_ui.py and mobile's TeamStanceScreen.tsx) — it reads/
- * writes GM Targets' existing `untouchable` flag directly. This file only
+ * writes Watchlist' existing `untouchable` flag directly. This file only
  * joins GET .../my-team's roster against GET .../gm-targets' untouchable
  * set, the same client-side join mobile's screen already does.
  */

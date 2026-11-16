@@ -11,7 +11,7 @@ test('uses the fallback for missing, empty or malformed input', () => {
 
 test('keeps valid server rows and drops malformed ones', () => {
   const rows = normalizePremiumComparison([
-    { key: 'gm_targets', label: 'GM Targets', free: '3 players', pro: '50 players' },
+    { key: 'gm_targets', label: 'Watchlist', free: '3 players', pro: '50 players' },
     { nope: true },
   ]);
   assert.equal(rows.length, 1);

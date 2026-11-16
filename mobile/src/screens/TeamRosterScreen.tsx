@@ -1,3 +1,4 @@
+import { TERMS } from '../lib/terms';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
@@ -102,7 +103,7 @@ interface RankMetric {
 function buildRankMetrics(ranking: TeamRanking): RankMetric[] {
   const metrics: RankMetric[] = [
     { key: 'power', label: 'Roster Power', icon: 'flash', rank: ranking.power_rank, tied: ranking.power_rank_tied, tappable: true },
-    { key: 'franchise', label: 'Franchise', icon: 'star', rank: ranking.franchise_rank, tied: ranking.franchise_rank_tied, tappable: true },
+    { key: 'franchise', label: TERMS.longTerm, icon: 'star', rank: ranking.franchise_rank, tied: ranking.franchise_rank_tied, tappable: true },
     { key: 'draft', label: 'Draft Capital', icon: 'file-tray-stacked-outline', rank: ranking.draft_capital_rank, tied: ranking.draft_capital_rank_tied },
     { key: 'starters', label: 'Starters', icon: 'american-football-outline', rank: ranking.starter_rank, tied: ranking.starter_rank_tied },
     { key: 'bench', label: 'Bench', icon: 'people-outline', rank: ranking.bench_rank, tied: ranking.bench_rank_tied },

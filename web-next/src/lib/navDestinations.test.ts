@@ -96,9 +96,9 @@ describe("one entry point per destination", () => {
     expect(draft.tabs!.map((t) => t.label)).toEqual(["Overview", "Picks"]);
   });
 
-  it("Home is the league switcher and Account owns settings", () => {
+  it("Your leagues (was Home) is the league switcher and Account owns settings", () => {
     const rows = all();
-    const home = rows.find((d) => d.label === "Home")!;
+    const home = rows.find((d) => d.label === "Your leagues")!;
     const account = rows.find((d) => d.label === "Account")!;
     expect(home.subtitle).not.toMatch(/account/i);
     expect(account.subtitle).toMatch(/settings/i);
@@ -148,7 +148,7 @@ describe("searchNavDestinations", () => {
     const find = (q: string, label: string) => searchNavDestinations(dests, q).find((d) => d.label === label)!;
     expect(find("scouting", "Draft Center > Scouting").pro).toBe(true);
     expect(find("finder", "Trade Hub > Finder").pro).toBe(true);
-    expect(find("analyzer", "Trade Hub > Analyzer").pro).toBeFalsy();
+    expect(find("analyzer", "Trade Hub > Grade a trade").pro).toBeFalsy();
     expect(find("explore", "Waivers > Explore").pro).toBeFalsy();
   });
 

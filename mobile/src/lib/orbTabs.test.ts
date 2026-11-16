@@ -76,7 +76,7 @@ test('Pro and needsLeague follow the page unless the tab overrides', () => {
   assert.equal(find('scouting', 'Draft Center > Scouting').pro, true);
   assert.equal(find('scouting', 'Draft Center > Scouting').needsLeague, true);
   assert.equal(find('finder', 'Trade Hub > Finder').pro, true);
-  assert.equal(find('analyzer', 'Trade Hub > Analyzer').pro, false);
+  assert.equal(find('analyzer', 'Trade Hub > Grade a trade').pro, false);
   assert.equal(find('playoff odds', 'League Rankings > Playoff Odds').pro, true);
   const history = find('past trades', 'Trade Hub > History');
   assert.equal(history.route, 'TradeHistory');

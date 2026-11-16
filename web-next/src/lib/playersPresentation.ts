@@ -2,7 +2,7 @@
  * Players / Asset Explorer (Revision 16) presentation helpers — pure
  * search/filter predicates only. Ranking/valuation itself is already
  * computed server-side (GET .../leagues/{id}/rankings, the same endpoint
- * GM Targets, Player Compare, and Trade Analyzer already read — see that
+ * Watchlist, Player Compare, and Trade Analyzer already read — see that
  * endpoint's comment in src/lib/api.ts calling this out as the shape "a
  * future Players/Player Detail page should reuse"). Nothing here re-derives
  * score, rank, or OVR.

@@ -1,5 +1,6 @@
 "use client";
 
+import { TERMS } from "@/lib/terms";
 import { ModuleMore } from "@/components/ui/ModuleMore";
 import { FreeLimitNote } from "@/components/FreeLimitNote";
 import { ButtonLink } from "@/components/Button";
@@ -66,7 +67,7 @@ import { PresenceList } from "@/components/ui/Presence";
  * the team situation, GM targets and GM plan into one page?" / agreed
  * "yes I like it... same reasoning as killing the Explore grid today"):
  * Team Situation (stance declaration + the roster-wide "Protected
- * Players" checklist) and GM Targets (the Untouchable/Watching
+ * Players" checklist) and Watchlist (the Untouchable/Watching
  * watchlist) are folded in here as always-visible sections — neither was
  * ever Premium-gated, so they stay reachable for Free users even though
  * the roadmap itself (season phase/stance hero + focus areas) still is.
@@ -365,7 +366,7 @@ function TargetRowView({
     <div className="flex flex-col gap-2 py-3" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
       <div className="flex items-center justify-between gap-3">
         <PlayerIdentity
-          identity={{ ...player, player_id: target.player_id, name, sourceLabel: "GM Targets", leagueId, leagueName }}
+          identity={{ ...player, player_id: target.player_id, name, sourceLabel: TERMS.watchlist, leagueId, leagueName }}
           playerId={target.player_id}
           name={name}
           position={player?.position}
@@ -443,7 +444,7 @@ export function GmPlanContent({
   /** Plan Snapshot tiles (lib/gmPlanSnapshot); omitted tiles never render. */
   snapshot?: PlanSnapshotTile[];
   initialTab?: GmPlanTab;
-  /** The server's GM Targets cap for Free and whether this account is
+  /** The server's Watchlist cap for Free and whether this account is
    * Premium (GET .../gm-targets), for the "Free: X of Y" note. */
   targetsLimit?: { freeLimit?: number; isPremium?: boolean };
 }) {
@@ -479,7 +480,7 @@ export function GmPlanContent({
   const targetsNote = (
     <FreeLimitNote
       kind="cap"
-      noun="GM Targets"
+      noun={TERMS.watchlist}
       limit={targetsLimit?.freeLimit}
       used={trackedRows.length}
       isPremium={targetsLimit?.isPremium}
@@ -516,7 +517,7 @@ export function GmPlanContent({
           // TRACKED_EVENTS, already labeled on the Founder Analytics
           // dashboard) had no caller anywhere -- this is the real "save a
           // GM Target" action (the Protected Players checklist adds the
-          // player to the same tracked-targets table GM Targets reads).
+          // player to the same tracked-targets table Watchlist reads).
           // dedupe: false -- every distinct player added is its own real,
           // independently-countable interaction, same reasoning
           // trackFeatureUse's own doc comment gives for pqv_opened/
@@ -838,7 +839,7 @@ export function GmPlanContent({
 
       {tab === "watching" ? (
         <section className="flex flex-col gap-2">
-          <SectionHeading note="Considering or monitoring; not trade-protected.">Watching</SectionHeading>
+          <SectionHeading note="Considering or monitoring; not trade-protected.">{TERMS.watchlist}</SectionHeading>
           {targetsNote}
           {!rankings || !leagueId ? null : watching.length === 0 ? (
             <EmptyState

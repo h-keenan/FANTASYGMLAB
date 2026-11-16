@@ -1,7 +1,7 @@
 /**
  * One landing screen (Dashboard) and one GM Plan screen.
  *
- * League Overview (`LeagueDetail`), GM Targets (`GmTargets`) and Team
+ * League Overview (`LeagueDetail`), Watchlist (`GmTargets`) and Team
  * Situation (`TeamStance`) used to be separate screens. Their content now lives
  * on Dashboard and GM Plan (matching web), but the route names stay registered
  * so deep links, push taps, stale navigation state and older callers keep

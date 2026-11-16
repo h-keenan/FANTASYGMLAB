@@ -71,7 +71,7 @@ describe("DashboardContent for a beginner", () => {
     expandHelp();
     const strip = screen.getByLabelText("Team summary");
     const lines = Array.from(strip.querySelectorAll("[data-beginner-help] p")).map((p) => p.textContent);
-    expect(lines.some((l) => l?.startsWith("Power Rank: "))).toBe(true);
+    expect(lines.some((l) => l?.startsWith("This season: "))).toBe(true);
     expect(lines.some((l) => l?.startsWith("Average Age: "))).toBe(true);
     expect(screen.getByText(/^Today lists the roster moves/)).toBeInTheDocument();
   });

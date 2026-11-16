@@ -11,7 +11,7 @@ export const DESTINATION_LABELS: Record<string, string> = {
   rankings: "Open League Rankings",
   gm_plan: "Open GM Plan",
   dashboard: "Open workflow",
-  // GM Targets (Revision 11) has no in-page add flow (see GmTargetsContent's
+  // Watchlist (Revision 11) has no in-page add flow (see GmTargetsContent's
   // own docstring) — its empty state sends a user to add a first target.
   // Players now has a real Next.js page (Revision 16) — see
   // GamePlanCard.tsx's INTERNAL_ROUTES, which routes this destination there
