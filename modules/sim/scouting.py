@@ -117,24 +117,24 @@ def draw_archetype(z: float, u: float) -> str:
     return ARCHETYPES[-1]
 
 
-def dev_steps(pos: str, age: float, arch: str, jitters: Sequence[float]) -> tuple[float, float, float, float]:
+def dev_steps(pos: str, age: float, arch: str, jitters: Sequence[float], knots_v: int = 0) -> tuple[float, float, float, float]:
     """The four offseason ratios a rookie of ``age`` (during his rookie season) follows: the plain age curve
     times his archetype, with a little per-player wobble."""
 
     rel = ARCHETYPE_REL[arch]
     return tuple(  # type: ignore[return-value]
-        round(aging.age_mult(pos, age + k) * rel[k] * math.exp(0.025 * float(jitters[k])), 4) for k in range(4)
+        round(aging.age_mult(pos, age + k, knots_v) * rel[k] * math.exp(0.025 * float(jitters[k])), 4) for k in range(4)
     )
 
 
-def rookie_dev_fields(pos: str, age: float, z: float, seed: int, class_rank: int, class_size: int) -> dict[str, float]:
+def rookie_dev_fields(pos: str, age: float, z: float, seed: int, class_rank: int, class_size: int, knots_v: int = 0) -> dict[str, float]:
     """The numeric fields stored in a generated rookie's ``extra`` (version-gated by the caller)."""
 
     g = _gen(seed)
     u = float(g.random())
     jit = [float(g.standard_normal()) for _ in range(4)]
     arch = draw_archetype(z, u)
-    r1, r2, r3, r4 = dev_steps(pos, age, arch, jit)
+    r1, r2, r3, r4 = dev_steps(pos, age, arch, jit, knots_v)
     return {
         "scout_seed": float(seed), "class_rank": float(class_rank), "class_size": float(class_size), "talent_z": round(z, 4),
         "dev_arch": float(ARCHETYPES.index(arch)), "dev_r1": r1, "dev_r2": r2, "dev_r3": r3, "dev_r4": r4,

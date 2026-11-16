@@ -33,7 +33,7 @@ GOLDEN_OLD = {
     "redraft": "1c4fc89f0f26d9a75c02265a03c0b7252ab92a0a511ead91893a2e0110471fec",
     "dynasty3": "67fa6cb0ebeb536b641b15bbe3b898a30771b8169a3fa8c0d1b634db3822fd84",
 }
-OLD_FLAGS = ("hint_v", "limit_v", "kd_v", "world_v", "aging_v", "names_v", "econ_v")
+OLD_FLAGS = ("hint_v", "limit_v", "kd_v", "world_v", "aging_v", "names_v", "econ_v", "stability_v")
 
 
 def _old_settings(**extra) -> GameSettings:
@@ -260,7 +260,7 @@ def test_an_offseason_update_waits_one_more_season():
         assert dict(root.under(state.rules).season_view(season).players) == dict(plain_root.season_view(season).players)
     assert _replay(root, em) == state.digest()
     rows = rules.rules_info(root.settings, root.under(state.rules).season_view(2).settings, state.rules, "offseason", 2)
-    assert [s["flag"] for s in rows["scheduled"]] == ["aging_v", "names_v"] and rows["rules_version"] == 1 and not rows["eligible"]
+    assert [s["flag"] for s in rows["scheduled"]] == ["aging_v", "names_v", "stability_v"] and rows["rules_version"] == 1 and not rows["eligible"]
 
 
 def test_new_rookie_names_do_not_repeat_after_a_names_update():

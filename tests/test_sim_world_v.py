@@ -44,6 +44,7 @@ def _settings(world: bool, **extra) -> GameSettings:
         d.pop("world_v", None)  # a save from before world_v
         d.pop("econ_v", None)  # ... and before econ_v (the goldens below predate both)
         d.pop("aging_v", None)  # ... and before aging_v
+        d.pop("stability_v", None)  # ... and before stability_v
     return GameSettings.from_dict(d)
 
 
@@ -217,7 +218,7 @@ def test_depth_charts_follow_the_players_each_season_with_world_v_and_stay_stati
             groups[p.nfl_team, p.pos].append(p)
     for g in groups.values():
         by_order = sorted(g, key=lambda p: p.extra["depth_chart_order"])
-        assert [p.pid for p in by_order] == [p.pid for p in sorted(g, key=lambda p: (-p.mean, -p.market, p.pid))]
+        assert all(a.mean >= b.mean - 0.011 for a, b in zip(by_order, by_order[1:]))  # ordered by the unrounded projection (the pool rounds means to 0.01)
     old_root, _ = _dynasty(model, world=False)
     sn0 = old_root.season_view(3)
     rookies = [p for p in sn0.players.values() if p.extra.get("draft_year")]

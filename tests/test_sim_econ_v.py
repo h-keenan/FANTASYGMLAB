@@ -41,6 +41,7 @@ def _settings(econ: bool, **extra) -> GameSettings:
     if not econ:
         d.pop("econ_v", None)  # a save from before econ_v
         d.pop("aging_v", None)  # ... which also predates aging_v (the goldens were captured before both)
+        d.pop("stability_v", None)  # ... and stability_v
     return GameSettings.from_dict(d)
 
 

@@ -36,10 +36,33 @@ AGE_KNOTS_V1: dict[str, tuple[tuple[float, float], ...]] = {
     "QB": ((21, 1.08), (23, 1.04), (25, 1.02), (30, 1.00), (34, 0.985), (37, 0.95), (40, 0.89), (43, 0.80)),
     "K": ((21, 1.00), (38, 1.00), (40, 0.97), (43, 0.91), (46, 0.84)),
 }
+# stability_v 1 (aging knots v2): early-career growth. The v0/v1 knots reproduce the panel's median ratio of REALIZED next/this points per game,
+# but the sim applies them to the hidden projection and every season then draws its own story around it, so the realized ratio the sim produced
+# was 0.83 / 0.79 / 0.88 for a WR 22 / TE 23 / RB 22 against the panel's 1.05 / 1.14 / 1.07 (docs/audits/2026-11-sim-desk-logic-realism-audit.md P1-7).
+# The v2 knots are the TRUE talent trajectory, shaped after the long-standing public dynasty aging curves and checked against the panel through the
+# realized ratio the engine produces (``calibration/dynasty_distributions.py``, "realized ratio by age band"): running backs are youngest
+# (rise to 22-23, flat to 25, a cliff from 26-27), wide receivers keep improving through 24-25 and plateau to 27, tight ends are slow starters that
+# peak at 25-28 (the usual "year-3 breakout"), quarterbacks rise to their late 20s and hold into the mid 30s. The panel (TE n = 10 per age) only
+# fixes the level of the realized ratios; the shape is the published one, not a fit to a 10-player cell.
+AGE_KNOTS_V2: dict[str, tuple[tuple[float, float], ...]] = {
+    "QB": ((21, 1.10), (23, 1.06), (25, 1.03), (28, 1.01), (31, 1.00), (34, 0.985), (37, 0.95), (40, 0.89), (43, 0.80)),
+    "RB": ((21, 1.28), (22, 1.28), (23, 1.08), (24, 0.97), (25, 0.96), (26, 0.93), (27, 0.78), (28, 0.70), (30, 0.62), (33, 0.52)),
+    "WR": ((21, 1.20), (22, 1.17), (23, 1.07), (24, 0.98), (25, 0.90), (26, 0.87), (27, 0.85), (28, 0.82), (30, 0.75), (32, 0.66), (35, 0.55)),
+    "TE": ((21, 1.18), (22, 1.22), (23, 1.27), (24, 1.12), (25, 0.98), (26, 0.92), (27, 0.95), (28, 0.90), (29, 0.80), (31, 0.72), (34, 0.60)),
+    "K": AGE_KNOTS_V1["K"],
+    "DEF": ((21, 1.0), (40, 1.0)),
+}
 # Age at which retirement starts to be likely, and how fast the hazard climbs.
 RETIRE_AGE = {"QB": 38.0, "RB": 31.0, "WR": 34.0, "TE": 34.5, "K": 41.0, "DEF": 99.0}
 RETIRE_SCALE = 1.7
 MARKET_HALF_LIFE = 0.6  # how much of the PPG change carries into dynasty market value (exponent)
+# stability_v 1: how much of a season's result (realized / projected points per game, centered on the position's typical result) is carried into the
+# next projection. A projection is a posterior: last year's production is evidence about talent, so a 22-year-old who broke out is projected higher
+# next year, not pulled back to his old number. Weighted by OUTCOME_WEIGHT because one season is also mostly noise (roughly the weight real
+# projection systems put on last season's per-game points against the prior, 0.3 to 0.6).
+OUTCOME_WEIGHT = 0.5
+REVERSION = 0.40  # share of the gap (log projection vs the position's typical starter) closed per year, see game_dynasty.season_outcomes
+OUTCOME_CLIP = (-1.0, 0.6) # a 70-point season does not become next year's projection; a lost job (collapse) is remembered at most this hard
 FUTURE_YEARS = 4
 FUTURE_DISCOUNT = 0.9
 MIN_FACTOR, MAX_FACTOR = 0.35, 1.3
@@ -54,7 +77,7 @@ def stable_key(text: str) -> int:
 def age_mult(pos: str, age: float, v: int = 0) -> float:
     """Expected multiplier on next season's PPG for a player of ``age`` now (``v`` = the game's aging_v)."""
 
-    table = AGE_KNOTS_V1 if v >= 1 else AGE_KNOTS
+    table = AGE_KNOTS_V2 if v >= 2 else AGE_KNOTS_V1 if v >= 1 else AGE_KNOTS
     knots = table.get(pos) or table["WR"]
     if age <= knots[0][0]:
         return knots[0][1]
@@ -127,20 +150,24 @@ def retire_prob_v1(pos: str, age: float, role: float, quality: float, ratio: flo
 
 def progress(
     pos: str, age: float, mean: float, sd: float, market: float, z: float, u_ret: float, mult: float | None = None,
-    flat_k: bool = False, aging_v: int = 0, role: float = 0.5,
+    flat_k: bool = False, aging_v: int = 0, role: float = 0.5, knots_v: int | None = None, outcome: float = 0.0, ceiling: float | None = None,
 ) -> tuple[float, float, float, float, bool]:
     """One offseason for one player. ``z`` is a standard normal and ``u_ret`` a
     uniform from the player's own stream. ``mult`` replaces the plain age curve for a
-    player with his own development curve (a generated rookie, see ``scouting``).
+    player with his own development curve (a generated rookie, see ``scouting``). ``knots_v`` picks the age-knot
+    generation (default: ``aging_v``); ``ceiling`` (stability_v 1) is the position's best projection in the league's first season, which growth cannot run past; ``outcome`` is the stability_v 1 feedback: the log of how the season just played
+    went against his projection (centered on the position), already weighted by ``OUTCOME_WEIGHT``, so a breakout carries into next year's projection and a bust does too.
     Returns ``(age, mean, sd, market, retired)`` for next season."""
 
     if mult is None:
-        mult = age_mult(pos, age, aging_v)
+        mult = age_mult(pos, age, aging_v if knots_v is None else knots_v)
         if flat_k and pos == "K":  # dynasty_v 3: kickers hold their level until their late decline (the plain curve compounds +2% a year)
             mult = min(mult, 1.0)
+    if ceiling and mult > 1.0:  # stability_v 1: growth has diminishing returns as a projection nears the best the league has ever had
+        mult = 1.0 + (mult - 1.0) * max(0.0, 1.0 - (mean / ceiling) ** 2)
     spread = 0.10 if pos != "K" else 0.06
     noise = math.exp(spread * z - 0.5 * spread * spread)
-    new_mean = max(0.5, mean * mult * noise) if pos != "DEF" else mean
+    new_mean = max(0.5, mean * mult * noise * math.exp(outcome)) if pos != "DEF" else mean
     ratio = new_mean / mean if mean > 0 else 1.0
     new_age = age + 1.0
     # Dynasty market value follows the production change and the new age.

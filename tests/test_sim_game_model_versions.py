@@ -9,7 +9,7 @@ import hashlib
 from dataclasses import replace
 from pathlib import Path
 
-from modules.sim import game_scoring, player_model, player_model_v1, player_model_v2, player_model_v3, player_model_v4, player_model_v5
+from modules.sim import game_scoring, player_model, player_model_v1, player_model_v2, player_model_v3, player_model_v4, player_model_v5, player_model_v6
 from tests.test_sim_game_engine import BYES, ROWS, InMemoryBackend
 from tests import test_sim_game_engine as eng
 
@@ -19,6 +19,9 @@ V3_ID = "player_model-player-model-3"
 V4_ID = "player_model-player-model-4"
 V5_ID = "player_model-player-model-5"
 V6_ID = "player_model-player-model-6"
+V7_ID = "player_model-player-model-7"
+# sha256 of modules/sim/player_model_v6.py: the frozen copy of player-model-6 before rookie outcome variance (player-model-7)
+V6_SHA256 = "43fedc4328ec41b18f745d255fdb366f97bd2cad3cbb74d343da303504e19b39"
 # sha256 of modules/sim/player_model_v5.py: the frozen copy of player-model-5 before the single-game tail bounds (player-model-6)
 V5_SHA256 = "7f7aac6d2676b1d35b917eebd6bf9a3f57744eb68a94b941f5b5231b16cda8a1"
 # state digests after weeks 2..6 for seed 11 / user slot 4 (ai_v 0), produced by the player-model-5 code (the default of origin/main) before player-model-6 existed
@@ -99,7 +102,7 @@ def test_v1_module_is_a_frozen_copy():
     path = Path(player_model_v1.__file__)
     assert hashlib.sha256(path.read_bytes()).hexdigest() == V1_SHA256, "player_model_v1.py must never change"
     assert player_model_v1.MODEL_VERSION == "player-model-1"
-    assert player_model.MODEL_VERSION == "player-model-6"
+    assert player_model.MODEL_VERSION == "player-model-7"
 
 
 def test_v2_module_is_a_frozen_copy():
@@ -110,17 +113,17 @@ def test_v2_module_is_a_frozen_copy():
 def test_get_model_routes_each_id_to_its_own_module_and_new_games_use_the_latest():
     assert game_scoring.get_model(V1_ID)._m is player_model_v1
     assert game_scoring.get_model(V2_ID)._m is player_model_v2 and game_scoring.get_model(V3_ID)._m is player_model_v3
-    assert game_scoring.get_model(V4_ID)._m is player_model_v4 and game_scoring.get_model(V5_ID)._m is player_model_v5 and game_scoring.get_model(V6_ID)._m is player_model
+    assert game_scoring.get_model(V4_ID)._m is player_model_v4 and game_scoring.get_model(V5_ID)._m is player_model_v5 and game_scoring.get_model(V6_ID)._m is player_model_v6 and game_scoring.get_model(V7_ID)._m is player_model
     assert game_scoring.get_model(V1_ID).model_id == V1_ID and game_scoring.get_model(V2_ID).model_id == V2_ID
-    assert game_scoring.default_model().model_id == V6_ID
+    assert game_scoring.default_model().model_id == V7_ID
     assert game_scoring.get_model(game_scoring.FALLBACK_ID).model_id == game_scoring.FALLBACK_ID
     assert game_scoring.get_model("").model_id == game_scoring.FALLBACK_ID
 
 
 def test_unknown_model_ids_fall_back_to_the_default_with_a_note():
     model, note = game_scoring.resolve_model("player_model-player-model-99")
-    assert model.model_id == V6_ID and note and "player_model-player-model-99" in note
-    for known in (V1_ID, V2_ID, V3_ID, V4_ID, V5_ID, V6_ID, game_scoring.FALLBACK_ID, None):
+    assert model.model_id == V7_ID and note and "player_model-player-model-99" in note
+    for known in (V1_ID, V2_ID, V3_ID, V4_ID, V5_ID, V6_ID, V7_ID, game_scoring.FALLBACK_ID, None):
         assert game_scoring.resolve_model(known)[1] is None
 
 
@@ -197,6 +200,13 @@ def test_a_game_created_under_v5_replays_and_resumes_identically():
     assert store.load_state("u", gid, snap, use_checkpoint=False).digest() == GOLDEN_V5_DIGESTS[STOP_WEEK]
 
 
-def test_v6_games_resume_equal_replay():
-    store, gid, snap, state, _ = _play(V6_ID)
+def test_v6_module_is_a_frozen_copy():
+    assert hashlib.sha256(Path(player_model_v6.__file__).read_bytes()).hexdigest() == V6_SHA256, "player_model_v6.py must never change"
+    assert player_model_v6.MODEL_VERSION == "player-model-6"
+    assert player_model_v6.SEASON.sig_rook == 0.0 and not hasattr(player_model_v6.SEASON, "bust_sd_rook")
+    assert player_model.SEASON.bust_sd_rook > 0.0 and player_model.SEASON.sig_rook_add > 0.0
+
+
+def test_v7_games_resume_equal_replay():
+    store, gid, snap, state, _ = _play(V7_ID)
     assert store.load_state("u", gid, snap, use_checkpoint=True).digest() == store.load_state("u", gid, snap, use_checkpoint=False).digest() == state.digest()
