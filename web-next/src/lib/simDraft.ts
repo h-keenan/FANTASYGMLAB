@@ -5,7 +5,7 @@ import { badgeFromTag, contextSuppressed, type BadgeInput, type BadgeKind } from
 import { playerSurname } from "./playerNameDisplay";
 import type { PlayerListStat } from "./playerListRow";
 import { simGradeOf, simGradeText, type SimGradeInput } from "./simGrade";
-import { simHeadshotId, simPlayerTags, simFmtPts, simFmtValue, simRosterNeeds, simParsePickId, simPickSlotText, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
+import { simHeadshotId, simPlayerTags, simFmtPts, simFmtValue, simRosterNeeds, simSlotAccepts, simParsePickId, simPickSlotText, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
 
 export interface SimDraftProgress {
   round: number;
@@ -558,4 +558,61 @@ export function simDraftSurvival(
   const head = `${picksAway} pick${picksAway === 1 ? "" : "s"} before your #${nextPickNo}`;
   const runBit = run ? ` ${run.pos} run: ${run.count} of the last ${recent.length}.` : "";
   return { nextPickNo, picksAway, gone, toss, there, run, text: `${head}, ${bits.join("; ")}.${runBit}` };
+}
+
+// --- "Your roster" strip in the draft clock ----------------------------------------------------------------------------
+
+export interface SimRosterSlotCell {
+  key: string;
+  slot: SimSlot;
+  /** Short slot label: "QB", "FLEX", "SF". */
+  label: string;
+  player: SimGamePlayer | null;
+  /** An empty strict-position slot: the same hole `simRosterNeeds` / the header's "need RB/TE" names (a flex slot is never a need). */
+  need: boolean;
+}
+
+export interface SimRosterGroup {
+  pos: SimPos;
+  players: SimGamePlayer[];
+  have: number;
+  starters: number;
+}
+
+export interface SimRosterStrip {
+  slots: SimRosterSlotCell[];
+  bench: { have: number; max: number };
+  groups: SimRosterGroup[];
+  empty: number;
+}
+
+const SIM_SLOT_LABEL: Partial<Record<SimSlot, string>> = { SUPER_FLEX: "SF", REC_FLEX: "W/T", WRRB_FLEX: "W/R" };
+const SIM_FLEX_SLOTS: readonly SimSlot[] = ["FLEX", "SUPER_FLEX", "REC_FLEX", "WRRB_FLEX"];
+
+/**
+ * The league's starting slots in order, filled from the roster: strict slots take their position first (draft order), then flex slots
+ * take whoever is left and eligible; everyone else is bench. One source with the header's need text: an empty strict slot exists
+ * exactly when `simRosterNeeds` has have < starters for that position. Works for startup and rookie drafts (any roster list).
+ */
+export function simDraftRosterStrip(roster: readonly SimGamePlayer[], slots: readonly SimSlot[], rosterLimit: number, benchSetting?: number | null): SimRosterStrip {
+  const used = new Set<string>();
+  const cells: SimRosterSlotCell[] = slots.map((slot, i) => ({ key: `${slot}-${i}`, slot, label: SIM_SLOT_LABEL[slot] ?? slot, player: null, need: false }));
+  const isStrict = (slot: SimSlot) => !SIM_FLEX_SLOTS.includes(slot);
+  for (const strictPass of [true, false]) {
+    for (const cell of cells) {
+      if (isStrict(cell.slot) !== strictPass) continue;
+      const found = roster.find((p) => !used.has(p.id) && simSlotAccepts(cell.slot, p.pos));
+      if (found) {
+        used.add(found.id);
+        cell.player = found;
+      }
+    }
+  }
+  for (const cell of cells) cell.need = !cell.player && isStrict(cell.slot);
+  const have = roster.filter((p) => !used.has(p.id)).length;
+  const max = Math.max(have, benchSetting != null && benchSetting >= 0 ? benchSetting : Math.max(0, rosterLimit - slots.length));
+  const groups = simRosterNeeds([...roster], [...slots])
+    .map((n) => ({ pos: n.pos, players: roster.filter((p) => p.pos === n.pos), have: n.have, starters: n.starters }))
+    .filter((g) => g.players.length > 0 || g.starters > 0);
+  return { slots: cells, bench: { have, max }, groups, empty: cells.filter((c) => !c.player).length };
 }
