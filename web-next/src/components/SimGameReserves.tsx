@@ -7,6 +7,7 @@ import { SimRosterLine, type SimCtx } from "@/components/SimGameParts";
 import type { SimMoveHandle } from "@/components/SimMoveStrip";
 import { api } from "@/lib/api";
 import {
+  simBlockable,
   simGameGate,
   simReserveReasonText,
   simReserveUsedLine,
@@ -123,7 +124,7 @@ export function useSimRosterMoves({
       changeSlot: o.changeSlot,
       lineupLocked: o.lineupLocked,
       canCut: Boolean(onCut) && !o.noCut,
-      block: blocksOn && !o.noBlock && player.pos !== "K" && player.pos !== "DEF" ? { on: Boolean(player.block?.mine) } : null,
+      block: blocksOn && !o.noBlock && simBlockable(ctx.game.settings, player.pos) ? { on: Boolean(player.block?.mine) } : null,
       profile: true,
     };
     const specs = simMoveSpecs(input);

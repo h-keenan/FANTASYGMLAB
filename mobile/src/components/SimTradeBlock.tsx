@@ -15,7 +15,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simListStats } from '../lib/simDraft';
 import { simGradeCompare } from '../lib/simGrade';
-import { simIsPick, simPicksOf, type SimBlockResponse, type SimGamePlayer, type SimPickAsset, type SimPos, type SimTradeAsset } from '../lib/simGame';
+import { simBlockable, simIsPick, simPicksOf, type SimBlockResponse, type SimGamePlayer, type SimPickAsset, type SimPos, type SimTradeAsset } from '../lib/simGame';
 
 type Hint = SimPos | 'any';
 const HINTS: { key: Hint; label: string }[] = [{ key: 'any', label: 'Any' }, ...(['QB', 'RB', 'WR', 'TE'] as const).map((p) => ({ key: p as Hint, label: p }))];
@@ -82,7 +82,7 @@ export function SimBlockView({ ctx, onMakeOffer }: { ctx: SimCtx; onMakeOffer: (
   );
 
   const onIds = useMemo(() => new Set((block?.mine ?? []).map((m) => m.asset.id)), [block]);
-  const candidates = useMemo(() => roster.filter((p) => !onIds.has(p.id) && p.pos !== 'K' && p.pos !== 'DEF').sort((a, b) => simGradeCompare(a, b) || (b.ros_mean ?? 0) - (a.ros_mean ?? 0)), [roster, onIds]);
+  const candidates = useMemo(() => roster.filter((p) => !onIds.has(p.id) && simBlockable(ctx.game.settings, p.pos)).sort((a, b) => simGradeCompare(a, b) || (b.ros_mean ?? 0) - (a.ros_mean ?? 0)), [roster, onIds, ctx.game.settings]);
   const myPicks = simPicksOf(picks, teamId).filter((p) => !onIds.has(p.id));
 
   if (failed) {
@@ -195,7 +195,7 @@ export function SimBlockToggle({ ctx, player }: { ctx: SimCtx; player: SimGamePl
       cancelled = true;
     };
   }, [enabled, ctx.gameId, player.id, player.block?.mine]);
-  if (!enabled || player.owner?.type !== 'you' || player.pos === 'K' || player.pos === 'DEF') return null;
+  if (!enabled || player.owner?.type !== 'you' || !simBlockable(ctx.game.settings, player.pos)) return null;
   return (
     <Button
       size="sm"

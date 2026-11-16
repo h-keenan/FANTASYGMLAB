@@ -41,6 +41,7 @@ from modules.sim.game_types import (
     STABILITY_VERSION,
     VORP_VERSION,
     ADVICE_VERSION,
+    POS_VERSION,
     HINT_VERSION,
     KD_VERSION,
     LIMIT_VERSION,
@@ -63,6 +64,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "stability_v": (STABILITY_VERSION, SEASON),
     "vorp_v": (VORP_VERSION, NOW),
     "advice_v": (ADVICE_VERSION, NOW),
+    "pos_v": (POS_VERSION, NOW),
 }
 
 # What the UI shows for each flag: a short label, one sentence of what changes, and whether it needs a dynasty with offseasons.
@@ -110,6 +112,11 @@ FLAGS: dict[str, dict[str, Any]] = {
     "advice_v": {
         "label": "Smarter draft advice",
         "body": "The draft hint and Auto-pick weigh value against your starting-slot needs, positional runs and thin tiers, byes and injuries, and say why (for example, why a big value gap beats a need).",
+        "dynasty_only": False,
+    },
+    "pos_v": {
+        "label": "Kickers and defenses trade like any position",
+        "body": "A team that needs a kicker (or defense) will take a better one for fair value and cut its worse one, a team that is set declines a worse one on value, and the Needs tags match what the AI will pay for. Kickers and defenses can go on your trade block.",
         "dynasty_only": False,
     },
     "names_v": {

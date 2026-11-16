@@ -40,7 +40,7 @@ from modules.sim.types import is_pick_id
 
 ROWS, BYES = build_synthetic_pool(7)
 MODEL = "player_model-player-model-5"
-OLD_FLAGS = ("hint_v", "limit_v", "kd_v", "world_v", "aging_v", "names_v", "econ_v")
+OLD_FLAGS = ("hint_v", "limit_v", "kd_v", "world_v", "aging_v", "names_v", "econ_v", "pos_v")
 RULE_CODES = {"singleton_limit", "roster_full", "picks_locked", "wrong_phase", "trades_closed", "trade_deadline_passed", "partner_trade_limit", "duplicate_offer"}
 
 
