@@ -231,71 +231,139 @@ def annotate_sleeper_trending_add(
     return annotated
 
 
-def waiver_confidence_label(row, position_rank: int) -> tuple[str, str]:
-    """Real recommendation-confidence signal for a Priority Adds candidate.
+# An "elite" wire add must clear an ABSOLUTE bar, not just beat the rest of
+# the wire (audit P1-2: a wire scored [6..1] used to mint the same two "Elite"
+# rows as [900..600]). Preferred bar: the 0-99 overall rating the endpoint
+# already percentiles against the WHOLE league-eligible pool (72 = about the
+# 80th percentile at the position, a real starter-level player). Frames that
+# carry no rating fall back to a plain score floor.
+ELITE_MIN_OVERALL_RATING = 72
+ELITE_MIN_SCORE = 50.0
 
-    Not a new score: derived directly from the same already-computed signals
-    ``rank_priority_add_candidates`` uses to rank this exact row —
-    ``priority_need_fit`` / ``injury_replacement_fit`` (does this fill a real
-    roster need) and ``priority_value_opportunity`` (is this elite value on
-    the wire regardless of need) — mirroring Trade Ideas'
-    High/Medium/Low confidence language
-    (``modules.trade_ideas._trade_confidence_label``) so the same badge/label
-    visual pattern (``modules.trade_visual_language.confidence_indicator_html``)
-    reads consistently across both surfaces.
+_STASH_OPPORTUNITIES = {"Backup With Upside", "Starter At Risk", "Committee Back"}
+_PRIORITY_SIGNAL_COLUMNS = ("priority_need_fit", "priority_value_opportunity")
 
-    Rows that never went through ``rank_priority_add_candidates`` (no
-    ``priority_need_fit``/``priority_value_opportunity`` columns at all —
-    e.g. Stash Candidates/Watchlist Depth/FAAB Shortlist, which are sourced
-    from the raw wire, not the need-fit ranker) return an empty label rather
-    than fabricate one from signals that were never actually computed for
-    them.
+
+def _row_number(row, *keys) -> float | None:
+    for key in keys:
+        try:
+            value = row.get(key)
+        except Exception:
+            value = None
+        if value is None:
+            continue
+        try:
+            number = float(value)
+        except Exception:
+            continue
+        if number == number:
+            return number
+    return None
+
+
+def _clear_elite_bar(row, score: float) -> bool:
+    """Absolute (not wire-relative) "elite value" bar for one candidate."""
+
+    rating = _row_number(row, "_overall_rating_col", "overall_rating")
+    if rating is not None:
+        return rating >= ELITE_MIN_OVERALL_RATING
+    return score >= ELITE_MIN_SCORE
+
+
+def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
+    """ONE verdict for a waiver candidate: ``(label, tone, confidence, reason)``.
+
+    Label and confidence come from the same branch so they cannot disagree:
+
+    * Add   (High)   - fills a real roster need (positional depth vs starting
+      requirements, injury/bye hole) or is a big lineup upgrade over the
+      starter/bench player it replaces.
+    * Stash (Medium/Low) - cheap upside for later: the best stash at a need
+      nobody on the wire fills, elite wire value with no need today, or a
+      young / contingent-role player.
+    * Watch (Low)    - nothing to do now.
+
+    ``position_rank`` (rank among free agents) only appears in the reason
+    text; it never decides the label. Rows that never went through
+    ``rank_priority_add_candidates`` carry no need signals, so their
+    confidence is "" (never fabricated) and they can only be Stash or Watch.
+    The reason is one plain line weighing need, upgrade size, age/upside,
+    competition on the wire and the team's posture when the row carries one.
     """
 
-    if "priority_need_fit" not in row and "priority_value_opportunity" not in row:
-        return "", ""
-    stale = bool(row.get("stale_free_agent"))
+    computed = any(col in row for col in _PRIORITY_SIGNAL_COLUMNS)
+    pos = _safe_text(row.get("position")).strip().upper()
+    score = _row_number(row, "score", "value_score") or 0.0
+    age = _row_number(row, "age") or 0.0
+    ppw = _row_number(row, "priority_wire_ppw", "lineup_ppw")
+    opportunity = _safe_text(row.get("opportunity_label")).strip()
+    posture = _safe_text(row.get("roster_posture") or row.get("posture")).strip()
     try:
-        score = int(round(float(row.get("score", row.get("value_score", 0)) or 0)))
+        rank = int(position_rank or 0)
     except Exception:
-        score = 0
-    if stale or score <= 0:
-        return "Low", "Stale or low-value under the current lens."
+        rank = 0
+
+    def ctx(*lead: str) -> str:
+        parts = [p for p in lead if p]
+        if ppw is not None and ppw >= FILLS_NEED_MIN_PPW:
+            parts.append(f"worth about +{ppw:.1f} pts/wk in your lineup")
+        if age and age <= 24:
+            parts.append(f"age {int(age)} with room to grow")
+        elif age and age >= 31:
+            parts.append(f"age {int(age)}, short shelf life")
+        if opportunity:
+            parts.append(opportunity.lower())
+        if rank and rank <= 3 and pos:
+            parts.append(f"#{rank} {pos} on the wire")
+        elif rank and pos:
+            parts.append(f"only #{rank} {pos} on the wire, so less competition")
+        if posture:
+            parts.append(f"fits a {posture.lower()} posture")
+        text = "; ".join(parts[:4])
+        return text[:1].upper() + text[1:] + "." if text else ""
+
+    if bool(row.get("stale_free_agent")) or (computed and score <= 0):
+        return ("Watch", "neutral", "Low" if computed else "",
+                "Stale or low value under the current lens; nothing to do now.")
     need_fit = bool(row.get("priority_need_fit")) or bool(row.get("injury_replacement_fit"))
-    if bool(row.get("priority_stash_for_need")) and not need_fit:
-        return "Medium", "Best stash at your top need; no one on the wire would start for you there."
-    value_opportunity = bool(row.get("priority_value_opportunity"))
     if bool(row.get("priority_bigger_upgrade")):
-        return "High", "Adds more lineup points than the best fix at your biggest need."
+        return ("Add", "opportunity", "High",
+                ctx("Bigger lineup upgrade than the best fix at your biggest need"))
     if need_fit:
-        return "High", "Matches a real roster need on this roster."
-    if value_opportunity or int(position_rank or 99) <= 1:
-        return "Medium", "Elite wire value, but not tied to a stated roster need."
-    return "Low", "Depth-level add without a strong need or value signal."
+        lead = (
+            "Covers an injury hole in your lineup"
+            if bool(row.get("injury_replacement_fit"))
+            else f"Fills a real {pos or 'roster'} need".replace("  ", " ")
+        )
+        return "Add", "opportunity", "High", ctx(lead)
+    if bool(row.get("priority_stash_for_need")):
+        return ("Stash", "information", "Medium",
+                ctx("Best stash at your top need; nobody on the wire would start there"))
+    if bool(row.get("priority_value_opportunity")):
+        return ("Stash", "information", "Medium",
+                ctx("Elite value on the wire, but no roster need today"))
+    if (age and age <= 24) or opportunity in _STASH_OPPORTUNITIES:
+        return ("Stash", "information", "Low" if computed else "",
+                ctx("Cheap upside for later, no need today"))
+    return ("Watch", "neutral", "Low" if computed else "",
+            ctx("Depth only; no need or value signal"))
 
 
 _safe_text = league_display._safe_text
 
 
-def waiver_recommendation_label(row, position_rank: int) -> tuple[str, str]:
-    """Translate existing waiver signals into a concise presentation label."""
+def waiver_confidence_label(row, position_rank: int) -> tuple[str, str]:
+    """Confidence badge ``(label, reason)``; a view of ``waiver_recommendation``."""
 
-    if bool(row.get("stale_free_agent")):
-        return "Watch", "neutral"
-    if bool(row.get("injury_replacement_fit")) or position_rank <= 3:
-        return "Add", "opportunity"
-    opportunity = _safe_text(row.get("opportunity_label")).strip()
-    try:
-        age = float(row.get("age") or 0)
-    except Exception:
-        age = 0
-    if (age and age <= 24) or opportunity in {
-        "Backup With Upside",
-        "Starter At Risk",
-        "Committee Back",
-    }:
-        return "Stash", "information"
-    return "Watch", "neutral"
+    _label, _tone, confidence, reason = waiver_recommendation(row, position_rank)
+    return confidence, reason if confidence else ""
+
+
+def waiver_recommendation_label(row, position_rank: int) -> tuple[str, str]:
+    """Add / Stash / Watch ``(label, tone)``; a view of ``waiver_recommendation``."""
+
+    label, tone, _confidence, _reason = waiver_recommendation(row, position_rank)
+    return label, tone
 
 
 def select_top_waiver_opportunity(
@@ -634,7 +702,10 @@ def rank_priority_add_candidates(
             is_need = position in needed or injured
         if position == "K":
             is_need = bool(kicker_required and not has_viable_kicker)
-        is_elite_value = bool(overall_rank.at[idx] <= 2 or score >= top_cutoff)
+        is_elite_value = bool(
+            (overall_rank.at[idx] <= 2 or score >= top_cutoff)
+            and _clear_elite_bar(positive.loc[idx], score)
+        )
         if position in {"QB", "TE"} and position not in (need_rank if use_model else needed) and not injured:
             is_need = False
             # Do not let covered QB/TE displace true skill-position needs.
@@ -644,10 +715,14 @@ def rank_priority_add_candidates(
                 # Adequate 1QB rooms: ordinary QBs are not Priority Adds.
                 is_elite_value = False
             elif position == "TE":
-                is_elite_value = bool(overall_rank.at[idx] <= 1 and score >= top_cutoff)
+                is_elite_value = bool(
+                    overall_rank.at[idx] <= 1 and score >= top_cutoff and _clear_elite_bar(positive.loc[idx], score)
+                )
             else:
                 # Superflex without a true QB need: only exceptional wire QB value.
-                is_elite_value = bool(overall_rank.at[idx] <= 2 and score >= top_cutoff)
+                is_elite_value = bool(
+                    overall_rank.at[idx] <= 2 and score >= top_cutoff and _clear_elite_bar(positive.loc[idx], score)
+                )
         if position == "K" and suppress_kickers:
             is_need = False
             is_elite_value = False

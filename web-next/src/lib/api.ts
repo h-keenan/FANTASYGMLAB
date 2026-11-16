@@ -1474,10 +1474,12 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
   /** Null-safe: clients must render a missing/non-applicable bid. */
   faab: WaiverFaabGuidance | null;
   /** Real need-fit/standout-value confidence for this recommendation
-   * (High/Medium/Low — modules.waivers_ui.waiver_confidence_label), the
+   * (High/Medium/Low — modules.waivers_logic.waiver_recommendation), the
    * same already-computed signals that ranked it into Priority Adds. */
   confidence_label: string;
   confidence_reason: string;
+  /** One plain line from modules.waivers_logic.waiver_recommendation weighing need, upgrade size, age/upside, competition and posture; same text as confidence_reason when a badge shows. */
+  recommendation_reason?: string;
   /** Display-only role flag from modules/usage_trends.py (never feeds the score, rank or bid).
    * `usage_flag_status` says why `usage_flag` is null: "unavailable" = no weekly stats were loaded. */
   usage_flag?: Pick<UsageFlag, "key" | "label" | "tone" | "explanation"> | null;

@@ -24,7 +24,7 @@ export function waiversReasonMessage(reason: string): string | null {
   });
 }
 
-/** modules.waivers_ui.waiver_recommendation_label's three tones -> this
+/** modules.waivers_logic.waiver_recommendation's three tones -> this
  * app's existing semantic tokens (same opportunity/information/neutral
  * mapping mobile's recommendationToneColor uses: amber for "Add", cyan for
  * "Stash", muted slate for "Watch"). */
@@ -179,7 +179,7 @@ export function waiverReasonChips(
 export type WaiverRecFilter = "all" | "Add" | "Stash" | "Watch";
 
 /** Filter pills for "More recommended adds" — by the server's own
- * recommendation_label (waiver_recommendation_label: Add / Stash / Watch). */
+ * recommendation_label (waiver_recommendation: Add / Stash / Watch). */
 export function filterByRecommendation<T extends { recommendation_label: string }>(
   rows: T[],
   filter: WaiverRecFilter,
