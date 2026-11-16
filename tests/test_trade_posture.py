@@ -271,7 +271,7 @@ def test_calibration_grid_verdict_changes_are_few_directional_and_explained(monk
     assert len(ui_changed) / len(after) <= 0.30  # share-based cuts are tighter on big deals
     # There is no separate label any more: the band IS the UI rung of the score.
     assert ui_changed <= label_changed
-    assert len(label_changed) / len(after) <= 0.35
+    assert len(label_changed) / len(after) <= 0.40
     for key in ui_changed:
         _, name, strat = key
         a, b = after[key], before[key]

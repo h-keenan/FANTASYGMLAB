@@ -41,7 +41,7 @@ def test_trade_card_maps_canonical_fields_only():
     assert card.is_shareable
     assert card.card_type == share.CARD_TYPE_TRADE
     assert card.value_change == "+314"
-    assert card.verdict == "Fair"
+    assert card.verdict == "Favorable"  # +314 on a 414-point deal is a big edge
     assert card.receive_side_label == "This roster receives"
     assert card.acquire_total == 414
     assert card.send_total == 100
