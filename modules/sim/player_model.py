@@ -43,7 +43,12 @@ from typing import Any, Mapping
 
 import numpy as np
 
-MODEL_VERSION = "player-model-7"
+MODEL_VERSION = "player-model-8"
+# player-model-8 (frozen predecessor: player_model_v7.py): the TOP-TIER season low tail. v7 drew a bust season for a star from the same shape it uses for a
+# starter (median 0.76 of the projection, log-sd 0.37, about 17 percent of seasons), so a top-12 projected RB/WR/TE finished under 0.6 of his projection
+# in about one season in eight and the sim's top-12 realized / projected points per game had a 5th percentile of 0.39-0.46 against 0.58-0.70 in the real
+# 2021-25 panel (sd of the log 0.30-0.36 against 0.21-0.27). A star's bust is now shallower and rarer, ramping in with the log-tier (``star_tau``): a
+# starter or flex player is untouched. See docs/audits/2026-11-realism-advice-audit-2.md.
 # player-model-7 (frozen predecessor: player_model_v6.py): rookie year-1 OUTCOME VARIANCE. v6 gave a top-12 class rookie a 14 percent chance of finishing
 # under 0.6 of his projection (real classes 21 percent, 2021-25 panel) and 86 percent of reaching 8 points per game: its solid season was a tight lognormal
 # (log-sd 0.07 at the top of the class) and a "bust" a shallow, narrow drop. Rookies now get a wider solid season (``sig_rook_add``) and a wider bust
@@ -193,6 +198,9 @@ class SeasonParams:
     sig_rook_add: float = 0.18   # player-model-7: extra solid-season log-sd for rookies, ADDED (a top-of-class rookie's own spread is tiny, so a multiplier does nothing there)
     bust_sd_rook: float = 0.18   # player-model-7: extra bust-depth log-sd for rookies, added
     te_sig: float = 1.0325          # solid-season log-sd multiplier for tight ends
+    star_tau: float = 0.3        # player-model-8: log-tier (log of proj / reference) at which the star adjustments below are fully on (linear from 0)
+    bust_sd_star: float = 0.60   # player-model-8: share of the bust log-sd a full star drops (0.371 -> 0.148)
+    pu_star: float = -0.70       # player-model-8: logit shift of the bust probability for a full star
 
 
 @dataclass(frozen=True)
@@ -506,7 +514,8 @@ def season_level(
     old = np.clip((age - 27.0) / 4.0, -1.5, 1.5)
     rk = rookie.astype(float)
     pb = _sigmoid(p.pb0 + p.pb_rook * rk + p.pb_age * young + p.pb_tier * tau - 1.1 * is_qb)
-    pu = _sigmoid(p.pu0 + p.pu_rook * rk + p.pu_age * old + p.pu_tier * tau + p.pu_qb * is_qb)
+    star = (np.clip(tau / p.star_tau, 0.0, 1.0) if p.star_tau > 0.0 else np.zeros_like(tau)) * (1.0 - rk)  # a rookie keeps v7 year-one bust variance (real classes bust about one time in five)
+    pu = _sigmoid(p.pu0 + p.pu_rook * rk + p.pu_age * old + p.pu_tier * tau + p.pu_qb * is_qb + p.pu_star * star)
     ps = _sigmoid(p.ps0 + p.ps_tier * np.clip(tau, -1.0, 1.0)) * (1.0 - rk)
     pi = _sigmoid(np.full_like(proj, p.pi0))
     probs = np.stack([pb, pu, ps, pi])
@@ -529,7 +538,7 @@ def season_level(
     gain = p.gain_mean * gain_scale * np.exp(p.gain_tier * np.clip(tau, -2.0, 1.0)) * u["g"] / p.gain_shape
     breakout = proj * b + gain
     bust_mult = np.where(is_qb, p.qb_bust_mult, p.bust_mult)
-    bust_sd = p.bust_sd + p.bust_sd_rook * rk
+    bust_sd = p.bust_sd * (1.0 - p.bust_sd_star * star) + p.bust_sd_rook * rk
     bust = proj * bust_mult * np.exp(bust_sd * u["z2"] - 0.5 * bust_sd**2)
     mean = np.where(arch == 1, breakout, np.where(arch == 2, bust, solid))
     # Role collapse: a heavy left tail (a depth chart loss, a lost job) that a lognormal around the

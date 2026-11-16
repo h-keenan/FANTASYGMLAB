@@ -13,8 +13,9 @@ from modules.sim.game_actions import cut_player
 from modules.sim.game_eval import Evaluator, USER_PARAMS
 
 
-def run(seed, n_seasons, teams=12, flags=None):
-    """``flags``: GameSettings overrides, e.g. ``{"incumbent_v": 0, "defense_v": 0}`` for a before/after run."""
+def run(seed, n_seasons, teams=12, flags=None, profiles=False):
+    """``flags``: GameSettings overrides, e.g. ``{"incumbent_v": 0, "defense_v": 0}`` for a before/after run. ``profiles``: also record each skill
+    player's hidden season profile (``prof``: projection, season multiplier, archetype, rookie flag) for the season-variance reports."""
     model_id = game_scoring.default_model().model_id
     pool, byes = tail_report.pool_from_panel(dataset.load_panel())
     base = GameSettings.parse({"mode": "dynasty", "teams": teams, "user_slot": 3, "start_year": 2026, "seasons": n_seasons, "rookie_rounds": 3, "scoring": "ppr"})
@@ -56,12 +57,21 @@ def run(seed, n_seasons, teams=12, flags=None):
             g = [x for x in hist[:S.regular_weeks] if x is not None]
             if len(g) >= 8 and pid in snap.players:
                 pl[pid] = (snap.players[pid].pos, float(np.mean(g)), snap.players[pid].age, sum(g), len(g))
+        prof = {}
+        if profiles:
+            from modules.sim.game_engine import session_for
+            sess = session_for(snap, sd)
+            for pid in snap.pids:
+                pl_ = snap.players[pid]
+                if pl_.pos in ("QB", "RB", "WR", "TE") and pl_.mean > 0:
+                    pr = sess.profile(pid)
+                    prof[pid] = dict(proj=pl_.mean, mult=float(pr.season_multiplier), arch=pr.archetype, rookie=bool(pr.rookie), age=pl_.age, pos=pl_.pos)
         team_val = {t: sum(snap.players[p].market for p in state.holdings(t) if p in snap.players) for t in snap.tids}
         team_age = {t: float(np.mean([snap.players[p].age for p in state.rosters[t] if p in snap.players])) for t in snap.tids}
         wins = {t: (state.stand[t]["w"] + 0.5 * state.stand[t]["t"]) / S.regular_weeks for t in snap.tids}
         pfs = {t: state.stand[t]["pf"] for t in snap.tids}
         comp = {t: dict(Counter(snap.players[p].pos for p in state.rosters[t] if p in snap.players)) for t in snap.tids}
-        out.append(dict(season=state.season_no, champ=state.champion, user=snap.user_team.tid, weekly=weekly, margins=margins,
+        out.append(dict(prof=prof, season=state.season_no, champ=state.champion, user=snap.user_team.tid, weekly=weekly, margins=margins,
                         slot_pts={k: list(v) for k, v in slot_pts.items()}, pl=pl, team_val=team_val, team_age=team_age, wins=wins,
                         pfs=pfs, comp=comp, nplayers=len(snap.players),
                         nfl={pid: p.nfl_team for pid, p in snap.players.items()}, depth={pid: p.extra.get("depth_chart_order") for pid, p in snap.players.items()},

@@ -9,7 +9,7 @@ import hashlib
 from dataclasses import replace
 from pathlib import Path
 
-from modules.sim import game_scoring, player_model, player_model_v1, player_model_v2, player_model_v3, player_model_v4, player_model_v5, player_model_v6
+from modules.sim import game_scoring, player_model, player_model_v1, player_model_v2, player_model_v3, player_model_v4, player_model_v5, player_model_v6, player_model_v7
 from tests.test_sim_game_engine import BYES, ROWS, InMemoryBackend
 from tests import test_sim_game_engine as eng
 
@@ -20,6 +20,17 @@ V4_ID = "player_model-player-model-4"
 V5_ID = "player_model-player-model-5"
 V6_ID = "player_model-player-model-6"
 V7_ID = "player_model-player-model-7"
+V8_ID = "player_model-player-model-8"
+# sha256 of modules/sim/player_model_v7.py: the frozen copy of player-model-7 before the shallower top-tier bust (player-model-8)
+V7_SHA256 = "7184fe31a43ee60db6f284bce6333f1fe48c8a3f9d36a3ffcabf2f3d225f62e8"
+# state digests after weeks 2..6 for seed 11 / user slot 4 (ai_v 0), produced by the player-model-7 code (the default of origin/main) before player-model-8 existed
+GOLDEN_V7_DIGESTS = {
+    2: "e161df3466312cebd661993ec8d7b755a139908e22478775b2138488938599e7",
+    3: "dbc195f2fe3db8bfaf2f7705296b36d9504d6d9a8119da260a5e3c242bf35386",
+    4: "0fe506c358b662883f848dbdb3e2e78d6fffb108f23ff317917aef8dcc118a42",
+    5: "9dd015a4f19cb9c1b7a748095397a84356203e8d059ac1d3d78da8dc8d97d6f6",
+    6: "cc832ee1b9c852a5ab732218a84f2a1aaaca78aae6f4b76c9affeda44f2a556f",
+}
 # sha256 of modules/sim/player_model_v6.py: the frozen copy of player-model-6 before rookie outcome variance (player-model-7)
 V6_SHA256 = "43fedc4328ec41b18f745d255fdb366f97bd2cad3cbb74d343da303504e19b39"
 # sha256 of modules/sim/player_model_v5.py: the frozen copy of player-model-5 before the single-game tail bounds (player-model-6)
@@ -102,7 +113,7 @@ def test_v1_module_is_a_frozen_copy():
     path = Path(player_model_v1.__file__)
     assert hashlib.sha256(path.read_bytes()).hexdigest() == V1_SHA256, "player_model_v1.py must never change"
     assert player_model_v1.MODEL_VERSION == "player-model-1"
-    assert player_model.MODEL_VERSION == "player-model-7"
+    assert player_model.MODEL_VERSION == "player-model-8"
 
 
 def test_v2_module_is_a_frozen_copy():
@@ -113,17 +124,17 @@ def test_v2_module_is_a_frozen_copy():
 def test_get_model_routes_each_id_to_its_own_module_and_new_games_use_the_latest():
     assert game_scoring.get_model(V1_ID)._m is player_model_v1
     assert game_scoring.get_model(V2_ID)._m is player_model_v2 and game_scoring.get_model(V3_ID)._m is player_model_v3
-    assert game_scoring.get_model(V4_ID)._m is player_model_v4 and game_scoring.get_model(V5_ID)._m is player_model_v5 and game_scoring.get_model(V6_ID)._m is player_model_v6 and game_scoring.get_model(V7_ID)._m is player_model
+    assert game_scoring.get_model(V4_ID)._m is player_model_v4 and game_scoring.get_model(V5_ID)._m is player_model_v5 and game_scoring.get_model(V6_ID)._m is player_model_v6 and game_scoring.get_model(V7_ID)._m is player_model_v7 and game_scoring.get_model(V8_ID)._m is player_model
     assert game_scoring.get_model(V1_ID).model_id == V1_ID and game_scoring.get_model(V2_ID).model_id == V2_ID
-    assert game_scoring.default_model().model_id == V7_ID
+    assert game_scoring.default_model().model_id == V8_ID
     assert game_scoring.get_model(game_scoring.FALLBACK_ID).model_id == game_scoring.FALLBACK_ID
     assert game_scoring.get_model("").model_id == game_scoring.FALLBACK_ID
 
 
 def test_unknown_model_ids_fall_back_to_the_default_with_a_note():
     model, note = game_scoring.resolve_model("player_model-player-model-99")
-    assert model.model_id == V7_ID and note and "player_model-player-model-99" in note
-    for known in (V1_ID, V2_ID, V3_ID, V4_ID, V5_ID, V6_ID, V7_ID, game_scoring.FALLBACK_ID, None):
+    assert model.model_id == V8_ID and note and "player_model-player-model-99" in note
+    for known in (V1_ID, V2_ID, V3_ID, V4_ID, V5_ID, V6_ID, V7_ID, V8_ID, game_scoring.FALLBACK_ID, None):
         assert game_scoring.resolve_model(known)[1] is None
 
 
@@ -205,6 +216,32 @@ def test_v6_module_is_a_frozen_copy():
     assert player_model_v6.MODEL_VERSION == "player-model-6"
     assert player_model_v6.SEASON.sig_rook == 0.0 and not hasattr(player_model_v6.SEASON, "bust_sd_rook")
     assert player_model.SEASON.bust_sd_rook > 0.0 and player_model.SEASON.sig_rook_add > 0.0
+
+
+def test_v7_module_is_a_frozen_copy_and_a_v7_game_replays_identically():
+    assert hashlib.sha256(Path(player_model_v7.__file__).read_bytes()).hexdigest() == V7_SHA256, "player_model_v7.py must never change"
+    assert player_model_v7.MODEL_VERSION == "player-model-7" and not hasattr(player_model_v7.SEASON, "bust_sd_star")
+    assert player_model.SEASON.bust_sd_star > 0.0 and player_model.SEASON.pu_star < 0.0
+    store, gid, snap, state, digests = _play(V7_ID)
+    assert snap.scoring_model == V7_ID and digests == GOLDEN_V7_DIGESTS, "v7 game results changed"
+    assert store.load_state("u", gid, snap, use_checkpoint=False).digest() == GOLDEN_V7_DIGESTS[STOP_WEEK]
+
+
+def test_v8_changes_only_the_top_tier_bust():
+    """A starter / flex / depth player draws the same season under v7 and v8 (the star terms are zero at or below the reference tier)."""
+
+    import numpy as np
+
+    for proj in (3.0, 6.0, 9.0, 11.0):
+        r1, r2 = player_model_v7.profile_rng(5, "x"), player_model.profile_rng(5, "x")
+        p = {"player_id": "x", "pos": "WR", "age": 25.0, "team": "KC", "projection_mean_ppg": proj, "is_rookie": False}
+        a = player_model_v7.draw_season_profile(p, r1)
+        b = player_model.draw_season_profile(p, r2)
+        assert a.season_mean_ppg == b.season_mean_ppg and a.archetype == b.archetype
+    u = {"cat": np.array([0.2]), "z1": np.array([0.0]), "z2": np.array([-2.0]), "g": np.array([1.0]), "c2": np.array([0.99])}
+    args = (np.array([2]), np.array([20.0]), np.array([25.0]), np.array([False]), u)
+    # a star in a bust season: shallower than in v7 (same draw, smaller log-sd)
+    assert player_model.season_level(*args)[1][0] > player_model_v7.season_level(*args)[1][0]
 
 
 def test_v7_games_resume_equal_replay():

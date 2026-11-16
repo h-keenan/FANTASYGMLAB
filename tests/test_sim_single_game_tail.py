@@ -7,6 +7,7 @@ import pytest
 
 from modules.sim import player_model as pm
 from modules.sim import player_model_v5 as v5
+from modules.sim import player_model_v7 as v7  # same season story as v5 (player-model-8 reshapes the top tier's bust, which is not the single-game tail)
 from modules.sim.calibration import backtest, dataset, single_game_tail
 
 
@@ -37,7 +38,7 @@ def _pts(mod, pos, ppg, n):
 
 @pytest.mark.parametrize("pos,ppg", [("WR", 17.0), ("RB", 17.0), ("TE", 11.0)])
 def test_v6_removes_the_extreme_tail_but_not_the_body(pos, ppg):
-    a, b = _pts(v5, pos, ppg, 300), _pts(pm, pos, ppg, 300)
+    a, b = _pts(v5, pos, ppg, 300), _pts(v7, pos, ppg, 300)
     assert b.max() < 62.0 and np.percentile(b, 99.9) <= np.percentile(a, 99.9) + 1e-9
     # the body (mean, sd, p90) is the same up to the few capped games
     assert b.mean() == pytest.approx(a.mean(), rel=0.01) and b.std() == pytest.approx(a.std(), rel=0.03)
