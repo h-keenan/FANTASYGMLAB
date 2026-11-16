@@ -130,6 +130,19 @@ def sim_enabled(environ: Mapping[str, str] | None = None) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+class PlanUnverified(Exception):
+    """The caller's plan could not be read (a failed profile lookup). Never a
+    verdict: it must neither show the Free paywall nor unlock Pro."""
+
+
+PLAN_UNVERIFIED_MESSAGE = "We couldn't verify your plan just now. Your game is safe. Try again in a moment."
+
+
+def plan_unverified_response() -> dict[str, Any]:
+    return {"ok": True, "reason": "plan_unverified", "message": PLAN_UNVERIFIED_MESSAGE,
+            "is_premium": None, "upsell": None, "preview": None}
+
+
 @dataclass
 class SimApiDeps:
     require_user: Callable[..., dict[str, Any]]
@@ -436,4 +449,9 @@ def mount(app: Any, deps: SimApiDeps, environ: Mapping[str, str] | None = None) 
     if not sim_enabled(environ):
         return False
     app.include_router(build_router(deps))
+
+    async def _plan_unverified_handler(_request: Any, _exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=200, content=plan_unverified_response(), headers={"Retry-After": "2"})
+
+    app.add_exception_handler(PlanUnverified, _plan_unverified_handler)
     return True

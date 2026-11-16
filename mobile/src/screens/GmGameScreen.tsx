@@ -192,6 +192,7 @@ export default function GmGameScreen({ navigation }: Props) {
         setGameState(body.game);
         dispatch({ type: 'game_updated', game: body.game });
         if (body.preview !== undefined) setPreview(body.preview ?? null);
+        if (body.is_premium === true) dispatch({ type: 'dismiss_paywall' });
       }
     } catch {
       /* the next action reports the failure */
@@ -231,6 +232,10 @@ export default function GmGameScreen({ navigation }: Props) {
       setTick((n) => n + 1);
     },
     onDelta,
+    () => {
+      setPreview(null);
+      dispatch({ type: 'dismiss_paywall' });
+    },
   );
 
   // Hub data: options (works for Free) and the saved games.
