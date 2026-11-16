@@ -15,8 +15,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
 import { SimPickSheet } from "@/components/SimPickSheet";
-import type { PlayerRef } from "@/lib/playerAnatomy";
-import { PickOpenContext, PlayerOpenContext, type PickTapRef } from "@/components/ui/PlayerOpenContext";
+import type { PickTapRef } from "@/components/ui/PlayerOpenContext";
 import { BottomDock } from "@/components/ui/BottomDock";
 import { SimPillHost } from "@/components/SimPillHost";
 import { SimActionBar } from "@/components/SimActionBar";
@@ -31,7 +30,7 @@ import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { simMenuHero, simRulesParts } from "@/lib/simSummaries";
 import { Hero } from "@/components/ui/ModuleTemplates";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { simPlayerFromRef, SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimRowAccordion, SimTeamLink, SimTeamOpenContext, type SimCtx } from "@/components/SimGameParts";
+import { SimNotice, SimOpenersProvider, SimPreviewBanner, SimRowAccordion, SimTeamLink, type SimCtx } from "@/components/SimGameParts";
 import { SimBlockToggle } from "@/components/SimTradeBlock";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimRealismModule } from "@/components/SimRealism";
@@ -466,6 +465,7 @@ export function SimGameContent() {
   if (flow.view === "game" && game && ctx) {
     return (
       <Shell wide game>
+        <SimOpenersProvider ctx={ctx}>
         <GameScreen
           flow={flow}
           game={game}
@@ -543,6 +543,7 @@ export function SimGameContent() {
             }}
           />
         ) : null}
+        </SimOpenersProvider>
       </Shell>
     );
   }
@@ -1001,7 +1002,6 @@ function GameScreen({
   const showBar = inSeason && !recap && !simToResult;
   const showOffBar = stage === "offseason" && !draftRecap && !recap;
   const [moreOpen, setMoreOpen] = useState(false);
-  const simPlayerOpener = useCallback((ref: PlayerRef) => ctx.openPlayer(simPlayerFromRef(ref)), [ctx]);
   // Phones: the game orb (docked above the Advance pill) is the page navigator; the top PillRows render from md up.
   const showOrb = showBar || showOffBar || (stage === "draft" && !draftRecap && !recap);
   const orbNode = showOrb ? (
@@ -1017,10 +1017,6 @@ function GameScreen({
   ) : null;
 
   return (
-    <SimTeamOpenContext.Provider value={ctx.openTeam}>
-    <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
-    <PlayerOpenContext.Provider value={simPlayerOpener}>
-    <PickOpenContext.Provider value={ctx.openPick}>
     <SimRowAccordion>
     {/* Phones: a 100dvh flex column. Compact header on top, content flex-1, and the action pill + bottom tab bar as an in-flow
         sticky footer (no position:fixed, no JS placement), so iOS Safari viewport quirks cannot float it. */}
@@ -1138,10 +1134,6 @@ function GameScreen({
       </Sheet>
     </div>
     </SimRowAccordion>
-    </PickOpenContext.Provider>
-    </PlayerOpenContext.Provider>
-    </SimOpenPlayerContext.Provider>
-    </SimTeamOpenContext.Provider>
   );
 }
 

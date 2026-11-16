@@ -1521,6 +1521,8 @@ a {
   gap: var(--space-xs);
   margin-top: var(--space-xs);
 }
+.pqv-owner-tag { display: inline-flex; min-width: 0; max-width: 100%; align-items: center; gap: 0.25rem; }
+.pqv-owner-label { flex: none; font-size: 0.625rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
 .pqv-tier-mismatch-note {
   font-size: 0.75rem;
   color: var(--color-text-muted);
@@ -1921,14 +1923,14 @@ a {
   }
   /* Peek / full (coridian_ pick 1b): peek is one fixed height, so switching pills never moves the sheet; the handle drags to full. */
   .pqv-modal[data-snap="full"] {
-    min-height: calc(92dvh - var(--kb-inset, 0px));
-    max-height: calc(92dvh - var(--kb-inset, 0px));
+    min-height: calc(94dvh - var(--kb-inset, 0px));
+    max-height: calc(94dvh - var(--kb-inset, 0px));
   }
   /* Peek height is computed from the content (PlayerQuickView measures the pill row and sets --pqv-peek-h; lib/playerAnatomy
-     peekSheetHeight): compact header + pill row + one content line. 65dvh (= PEEK_MIN_FRAC, what a short header measures to) is the first-paint fallback, so the open never jumps. */
+     peekSheetHeight): compact header + pill row + one content line. 88dvh (= PEEK_MIN_FRAC, what a short header measures to) is the first-paint fallback, so the open never jumps. */
   .pqv-modal[data-snap="peek"] {
-    height: var(--pqv-peek-h, calc(65dvh - var(--kb-inset, 0px)));
-    max-height: var(--pqv-peek-h, calc(65dvh - var(--kb-inset, 0px)));
+    height: var(--pqv-peek-h, calc(88dvh - var(--kb-inset, 0px)));
+    max-height: var(--pqv-peek-h, calc(88dvh - var(--kb-inset, 0px)));
     min-height: 0;
   }
   /* Compact header at peek (coridian_ "PQV glitch", 2026-11-14): 56px avatar, name + meta + a one-line summary of the three
@@ -4481,6 +4483,22 @@ main > header:has(> h1.sr-only:only-child) {
   height: var(--tabs-mask, 0px);
   background: var(--color-surface-primary);
   pointer-events: none;
+}
+/* Player sheet: the strip sits on the sheet's own glass, so it gets a translucent glass backing exactly the size of the row
+   (no padded slab, no hard rectangle) and stacks above positioned cards in the panel below, so rows never show through. */
+.pqv-modal .tabs-sticky {
+  z-index: 8;
+  padding: 0;
+  margin: 0;
+  background: color-mix(in srgb, var(--color-surface-primary) 78%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: none;
+}
+.pqv-modal .tabs-sticky::before {
+  background: color-mix(in srgb, var(--color-surface-primary) 78%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
 }
 .tabs-panel[data-dir="1"] {
   animation: tabs-slide-from-right 160ms ease-out;

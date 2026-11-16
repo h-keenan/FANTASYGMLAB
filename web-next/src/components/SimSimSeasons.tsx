@@ -8,6 +8,7 @@ import { CompactModule } from "@/components/ui/CompactModule";
 import { api } from "@/lib/api";
 import type { SimHistorySeason } from "@/lib/simGame";
 import { simCareerSeasonParts, simCareerSeasonTitle } from "@/lib/simHistory";
+import { simScoreTierTone, simWeekTier } from "@/lib/simScoreTier";
 
 /**
  * The sim's OWN seasons of a player, newest first, under the real career in the Stats tab: one compact module per season played
@@ -64,12 +65,22 @@ export function SimSimSeasons({ gameId, playerId }: { gameId: string; playerId: 
                 </p>
               ) : null}
               <ul className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5">
-                {(s.weeks ?? []).map((w) => (
-                  <li key={`${w.week}-${w.playoff ? "p" : "r"}`} className="flex items-baseline justify-between rounded-md px-2 py-1 text-xs" style={{ background: "var(--glass-input-bg)" }}>
-                    <span style={{ color: "var(--color-text-muted)" }}>{w.playoff ? `P${w.week}` : `Wk ${w.week}`}</span>
-                    <span className="font-bold tabular-nums">{w.points.toFixed(1)}</span>
-                  </li>
-                ))}
+                {(s.weeks ?? []).map((w) => {
+                  // Boom / average / bust against this position's normal (lib/simScoreTier): semantic tokens, a soft tint plus ink.
+                  const tone = simScoreTierTone(simWeekTier(w.points, s.pos));
+                  const color = tone ? `var(--color-${tone})` : null;
+                  return (
+                    <li
+                      key={`${w.week}-${w.playoff ? "p" : "r"}`}
+                      className="flex items-baseline justify-between rounded-md px-2 py-1 text-xs"
+                      data-tier={tone ?? "average"}
+                      style={{ background: color ? `color-mix(in srgb, ${color} 14%, var(--glass-input-bg))` : "var(--glass-input-bg)" }}
+                    >
+                      <span style={{ color: "var(--color-text-muted)" }}>{w.playoff ? `P${w.week}` : `Wk ${w.week}`}</span>
+                      <span className="font-bold tabular-nums" style={color ? { color: `color-mix(in srgb, ${color} 80%, var(--color-text-primary))` } : undefined}>{w.points.toFixed(1)}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </CompactModule>

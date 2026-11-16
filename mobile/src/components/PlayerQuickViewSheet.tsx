@@ -515,9 +515,16 @@ export default function PlayerQuickViewSheet({
                   {headerTags.length > 0 ? (
                     <>
                       <PlayerBadges badges={headerTags.map((tag) => badgeFromTag(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} />
-                      {headerTags.filter((tag) => !badgeFromTag(tag)).map((tag) => (
-                        <ToneBadge key={tag.key} label={tag.label} color={tagToneColor(tag.tone, colors)} size="xs" shrink />
-                      ))}
+                      {headerTags.filter((tag) => !badgeFromTag(tag)).map((tag) =>
+                        tag.key === 'owner' ? (
+                          <View key={tag.key} style={styles.ownerTag} accessibilityLabel={`Owner: ${tag.label}`}>
+                            <AppText style={styles.ownerLabel}>OWNER</AppText>
+                            <ToneBadge label={tag.label} color={tagToneColor(tag.tone, colors)} size="xs" shrink />
+                          </View>
+                        ) : (
+                          <ToneBadge key={tag.key} label={tag.label} color={tagToneColor(tag.tone, colors)} size="xs" shrink />
+                        ),
+                      )}
                     </>
                   ) : injury ? (
                     badgeFromInjury(injury) ? (
@@ -602,8 +609,10 @@ function createStyles(colors: ThemeColors) {
       minHeight: sheetHeight.min,
       maxHeight: sheetHeight.max,
     },
-    sheetPeek: { minHeight: '65%', maxHeight: '65%' },
-    sheetFull: { minHeight: '92%', maxHeight: '92%' },
+    sheetPeek: { minHeight: '88%', maxHeight: '88%' },
+    sheetFull: { minHeight: '94%', maxHeight: '94%' },
+    ownerTag: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+    ownerLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
     grip: { height: 24, alignItems: 'center', justifyContent: 'center' },
     gripBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong },
     stickyTabs: { backgroundColor: colors.surface, paddingVertical: spacing.xs },

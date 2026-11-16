@@ -74,12 +74,12 @@ describe("playerAnatomy", () => {
 });
 
 describe("peek sheet height (computed from content)", () => {
-  it("fits header + pill row + one content block, clamped to 65-75% of the screen", async () => {
-    const { peekSheetHeight, peekShowsTabs, PEEK_FIRST_LINE_PX } = await import("./playerAnatomy");
-    expect(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 0 })).toBe(400 + PEEK_FIRST_LINE_PX);
-    expect(peekSheetHeight({ anchorBottom: 210, viewportH: 844 })).toBe(Math.round(844 * 0.65)); // short header: never a sliver
-    expect(peekSheetHeight({ anchorBottom: 900, viewportH: 640 })).toBe(Math.round(640 * 0.75)); // never right under the page header
-    expect(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 34 })).toBe(584);
+  it("fits header + pill row + one content block, clamped to 88-92% of the screen (opens near full height)", async () => {
+    const { peekSheetHeight, peekShowsTabs } = await import("./playerAnatomy");
+    expect(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 0 })).toBe(Math.round(844 * 0.88));
+    expect(peekSheetHeight({ anchorBottom: 210, viewportH: 844 })).toBe(Math.round(844 * 0.88)); // short header: never a sliver
+    expect(peekSheetHeight({ anchorBottom: 900, viewportH: 640 })).toBe(Math.round(640 * 0.92)); // never right under the page header
+    expect(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 34 })).toBe(Math.round(844 * 0.88));
     // the 390x844 and 360x640 compact layouts (measured in pqv_peek_geometry.mjs) keep the pill row inside the peek
     for (const [anchor, vh] of [[210, 844], [187, 640]] as const) expect(peekShowsTabs(anchor, peekSheetHeight({ anchorBottom: anchor, viewportH: vh }))).toBe(true);
     expect(peekShowsTabs(300, 250)).toBe(false);

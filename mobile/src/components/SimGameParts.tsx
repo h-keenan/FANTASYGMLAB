@@ -1,6 +1,6 @@
-import { TapScopeContext, type PickTapRef } from './PlayerOpenContext';
+import { PickOpenContext, PlayerOpenContext, TapScopeContext, type PickTapRef } from './PlayerOpenContext';
 import PressableScale from './PressableScale';
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -620,6 +620,25 @@ export function simPlayerFromRef(ref: { id?: string | null; name: string; positi
 export const SimOpenPlayerContext = createContext<((player: SimGamePlayer) => void) | null>(null);
 
 export const SimTeamOpenContext = createContext<((teamId: string) => void) | null>(null);
+
+/**
+ * THE sim opener scope: every player / team / pick tap inside it opens the SIM sheets (sim player id, sim PQV), never the
+ * real-NFL Player Quick View. It wraps the game screen AND the sheets the game opens (team scouting report, player sheet,
+ * pick sheet): a sheet rendered outside it falls back to the real PQV and looks a fictional sim player up in real data.
+ */
+export function SimOpenersProvider({ ctx, children }: { ctx: SimCtx; children: ReactNode }) {
+  const openPlayer = ctx.openPlayer;
+  const refOpener = useCallback((ref: Parameters<typeof simPlayerFromRef>[0]) => openPlayer(simPlayerFromRef(ref)), [openPlayer]);
+  return (
+    <SimTeamOpenContext.Provider value={ctx.openTeam}>
+      <SimOpenPlayerContext.Provider value={openPlayer}>
+        <PlayerOpenContext.Provider value={refOpener}>
+          <PickOpenContext.Provider value={ctx.openPick}>{children}</PickOpenContext.Provider>
+        </PlayerOpenContext.Provider>
+      </SimOpenPlayerContext.Provider>
+    </SimTeamOpenContext.Provider>
+  );
+}
 
 /**
  * A team's emblem and name as one tap target that opens its scouting sheet
