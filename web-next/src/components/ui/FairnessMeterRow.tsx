@@ -35,14 +35,17 @@ export function FairnessMeterRow({ meter, ariaLabel }: { meter: FairnessMeter; a
           data-testid="fairness-fill-left"
         />
         <span className="absolute top-1/2 h-3.5 w-0.5 -translate-y-1/2" style={{ left: "50%", background: "var(--color-text-muted)" }} aria-hidden="true" />
-        {/* The marker rides a full-width carrier moved by percent of its own width (transform only). */}
-        <span
-          className="fairness-glide absolute left-0 top-0 h-full w-full"
-          style={{ transform: `translateX(${meter.position * 100}%)`, transition: `transform ${glide}` }}
-          aria-hidden="true"
-          data-testid="fairness-marker"
-        >
-          <span className="absolute left-0 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ background: TONE[meter.tone], boxShadow: "0 0 0 2px var(--color-surface-muted)", transition: `background ${glide}` }} />
+        {/* The marker rides a track-width carrier moved by percent of its own width (transform only). At the 100% end that
+            carrier sits one full track-width right of the track, which stretched the whole page sideways on a phone, so the
+            carrier lives in a clip window that overhangs the track by 10px each side (room for the dot and its ring). */}
+        <span className="pointer-events-none absolute inset-y-0 -left-2.5 -right-2.5 overflow-x-clip" aria-hidden="true">
+          <span
+            className="fairness-glide absolute top-0 h-full"
+            style={{ left: 10, width: "calc(100% - 20px)", transform: `translateX(${meter.position * 100}%)`, transition: `transform ${glide}` }}
+            data-testid="fairness-marker"
+          >
+            <span className="absolute left-0 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ background: TONE[meter.tone], boxShadow: "0 0 0 2px var(--color-surface-muted)", transition: `background ${glide}` }} />
+          </span>
         </span>
       </div>
       <span className="shrink-0 text-xs font-extrabold" style={{ color: TONE[meter.tone] }} data-testid="fairness-label" aria-live="polite">{meter.label}</span>

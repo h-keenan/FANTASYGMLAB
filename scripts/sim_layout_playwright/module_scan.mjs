@@ -24,6 +24,8 @@ const LID = "1221647449446162432";
 // Audit knobs (docs/audits/2026-11-ui-consistency-audit-4.md): NAV=bottom opens every page in the phone shell (header + bottom pill) instead of the legacy
 // header + orb, FULL=1 saves full-page screenshots, METRICS=1 adds the design-token census (radii, type sizes, gold, button heights) to report.json.
 const NAV = process.env.NAV || "";
+// OVERFLOW=1: every route (incl. the overflow-only ones), failing ONLY on a sideways-scrolling document and naming the elements that cause it.
+const OVERFLOW_MODE = process.env.OVERFLOW === "1";
 const FULL = process.env.FULL === "1";
 const METRICS = process.env.METRICS === "1";
 fs.mkdirSync(OUT, { recursive: true });
@@ -112,6 +114,25 @@ FIX.recap = { ok: true, reason: "", max_completed_week: 9, my_roster_id: "3", re
   rStory({ story_type: "trade", title: "Trade of the week", summary: "Epstein's List received Aaron Jones and a 2027 R2; Shiesty received Tyrone Tracy.", primary_team: rTeams[0], secondary_team: rTeams[4], primary_roster_id: "1", secondary_roster_id: "5", players: ["Aaron Jones", "Tyrone Tracy"], metric_label: "", metric_value: "", history_filter: "Trades", editorial_label: "Too Early to Tell", value_lenses: [{ lens: "now", label: "Current market", note: "Current values only." }], sides: [{ team_name: rTeams[0], roster_id: "1", assets: [rAsset("9003", "Aaron Jones", "RB", "MIN"), { kind: "pick", name: "2027 R2", label: "2027 Round 2", season: "2027", round: 2 }] }, { team_name: rTeams[4], roster_id: "5", assets: [rAsset("9004", "Tyrone Tracy", "RB", "NYG")] }] }),
   rStory({ story_type: "activity", title: "Most active desk", summary: "Not Your Dad's Dih made 6 moves.", primary_team: rTeams[3], primary_roster_id: "4", metric_label: "Moves", metric_value: "6", history_filter: "All" }),
 ] } };
+// News fixtures (GET /v1/news general feed + the roster-matched alerts digest on top), so /news renders its real rows, avatar strip and chips.
+const nowTs = Date.now() / 1000;
+const nItem = (title, ev, ago, extra = {}) => ({ title, link: `https://example.com/${encodeURIComponent(title).slice(0, 20)}`, source: "Beat writer", summary: null, published_ts: nowTs - ago, event_type: ev, speculative: false, ...extra });
+const nAlert = (n, id, name, pos, team, title, ev, ago, rel, read = false) => ({ ...nItem(title, ev, ago), alert_key: `k${n}`, read, matched_player: name, matched_player_id: id, matched_player_position: pos, matched_player_team: team, matched_player_relation: rel });
+const NEWS_ALERTS = [
+  nAlert(1, "9221", "Jahmyr Gibbs", "RB", "DET", "Full practice, expects 22 touches in the Sunday matchup against a very physical front seven", "role/depth chart", 3600, "starter"),
+  nAlert(2, "6804", "Trey Lawrence", "TE", "NYG", "Questionable with ankle, test Friday", "injury/status", 10800, "starter"),
+  nAlert(3, "6794", "Malik Nabers", "WR", "NYG", "Limited again, role unchanged", "injury/status", 21600, "starter"),
+  nAlert(4, "4881", "Christian Sutton-Washington", "QB", "HOU", "Throws for 3 TDs in the scrimmage", "role/depth chart", 86400, "starter"),
+  nAlert(5, "1111", "Devon Henry", "RB", "MIA", "Signed to the practice squad", "transaction", 90000, "bench"),
+  nAlert(6, "2222", "Amon-Ra St. Brown", "WR", "DET", "Back at practice", "injury/status", 95000, "starter"),
+  nAlert(7, "3333", "Jordan Mason", "RB", "SF", "Expected to lead the backfield", "role/depth chart", 99000, "starter"),
+];
+const NEWS_GENERAL = [
+  nItem("Example Eagles claim K. Allen off waivers", "transaction", 18000),
+  nItem("Sample Sharks cut D. Henry", "transaction", 25000, { matched_player: "Devon Henry", matched_player_id: "1111", matched_player_position: "RB", matched_player_team: "MIA" }),
+  nItem("Test Titans trade for P. Nacua in a blockbuster deal that reshapes the Supercalifragilisticexpialidocious division", "transaction", 32000),
+];
+
 const ROUTES = [
   { name: "today", path: `/dashboard/${LID}?name=Donk`, family: "none" },
   { name: "team", path: `/my-team/${LID}?name=Donk`, family: "team" },
@@ -127,9 +148,46 @@ const ROUTES = [
   { name: "recaps", path: `/league-recaps/${LID}?name=Donk`, family: "league", maxTablists: 3, expandAll: true, noTruncate: true },
   { name: "draft-center", path: `/draft-center/${LID}?name=Donk`, family: "none" },
   { name: "sample-league", path: `/sample-league`, family: "none", maxTablists: 2, noAuth: true },
+  // Overflow-only routes (OVERFLOW=1, scripts/sim_layout_playwright/route_overflow in CI): every other main route, checked for sideways scroll only.
+  { name: "news-nfl", path: `/news?league=${LID}&name=Donk`, overflowOnly: true },
+  { name: "news-league", path: `/news?tab=league&league=${LID}&name=Donk`, overflowOnly: true },
+  { name: "news-league-history", path: `/news?tab=league&recaps=history&league=${LID}&name=Donk`, overflowOnly: true },
+  { name: "news-league-storylines", path: `/news?tab=league&recaps=storylines&league=${LID}&name=Donk`, overflowOnly: true },
+  { name: "news-league-roundup", path: `/news?tab=league&recaps=roundup&league=${LID}&name=Donk`, overflowOnly: true },
+  { name: "games-pickem", path: `/games/${LID}?name=Donk&tab=pickem`, overflowOnly: true },
+  { name: "players-prospects", path: `/players/${LID}?name=Donk&tab=prospects`, overflowOnly: true },
+  { name: "waivers-explore", path: `/waivers/${LID}?name=Donk&tab=explore`, overflowOnly: true },
+  { name: "waivers-watchlist", path: `/waivers/${LID}?name=Donk&tab=watchlist`, overflowOnly: true },
+  { name: "commissioner", path: `/commissioner/${LID}?name=Donk`, overflowOnly: true },
+  { name: "community", path: `/community?league=${LID}&name=Donk`, overflowOnly: true },
+  { name: "fantasy-sim", path: `/fantasy-sim/${LID}?name=Donk`, overflowOnly: true },
+  { name: "account", path: `/account`, overflowOnly: true },
+  { name: "landing", path: `/`, overflowOnly: true, noAuth: true },
 ];
 const session = { access_token: "a.b.c", refresh_token: "r", token_type: "bearer", expires_in: 99999, expires_at: Math.floor(Date.now() / 1000) + 99999, user: { id: "u1", aud: "authenticated", role: "authenticated", email: "t@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Elements whose box ends past the viewport (outside a deliberate horizontal scroller): the culprits when the document scrolls sideways. Innermost first.
+const OFFENDERS = () => {
+  const W = document.documentElement.clientWidth;
+  const sel = (el) => { const id = el.getAttribute("data-testid"); const cls = typeof el.className === "string" ? el.className.trim().split(/\s+/).slice(0, 3).join(".") : ""; return `${el.tagName.toLowerCase()}${id ? `[data-testid=${id}]` : ""}${cls ? "." + cls : ""}`; };
+  const inScroller = (el) => { for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) { const o = getComputedStyle(n).overflowX; if (o === "auto" || o === "scroll" || o === "hidden" || o === "clip") return true; } return false; };
+  const bad = [];
+  for (const el of document.querySelectorAll("body *")) {
+    if (el.closest("nextjs-portal,[data-nextjs-toast]") || ["SCRIPT", "STYLE"].includes(el.tagName)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0 || (r.right <= W + 1 && r.left >= -1) || inScroller(el)) continue;
+    bad.push(el);
+  }
+  // Innermost offenders (no offending descendant) are the elements that actually hold the too-wide content; each is listed with its ancestor chain's widths so a wide wrapper is visible too.
+  const set = new Set(bad);
+  const leaves = bad.filter((el) => ![...el.querySelectorAll("*")].some((d) => set.has(d)));
+  return leaves.slice(0, 8).map((el) => {
+    const r = el.getBoundingClientRect();
+    const chain = []; for (let n = el.parentElement; n && n !== document.documentElement && chain.length < 12; n = n.parentElement) chain.push(`${sel(n)} w=${Math.round(n.getBoundingClientRect().width)}`);
+    return `${sel(el)} right=${Math.round(r.right)} w=${Math.round(r.width)} "${(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 30)}" <- ${chain.join(" < ")}`;
+  });
+};
 
 const PAGE_CHECK = () => {
   const W = document.documentElement.clientWidth;
@@ -213,6 +271,8 @@ for (const w of WIDTHS) {
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
     if (u.hostname === "localhost" && u.port === "8000") {
       if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+      if (u.pathname === "/v1/news") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, items: NEWS_GENERAL }), headers: cors });
+      if (/\/alerts$/.test(u.pathname)) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, reason: "", items: NEWS_ALERTS }), headers: cors });
       const m = u.pathname.match(/\/v1\/leagues\/[^/]+\/(games\/season-sim)$/) || u.pathname.match(/\/v1\/leagues\/[^/]+\/([a-z-]+)$/) || u.pathname.match(/\/v1\/players\/(value-signals)$/) || (u.pathname.endsWith("/trade-ideas/multi") ? [0, "multi"] : null);
       const body = m && FIX[m[1]] ? FIX[m[1]] : {};
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body), headers: cors });
@@ -224,12 +284,16 @@ for (const w of WIDTHS) {
   page.on("pageerror", () => {});
   for (const r of ROUTES) {
     if (process.env.ONLY && !process.env.ONLY.split(",").includes(r.name)) continue;
+    if (OVERFLOW_MODE ? false : r.overflowOnly) continue;
     try {
       await page.goto(`${BASE}${r.path}`, { waitUntil: "domcontentloaded", timeout: 90000 });
       await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" }).catch(() => {});
       await sleep(r.name === "today" && w === WIDTHS[0] ? 12000 : 5000);
+      // The app shell / Sim root carry an overflow-x: clip backstop; measure without it so a real overflow is still caught (and named).
+      if (OVERFLOW_MODE) await page.addStyleTag({ content: ".app-shell,.sim-root{overflow-x:visible!important}" }).catch(() => {});
       if (LARGE) await page.addStyleTag({ content: "html{font-size:125%!important}" }).catch(() => {});
       const res = await page.evaluate(PAGE_CHECK);
+      if (res.overflow) res.overflow.offenders = await page.evaluate(OFFENDERS);
       if (r.expandAll) {
         // Open every collapsed module and the first player row, so the scan covers the bodies, then pick another week from the strip.
         for (let pass = 0; pass < 8; pass += 1) {
@@ -270,7 +334,8 @@ let bad = 0;
 for (const r of results) {
   const problems = [];
   if (r.error) problems.push(`error ${r.error}`);
-  if (r.overflow) problems.push(`overflow ${r.overflow.scrollWidth}>${r.overflow.width}`);
+  if (r.overflow) problems.push(`overflow ${r.overflow.scrollWidth}>${r.overflow.width}${r.overflow.offenders?.length ? " culprits: " + r.overflow.offenders.join(" || ") : ""}`);
+  if (OVERFLOW_MODE) { console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}${problems.length ? "  " + problems.join("; ") : ""}`); if (problems.length) bad += 1; continue; }
   if (r.emptyHeaders?.length) problems.push(`empty collapsed headers: ${r.emptyHeaders.map((h) => h.title).join(", ")}`);
   // Strip geometry (equal, centred tabs) is a >= 360px rule: at 320px a long label (Standings, Notifications) makes a tab wider than its share and the row scrolls instead of cutting it.
   if (r.strip && !LARGE && r.width >= 360 && r.width < 768 && r.page !== "sample-league") {
