@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -66,12 +66,26 @@ export default function CommissionerScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { lens } = useValuationLens(leagueId);
-  const [draftOrder, setDraftOrder] = useState<DraftOrderRule>('unknown');
+  const queryClient = useQueryClient();
+  // The saved rule (per user + league, server-side). Until it resolves the integrity read waits, so the first request already uses the saved rule.
+  const ruleQuery = useQuery({
+    queryKey: queryKeys.draftOrderRule(leagueId),
+    queryFn: async () => (await api.getDraftOrderRule(leagueId)).draft_order ?? 'unknown',
+    staleTime: 5 * 60 * 1000,
+  });
+  const ruleReady = ruleQuery.isSuccess || ruleQuery.isError;
+  const draftOrder: DraftOrderRule = ruleQuery.data ?? 'unknown';
+  // Changing it saves server-side and re-keys the integrity read (a refetch with the new rule).
+  const setDraftOrder = (value: DraftOrderRule) => {
+    queryClient.setQueryData(queryKeys.draftOrderRule(leagueId), value);
+    api.setDraftOrderRule(leagueId, value).catch(() => {});
+  };
   useScreenHeaderTitle(navigation, 'Commissioner', leagueName);
 
   const query = useQuery({
     queryKey: queryKeys.commissionerIntegrity(leagueId, draftOrder),
     queryFn: () => api.getCommissionerIntegrity(leagueId, draftOrder),
+    enabled: ruleReady,
     staleTime: 5 * 60 * 1000,
   });
   const data = query.data;
@@ -82,7 +96,7 @@ export default function CommissionerScreen({ route, navigation }: Props) {
   };
 
   let body: React.ReactNode;
-  if (query.isLoading) {
+  if (!ruleReady || query.isLoading) {
     body = <SkeletonList label="league integrity" count={5} />;
   } else if (query.error || !data) {
     body = <ErrorState title="Couldn't load League integrity" message={toUserErrorMessage(query.error, 'Failed to load League integrity.')} />;

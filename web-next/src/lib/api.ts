@@ -14,6 +14,7 @@ import type { OpponentProfileResponse } from "./opponentProfile";
 import type {
   CommissionerIntegrityResponse,
   DraftOrderRule,
+  DraftOrderRuleResponse,
   VetoCheckRequest,
   VetoCheckResponse,
 } from "./commissionerIntegrity";
@@ -4506,6 +4507,15 @@ export const api = {
     authorizedRequest<CommissionerIntegrityResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
     ),
+
+  // The caller's saved draft-order rule (stored per user + league beside Team Situation).
+  getDraftOrderRule: (leagueId: string) =>
+    authorizedRequest<DraftOrderRuleResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/draft-order`),
+  setDraftOrderRule: (leagueId: string, draftOrder: DraftOrderRule) =>
+    authorizedRequest<DraftOrderRuleResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/draft-order`, {
+      method: "POST",
+      jsonBody: { draft_order: draftOrder },
+    }),
 
   // Trade veto calculator: a POST that grades a proposed trade on demand (not cacheable).
   postCommissionerVetoCheck: (leagueId: string, body: VetoCheckRequest) =>

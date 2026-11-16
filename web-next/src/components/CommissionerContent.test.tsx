@@ -11,6 +11,8 @@ vi.mock("@/lib/api", async () => {
   return { ...actual, api: {
       ...actual.api,
       getCommissionerIntegrity: vi.fn(),
+      getDraftOrderRule: vi.fn(),
+      setDraftOrderRule: vi.fn(),
       getLeagueRankings: vi.fn(),
       getLeagueDraftPicks: vi.fn(),
       getLeagueRosters: vi.fn(),
@@ -34,7 +36,11 @@ function body(overrides: Partial<CommissionerIntegrityResponse> = {}): Commissio
 }
 
 describe("CommissionerContent", () => {
-  beforeEach(() => vi.mocked(api.getCommissionerIntegrity).mockReset());
+  beforeEach(() => {
+    vi.mocked(api.getCommissionerIntegrity).mockReset();
+    vi.mocked(api.getDraftOrderRule).mockReset().mockResolvedValue({ ok: true, draft_order: "unknown" });
+    vi.mocked(api.setDraftOrderRule).mockReset().mockResolvedValue({ ok: true, draft_order: "record" });
+  });
 
   it("shows flagged teams with evidence and innocent explanations, others collapsed", async () => {
     vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(body());
@@ -54,6 +60,16 @@ describe("CommissionerContent", () => {
     await screen.findByText("Tanker");
     fireEvent.click(screen.getByText("Worst record"));
     await waitFor(() => expect(api.getCommissionerIntegrity).toHaveBeenLastCalledWith("L1", "record"));
+    expect(api.setDraftOrderRule).toHaveBeenCalledWith("L1", "record");
+  });
+
+  it("loads the saved draft-order rule before the first integrity request", async () => {
+    vi.mocked(api.getDraftOrderRule).mockResolvedValue({ ok: true, draft_order: "lottery" });
+    vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(body());
+    render(<CommissionerContent leagueId="L1" leagueName="My League" />);
+    await screen.findByText("Tanker");
+    expect(api.getCommissionerIntegrity).toHaveBeenCalledTimes(1);
+    expect(api.getCommissionerIntegrity).toHaveBeenCalledWith("L1", "lottery");
   });
 
   it("is honest in early season and for unsupported platforms", async () => {

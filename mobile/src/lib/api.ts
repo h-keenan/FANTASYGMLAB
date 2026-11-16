@@ -22,6 +22,7 @@ import type { PercentileExplorerResponse } from './percentileExplorer';
 import type {
   CommissionerIntegrityResponse,
   DraftOrderRule,
+  DraftOrderRuleResponse,
   VetoCheckRequest,
   VetoCheckResponse,
 } from './commissionerIntegrity';
@@ -3994,6 +3995,11 @@ export const api = {
     authorizedFetch<CommissionerIntegrityResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
     ),
+  // The caller's saved draft-order rule (stored per user + league beside Team Situation).
+  getDraftOrderRule: (leagueId: string) =>
+    authorizedFetch<DraftOrderRuleResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/draft-order`),
+  setDraftOrderRule: (leagueId: string, draftOrder: DraftOrderRule) =>
+    authorizedPost<DraftOrderRuleResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/draft-order`, { draft_order: draftOrder }),
   // Trade veto calculator: a POST that grades a proposed trade on demand (not cacheable).
   postCommissionerVetoCheck: (leagueId: string, body: VetoCheckRequest) =>
     authorizedPost<VetoCheckResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/veto-check`, body),

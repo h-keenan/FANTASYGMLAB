@@ -8200,6 +8200,52 @@ def test_get_team_stance_includes_the_backend_computed_strategy(monkeypatch):
     assert body["strategy"] == "rebuild"
 
 
+def test_draft_order_rule_reads_saved_value_and_defaults_to_unknown(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    row_response = Mock(status_code=200)
+    row_response.json.return_value = [{"draft_order_rule": "lottery"}]
+    monkeypatch.setattr("modules.sleeper.get_league", lambda *a, **kw: {"status": "in_season"})
+    with patch("requests.get", side_effect=[auth_user_response, row_response]):
+        body = client.get("/v1/leagues/abc/commissioner/draft-order", headers={"Authorization": "Bearer good-token"}).json()
+    assert body["ok"] is True and body["draft_order"] == "lottery"
+
+    auth_user_response2 = Mock(status_code=200)
+    auth_user_response2.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    empty_response = Mock(status_code=200)
+    empty_response.json.return_value = []
+    with patch("requests.get", side_effect=[auth_user_response2, empty_response]):
+        body = client.get("/v1/leagues/abc/commissioner/draft-order", headers={"Authorization": "Bearer good-token"}).json()
+    assert body["draft_order"] == "unknown"
+
+
+def test_set_draft_order_rule_upserts_only_the_rule_and_validates(monkeypatch):
+    client = _client(monkeypatch)
+    captured = {}
+
+    def fake_upsert(config, token, table, payload, *, on_conflict):
+        captured.update(table=table, payload=payload, on_conflict=on_conflict)
+        return True, ""
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    monkeypatch.setattr("modules.account_store.upsert_row", fake_upsert)
+    with patch("requests.get", side_effect=[auth_user_response]):
+        body = client.post("/v1/leagues/abc/commissioner/draft-order", json={"draft_order": "record"}, headers={"Authorization": "Bearer good-token"}).json()
+    assert body == {"ok": True, "draft_order": "record"}
+    assert captured["table"] == "team_stance"
+    assert captured["payload"] == {"user_id": "user-123", "league_id": "abc", "draft_order_rule": "record"}
+    assert captured["on_conflict"] == "user_id,league_id"
+
+    auth_user_response2 = Mock(status_code=200)
+    auth_user_response2.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    with patch("requests.get", side_effect=[auth_user_response2]):
+        bad = client.post("/v1/leagues/abc/commissioner/draft-order", json={"draft_order": "coinflip"}, headers={"Authorization": "Bearer good-token"})
+    assert bad.status_code == 422
+
+
 def test_team_stance_caches_across_requests_for_the_same_user_and_league(monkeypatch):
     """coridian_, 2026-10-19: third uncached hot path found in the same
     site-wide load-time audit as saved_leagues/profile_fields —
