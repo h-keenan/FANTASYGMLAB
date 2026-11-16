@@ -154,7 +154,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [faabTargets, setFaabTargets] = useState<WaiverPlayer[]>([]);
   const [isPremium, setIsPremium] = useState(true);
   const [usageGated, setUsageGated] = useState(false);
-  const [stats, setStats] = useState<{ available: number | null; faab: string; faabLabel: string }>({
+  const [stats, setStats] = useState<{ available: number | null; faab: string; faabAmount?: number | null; faabLabel: string }>({
     available: null,
     faab: '—',
     faabLabel: 'FAAB',
@@ -215,7 +215,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
             available: result.available_count ?? result.players.length,
             ...(result.faab_enabled === false
               ? { faab: result.waiver_mode === 'reverse_standings' ? 'Reverse' : 'Rolling', faabLabel: 'Waivers' }
-              : { faab: result.faab_remaining != null ? formatMoney(result.faab_remaining) : '—', faabLabel: 'FAAB' }),
+              : { faab: result.faab_remaining != null ? formatMoney(result.faab_remaining) : '—', faabAmount: result.faab_remaining ?? null, faabLabel: 'FAAB' }),
           });
           setNotice(result.reason ? reasonMessage(result.reason) : null);
         } catch (err) {
@@ -442,7 +442,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
             <DashboardStatRow
               items={[
                 { label: 'Available', value: stats.available != null ? String(stats.available) : '—' },
-                { label: stats.faabLabel, value: stats.faab },
+                { label: stats.faabLabel, value: stats.faab, amount: stats.faabAmount },
                 { label: 'Team need', value: teamNeedStat({ needs_model: needsModel, needed_positions: neededPositions }) },
               ]}
             />
