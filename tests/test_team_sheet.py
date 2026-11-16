@@ -43,6 +43,18 @@ def test_roster_rows_injuries_and_depth():
     assert ts.depth_by_position(rows) == {"QB": 1, "WR": 1}
 
 
+def test_roster_status_injured_reserve_counts_as_an_injury_when_the_designation_is_blank():
+    frame = pd.DataFrame(
+        [
+            {"player_id": "1", "name": "Star RB", "position": "RB", "team": "KC", "age": 25, "status": "Injured Reserve", "injury_status": "", "dynasty_score": 90},
+            {"player_id": "2", "name": "Fine WR", "position": "WR", "team": "KC", "age": 25, "status": "Active", "injury_status": "", "dynasty_score": 60},
+        ]
+    )
+    rows = ts.roster_rows(frame, {"players": ["1", "2"], "starters": ["1"]}, "dynasty_score")
+    assert [r["player_id"] for r in ts.injuries(rows)] == ["1"]
+    assert {r["player_id"]: r["injury_status"] for r in rows}["1"] == "Injured Reserve"
+
+
 def test_season_result_places_by_wins_then_points():
     def r(i, owner, w, fpts):
         return {"roster_id": i, "owner_id": owner, "settings": {"wins": w, "losses": 14 - w, "fpts": fpts}}

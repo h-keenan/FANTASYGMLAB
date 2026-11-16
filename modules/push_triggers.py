@@ -902,16 +902,19 @@ def injury_status_push_items(
 
     if not roster_player_ids or players_df is None or players_df.empty:
         return []
-    if "injury_status" not in players_df.columns or "player_id" not in players_df.columns:
+    if "player_id" not in players_df.columns or not ({"injury_status", "status"} & set(players_df.columns)):
         return []
 
     rows = players_df[players_df["player_id"].astype(str).isin(roster_player_ids)]
     items: list[dict[str, Any]] = []
     for _, row in rows.iterrows():
+        # Sleeper's roster ``status`` ("Injured Reserve") can be set while ``injury_status`` is blank; the in-app Alerts feed reads both, so the push does too.
+        roster_status = _safe_text(row.get("status"))
         status_raw = _safe_text(row.get("injury_status"))
-        status_norm = status_raw.strip().casefold()
-        if not injury_table.is_unavailable("", status_raw):
+        if not injury_table.is_unavailable(roster_status, status_raw):
             continue
+        status_raw = status_raw or roster_status
+        status_norm = status_raw.strip().casefold()
         player_id = _safe_text(row.get("player_id"))
         name = _safe_text(row.get("name"), "A player on your roster")
         if not player_id:
@@ -1006,9 +1009,12 @@ def lineup_lock_push_items(
             if nfl_schedule.team_bye_week(team, season, games=games) == week:
                 bad_slots += 1  # a bye-week starter scores zero
             continue
+        roster_status = _safe_text(row.get("status"))
         status_raw = _safe_text(row.get("injury_status"))
+        unavailable = injury_table.is_unavailable(roster_status, status_raw)
+        status_raw = status_raw or roster_status
         status_norm = status_raw.casefold()
-        if injury_table.is_unavailable("", status_raw) and in_window(
+        if unavailable and in_window(
             _parse_dt(game.get("kickoff_at"))
         ):
             name = _safe_text(row.get("name"), "A starter")

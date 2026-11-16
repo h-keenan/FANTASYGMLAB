@@ -269,6 +269,55 @@ def would_start(candidate_score: float, healthy_scores: Sequence[float], slots: 
     return float(candidate_score) > ordered[slots - 1]
 
 
+# Which positions each flex slot really takes in a lineup (a superflex / OP slot takes any of the four, not just a QB).
+_LINEUP_FLEX = {
+    "FLEX": ("RB", "WR", "TE"),
+    "WRRB_FLEX": ("RB", "WR"),
+    "REC_FLEX": ("WR", "TE"),
+    "SUPER_FLEX": ("QB", "RB", "WR", "TE"),
+    "OP": ("QB", "RB", "WR", "TE"),
+}
+
+
+def _best_lineup_total(scores_by_position: Mapping[str, Sequence[float]], roster_positions: Sequence[object]) -> float:
+    """Total score of the best lineup a roster can field: dedicated slots take the best player at their position, then each flex slot (most
+    restrictive first) takes the best player left among the positions it accepts. An empty slot scores 0."""
+
+    pools = {pos: sorted((float(s) for s in vals if s is not None and s == s), reverse=True) for pos, vals in scores_by_position.items()}
+    slots = [str(s or "").strip().upper() for s in roster_positions]
+    total = 0.0
+    for slot in slots:
+        if slot in _SKILL_POSITIONS:
+            pool = pools.get(slot) or []
+            if pool:
+                total += max(0.0, pool.pop(0))
+    for slot in sorted((s for s in slots if s in _LINEUP_FLEX), key=lambda s: (len(_LINEUP_FLEX[s]), s)):
+        best_pos, best = None, 0.0
+        for pos in _LINEUP_FLEX[slot]:
+            pool = pools.get(pos) or []
+            if pool and pool[0] > best:
+                best_pos, best = pos, pool[0]
+        if best_pos is not None:
+            pools[best_pos].pop(0)
+            total += best
+    return total
+
+
+def would_start_in_lineup(
+    position: str, candidate_score: float, healthy_by_position: Mapping[str, Sequence[float]], roster_positions: Sequence[object],
+) -> bool:
+    """True when adding the candidate makes the roster's best lineup better: he fills an empty slot or displaces a lineup member (flex slots
+    included). A tight-end who would only be the third best flex option behind better backs and receivers does not "start"."""
+
+    pos = str(position or "").upper()
+    if candidate_score is None or float(candidate_score) <= 0 or pos not in _SKILL_POSITIONS:
+        return False
+    base = {p: list(v) for p, v in healthy_by_position.items()}
+    with_candidate = {p: list(v) for p, v in healthy_by_position.items()}
+    with_candidate.setdefault(pos, []).append(float(candidate_score))
+    return _best_lineup_total(with_candidate, roster_positions) > _best_lineup_total(base, roster_positions) + 1e-9
+
+
 @dataclass(frozen=True)
 class FaabRival:
     roster_id: str
@@ -290,6 +339,9 @@ class FaabMarket:
     wire_scores_by_position: Mapping[str, tuple[float, ...]]
     # player_id -> {"count", "rank"} from Sleeper's global trending-add list.
     trending_adds: Mapping[str, Mapping[str, int]]
+    # The league's lineup slots. When present, "would start" is a lineup-displacement test (flex slots included); absent (older callers),
+    # the position-count approximation is used.
+    roster_positions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -396,7 +448,14 @@ def build_faab_market(
         my_healthy_scores_by_position=my_scores,
         wire_scores_by_position={pos: tuple(sorted(v, reverse=True)) for pos, v in wire.items()},
         trending_adds=dict(trending_adds or {}),
+        roster_positions=tuple(str(x or "").strip().upper() for x in ((league or {}).get("roster_positions") or ())),
     )
+
+
+def _starts(market: FaabMarket, pos: str, candidate_score: float, healthy_by_position: Mapping[str, Sequence[float]], slots: int) -> bool:
+    if market.roster_positions and any(str(s) in _SKILL_POSITIONS or str(s) in _LINEUP_FLEX for s in market.roster_positions):
+        return would_start_in_lineup(pos, candidate_score, healthy_by_position, market.roster_positions)
+    return would_start(candidate_score, healthy_by_position.get(pos, ()), slots)
 
 
 def estimate_competition(market: FaabMarket, position: str, candidate_score: float) -> FaabCompetition:
@@ -407,7 +466,7 @@ def estimate_competition(market: FaabMarket, position: str, candidate_score: flo
     needing = [
         rival
         for rival in market.rivals
-        if would_start(candidate_score, rival.healthy_scores_by_position.get(pos, ()), slots)
+        if _starts(market, pos, candidate_score, rival.healthy_scores_by_position, slots)
     ]
     budgets_known = market.my_remaining is not None and all(r.remaining is not None for r in market.rivals)
     richer = with_budget = 0
@@ -427,11 +486,7 @@ def market_starter_status(market: FaabMarket, position: str, candidate_score: fl
     """Would this free agent crack the user's own healthy starting group?"""
 
     pos = str(position or "").upper()
-    return would_start(
-        candidate_score,
-        market.my_healthy_scores_by_position.get(pos, ()),
-        int(market.slots_by_position.get(pos, 0)),
-    )
+    return _starts(market, pos, candidate_score, market.my_healthy_scores_by_position, int(market.slots_by_position.get(pos, 0)))
 
 
 # --- Why the player is on the wire -------------------------------------------
