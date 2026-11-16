@@ -440,6 +440,22 @@ def test_injury_status_push_items_fires_for_risk_status():
     ]
 
 
+def test_injury_status_push_items_sees_injured_reserve_on_the_roster_status_field():
+    """A star on 'Injured Reserve' with a blank injury designation produced no push while a bench player who is 'Out' did."""
+
+    players_df = pd.DataFrame(
+        [
+            {"player_id": "p1", "name": "Star RB", "status": "Injured Reserve", "injury_status": ""},
+            {"player_id": "p2", "name": "Fine Guy", "status": "Active", "injury_status": ""},
+        ]
+    )
+    items = push_triggers.injury_status_push_items(
+        league_id="league-1", league_name="Test League", roster_player_ids={"p1", "p2"}, players_df=players_df,
+    )
+    assert [i["recommendation_id"] for i in items] == ["injury:p1:injured reserve"]
+    assert items[0]["headline"] == "Star RB is now Injured Reserve"
+
+
 def test_injury_status_push_items_excludes_questionable():
     players_df = pd.DataFrame([{"player_id": "p1", "name": "Iffy Guy", "injury_status": "Questionable"}])
     items = push_triggers.injury_status_push_items(
@@ -1164,6 +1180,16 @@ def test_lineup_lock_flags_out_starter_inside_window_only():
     assert items[0]["category"] == "lineup_lock"
     assert "Hurt Guy" in items[0]["headline"]
     assert "Secret League" not in items[0]["headline"]
+
+
+def test_lineup_lock_flags_a_starter_on_injured_reserve_recorded_on_the_roster_status():
+    players = pd.DataFrame([{"player_id": "p1", "name": "Hurt Guy", "team": "KC", "status": "Injured Reserve", "injury_status": ""}])
+    items = push_triggers.lineup_lock_push_items(
+        league_id="L1", league_name="Secret League", league=_league(),
+        my_roster={"players": ["p1"], "starters": ["p1"]}, players_df=players, games=_games_frame(), now=_NOW,
+    )
+    assert len(items) == 1 and items[0]["category"] == "lineup_lock"
+    assert "Hurt Guy" in items[0]["headline"]
 
 
 def test_lineup_lock_flags_empty_and_invalid_slots_before_next_kickoff():

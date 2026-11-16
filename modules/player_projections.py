@@ -1188,8 +1188,11 @@ def _role_adjustment(player: Dict[str, Any], players: Dict[str, Any]) -> Dict[st
         cls = injury_status.classify(str(other.get("status") or ""), str(other.get("injury_status") or ""))
         if cls.ruled_out:
             continue  # the starter is out, so this QB is the one playing
+        # The backup plays in the games the starter does not: a Doubtful starter (p_play 0.15) leaves his backup about 85 percent of the snaps, not the
+        # 20 percent a healthy starter's backup sees. Never below the garbage-time floor.
+        share = max(BACKUP_QB_PLAY_SHARE, 1.0 - float(cls.p_play))
         return {
-            "multiplier": BACKUP_QB_PLAY_SHARE,
+            "multiplier": round(min(1.0, share), 3),
             "reason": "backup_qb",
             "applied": True,
             "starter_player_id": str(pid),

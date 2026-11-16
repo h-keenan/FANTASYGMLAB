@@ -14,6 +14,8 @@ from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
+from modules import injury_status
+
 POSITION_ORDER = ("QB", "RB", "WR", "TE", "K", "DEF")
 _HEALTHY = {"", "active", "none", "nan", "healthy"}
 _SKIP_IDS = {"", "0", "None", "nan"}
@@ -102,6 +104,9 @@ def roster_rows(valued: pd.DataFrame, roster: Mapping[str, Any], score_field: st
     for _, row in frame.iterrows():
         pid = str(row.get("player_id"))
         injury = _text(row.get("injury_status"))
+        roster_status = _text(row.get("status"))
+        if injury.lower() in _HEALTHY and injury_status.is_unavailable(roster_status, injury):
+            injury = roster_status  # Sleeper can record "Injured Reserve" on the roster status with a blank injury designation
         value = _num(row.get(score_field))
         age = _num(row.get("age"))
         rows.append(

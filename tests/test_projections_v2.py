@@ -100,6 +100,22 @@ def test_backup_qb_behind_healthy_starter_is_scaled_down():
     assert pp._role_adjustment(players["qb1"], players)["applied"] is False
 
 
+def test_backup_qb_behind_a_doubtful_starter_gets_most_of_the_snaps():
+    """A Doubtful starter (p_play 0.15) used to leave his backup at the 20 percent garbage-time share, so the team's expected QB output read about 35 percent."""
+
+    from modules import injury_status
+
+    players = {"qb1": _qb(1, injury_status="Doubtful"), "qb2": _qb(2)}
+    out = pp._role_adjustment(players["qb2"], players)
+    p_play = injury_status.classify("Active", "Doubtful").p_play
+    assert out["applied"] and out["multiplier"] == pytest.approx(1.0 - p_play, abs=0.001) and out["multiplier"] > 0.8
+    # the two QBs together now cover the team's QB production (starter p_play + backup share), most of one QB
+    assert p_play + (1.0 - p_play) * out["multiplier"] > 0.85  # was 0.15 + 0.85 * 0.2 = 0.32
+    # a Questionable starter (p_play 0.85) keeps the old floor
+    q = {"qb1": _qb(1, injury_status="Questionable"), "qb2": _qb(2)}
+    assert pp._role_adjustment(q["qb2"], q)["multiplier"] == pp.BACKUP_QB_PLAY_SHARE
+
+
 def test_backup_qb_is_not_scaled_when_the_starter_is_out():
     players = {"qb1": _qb(1, status="Inactive", injury_status="IR"), "qb2": _qb(2)}
     assert pp._role_adjustment(players["qb2"], players)["applied"] is False

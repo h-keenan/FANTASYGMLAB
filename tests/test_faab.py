@@ -275,6 +275,42 @@ def test_starting_slots_respect_flex_rules():
     assert slots == {"QB": 2, "RB": 4, "WR": 4, "TE": 2, "K": 0}
 
 
+def test_a_flex_slot_does_not_make_every_roster_need_a_tight_end():
+    """Flex slots were added to the TE count (1 TE + 2 FLEX = 3), so a rival with two good TEs 'needed' a third and every card said '11 teams need a TE'."""
+
+    positions = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "BN", "BN"]
+    deep = {"QB": [200.0], "RB": [300.0, 280.0, 260.0, 100.0], "WR": [300.0, 280.0, 260.0, 100.0], "TE": [250.0, 240.0]}
+    assert faab.starting_slots_by_position(positions)["TE"] == 3 and faab.would_start(200.0, deep["TE"], 3) is True  # the old answer
+    assert faab.would_start_in_lineup("TE", 200.0, deep, positions) is False  # the two flex slots go to the 260s
+    assert faab.would_start_in_lineup("TE", 270.0, deep, positions) is True  # a better TE1 raises the lineup
+    assert faab.would_start_in_lineup("TE", 255.0, deep, positions) is True  # beats the starting TE
+    thin = {"QB": [200.0], "RB": [300.0, 280.0], "WR": [300.0, 280.0], "TE": [250.0]}  # empty flex slots: anyone useful fills them
+    assert faab.would_start_in_lineup("TE", 100.0, thin, positions) is True
+    assert faab.would_start_in_lineup("TE", 0.0, thin, positions) is False
+    # superflex takes a back or receiver, not just a quarterback
+    sf = {"QB": [200.0], "RB": [300.0, 280.0, 100.0], "WR": [300.0, 280.0], "TE": [250.0]}
+    assert faab.would_start_in_lineup("RB", 150.0, sf, ["QB", "RB", "RB", "WR", "WR", "TE", "SUPER_FLEX"]) is True
+
+
+def test_market_competition_counts_lineup_displacement_not_flex_inflated_slots():
+    league = {"settings": {"waiver_budget": 100}, "roster_positions": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "BN"]}
+    rows = []
+    rosters = []
+    for rid in range(1, 12):
+        ids = []
+        for pos, vals in (("QB", [200]), ("RB", [300, 280, 260]), ("WR", [300, 280, 260]), ("TE", [250, 240])):
+            for i, v in enumerate(vals):
+                pid = f"{rid}{pos}{i}"
+                rows.append({"player_id": pid, "position": pos, "dynasty_score": v, "status": "Active", "injury_status": ""})
+                ids.append(pid)
+        rosters.append({"roster_id": rid, "players": ids, "settings": {"waiver_budget_used": 0}})
+    frame = pd.DataFrame(rows)
+    market = faab.build_faab_market(league=league, rosters=rosters, my_roster_id=1, valued=frame, score_field="dynasty_score")
+    assert faab.estimate_competition(market, "TE", 200).rivals_needing == 0  # was 10 of 10
+    assert faab.market_starter_status(market, "TE", 200) is False
+    assert faab.estimate_competition(market, "TE", 255).rivals_needing == 10
+
+
 def _market_frame():
     rows = []
     # Rival 2: two strong RBs, one on IR (doesn't count).
