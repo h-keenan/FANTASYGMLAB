@@ -13,10 +13,8 @@ import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { DENSITY_OPTIONS, THEME_OPTIONS } from "@/lib/displayPreferences";
 import {
-  EXPERIENCE_GOAL_OPTIONS,
   EXPERIENCE_LEVEL_OPTIONS,
   PLAIN_COPY,
-  type ExperienceGoal,
   type ExperienceLevel,
 } from "@/lib/experienceCopy";
 import { trialEndLabel } from "@/lib/trialCopy";
@@ -158,11 +156,6 @@ const EXPLANATION_OPTIONS: Array<{ value: ExperienceLevel; label: string; descri
   description: EXPERIENCE_LEVEL_OPTIONS[value].body,
 }));
 
-const GOAL_OPTIONS = (Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoal[]).map((value) => ({
-  value,
-  label: EXPERIENCE_GOAL_OPTIONS[value].label,
-}));
-
 /** The onboarding carousel's "How much dynasty experience do you have?"
  * answer, editable later. Reads/writes through ExperienceLevelContext (the
  * same /v1/preferences field), so the change applies across the app right
@@ -242,39 +235,6 @@ function ExplanationsSetting() {
   );
 }
 
-/** The optional "what's your goal this season?" chip, alongside experience
- * level. Skippable — tapping the already-selected chip clears it back to
- * unset. Reads/writes through ExperienceLevelContext, same /v1/preferences
- * field the onboarding carousel's goal chip writes. */
-function GoalSetting() {
-  const { goal, setGoal } = useExperienceLevel();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const pick = (value: string) => {
-    const next = goal === value ? null : (value as ExperienceGoal);
-    setSaving(true);
-    setError(null);
-    setGoal(next)
-      .catch(() => setError("Couldn't save this setting. Try again."))
-      .finally(() => setSaving(false));
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span id="account-goal-label" className="text-sm font-semibold">
-        {PLAIN_COPY.experienceGoalPrompt}
-      </span>
-      <PillRow ariaLabel={PLAIN_COPY.experienceGoalPrompt} options={GOAL_OPTIONS} active={goal ?? ""} onSelect={saving ? undefined : pick} />
-      {error ? (
-        <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 /** Density (Guided/Compact), theme (Night/Day/Auto) and the college
  * football switch. Same options and copy as the app's Account screen;
  * density and theme sync through /v1/preferences, so a choice made in
@@ -325,7 +285,6 @@ function PreferencesSection({
 
       <ExplanationsSetting />
 
-      <GoalSetting />
 
       <DisplaySettings />
 

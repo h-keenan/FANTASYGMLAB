@@ -4503,11 +4503,6 @@ export const api = {
    * OnboardingCarousel (`api.setExperienceLevel`). */
   setExperienceLevel: (level: ExperienceLevelValue) =>
     authorizedPost<DevicePreferencesResponse>('/v1/preferences', { experience_level: level }),
-  /** The optional "what's your goal this season?" chip, alongside
-   * experience level. `null` clears it back to unset (sent to the backend
-   * as "", its explicit-clear sentinel). */
-  setExperienceGoal: (goal: ExperienceGoalValue | null) =>
-    authorizedPost<DevicePreferencesResponse>('/v1/preferences', { experience_goal: goal ?? '' }),
   updateDevicePreferences: (body: {
     uiDensity?: UiDensityValue;
     themeMode?: ThemeModeValue;

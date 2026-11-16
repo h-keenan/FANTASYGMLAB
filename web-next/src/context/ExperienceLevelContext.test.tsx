@@ -21,7 +21,6 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       getDevicePreferences: vi.fn(),
       setExperienceLevel: vi.fn(),
-      setExperienceGoal: vi.fn(),
     },
   };
 });
@@ -123,8 +122,7 @@ beforeEach(() => {
   window.localStorage.clear();
   vi.mocked(api.getDevicePreferences).mockReset();
   vi.mocked(api.setExperienceLevel).mockReset();
-  vi.mocked(api.setExperienceGoal).mockReset();
-});
+  });
 
 async function expandHelp() {
   await screen.findAllByRole("button", { name: /^About / });
@@ -240,24 +238,5 @@ describe("Account page Explanations setting", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't save/i);
     expect(screen.getByRole("radio", { name: /new to dynasty/i })).toHaveAttribute("aria-checked", "true");
-  });
-});
-
-describe("Account page goal setting", () => {
-  it("is unselected by default, saves a pick, and clears it on a second click", async () => {
-    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
-    vi.mocked(api.setExperienceGoal).mockResolvedValue(preferences(null, "win_now"));
-    renderAccount();
-
-    await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
-    const winNow = screen.getByRole("tab", { name: /^win now$/i });
-    expect(winNow).toHaveAttribute("aria-selected", "false");
-
-    fireEvent.click(winNow);
-    await waitFor(() => expect(api.setExperienceGoal).toHaveBeenCalledWith("win_now"));
-    await waitFor(() => expect(screen.getByRole("tab", { name: /^win now$/i })).toHaveAttribute("aria-selected", "true"));
-
-    fireEvent.click(screen.getByRole("tab", { name: /^win now$/i }));
-    await waitFor(() => expect(api.setExperienceGoal).toHaveBeenCalledWith(null));
   });
 });

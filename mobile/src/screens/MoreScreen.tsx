@@ -39,7 +39,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCollegeInterest } from '../context/CollegeInterestContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
-import { EXPERIENCE_GOAL_OPTIONS, EXPERIENCE_LEVEL_OPTIONS, PLAIN_COPY, type ExperienceGoal, type ExperienceLevel } from '../lib/experienceCopy';
+import { EXPERIENCE_LEVEL_OPTIONS, type ExperienceLevel } from '../lib/experienceCopy';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import ReferralCard from '../components/ReferralCard';
@@ -81,12 +81,6 @@ const EXPERIENCE_OPTIONS: Array<{ value: ExperienceLevel; label: string; descrip
   description: EXPERIENCE_LEVEL_OPTIONS[value].body,
 }));
 
-// The optional "what's your goal this season?" chip, alongside experience
-// level. Tapping the already-selected one clears it back to unset.
-const GOAL_OPTIONS: Array<{ value: ExperienceGoal; label: string }> = (
-  Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoal[]
-).map((value) => ({ value, label: EXPERIENCE_GOAL_OPTIONS[value].label }));
-
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; description: string }> = [
   { value: 'dark', label: 'Night', description: 'OLED black — always dark' },
   { value: 'light', label: 'Day', description: 'Glacier ice white — always light' },
@@ -115,8 +109,6 @@ export default function MoreScreen({ navigation }: Props) {
   const {
     level: experienceLevel,
     setLevel: setExperienceLevel,
-    goal: experienceGoal,
-    setGoal: setExperienceGoal,
   } = useExperienceLevel();
   const { mode: themeMode, setMode: setThemeMode, colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -484,17 +476,6 @@ export default function MoreScreen({ navigation }: Props) {
               description={option.description}
               active={experienceLevel === option.value}
               onPress={() => setExperienceLevel(option.value)}
-            />
-          ))}
-        </View>
-        <AppText style={styles.groupCaption}>{PLAIN_COPY.experienceGoalPrompt}</AppText>
-        <View style={styles.optionRow}>
-          {GOAL_OPTIONS.map((option) => (
-            <OptionCard
-              key={option.value}
-              label={option.label}
-              active={experienceGoal === option.value}
-              onPress={() => setExperienceGoal(experienceGoal === option.value ? null : option.value)}
             />
           ))}
         </View>

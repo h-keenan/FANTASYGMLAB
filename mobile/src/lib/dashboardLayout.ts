@@ -221,15 +221,18 @@ export const TRADES_BLOCK_COPY = {
   deadlinePassed: "Trade deadline has passed; trades reopen after the season.",
   beginnerExplainer:
     "A trade idea shows who you give, who you get, and whether the value works out for you. Nothing happens until you send it in Sleeper.",
-  goalLine: {
-    win_now: "Tuned for winning this season.",
-    rebuilding: "Tuned for building future value.",
-    exploring: "",
+  // The league's real GM stance (Team Situation), which is what trade advice is tuned by.
+  stanceLine: {
+    competing: "Trade ideas are tuned for winning this season.",
+    rebuilding: "Trade ideas are tuned for building future value.",
+    balanced: "Trade ideas balance this season and the future.",
   },
+  changeStance: "Change in GM Plan",
 } as const;
 
-export function tradesGoalLine(goal: string | null | undefined): string {
-  return goal === "win_now" || goal === "rebuilding" || goal === "exploring" ? TRADES_BLOCK_COPY.goalLine[goal] : "";
+/** One line naming the league's GM stance; "" when none is set (nothing to claim). */
+export function tradesStanceLine(stance: string | null | undefined): string {
+  return stance === "competing" || stance === "rebuilding" || stance === "balanced" ? TRADES_BLOCK_COPY.stanceLine[stance] : "";
 }
 
 /** Beginner tiers get short explainers; veterans get the call and the numbers only. */

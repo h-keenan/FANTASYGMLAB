@@ -87,7 +87,8 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
-import { useExperienceCopy, useExperienceLevel } from '../context/ExperienceLevelContext';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
+import { useGmStance } from '../context/GmStanceContext';
 import { DashboardMore, DashboardTeamStats, DashboardTradesBlock } from '../components/DashboardBlocks';
 import DecisionQueue, { decisionRoute } from '../components/DecisionQueue';
 import { buildDecisionQueue } from '../lib/decisionQueue';
@@ -203,7 +204,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const [isFirstVisit, setIsFirstVisit] = useState(true);
   const { showExplanations } = useDensity();
   const experienceCopy = useExperienceCopy();
-  const { goal } = useExperienceLevel();
+  // The league's real GM stance (what trade advice is tuned by), shown on the trade line for beginners.
+  const { stance } = useGmStance(leagueId);
   const queryClient = useQueryClient();
   // The persisted AsyncStorage cache restores asynchronously — gating on it
   // keeps a query from firing (and racing/overwriting) before last session's
@@ -557,7 +559,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           leagueId={leagueId}
           leagueName={leagueName}
           isBeginner={experienceCopy.isBeginner}
-          goal={goal}
+          stance={stance}
           deadlineInAttention={hasKind('deadline')}
           onNavigate={navigate}
         />

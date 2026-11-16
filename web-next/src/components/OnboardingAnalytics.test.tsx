@@ -10,7 +10,6 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       setExperienceLevel: vi.fn().mockResolvedValue({ ok: true }),
-      setExperienceGoal: vi.fn().mockResolvedValue({ ok: true }),
     },
   };
 });

@@ -1,8 +1,8 @@
 import { TERMS } from "@/lib/terms";
 import { ModuleMore } from "@/components/ui/ModuleMore";
-import type { MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 
-import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
+import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { SinceLastVisitStrip } from "@/components/SinceLastVisitStrip";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
@@ -29,7 +29,7 @@ import { DashboardMore, DashboardTradesBlock } from "@/components/DashboardBlock
 import { DecisionQueue, decisionHref } from "@/components/DecisionQueue";
 import { buildDecisionQueue } from "@/lib/decisionQueue";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
-import { useExperienceCopy, useExperienceLevel } from "@/context/ExperienceLevelContext";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { isTradeItem } from "@/lib/dashboardLayout";
 import { buildTeamStatusMatchup } from "@/lib/teamStatus";
 
@@ -89,7 +89,22 @@ export function DashboardContent({
   // Beginner helper text (onboarding experience level) — null/undefined for
   // advanced or unset accounts, so every tile below renders as before.
   const copy = useExperienceCopy();
-  const { goal } = useExperienceLevel();
+  // The league's real GM stance (what trade advice is tuned by), shown on the trade line for beginners.
+  const [stance, setStance] = useState<string>("");
+  const showStance = copy.isBeginner && !sample;
+  useEffect(() => {
+    if (!showStance || !leagueId) return;
+    let cancelled = false;
+    api
+      .getTeamStance(leagueId)
+      .then((res) => {
+        if (!cancelled) setStance(res.stance || "");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [showStance, leagueId]);
   const query = `?name=${encodeURIComponent(leagueName)}`;
   const Shell: "div" | "main" = sample ? "div" : "main";
   const watchItems = data.items.filter((item) => item.category !== "top_priority");
@@ -216,7 +231,7 @@ export function DashboardContent({
         leagueId={leagueId}
         leagueName={leagueName}
         isBeginner={copy.isBeginner}
-        goal={goal}
+        stance={stance}
         deadlineInAttention={deadlineInAttention}
       />
 

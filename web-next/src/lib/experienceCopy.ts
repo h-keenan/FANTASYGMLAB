@@ -167,24 +167,6 @@ export const BEGINNER_LABELS = {
 
 export type BeginnerLabelKey = keyof typeof BEGINNER_LABELS;
 
-/** The optional "what's your goal this season?" chip, alongside experience
- * level (same onboarding step, same Settings mirror). Stored separately
- * through POST /v1/preferences (`experience_goal`), skippable and
- * changeable anytime — unlike experience_level, it can be cleared back to
- * null. Copy only, same byte-identical-with-mobile guarantee. */
-export type ExperienceGoal = "win_now" | "rebuilding" | "exploring";
-export type ExperienceGoalSetting = ExperienceGoal | null;
-
-export function normalizeExperienceGoal(value: unknown): ExperienceGoalSetting {
-  return value === "win_now" || value === "rebuilding" || value === "exploring" ? value : null;
-}
-
-export const EXPERIENCE_GOAL_OPTIONS = {
-  win_now: { label: "Win Now" },
-  rebuilding: { label: "Rebuilding" },
-  exploring: { label: "Just Exploring" },
-} as const;
-
 /** Plain (not beginner-gated) next-step and orientation copy that must read
  * the same on web and mobile. A web test keeps the two maps byte-identical. */
 export const PLAIN_COPY = {
@@ -197,8 +179,6 @@ export const PLAIN_COPY = {
     "A season headline for your team, your best trade paths, and roster-construction focus areas, all built from your Team Snapshot above.",
   onboardingDynastyNote:
     "Dynasty is the long-term fantasy format where you keep your players year to year. If you're completely new to fantasy football, choose New to fantasy football.",
-  experienceGoalPrompt: "What's your goal this season?",
-  experienceGoalOptionalNote: "Optional — skip if you're not sure yet.",
   onboardingLevelQuestion: "Which sounds most like you?",
   onboardingLevelBody: "Sets how much explanation shows up. Change it anytime in Account.",
   onboardingPickOne: "Pick one to continue",
