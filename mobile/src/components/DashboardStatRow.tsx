@@ -72,7 +72,7 @@ function createStyles(colors: ThemeColors) {
     tile: { alignSelf: 'stretch', minWidth: 0, paddingHorizontal: spacing.sm },
     // Inline after the label (MetricCard labelAccessory), never an absolute corner badge over the text.
     // TapForWhy's hitSlop keeps a 44pt target without growing the row.
-    whyBtn: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.glassInset },
-    whyGlyph: { fontSize: 10, lineHeight: 12, fontWeight: '800', color: colors.textTertiary, includeFontPadding: false, textAlign: 'center' },
+    whyBtn: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.glassInset },
+    whyGlyph: { fontSize: 12, lineHeight: 14, fontWeight: '800', color: colors.textTertiary, includeFontPadding: false, textAlign: 'center' },
   });
 }
