@@ -509,7 +509,7 @@ function MatchupHero({
   });
   return (
     <>
-      <MatchupHeroCard model={model} onOpenPlayer={onOpenPlayer} action={<Button label="Open lineup" onPress={onOpenLineup} />} testID="matchup-hero" />
+      <MatchupHeroCard model={model} bigPlays={matchup.live ? matchup.big_plays : undefined} onOpenPlayer={onOpenPlayer} action={<Button label="Open lineup" onPress={onOpenLineup} />} testID="matchup-hero" />
       {myPct == null ? <AppText style={styles.oddsUnavailable}>{winProbabilityUnavailableMessage(matchup)}</AppText> : null}
     </>
   );

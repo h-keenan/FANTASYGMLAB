@@ -1976,6 +1976,25 @@ export interface MatchupResponse {
   live?: boolean;
   /** Seconds a client should wait between refreshes while live; null otherwise. */
   poll_after_seconds?: number | null;
+  /** Latest big plays, newest first (max 3); empty when no live games / no events. */
+  big_plays?: MatchupBigPlay[];
+}
+
+/** A big play (TD, long gain, turnover, 2-pt) inferred from live stat-line changes between polls. */
+export interface MatchupBigPlay {
+  id: string;
+  /** Epoch ms the change was noticed (not the play clock). */
+  at: number;
+  player_id: string | null;
+  name: string;
+  position: string | null;
+  team: string | null;
+  side: "mine" | "opponent";
+  /** Fantasy points swing for that side under the league's scoring. */
+  points: number;
+  description: string;
+  /** Several things landed between polls (a combined drive). */
+  approx: boolean;
 }
 
 /** One slot of a proposed lineup sent to POST .../matchup/what-if. */

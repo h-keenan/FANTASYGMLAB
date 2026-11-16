@@ -203,6 +203,7 @@ from modules import (
     league_value_settings,
     league_display,
     live_activity,
+    live_big_plays,
     live_policy,
     live_stat_lines,
     live_draft,
@@ -16743,6 +16744,22 @@ def _build_matchup(
                 if _starter.get("game_started") is True and _remaining is not None
                 else None
             )
+    # Latest big plays (TD, long gain, turnover, 2-pt) derived from stat-line
+    # deltas between polls; shared per matchup via Redis. Live games only.
+    big_plays: list[dict[str, Any]] = []
+    if projection_context is not None and not is_external and live_policy.is_live():
+        big_plays = live_big_plays.present(
+            live_big_plays.ingest(
+                league_id,
+                current_week,
+                [
+                    (my_roster_id, my_side.get("real_starters") or []),
+                    (opponent_roster_id, opponent_side.get("real_starters") or []),
+                ],
+                scoring_settings=projection_context.scoring_settings,
+            ),
+            my_roster_id,
+        )
     unmapped_players: list[dict[str, Any]] = []
     if is_external:
         for side, entry in ((my_side, my_entry), (opponent_side, opponent_entry)):
@@ -16777,6 +16794,7 @@ def _build_matchup(
         ),
         "real_comparison": _real_matchup_comparison(my_side, opponent_side),
         "win_probability": win_probability,
+        "big_plays": big_plays,
         "game_state": _matchup_game_state(my_side, opponent_side),
         # Per-position expected-points edges for each lineup view. `actual`
         # is null until both sides have a real Sleeper lineup posted.
