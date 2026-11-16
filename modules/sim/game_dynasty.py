@@ -303,7 +303,7 @@ def rookie_class(
             age = ROOKIE_AGES[int(gen.choice(len(ROOKIE_AGES), p=ROOKIE_AGE_P))]
         if s.rookie_curves:  # version-gated: older dynasty saves keep the plain age curve and no scouting profile
             sseed = int(WorldRng(base.seed).stream(season, "gscout", j).integers(1, 2 ** 31 - 1))
-            extra.update(scouting.rookie_dev_fields(pos, age, scouting.talent_z(mean, ref12[pos]), sseed, j, n, knots_v=2 if s.stable else 0))
+            extra.update(scouting.rookie_dev_fields(pos, age, scouting.talent_z(mean, ref12[pos]), sseed, j, n, knots_v=3 if s.stable2 else 2 if s.stable else 0))
         rows.append({
             "pid": f"R{year}-{j:03d}", "name": name, "pos": pos,
             "nfl_team": nfl_team,
@@ -391,13 +391,14 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
     rows: dict[str, dict[str, Any]] = {}
     roles = _roles(prev) if gen.settings.aging_curves else {}
     stable = gen.settings.stable
-    outcomes = outcomes_mod.next_projection_shift(root, prev, season, _anchor(root), LEVEL_RANKS) if stable else {}
+    knots_v = 3 if gen.settings.stable2 else 2 if stable else None  # stability_v 2: the flatter late-career knots and the per-position carry (see aging)
+    outcomes = outcomes_mod.next_projection_shift(root, prev, season, _anchor(root), LEVEL_RANKS, v2=gen.settings.stable2) if stable else {}
     for pid in prev.pids:
         p = prev.players[pid]
         r = rng.stream(season - 1, "gage", aging.stable_key(pid))
         z, u = float(r.standard_normal()), float(r.random())
         own = scouting.step_ratio(p.extra, p.extra.get("years_exp", 0.0)) if gen.settings.rookie_curves else None
-        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=gen.settings.league_anchor, aging_v=gen.settings.aging_v, role=roles.get(pid, 0.5), knots_v=2 if stable else None, outcome=outcomes.get(pid, 0.0), ceiling=_anchor_top(root).get(p.pos) if stable else None)
+        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=gen.settings.league_anchor, aging_v=gen.settings.aging_v, role=roles.get(pid, 0.5), knots_v=knots_v, outcome=outcomes.get(pid, 0.0), ceiling=_anchor_top(root).get(p.pos) if stable else None)
         if gen.settings.league_anchor:  # nobody runs far past the best the league ever had: compress above it (no unbounded drift at the top)
             top = _anchor_top(root).get(p.pos)
             if top and mean > top:

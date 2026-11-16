@@ -52,6 +52,17 @@ AGE_KNOTS_V2: dict[str, tuple[tuple[float, float], ...]] = {
     "K": AGE_KNOTS_V1["K"],
     "DEF": ((21, 1.0), (40, 1.0)),
 }
+# stability_v 2 (aging knots v3): the v2 shapes were fitted on ages 21-24 only, and the sim's REALIZED next / this ratio for a top-24 player of 27 or more came out far
+# below the panel's (RB 0.51-0.56 / WR 0.70-0.73 / TE 0.66-0.74 against 0.71 / 0.88 / 0.97, docs/audits/2026-11-realism-advice-audit-2.md), because the steep v2
+# decline from 25 stacked on the REVERSION pull and a weak outcome carry. v3 is flatter from 25 on (a top-24 RB of 27 holds 0.83 of his projection a year instead of
+# 0.78, a WR 0.94 instead of 0.85, a TE 1.01 instead of 0.95; QBs and kickers are unchanged). The stronger carry below (``OUTCOME_WEIGHT_V2``) also keeps a young
+# player's breakout, so the early-career growth is trimmed a little (RB 22 1.28 -> 1.18, TE 23 1.27 -> 1.20) to keep the realized ratios of 22-year-olds on the panel's.
+AGE_KNOTS_V3: dict[str, tuple[tuple[float, float], ...]] = {
+    **AGE_KNOTS_V2,
+    "RB": ((21, 1.20), (22, 1.18), (23, 1.04), (24, 0.96), (25, 0.97), (26, 0.94), (27, 0.83), (28, 0.75), (30, 0.66), (33, 0.54)),
+    "WR": ((21, 1.20), (22, 1.17), (23, 1.07), (24, 1.00), (25, 0.97), (26, 0.95), (27, 0.94), (28, 0.92), (30, 0.85), (32, 0.74), (35, 0.60)),
+    "TE": ((21, 1.14), (22, 1.16), (23, 1.20), (24, 1.08), (25, 1.00), (26, 0.98), (27, 1.01), (28, 0.98), (29, 0.92), (31, 0.82), (34, 0.65)),
+}
 # Age at which retirement starts to be likely, and how fast the hazard climbs.
 RETIRE_AGE = {"QB": 38.0, "RB": 31.0, "WR": 34.0, "TE": 34.5, "K": 41.0, "DEF": 99.0}
 RETIRE_SCALE = 1.7
@@ -62,6 +73,10 @@ MARKET_HALF_LIFE = 0.6  # how much of the PPG change carries into dynasty market
 # projection systems put on last season's per-game points against the prior, 0.3 to 0.6).
 OUTCOME_WEIGHT = 0.5
 REVERSION = 0.40  # share of the gap (log projection vs the position's typical starter) closed per year, see game_dynasty.season_outcomes
+# stability_v 2: the carry and the pull per position, fitted to the panel's persistence (the correlation between a player's projection change and last season's
+# result is 0.66-0.77 in the panel against 0.40-0.50 for stability_v 1) while the level of every position's top 12 and depth stays where the season-1 pool put it.
+OUTCOME_WEIGHT_V2 = {"QB": 0.7, "RB": 1.0, "WR": 0.8, "TE": 0.7}
+REVERSION_V2 = {"QB": 0.15, "RB": 0.10, "WR": 0.45, "TE": 0.35}
 OUTCOME_CLIP = (-1.0, 0.6) # a 70-point season does not become next year's projection; a lost job (collapse) is remembered at most this hard
 FUTURE_YEARS = 4
 FUTURE_DISCOUNT = 0.9
@@ -77,7 +92,7 @@ def stable_key(text: str) -> int:
 def age_mult(pos: str, age: float, v: int = 0) -> float:
     """Expected multiplier on next season's PPG for a player of ``age`` now (``v`` = the game's aging_v)."""
 
-    table = AGE_KNOTS_V2 if v >= 2 else AGE_KNOTS_V1 if v >= 1 else AGE_KNOTS
+    table = AGE_KNOTS_V3 if v >= 3 else AGE_KNOTS_V2 if v >= 2 else AGE_KNOTS_V1 if v >= 1 else AGE_KNOTS
     knots = table.get(pos) or table["WR"]
     if age <= knots[0][0]:
         return knots[0][1]

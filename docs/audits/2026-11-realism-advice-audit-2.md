@@ -19,6 +19,7 @@ Severity: P0 = wrong or unsafe answer, broken state or exploit. P1 = clearly unr
 | Trade reason names a position the Needs tag and the offer do not support (the "They need a RB" case) | #2021 | merged, `eb0ad6e5` |
 | Desk P0 batch: IR on roster status for pushes and team sheet, FAAB lineup-displacement, backup QB behind a Doubtful starter | #2023 | open at time of writing, merge SHA in the delivery report |
 | `player-model-8`: shallower, rarer busts for top-tier players (the season low tail) | #2027 | open at time of writing, merge SHA in the delivery report |
+| `stability_v 2`: flatter late-career knots, per-position outcome carry and pull (late-career decline, persistence) | see the delivery report | upgradable, season boundary |
 
 ### The trade reason that named the wrong position (reported)
 Partner tags NEEDS WR, NEEDS K, DEEP RB, DEEP TE; the user sends a WR and receives an RB; the verdict reason read "They need a RB and this fills it. NEEDS RB".
@@ -61,7 +62,7 @@ Mean team score per week 97.5 to 98.5 (season 1 is 99.2; the star tier now score
 tried (`bust_sd_star` 0.8-0.9 with `pu_star` -1.3 to -2.0) and gave only another 0.01-0.04 on p10 while pushing team score to 99.6, so v8 keeps the conservative
 values. The QB row now sits inside the real interval and RB nearly does; WR and TE are still 0.1-0.15 low.
 
-**2. Late-career decline is too steep and too noisy (P1, proposal).** Top-24 by ppg, next / this by age, sim vs real (n=15-36 real per cell):
+**2. Late-career decline is too steep and too noisy (P1, `stability_v 2`, see the next section).** Top-24 by ppg, next / this by age, sim vs real (n=15-36 real per cell):
 
 | Cell | Real p50 / p10 / sd(log) | Sim (model-8 prototype, stability_v 1) |
 | --- | --- | --- |
@@ -84,6 +85,72 @@ top-12 projections are rookies, who are the most bimodal players in the model (5
 (`_supply_response`, `_equilibrium_plan`, `_supply_mid` in `game_dynasty.py`) stack on a class-strength factor that `stability_v` pushed harder; not isolated. This is
 the root of "rookies are too safe and too good" (earlier P1-9) and it inflates the top of the draft board and the dynasty market. Proposal: cap class slot
 projection at the real top-rookie curve (rank-1 about 0.9 of ref12) behind a season-boundary flag (`rookie_v 1`), and re-measure the supply controller.
+
+## Sim: late-career aging and persistence (`stability_v 2`, delivered)
+
+Item 2 of the variance section above, implemented. Season-boundary flag (`UPGRADABLE_FLAGS["stability_v"] = (2, "season")`): new games carry `stability_v 2`; a save on `stability_v 1`
+(or an earlier Realism update that took it 0 -> 1) is offered the second generation again (`game_rules.pending_flags` now counts what an earlier update already scheduled, so a flag
+is never offered twice at one value but can climb); a save that never updates replays exactly as before (40 seasons x 8 seeds of `dynasty_run` on `stability_v 1` compared with
+`origin/main` before the change: projections, weekly team points, champions and every player's games identical).
+
+What changed (`stability_v >= 2` only; `aging.py`, `season_outcomes.py`, `game_dynasty.py`):
+
+* **`AGE_KNOTS_V3`** for RB, WR and TE (QB, K and DEF keep the v2 knots): flatter from 25 on (RB 27 0.78 -> 0.83, 28 0.70 -> 0.75; WR 27 0.85 -> 0.94, 28 0.82 -> 0.92, 30 0.75 -> 0.85; TE 27 0.95 -> 1.01, 29 0.80 -> 0.92).
+  Early career is trimmed a little (RB 22 1.28 -> 1.18, 23 1.08 -> 1.04, TE 23 1.27 -> 1.20) because the stronger carry below keeps a young player's breakout, and
+  the realized ratio of 22-year-olds has to stay on the panel's (RB 22 1.09, TE 23 1.10-1.15; the panel has 1.07 and 1.14).
+* **A stronger, per-position outcome carry and a lighter pull** (`OUTCOME_WEIGHT_V2`, `REVERSION_V2`). Stability_v 1 had one weight (0.5) and one pull (0.40) for every position. The carry now follows
+  the persistence the panel shows per position (QB 0.7, RB 1.0, WR 0.8, TE 0.7) and the pull is set per position so each position's top 12 and depth stay on the season-1 level (QB 0.15, RB 0.10, WR 0.45, TE 0.35).
+  The audit's first guess (REVERSION 0.25 everywhere, weight 0.5) was run first: it left the persistence at 0.43-0.46 and the late-career medians 0.05-0.10 short.
+
+Measured with `python -m modules.sim.calibration.dynasty_tables --seeds 8 --seasons 10 --seed0 8` (new harness; 12-team PPR dynasties, headless, seeds 9-16 are hold-out: nothing was tuned on them;
+the design seeds were 1-8, a third set 17-24 gave the same picture). "Before" = `--flags '{"stability_v": 1}'`.
+
+Late career, hold-out seeds 9-16, top 24 by points per game, next / this ppg, same NFL team, 8+ games both years (p50 / p10 / sd of the log; real n = 14-27 per cell):
+
+| Cell | Real | Before (stability_v 1) | After (stability_v 2) |
+| --- | --- | --- | --- |
+| RB 25-26 | 0.90 / 0.63 / 0.22 | 0.82 / 0.49 / 0.39 | 0.90 / 0.58 / 0.36 |
+| RB 27+ | 0.71 / 0.52 / 0.28 | 0.64 / 0.30 / 0.48 | 0.76 / 0.47 / 0.35 |
+| WR 25-26 | 0.81 / 0.58 / 0.25 | 0.76 / 0.43 / 0.42 | 0.88 / 0.55 / 0.33 |
+| WR 27+ | 0.88 / 0.62 / 0.23 | 0.65 / 0.32 / 0.51 | 0.78 / 0.45 / 0.40 |
+| TE 25-26 | 0.72 / 0.50 / 0.48 | 0.87 / 0.46 / 0.53 | 0.96 / 0.42 / 0.61 |
+| TE 27+ | 0.97 / 0.73 / 0.22 | 0.78 / 0.38 / 0.56 | 0.89 / 0.43 / 0.52 |
+
+Top 12 by ppg, next / this (p10 / p50, share under 0.7; real n = 35-40):
+
+| Position | Real | Before | After |
+| --- | --- | --- | --- |
+| QB | 0.71 / 0.94, 10.5% | 0.69 / 0.92, 11.5% | 0.72 / 0.95, 7.6% |
+| RB | 0.60 / 0.86, 20.0% | 0.52 / 0.82, 31.7% | 0.58 / 0.87, 25.8% |
+| WR | 0.62 / 0.91, 15.0% | 0.46 / 0.79, 36.0% | 0.53 / 0.82, 31.2% |
+| TE | 0.68 / 0.92, 20.0% | 0.49 / 0.85, 31.9% | 0.55 / 0.89, 25.3% |
+
+Persistence (correlation of a top-24 player's projection change with last season's realized / projected result): real RB 0.77, WR 0.66, TE 0.73; before 0.48 / 0.46 / 0.39; after 0.63 / 0.52 / 0.54.
+The sim's number is measured on games played (weekly noise in the result, like the panel's); on the season story alone (`tests/test_sim_stability_v.py`, no games) it goes from 0.51 to 0.76, inside the real band.
+
+Balance over ten seasons (hold-out seeds 9-16; projection at rank 12 and 24 of each position, mean team points per week). Year 10 is as strong as year 1 and no position drifts more than the real years differ
+among themselves (RB 12th: 13.8 to 17.1 over 2021-25), but with the old rookie controllers still in place the top of QB and RB drifts up (QB 12th 20.3 -> 22.8): `rookie_v` (next) is the half that removes it.
+
+| Season | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Team points per week, before | 99.4 | 100.5 | 99.6 | 97.3 | 95.7 | 96.9 | 96.7 | 98.4 | 99.7 | 98.1 |
+| Team points per week, after | 99.4 | 102.4 | 101.9 | 101.5 | 100.6 | 100.2 | 98.3 | 99.3 | 101.2 | 100.0 |
+| RB12 before / after | 16.2 / 16.2 | 18.9 / 17.8 | 16.9 / 17.8 | 16.1 / 17.1 | 15.4 / 17.3 | 15.8 / 16.8 | 16.0 / 16.8 | 15.9 / 16.8 | 16.3 / 17.4 | 15.9 / 17.1 |
+| WR12 before / after | 15.3 / 15.3 | 15.8 / 16.2 | 16.2 / 16.4 | 15.9 / 16.3 | 15.8 / 16.3 | 15.8 / 16.3 | 16.0 / 16.0 | 15.9 / 15.9 | 16.0 / 16.0 | 16.2 / 16.6 |
+| TE12 before / after | 9.2 / 9.2 | 9.0 / 10.0 | 9.2 / 9.9 | 9.5 / 10.5 | 9.4 / 10.7 | 10.0 / 10.2 | 9.7 / 10.4 | 9.7 / 10.5 | 9.6 / 10.0 | 9.3 / 9.8 |
+| RB24 before / after | 12.7 / 12.7 | 13.9 / 13.2 | 13.6 / 13.2 | 13.1 / 13.2 | 12.7 / 13.1 | 12.9 / 13.4 | 12.6 / 12.9 | 12.9 / 12.8 | 13.4 / 13.2 | 12.9 / 13.2 |
+| WR24 before / after | 13.7 / 13.7 | 13.2 / 14.1 | 13.0 / 13.8 | 13.2 / 13.6 | 13.4 / 13.6 | 13.2 / 13.8 | 13.3 / 13.6 | 13.3 / 13.5 | 13.5 / 13.4 | 13.1 / 13.8 |
+
+Still open (not reachable by the age curve and carry, and not changed here):
+
+* The log sd of next / this for 27+ (0.35-0.52 against 0.22-0.28 real) and the share under 0.7 at the top 12 (25-31% against 15-20%) are mostly the season story's own spread (`season_multiplier`, sd 0.26-0.47 for RB and TE
+  veterans, a player-model topic like model-8's star bust), not the projection change (its sd is 0.19-0.27 and now follows the result). A model change cannot be re-timed inside a played season, so it is not part of this flag.
+* WR and TE 27+ medians are 0.78 / 0.89 against 0.88 / 0.97; flattening the knots further lifted the WR and TE levels past the season-1 pool, so the remaining gap is left as it is. TE 25-26 (real 0.72, n = 14) is the cell with the
+  thinnest panel sample and is not a target.
+* Persistence on games played is 0.52-0.63 against 0.66-0.77. The carry reads the season's story, not its weekly noise, which the panel's projections also saw; a higher weight only widened the projection spread.
+
+Tests: `tests/test_sim_stability_v.py` (gate and serialization for 0 / 1 / 2, the v3 knots against v2 and earlier, the per-position carry, a digest pin that a `stability_v 1` pool is unchanged, the persistence band, late-career ratios against `stability_v 1`, ten-season
+stationarity under v2, and an end-to-end 1 -> 2 offseason upgrade that replays to the same digest), `tests/test_sim_realism_update.py` (a flag that gets a newer generation is offered again and never twice at one value).
 
 ## Fantasy Desk findings (trace of every advice surface; repros on fixtures)
 
@@ -182,7 +249,7 @@ Outputs vs the real panel (ppg at rank, 8+ games; panel mean of 2022-25): RB and
 TE12 10 percent low. Kicker spread is too steep (K1 +1.4, K12 -0.8; K1 to K12 5.0 ppg sim against 2.8 real), a player-model topic left alone here.
 
 ## Decisions needed (product)
-1. Ship the late-career age curve and a lower `REVERSION` (`stability_v 2`)? It changes dynasty values for 27+ players, so it is an upgradable offseason change, not silent.
+1. Ship the late-career age curve and a lower `REVERSION` (`stability_v 2`)? Done as an upgradable offseason change (it changes dynasty values for 27+ players, so it is not silent); the owner may still veto the Realism update copy.
 2. Cap rookie class strength (`rookie_v 1`)? It lowers rookie pick values and the top of the draft board; real classes are far less top-heavy.
 3. Should the AI's posture follow standing (`posture_v`)? It makes the league feel more alive and removes the persona-decides-the-decade effect, at the cost of more volatile AI behaviour.
 4. Should the user's waiver claims be contested by AIs in priority order (`wire_v`)? This ends the "queue the best FA every week" edge.
@@ -199,5 +266,7 @@ TE12 10 percent low. Kicker spread is too steep (K1 +1.4, K12 -0.8; K1 to K12 5.
 ```
 PYTHONPATH=. python -m modules.sim.calibration.season_variance_report --seeds 8 --seasons 5 --seed0 8          # model-8
 PYTHONPATH=. python -m modules.sim.calibration.season_variance_report --seeds 8 --seasons 5 --seed0 8 --off    # model-7 behaviour
+PYTHONPATH=. python -m modules.sim.calibration.dynasty_tables --seeds 8 --seasons 10 --seed0 8                                         # stability_v 2 (balance, late career, persistence, rookies)
+PYTHONPATH=. python -m modules.sim.calibration.dynasty_tables --seeds 8 --seasons 10 --seed0 8 --flags '{"stability_v": 1}'            # before
 pytest tests/test_sim_verdict_reason.py tests/test_faab.py tests/test_push_triggers.py tests/test_team_sheet.py tests/test_projections_v2.py
 ```
