@@ -14,7 +14,7 @@ import {
   type TradeBoardPlayer,
   type TradeSettings,
 } from "./tradeAnalyzer";
-import { bandForScore, TRADE_VALUE_GOLDEN } from "../tradeValueBands.generated";
+import { bandForScore, dealSizeFor, TRADE_VALUE_GOLDEN } from "../tradeValueBands.generated";
 import { faqLd } from "./jsonld";
 import { parseAttribution } from "../attribution";
 
@@ -107,9 +107,12 @@ describe("evaluateTrade", () => {
 
 describe("public verdict uses the shared band ladder (audit C1/C2)", () => {
   it("every golden score lands in the same band, badge and tone the in-app verdict uses", () => {
-    for (const { score, id } of TRADE_VALUE_GOLDEN) {
-      const e = evaluateTrade([p("a", "A", "WR", 20000)], [p("b", "B", "WR", 20000 + score)], STD);
-      expect(e.badge, String(score)).toBe(bandForScore(score).badge);
+    for (const { score, id } of TRADE_VALUE_GOLDEN.filter((g) => g.deal_size === 20000)) {
+      // The larger side is always 20000 so the deal size matches the golden row.
+      const a = score > 0 ? 20000 - score : 20000;
+      const e = evaluateTrade([p("a", "A", "WR", a)], [p("b", "B", "WR", a + score)], STD);
+      const deal = dealSizeFor(e.totalA, e.totalB);
+      expect(e.badge, String(score)).toBe(bandForScore(score, deal).badge);
       expect(e.diff).toBe(score);
       expect(e.winner).toBe(id === "even" ? "even" : score > 0 ? "b" : "a");
     }

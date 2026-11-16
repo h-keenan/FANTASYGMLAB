@@ -202,16 +202,16 @@ class TestEvaluateTrade(unittest.TestCase):
     def test_fair_band_near_even(self):
         result = evaluator.evaluate_trade(
             send_assets=[{"score": 1000}],
-            receive_assets=[{"score": 1100}],
+            receive_assets=[{"score": 1020}],
         )
         self.assertEqual(result["verdict"], "Fair")
 
     def test_slight_overpay_band(self):
         result = evaluator.evaluate_trade(
             send_assets=[{"score": 2000}],
-            receive_assets=[{"score": 1200}],
+            receive_assets=[{"score": 1800}],
         )
-        self.assertEqual(result["delta"], -800)
+        self.assertEqual(result["delta"], -200)
         self.assertEqual(result["verdict"], "Slight Overpay")
 
     def test_major_overpay_band(self):

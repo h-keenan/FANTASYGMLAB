@@ -249,5 +249,5 @@ def evaluate_trade(
         "send_total": send_total,
         "receive_total": receive_total,
         "delta": delta,
-        "verdict": trade_value_verdict(delta),
+        "verdict": trade_value_verdict(delta, max(send_total, receive_total)),
     }

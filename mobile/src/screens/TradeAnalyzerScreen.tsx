@@ -58,6 +58,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { trackUse } from '../lib/analytics';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { valueDirectionLabel } from '../lib/tradeValue';
+import { dealSizeFor } from '../lib/tradeValueBands.generated';
 import { formatTradeGain } from '../lib/liveDraft';
 import { idpTradePoolPlayers } from '../lib/idpPresentation';
 import { quickAddPlacement } from '../lib/tradeShortcuts';
@@ -456,6 +457,15 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
     [sendIds, receiveIds],
   );
 
+  const quickCompareDealSize = useMemo(
+    () =>
+      dealSizeFor(
+        sendIds.reduce((sum, p) => sum + playerScore(p), 0),
+        receiveIds.reduce((sum, p) => sum + playerScore(p), 0),
+      ),
+    [sendIds, receiveIds],
+  );
+
   const sendCount = sendIds.length + sendPicks.length;
   const receiveCount = receiveIds.length + receivePicks.length;
   const scalePlayer = (p: RankedPlayer): TradeCardAsset => ({
@@ -667,7 +677,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       {quickMode ? (
         hasAnyAssets ? (
           <View style={styles.quickCompareSection}>
-            <AppText style={styles.deltaLabel}>{valueDirectionLabel(quickCompareDelta)}</AppText>
+            <AppText style={styles.deltaLabel}>{valueDirectionLabel(quickCompareDelta, quickCompareDealSize)}</AppText>
             <TradeValueBar delta={quickCompareDelta} style={styles.verdictValueBar} />
           </View>
         ) : null

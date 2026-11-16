@@ -65,7 +65,7 @@ def _assert_verdict_is_the_rung_of_the_score(verdict):
     """The one-number rule: band, UI verdict, tone and score_band all come from
     ``band_for_score(trade_score)``; no label or rung is applied after it."""
 
-    rung = trade_value_bands.band_for_score(verdict.trade_score)
+    rung = trade_value_bands.band_for_score(verdict.trade_score, verdict.deal_size or None)
     assert (verdict.band, verdict.ui_verdict, verdict.tone) == (rung.verdict, rung.ui_verdict, rung.tone)
     assert verdict.score_band == verdict.band
 
@@ -76,7 +76,7 @@ def test_contender_is_not_told_smash_accept_for_a_lineup_costing_value_win():
     assert fit["lineup_model"]["points"]["ros_delta"] < -60
     # The window cost is IN the score, so the verdict is simply the rung that
     # score lands in: not an accept, and nothing was relabelled afterwards.
-    assert verdict.trade_score < trade_value_bands.ACCEPT
+    assert verdict.trade_score < trade_value_bands.cuts_for(verdict.deal_size).accept
     _assert_verdict_is_the_rung_of_the_score(verdict)
     assert verdict.ui_verdict != "ACCEPT" and verdict.tone != "accept"
     assert trade_posture.tradeoff_tag(verdict.posture, verdict.posture_assessment) == "Costs your lineup"
@@ -268,7 +268,7 @@ def test_calibration_grid_verdict_changes_are_few_directional_and_explained(monk
     # Win-now side (where the owner's report lives): few verdicts move.
     assert len(ui_changed & win_now) / len(win_now) <= 0.15
     # Rebuild/tank move more by design: their lineup weight drops (PRESENT_ADJUST).
-    assert len(ui_changed) / len(after) <= 0.25
+    assert len(ui_changed) / len(after) <= 0.30  # share-based cuts are tighter on big deals
     # There is no separate label any more: the band IS the UI rung of the score.
     assert ui_changed <= label_changed
     assert len(label_changed) / len(after) <= 0.35
@@ -286,7 +286,7 @@ def test_calibration_grid_verdict_changes_are_few_directional_and_explained(monk
     # score: the cost is inside the number, not a flag next to a green card.
     for key, v in after.items():
         if key[2] == "contender" and v.posture_assessment["lineup_costly"]:
-            assert v.ui_verdict != ACCEPT_UI or v.trade_score >= trade_value_bands.ACCEPT, key
+            assert v.ui_verdict != ACCEPT_UI or v.trade_score >= trade_value_bands.cuts_for(v.deal_size).accept, key
     # Sensible trades keep their verdicts: even swaps and upgrades are untouched for every posture.
     for strat in POSTURES:
         for name in ("even-swap", "pick-for-starter", "2for1 up", "overpay"):
@@ -378,9 +378,11 @@ def test_a_contender_selling_its_best_player_for_picks_scores_below_an_accept():
     for key in ("contender", "fringe_contender"):
         v = out[key]
         assert v.posture_assessment["lineup_costly"], key
-        assert v.trade_score < trade_value_bands.ACCEPT, key
+        assert v.trade_score < trade_value_bands.cuts_for(v.deal_size).accept, key
         _assert_verdict_is_the_rung_of_the_score(v)
-        assert not trade_grade.clears_suggestion_bar(v), key
+        assert v.ui_verdict != ACCEPT_UI, key
+    # A contender is never SUGGESTED the sale (a fringe team's small cost can sit inside the even band).
+    assert not trade_grade.clears_suggestion_bar(out["contender"])
     # A rebuilder keeps the clean accept for the same package.
     assert out["rebuild"].ui_verdict == ACCEPT_UI
     assert trade_grade.clears_suggestion_bar(out["rebuild"])

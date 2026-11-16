@@ -590,7 +590,7 @@ def clears_suggestion_bar(verdict) -> bool:
     edge to them" band (-400..-150): a package the Analyzer itself words as
     giving up value. A suggestion is a recommendation to act, so it must also
     sit at or above the "essentially even" rung of the one score ladder
-    (modules.trade_value_bands.EDGE) whenever the verdict was decided on that ladder
+    (``trade_value_bands.cuts_for(deal).edge``) whenever the verdict was decided on that ladder
     (a lineup model exists). Scored on the same ``trade_score`` the
     verdict itself is decided on, so Hub/Finder and the Analyzer cannot diverge.
     """
@@ -611,7 +611,7 @@ def clears_suggestion_bar(verdict) -> bool:
         score = float(verdict.trade_score)
     except (TypeError, ValueError):
         return False
-    return score >= -trade_value_bands.EDGE
+    return score >= -trade_value_bands.cuts_for(getattr(verdict, "deal_size", None)).edge
 
 
 def league_waiver_pool(rosters, valued: pd.DataFrame) -> pd.DataFrame | None:
