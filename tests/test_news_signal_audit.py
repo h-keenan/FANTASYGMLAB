@@ -12,6 +12,7 @@ Proves:
 from __future__ import annotations
 
 import time
+import types
 from pathlib import Path
 
 import pandas as pd
@@ -416,6 +417,9 @@ def test_fetch_news_respects_disk_ttl(tmp_path, monkeypatch):
         return _Feed()
 
     monkeypatch.setattr(news.feedparser, "parse", _fake_parse)
+    monkeypatch.setattr(
+        news.requests, "get", lambda *a, **k: types.SimpleNamespace(content=b"", raise_for_status=lambda: None)
+    )
     items = news.fetch_news()
     assert called["feeds"] == 0
     assert items[0]["title"] == "Cached headline"
@@ -439,3 +443,14 @@ def test_injury_alert_path_uses_status_not_article_sentiment():
     assert 'df["news_factor"] = 0.0' in (ROOT / "modules" / "rankings.py").read_text(
         encoding="utf-8"
     )
+
+
+def test_parse_feed_failure_returns_fallback_without_raising(monkeypatch):
+    def _boom(*_a, **_k):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(news.requests, "get", _boom)
+    feed = news._parse_feed("https://example.test/feed")
+    assert feed.bozo is True
+    assert isinstance(feed.bozo_exception, RuntimeError)
+    assert feed.entries == []
