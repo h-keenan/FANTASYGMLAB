@@ -388,6 +388,27 @@ Superflex: QB Need teams 4 always -> 2.3 (0-5) and their QB-slot output 0.89 -> 
 Tests: `tests/test_sim_need_v.py` (gate, slots, the old tercile and a digest pin for `need_v 0`, tags that are not a fixed count, a QB hole the wire cannot fill, the trade AI reading the same tags);
 `tests/test_sim_pos_v.py` pins `need_v 0` for its tercile-based scenarios.
 
+### `cap_v 1`: one shared position limit (delivered, upgradable, immediate)
+
+Three places held their own number: the draft (`game_draft.POSITION_CAP`: QB 3, TE 3, RB / WR 9), the AI waiver planner (`game_ai_depth._cap`) and nothing in auto-pick's roster building. `game_caps.position_cap` is
+now the one source for auto-pick, the draft hint, the AI draft (all through `_candidates`) and the AI waiver planner: strict starting slots (a SUPER_FLEX is a QB start) + the flex slots that take the position
++ backups (QB / TE 1, RB / WR 2); K / DEF 1; a bench deeper than the caps add up to gets the slack spread over RB, WR, TE. The planner also holds the limit with no "wanted position" exemption: a hole this week or next
+(nobody can play) is covered while the healthy depth is under the limit, routine depth and backup-gap claims count everyone on the roster (an injured quarterback comes back and the extra would stay for good).
+
+QB count per team, 8 seeds, one-QB league (superflex stays at 3 by design: two starting spots plus a backup):
+
+| | `cap_v 0` | `cap_v 1` |
+| --- | --- | --- |
+| AI teams with 3+ QBs after the draft | 42% | 0% |
+| User auto-pick QBs after the draft (8 seeds) | 3 in all 8 | 2 in all 8 |
+| AI teams with 3+ QBs at the end of the season | 47% | 33% |
+| AI RB / WR 6+ after the draft (old cap 9) | 2% / 17% | 0% / 0% |
+
+Residual: AI teams still reach three QBs in a third of seasons through genuine hole cover (a QB1 and a QB2 both out) and AI-AI trades, and nothing drops the surplus when the injured player returns. A cut-down pass belongs
+with the deferred AI backup-QB planning (`ai_v 2`).
+
+Tests: `tests/test_sim_cap_v.py` (gate, the limit formula, planner and draft read one number, no third QB in a one-QB draft, a digest pin that `cap_v 0` drafts are unchanged).
+
 ## Decisions needed (product)
 1. Ship the late-career age curve and a lower `REVERSION` (`stability_v 2`)? Done as an upgradable offseason change (it changes dynasty values for 27+ players, so it is not silent); the owner may still veto the Realism update copy.
 2. Cap rookie class strength (`rookie_v 1`)? Done as an upgradable offseason change (it lowers rookie pick values and the top of the draft board; real classes are far less top-heavy); the owner may still veto the Realism update copy.

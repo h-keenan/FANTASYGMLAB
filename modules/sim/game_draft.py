@@ -18,6 +18,7 @@ from typing import Any, Mapping
 
 import numpy as np
 
+from modules.sim.game_caps import position_cap
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_setup import draft_order, pick_round
 from modules.sim.game_state import Emitter, GameState
@@ -161,7 +162,10 @@ def _candidates(ctx: DraftContext, tid: str, n: int) -> list[str]:
             continue
         if pos in SINGLETON_POSITIONS and (rnd < s.rounds - K_LAST_ROUNDS + 1 or counts[pos] >= 1):
             continue
-        cap = POSITION_CAP.get(pos, 99) + (s.slots.count("SUPER_FLEX") if pos == "QB" else 0)
+        if s.cap_v >= 1:  # one shared position limit (game_caps), the same one the AI's waiver planner holds
+            cap = position_cap(s, pos)
+        else:
+            cap = POSITION_CAP.get(pos, 99) + (s.slots.count("SUPER_FLEX") if pos == "QB" else 0)
         if counts[pos] >= cap and (forced is None or pos not in forced):
             continue
         out.append(pid)

@@ -46,6 +46,7 @@ from modules.sim.game_types import (
     POS_VERSION,
     INJURY_VERSION,
     ROOKIE_VERSION,
+    CAP_VERSION,
     NEED_VERSION,
     WIRE_VERSION,
     HINT_VERSION,
@@ -75,6 +76,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "pos_v": (POS_VERSION, NOW),
     "injury_v": (INJURY_VERSION, WEEK),
     "rookie_v": (ROOKIE_VERSION, SEASON),
+    "cap_v": (CAP_VERSION, NOW),
     "need_v": (NEED_VERSION, NOW),
     "wire_v": (WIRE_VERSION, WEEK),
 }
@@ -159,6 +161,11 @@ FLAGS: dict[str, dict[str, Any]] = {
     "need_v": {
         "label": 'Needs tags from real roster holes',
         "body": 'A team is tagged Needs only where its starters really fall short of the league (or a starting slot cannot be filled and the free-agent pool cannot fix it), a superflex counts as a second starting quarterback, flex slots are never a need, and the trade AI and its reasons read the same tags.',
+        "dynasty_only": False,
+    },
+    "cap_v": {
+        "label": 'One roster limit per position',
+        "body": "Auto-draft, draft hints, the AI draft and the AI's waiver moves all use one position limit (starting slots plus flex plus the backups byes and injuries call for), so a team no longer ends up with three quarterbacks in a one-QB league.",
         "dynasty_only": False,
     },
     "names_v": {

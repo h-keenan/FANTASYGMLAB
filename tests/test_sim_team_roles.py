@@ -124,7 +124,7 @@ def rows_with_phi(hurts_out=4):
 
 def make(model_id, rows=None, seed=11):
     rows = rows or ROWS
-    settings = replace(GameSettings.parse({"user_slot": 4}), reserve_v=0, ir_slots=0, incumbent_v=0, defense_v=0, injury_v=0)
+    settings = replace(GameSettings.parse({"user_slot": 4}), reserve_v=0, ir_slots=0, incumbent_v=0, defense_v=0, injury_v=0, cap_v=0)
     return build_snapshot(rows, BYES, settings, seed, scoring_model=model_id)
 
 
