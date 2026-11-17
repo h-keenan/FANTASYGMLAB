@@ -1,6 +1,7 @@
 import ConfirmInPlace from '../components/ConfirmInPlace';
 import { useNotice } from '../components/NoticeToast';
 import { funnelStepIndex } from '../lib/firstRunFlow';
+import { isProOrNull, planOf } from '../lib/plan';
 import { trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import FreeLimitNote from '../components/FreeLimitNote';
 import { clearPendingReferralCode, getPendingReferralCode } from '../lib/referralCapture';
@@ -153,8 +154,7 @@ export default function HomeScreen({ navigation, route }: Props) {
   // profile read blipped. The server still enforces the cap on save.
   const atLeagueCap =
     leagueCap > 0 &&
-    me?.profile_status === 'ok' &&
-    me?.entitlement !== 'premium' &&
+    planOf(me) === 'free' &&
     (leagues?.length ?? 0) >= leagueCap;
 
   // Cross-league glance cards: Premium with 2+ saved leagues gets the real
@@ -536,7 +536,7 @@ export default function HomeScreen({ navigation, route }: Props) {
               </View>
               {me ? (
                 <PressableScale accessibilityRole="button"
-                  disabled={me.entitlement === 'premium'}
+                  disabled={planOf(me) === 'pro'}
                   onPress={() => (me.profile_status === 'error' ? void load() : navigation.navigate('Paywall'))}
                   style={[
                     styles.entitlementPill,
@@ -551,7 +551,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   >
                     {me.profile_status === 'error'
                       ? "Couldn't verify your plan — tap to retry"
-                      : me.entitlement === 'premium'
+                      : planOf(me) === 'pro'
                         ? 'Pro'
                         : 'Free — Upgrade'}
                   </AppText>
@@ -613,7 +613,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 noun={leagueCap === 1 ? 'league' : 'leagues'}
                 limit={leagueCap}
                 used={leagues?.length ?? 0}
-                isPremium={me.profile_status === 'ok' ? me.entitlement === 'premium' : null}
+                isPremium={isProOrNull(me)}
               />
             ) : null}
             {atLeagueCap ? (

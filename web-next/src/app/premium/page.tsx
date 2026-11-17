@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { api, type BillingPlansResponse, type MeResponse } from "@/lib/api";
+import { planOf } from "@/lib/plan";
 import { PremiumContent } from "@/components/PremiumContent";
 import { PublicPricingContent } from "@/components/PublicPricingContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
@@ -65,5 +66,11 @@ export default function PremiumPage() {
     );
   }
 
-  return <PremiumContent entitlement={me.user.entitlement} plans={plans.plans} publishableKey={plans.stripe_publishable_key} trial={plans.trial} trialEndsAt={me.user.trial_ends_at} comparison={normalizePremiumComparison(me.premium_comparison)} />;
+  // A failed profile read is not a Free verdict: never offer a second checkout to someone who may already be Pro.
+  const plan = planOf(me.user);
+  if (plan === "unknown") {
+    return <ErrorState message="We could not confirm your plan right now. Nothing about your subscription has changed." onRetry={reloadPage} />;
+  }
+
+  return <PremiumContent entitlement={plan === "pro" ? "premium" : "free"} plans={plans.plans} publishableKey={plans.stripe_publishable_key} trial={plans.trial} trialEndsAt={me.user.trial_ends_at} comparison={normalizePremiumComparison(me.premium_comparison)} />;
 }

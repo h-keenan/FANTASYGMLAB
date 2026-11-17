@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import { api } from './api';
+import { showProMarkers } from './plan';
 import { queryKeys } from './queryKeys';
 import { PRO, getEntitlementTier, isAtLeast } from './revenuecat';
 
@@ -25,5 +26,5 @@ export function useShowProTags(): boolean {
       cancelled = true;
     };
   }, []);
-  return planQuery.data?.user.profile_status === 'ok' && planQuery.data.user.entitlement !== 'premium' && !storeSubscriber;
+  return showProMarkers(planQuery.data?.user, storeSubscriber);
 }

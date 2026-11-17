@@ -1,5 +1,6 @@
 "use client";
 
+import { planOf } from "@/lib/plan";
 import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState } from "react";
 
@@ -215,6 +216,7 @@ export function PremiumContent({
   trialEndsAt,
   comparison,
 }: {
+  /** From planOf(me.user): the page never renders this for an unreadable plan. */
   entitlement: "free" | "premium";
   plans: BillingPlan[];
   publishableKey: string;
@@ -222,10 +224,11 @@ export function PremiumContent({
   trialEndsAt?: string;
   comparison?: PremiumComparisonRow[];
 }) {
+  const isPro = planOf({ entitlement, profile_status: "ok" }) === "pro";
   const trialDays = activeTrialDays(trial);
   useEffect(() => {
-    trackFeatureUse("premium_viewed", { props: { tier: entitlement === "premium" ? "pro" : "free" } });
-  }, [entitlement]);
+    trackFeatureUse("premium_viewed", { props: { tier: isPro ? "pro" : "free" } });
+  }, [isPro]);
   const rows = comparison ?? FALLBACK_PREMIUM_COMPARISON;
   const tiers = Array.from(new Set(plans.map((p) => p.tier)));
   return (
@@ -240,7 +243,7 @@ export function PremiumContent({
         </p>
       </header>
 
-      {entitlement === "premium" ? <ManageBilling trialEndsAt={trialEndsAt} /> : null}
+      {isPro ? <ManageBilling trialEndsAt={trialEndsAt} /> : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="highlights-heading">
         <SectionHeading id="highlights-heading">What Pro adds</SectionHeading>

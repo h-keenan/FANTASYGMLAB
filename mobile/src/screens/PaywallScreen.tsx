@@ -8,6 +8,7 @@ import {
   proHighlights,
   type HighlightIcon,
 } from '../lib/paywallCopy';
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -131,7 +132,15 @@ export default function PaywallScreen({ navigation, route }: Props) {
   // remounts its stack onto Home, so no goBack is needed in that mode.
   const fromOnboarding = route.params?.fromOnboarding;
   const { completeOnboarding, completeOnboardingViaGetStarted } = useOnboarding();
+  // Every cached screen (plan marker, dashboard/waivers limits, Sim gate) was fetched as Free.
+  // A purchase or restore changes the plan, so drop them or Pro would look locked for minutes.
+  const queryClient = useQueryClient();
+  const refreshAfterPlanChange = useCallback(() => {
+    void queryClient.invalidateQueries();
+  }, [queryClient]);
   const exit = useCallback(() => {
+    refreshAfterPlanChange(); // the webhook has usually landed by the time they tap Done
+
     if (fromOnboarding === 'getStarted') {
       completeOnboardingViaGetStarted();
       return;
@@ -141,7 +150,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       return;
     }
     navigation.goBack();
-  }, [fromOnboarding, completeOnboarding, completeOnboardingViaGetStarted, navigation]);
+  }, [fromOnboarding, completeOnboarding, completeOnboardingViaGetStarted, navigation, refreshAfterPlanChange]);
   // Guests (Supabase anonymous users) may not buy: they must create an
   // account first (owner decision 2026-10-25, mirrors web TrialAccountGate).
   // Restore purchases stays available to everyone (Apple 3.1.1).
@@ -278,6 +287,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       props: { result: outcome.purchased ? 'purchased' : outcome.cancelled ? 'cancelled' : 'error' },
     });
     if (outcome.purchased) {
+      refreshAfterPlanChange();
       setPurchased(true);
       return;
     }
@@ -288,10 +298,19 @@ export default function PaywallScreen({ navigation, route }: Props) {
   const onRestore = async () => {
     setPurchaseError(null);
     setRestoring(true);
-    const active = await restorePurchases();
+    let active = false;
+    try {
+      active = await restorePurchases();
+    } catch {
+      // Offline / store error: say so instead of leaving the button spinning.
+      setRestoring(false);
+      setPurchaseError('Could not reach the store. Check your connection and try again.');
+      return;
+    }
     setRestoring(false);
     trackUse('paywall', 'restore', { props: { result: active ? 'restored' : 'none' } });
     if (active) {
+      refreshAfterPlanChange();
       setPurchased(true);
     } else {
       setPurchaseError('No active purchase found for this account.');

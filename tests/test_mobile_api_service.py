@@ -106,6 +106,14 @@ def _routed_requests_get(*, profile, auth=None, extra=()):
     return fake
 
 
+@pytest.fixture(autouse=True)
+def _no_referral_comp_read(monkeypatch):
+    """These tests script an ordered list of requests.get responses; the referral
+    comp lookup (covered in tests/test_entitlement_matrix.py) would consume one."""
+
+    monkeypatch.setattr("services.mobile_api_service._referral_comp_active", lambda *_a, **_k: False)
+
+
 def _client(monkeypatch):
     pytest.importorskip("httpx")
     from fastapi.testclient import TestClient

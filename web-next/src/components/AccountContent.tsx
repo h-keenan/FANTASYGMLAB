@@ -2,6 +2,7 @@
 
 import { HelpLink } from "@/components/HelpLink";
 import { supportMailto } from "@/lib/support";
+import { planOf, type Plan } from "@/lib/plan";
 import { PageTitle } from "@/components/PageTitle";
 import { useState } from "react";
 
@@ -69,8 +70,8 @@ function IdentitySection({ user }: { user: MeResponse["user"] }) {
         </div>
         <div className="flex items-center justify-between gap-3">
           <dt style={{ color: "var(--color-text-secondary)" }}>Plan</dt>
-          <dd className="font-semibold" style={{ color: user.entitlement === "premium" ? "var(--color-premium)" : "var(--color-text-primary)" }}>
-            {user.entitlement === "premium" ? "Pro" : "Free"}
+          <dd className="font-semibold" style={{ color: planOf(user) === "pro" ? "var(--color-premium)" : "var(--color-text-primary)" }}>
+            {planOf(user) === "pro" ? "Pro" : planOf(user) === "free" ? "Free" : "Unavailable"}
           </dd>
         </div>
       </dl>
@@ -80,11 +81,11 @@ function IdentitySection({ user }: { user: MeResponse["user"] }) {
 }
 
 function BillingSection({
-  entitlement,
+  plan,
   trialEndsAt,
   onOpenBillingPortal,
 }: {
-  entitlement: MeResponse["user"]["entitlement"];
+  plan: Plan;
   trialEndsAt?: string;
   onOpenBillingPortal: () => Promise<void>;
 }) {
@@ -94,7 +95,7 @@ function BillingSection({
   return (
     <section className="glass-surface p-4 flex flex-col gap-3" aria-labelledby="account-billing-heading">
       <SectionHeading id="account-billing-heading">Billing</SectionHeading>
-      {entitlement === "premium" ? (
+      {plan === "pro" ? (
         <>
           {trialEndLabel(trialEndsAt) ? (
             <p
@@ -127,6 +128,10 @@ function BillingSection({
             {busy ? "Opening…" : "Manage Billing"}
           </Button>
         </>
+      ) : plan === "unknown" ? (
+        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          We could not confirm your plan right now. Refresh in a moment; nothing about your subscription has changed.
+        </p>
       ) : (
         <>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
@@ -455,7 +460,7 @@ export function AccountContent({
       </header>
 
       <IdentitySection user={user} />
-      <BillingSection entitlement={user.entitlement} trialEndsAt={user.trial_ends_at} onOpenBillingPortal={onOpenBillingPortal} />
+      <BillingSection plan={planOf(user)} trialEndsAt={user.trial_ends_at} onOpenBillingPortal={onOpenBillingPortal} />
       <SavedLeaguesSection />
       <ReferralCard referral={referral} error={referralError} onRetry={onRetryReferral} />
       <PreferencesSection

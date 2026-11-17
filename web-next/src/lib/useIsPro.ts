@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import { isProOrNull } from "@/lib/plan";
 
 // One /v1/me read per signed-in user for the whole tab: the nav (orb and
 // sidebar) and anything else that only needs "is this person on Pro?" share
@@ -14,7 +15,7 @@ function loadIsPro(userId: string): Promise<boolean | null> {
   if (cache?.userId !== userId) {
     const promise = api
       .getMe()
-      .then((me) => (me.user.profile_status === "ok" ? me.user.entitlement === "premium" : null))
+      .then((me) => isProOrNull(me.user))
       .catch(() => {
         // Do not pin a failed read for the rest of the tab.
         if (cache?.promise === promise) cache = null;

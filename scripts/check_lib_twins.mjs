@@ -126,6 +126,7 @@ export const IDENTICAL = [
 
 // Same code, differing only in comments / import specifiers / quote style.
 export const MIRRORED = [
+  "plan.ts", // the one client Pro answer (planOf)
   "usePresence.ts",
   "waiverGroups.ts", // imports ./money (mobile needs the .ts extension for node strip-types tests)
   "pickBadge.ts",
