@@ -113,7 +113,7 @@ def test_the_depth_response_is_capped_and_a_quarterback_class_is_not_tapered():
 def test_a_rookie_v_0_save_builds_the_class_it_always_did():
     """The pool of a save without rookie_v is byte-for-byte what origin/main built before rookie_v existed."""
 
-    assert _digest(_root(3, 0), 4) == "d92d072e4e4053f2"
+    assert _digest(_root(3, 0, stability_v=2), 4) == "d92d072e4e4053f2"  # (a save made while stability_v 2 was current)
     assert _digest(_root(3, 1), 1) == _digest(_root(3, 0), 1)  # season 1 is the real pool
     assert _digest(_root(3, 1), 2) != _digest(_root(3, 0), 2)
 

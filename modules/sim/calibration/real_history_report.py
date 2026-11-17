@@ -16,7 +16,7 @@ Compared, sim vs real, by position (QB/RB/WR/TE) and by the player's finish (ppg
 * ``games``      games missed among last year's top-N (QB 12, RB 24, WR 36, TE 12), age <= 31: mean share missed, share with < 8 games.
 * ``scarcity``   ppg of the position's rank-k finisher (k = 1, 6, 12, 24, 36).
 
-Configurations compared on the sim side: the current default for new games (player-model-8 + stability_v 2 + rookie_v 1), the same with
+Configurations compared on the sim side: the current default for new games (player-model-8 + stability_v 3 + rookie_v 1), the same with stability_v 2 (the previous default), with
 ``rookie_v`` 0, with ``stability_v`` 1 / ``rookie_v`` 0, with the star terms off (player-model-7 behaviour), and a legacy save (stability_v 0 / rookie_v 0).
 """
 
@@ -37,6 +37,7 @@ AGE_BUCKETS = ((0, 24), (25, 26), (27, 28), (29, 30), (31, 99))
 TOPN = {"QB": 12, "RB": 24, "WR": 36, "TE": 12}
 CONFIGS = {
     "model-8 default": {},
+    "stability_v 2 (previous default)": {"stability_v": 2},
     "rookie_v 0": {"rookie_v": 0},
     "stability_v 1, rookie_v 0": {"stability_v": 1, "rookie_v": 0},
     "legacy (stability_v 0, rookie_v 0)": {"stability_v": 0, "rookie_v": 0},
