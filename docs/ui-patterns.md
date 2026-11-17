@@ -1373,3 +1373,15 @@ modules of one page emit the same fact.
 | Today | This season / Long term / Starters / Bench / Age | "My Team" module | tiles carry standing (record rank), not power rank |
 
 To add a fact, add it to `PAGE_FACT_OWNERS` under its owner; a second owner makes the test fail.
+
+## New-user smoke (CI job `new-user-smoke`)
+
+`scripts/sim_layout_playwright/new_user_smoke.mjs` walks the first-run journey at 390px against the production build with every API mocked (no Sleeper, Supabase or Stripe, no secrets): signed-out landing and sample league, connect a Sleeper username -> `/dashboard/<id>` Today, a stubbed signed-in account through onboarding, the free no-league state ("No saved league yet", Connect + Sample), bare `/dashboard` redirects, and Pro vs Free through `planOf()` (GM Plan module vs paywall, Account plan label). Every step fails on console errors, "Something went wrong", sideways scroll, or a first module past 110px (app pages; landing/onboarding/sample are exempt like `TOP_EXEMPT` in `module_scan.mjs`). Waits are on selectors; the run takes about 10s plus the build. The mobile half is `mobile/src/lib/newUserJourney.test.ts` (no headless RN render exists, so it walks the shared first-run state machine and checks the screens stay wired to it).
+
+Run locally: build and `npx next start -p 3232` in `web-next/` with `NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=x NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`, then `PW_CORE=.../playwright-core/index.mjs BASE=http://localhost:3232 node scripts/sim_layout_playwright/new_user_smoke.mjs` (`CHROME=<path>` to use a specific browser; screenshots land in `OUT`).
+
+Updating fixtures:
+- All payloads live in `new_user_fixtures.mjs`. League endpoints (`FIX`) are copied from `module_scan.mjs`; when an endpoint's response shape changes, change both.
+- `/v1/me` (`me(entitlement)`) must keep `profile_status: "ok"`, or `planOf()` reports "unknown" and the page shows "Unavailable".
+- The mocked API answers unknown paths with `{}`; the smoke logs them as `unmocked API paths`. If a new Today module crashes on `{}`, add its endpoint to the fixtures (or the handler in `new_user_smoke.mjs`) rather than loosening a check.
+- Changed onboarding copy or test ids: update the selectors at the top of each scenario, not the assertions.
