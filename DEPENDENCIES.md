@@ -21,7 +21,7 @@ Every third-party SDK/service this codebase actually calls at runtime — cross-
 
 Confirmed absent by direct code audit (worth recording so a future addition gets flagged instead of assumed-fine by omission):
 
-- No crash reporting / error tracking SDK (no Sentry, Bugsnag, Crashlytics)
+- Crash reporting: Sentry is present (`@sentry/react-native`, `@sentry/browser`, backend `SENTRY_DSN`, inert unless a DSN is supplied); no Bugsnag or Crashlytics. See `docs/audits/2026-11-dependency-and-freshness.md`.
 - No session-replay or keystroke-capture tool (Hotjar, FullStory, LogRocket, PostHog, Microsoft Clarity, Smartlook, Mouseflow)
 - No analytics SDK (Firebase Analytics, Mixpanel, Amplitude, Segment, AppsFlyer)
 - No third-party chat widget (Intercom, Drift, Crisp)

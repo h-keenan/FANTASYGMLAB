@@ -775,7 +775,22 @@ def read_stats_manifest(cache_path: str) -> Dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def _write_stats_manifest(cache_path: str, season: int, requested: Iterable[int], obtained: Iterable[int]) -> None:
+# A completed regular-season week has several hundred players with a ``gp``; a payload far
+# below this is a truncated / garbage response that "succeeded". Bye-heavy weeks still clear it.
+MIN_PLAYED_ROWS_PER_COMPLETED_WEEK = 150
+
+
+def _week_played_counts(payloads: Iterable[Any]) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for item in payloads:
+        if isinstance(item, tuple) and len(item) == 2 and isinstance(item[1], dict):
+            counts[str(int(item[0]))] = sum(1 for v in item[1].values() if isinstance(v, dict) and v.get("gp"))
+    return counts
+
+
+def _write_stats_manifest(
+    cache_path: str, season: int, requested: Iterable[int], obtained: Iterable[int], played_counts: Dict[str, int] | None = None
+) -> None:
     got = sorted({int(w) for w in obtained})
     manifest = {
         "schema": STATS_MANIFEST_SCHEMA,
@@ -783,6 +798,7 @@ def _write_stats_manifest(cache_path: str, season: int, requested: Iterable[int]
         "built_at": time.time(),
         "weeks_ok": got,
         "weeks_failed": sorted({int(w) for w in requested} - set(got)),
+        "week_played_counts": played_counts or {},
     }
     try:
         tmp_path = f"{stats_manifest_path(cache_path)}.{os.getpid()}.{threading.get_ident()}.tmp"
@@ -818,7 +834,10 @@ def season_stats_completeness(season: int | None = None) -> Dict[str, Any]:
     if manifest is None or int(manifest.get("schema") or 0) < STATS_MANIFEST_SCHEMA:
         return {"season": selected, "status": "unverified", "expected_through": expected, "missing_weeks": [], "age_seconds": age}
     missing = missing_expected_weeks(selected, manifest)
-    return {"season": selected, "status": "incomplete" if missing else "complete", "expected_through": expected, "missing_weeks": missing, "age_seconds": age}
+    counts = manifest.get("week_played_counts") or {}
+    # Completed weeks only (the current one is still filling); only judged when counts were recorded.
+    suspect = [w for w in range(1, expected) if str(w) in counts and int(counts[str(w)]) < MIN_PLAYED_ROWS_PER_COMPLETED_WEEK]
+    return {"season": selected, "status": "incomplete" if missing else "complete", "expected_through": expected, "missing_weeks": missing, "suspect_weeks": suspect, "age_seconds": age}
 
 
 def _stats_cache_needs_rebuild(cache_path: str, selected_season: int) -> bool:
@@ -989,7 +1008,7 @@ def _rebuild_season_player_stats(
             with open(tmp_path, "w", encoding="utf-8") as handle:
                 json.dump(aggregated, handle)
             os.replace(tmp_path, cache_path)  # atomic: other workers never read a half-written file
-            _write_stats_manifest(cache_path, selected_season, requested_weeks, obtained_weeks)
+            _write_stats_manifest(cache_path, selected_season, requested_weeks, obtained_weeks, _week_played_counts(weekly_payloads))
             fresh_mtime_ns = os.stat(cache_path).st_mtime_ns
             with _season_stats_memo_lock:
                 _season_stats_memo[cache_path] = aggregated
@@ -1185,7 +1204,16 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                 return _last_known_or_none()
 
             if response.status_code == 200:
-                payload = response.json()
+                try:
+                    payload = response.json()
+                except ValueError:
+                    # A 200 with a non-JSON body (maintenance page, proxy error): garbage,
+                    # not data. Same treatment as a failed call; never raise into a request.
+                    cache_status = "garbage"
+                    return _last_known_or_none()
+                if payload is None:
+                    cache_status = "garbage"
+                    return _last_known_or_none()
                 sleeper_budget.remember(url, payload)
                 return payload
             if response.status_code in _RETRYABLE_STATUS_CODES and attempt < retries:

@@ -236,6 +236,25 @@ def run_public_checks(now: datetime, get: Callable = http_get) -> tuple[list[Res
     return out, build
 
 
+def run_freshness_checks(get: Callable = http_get) -> list[Result]:
+    """One check per dataset from the API's own completeness / staleness report."""
+
+    status, body, _ = get(f"{API_BASE}/v1/public/data-freshness")
+    report = json_or_none(body) if status == 200 else None
+    if not isinstance(report, dict) or not isinstance(report.get("datasets"), list):
+        return [result("data_freshness", "fail", f"HTTP {status or 'no response'} or unexpected body")]
+    out: list[Result] = []
+    for row in report["datasets"]:
+        if not isinstance(row, dict):
+            continue
+        state = {"ok": "ok", "warn": "ok", "fail": "fail"}.get(str(row.get("status")), "fail")
+        detail = str(row.get("detail") or "")
+        if row.get("status") == "warn":
+            detail = f"warning: {detail}"
+        out.append(result(f"data_{row.get('name')}", state, detail))
+    return out
+
+
 def run_tls_checks(now: datetime, cert_fn: Callable[[str], str | None] = tls_not_after) -> list[Result]:
     out: list[Result] = []
     for base in (APP_BASE, API_BASE):
@@ -318,6 +337,7 @@ def run_github_checks(now: datetime, build: str, get: Callable = http_get) -> li
 def run_all(now: datetime | None = None) -> list[Result]:
     now = now or datetime.now(timezone.utc)
     results, build = run_public_checks(now)
+    results += run_freshness_checks()
     results += run_tls_checks(now)
     results += run_supabase_checks(now)
     results += run_github_checks(now, build)
