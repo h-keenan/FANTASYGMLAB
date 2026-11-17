@@ -25,6 +25,7 @@ import {
 } from "@/lib/idpPresentation";
 import { PickRow, draftPickRowProps } from "@/components/PickRow";
 import { ViewTabs } from "@/components/ui/ViewTabs";
+import { ExpandingSearch } from "@/components/ui/ExpandingSearch";
 import { PageControlsRow } from "@/components/ui/PageControls";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { picksSummaryParts } from "@/lib/playersModules";
@@ -223,6 +224,7 @@ export function PlayersContent({
   const showProspectsTab = collegeInterest !== "off" || initialTab === "prospects";
   const tab: PlayersTab = selectedTab === "prospects" && showProspectsTab ? "prospects" : "players";
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [position, setPosition] = useState("ALL");
   const [ageFilter, setAgeFilter] = useState<PlayersAgeFilter>("ALL");
   const [statusFilter, setStatusFilter] = useState<PlayersStatusFilter>("ALL");
@@ -338,7 +340,7 @@ export function PlayersContent({
           consolidation; hidden when the college-football preference is off, unless a link opened it) plus, on Players, search and
           the one Filters button (position, age, status, health, roster, sort). The first player row starts <= 110px under the nav. */}
       <PageControlsRow testId="players-controls">
-        {showProspectsTab ? (
+        {showProspectsTab && !(tab === "players" && searchOpen) ? (
           <ViewTabs
             label="Players section"
             className="shrink-0"
@@ -356,15 +358,8 @@ export function PlayersContent({
         ) : null}
         {tab === "players" ? (
           <>
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search"
-              aria-label="Search players"
-              className="filter-input min-w-0 flex-1 px-3 py-2 text-sm"
-            />
-            <FilterSheet
+            <ExpandingSearch value={search} onChange={setSearch} open={searchOpen} onOpenChange={setSearchOpen} label="Search players" placeholder="Search players" />
+            {searchOpen ? null : <FilterSheet
               groups={filterGroups}
               values={filterValues}
               resultCount={filterResultCount}
@@ -380,7 +375,7 @@ export function PlayersContent({
                 setSortKey(singleValue(filterGroups[5], next));
                 setSortMode(singleValue(filterGroups[6], next) as PlayersSortMode);
               }}
-            />
+            />}
           </>
         ) : null}
       </PageControlsRow>

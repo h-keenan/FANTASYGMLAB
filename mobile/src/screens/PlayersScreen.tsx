@@ -4,8 +4,8 @@ import { ReSettle } from '../components/Motion';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import GlassCard from '../components/GlassCard';
-import Input from '../components/Input';
 import PageFamilyTabs from '../components/PageFamilyTabs';
+import ExpandingSearch from '../components/ExpandingSearch';
 import PageControlRow, { ViewTabs } from '../components/PageControlRow';
 import CollegeScoutingPanel from '../components/CollegeScoutingPanel';
 import { needPositionsFrom, type ScoutingLens } from '../lib/scoutingLens';
@@ -290,6 +290,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>('ALL');
   const [search, setSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [players, setPlayers] = useState<RankedPlayer[] | null>(null);
   const [idp, setIdp] = useState<LeagueIdpValuesResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -447,9 +448,9 @@ export default function PlayersScreen({ route, navigation }: Props) {
       <>
       <View style={styles.controls}>
         <PageControlRow testID="players-controls">
-          {viewSelect}
-          <Input style={styles.search} placeholder="Search players" value={search} onChangeText={setSearch} autoCapitalize="none" accessibilityLabel="Search players" />
-          <FilterSheet
+          {searchOpen ? null : viewSelect}
+          <ExpandingSearch value={search} onChange={setSearch} open={searchOpen} onOpenChange={setSearchOpen} label="Search players" placeholder="Search players" />
+          {searchOpen ? null : <FilterSheet
             groups={filterGroups}
             values={filterValues}
             showChips={false}
@@ -461,7 +462,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
               setAvailabilityFilter(singleValue(filterGroups[3], next) as AvailabilityFilter);
               setViewMode(singleValue(filterGroups[4], next) as 'list' | 'grid');
             }}
-          />
+          />}
         </PageControlRow>
       </View>
       {error ? <ErrorState compact title="Couldn't load players" message={error} onRetry={() => setReloadToken((n) => n + 1)} /> : null}
@@ -558,7 +559,6 @@ function createStyles(colors: ThemeColors) {
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: 'transparent' },
   controls: { paddingHorizontal: spacing.lg },
-  search: { flex: 1, minWidth: 0, fontSize: 15 },
   prospectsContent: { paddingHorizontal: spacing.lg },
   discoveryCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
   // Position/Age/Status/Availability now render as one wrapping row of

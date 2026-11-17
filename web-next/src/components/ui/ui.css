@@ -665,6 +665,9 @@
   --bar-orb-gap: 4px;
   --bar-tab-height: 52px;
   --bar-header-height: 52px;
+  /* The ONE footer pill glass (Today / Players / Sim alike): opaque enough that list text behind never reads through the labels. */
+  --pill-glass-bg: linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 96%, transparent), color-mix(in srgb, var(--color-bg) 97%, transparent));
+  --pill-glass-blur: blur(28px) saturate(180%);
 }
 .bottom-stack {
   /* Inline fallback (before hydration, md+): sticky at the end of the column. On phones BottomDock portals it to <body> and
@@ -821,10 +824,9 @@ html[data-footer-hidden] .bottom-stack[data-dock="fixed"]:not(:focus-within):not
    two chromes match. Still inside the in-flow sticky .bottom-stack: the pill is margin inside the stack, never fixed. */
 .bottom-tab-bar {
   /* Frosted glass over the page background: translucent surface tint, strong blur, a lit top hairline, a soft shadow. */
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 46%, transparent), color-mix(in srgb, var(--color-bg) 70%, transparent));
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  backdrop-filter: blur(24px) saturate(180%);
+  background: var(--pill-glass-bg);
+  -webkit-backdrop-filter: var(--pill-glass-blur);
+  backdrop-filter: var(--pill-glass-blur);
   border: var(--border-width-default) solid var(--glass-border, var(--color-border));
   border-radius: 999px;
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), 0 6px 24px color-mix(in srgb, #000 40%, transparent), 0 0 20px color-mix(in srgb, var(--color-accent) 8%, transparent);
@@ -917,9 +919,9 @@ html[data-footer-hidden] .bottom-stack[data-dock="fixed"]:not(:focus-within):not
 .action-pill {
     margin: 0 var(--bar-side-inset) var(--bar-pill-bottom-gap);
     /* Same frosted glass as .bottom-tab-bar so the site shell and Fantasy Sim footers match. */
-    background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 46%, transparent), color-mix(in srgb, var(--color-bg) 70%, transparent));
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    backdrop-filter: blur(24px) saturate(180%);
+    background: var(--pill-glass-bg);
+    -webkit-backdrop-filter: var(--pill-glass-blur);
+    backdrop-filter: var(--pill-glass-blur);
     border: 1px solid var(--glass-border, var(--color-border));
     border-radius: 28px;
     box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), 0 6px 24px color-mix(in srgb, #000 40%, transparent), 0 0 20px color-mix(in srgb, var(--color-accent) 8%, transparent);

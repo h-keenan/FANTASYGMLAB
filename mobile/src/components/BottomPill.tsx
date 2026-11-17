@@ -133,12 +133,13 @@ export default function BottomPill({ children, segment: rawContext, orb, style, 
 function createStyles(colors: ThemeColors) {
   const target = BAR_METRICS.buttonMinHeight;
   return StyleSheet.create({
-    // Frosted capsule (no live blur, same as the app's glass cards): translucent fill, lit rim.
+    // Frosted capsule: the app has no live blur, so the fill is the solid elevated surface (web's --pill-glass-bg is 90%+ opaque);
+    // a translucent fill let list text read through the labels.
     pill: {
       borderRadius: 28,
       borderWidth: 1,
       borderColor: colors.glassBorder,
-      backgroundColor: colors.glass,
+      backgroundColor: colors.backgroundElevated,
       paddingHorizontal: BAR_METRICS.pillPadding,
       paddingVertical: BAR_METRICS.pillPadding,
       shadowColor: '#000',

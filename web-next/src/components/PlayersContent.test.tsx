@@ -94,6 +94,7 @@ describe("PlayersContent", () => {
   it("filters by search text", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Search players" }));
     fireEvent.change(screen.getByLabelText("Search players"), { target: { value: "beta" } });
 
     expect(screen.getByText("Beta Back")).toBeInTheDocument();
@@ -121,6 +122,7 @@ describe("PlayersContent", () => {
   it("shows the empty-filter message when nothing matches", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Search players" }));
     fireEvent.change(screen.getByLabelText("Search players"), { target: { value: "nonexistent" } });
 
     expect(screen.getByText("No players match")).toBeInTheDocument();
@@ -353,7 +355,7 @@ describe("PlayersContent", () => {
   it("folds the controls into one row: view select + search + Filters (position and sort live in the sheet)", () => {
     const { container } = render(<PlayersContent leagueId="L1" leagueName="Test League" data={DATA} rosters={[{ players: ["p1"] }]} />);
     const row = screen.getByTestId("players-controls");
-    expect(within(row).getByPlaceholderText("Search")).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Search players" })).toBeInTheDocument(); // collapsed: a 44px icon, never a squeezed field
     expect(within(row).getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
     // The Players / Prospects view is compact tabs (no select on the page); Sort moved into the sheet.
     expect(container.querySelectorAll("select")).toHaveLength(0);

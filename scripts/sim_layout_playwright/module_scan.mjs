@@ -464,7 +464,21 @@ for (const w of WIDTHS) {
         await opener.dispatchEvent("click", undefined, { timeout: 8000 }).catch((e) => console.log(`sheet opener (${SHEET}) not found: ${String(e).slice(0, 80)}`));
         await sleep(900);
         await page.screenshot({ path: `${OUT}/${r.name}-${SHEET}-${w}.png`, fullPage: false });
-      } else await page.screenshot({ path: `${OUT}/${r.name}-${w}.png`, fullPage: FULL });
+      } else {
+        await page.screenshot({ path: `${OUT}/${r.name}-${w}.png`, fullPage: FULL });
+        // SHOT_SCROLL=<px>: also save the page scrolled down (the footer pill over content) as <route>-scrolled-<w>.png; SHOT_CLICK=<css>: click it first and save <route>-clicked-<w>.png.
+        if (process.env.SHOT_SCROLL) {
+          await page.evaluate((y) => window.scrollTo(0, y), Number(process.env.SHOT_SCROLL)).catch(() => {});
+          await sleep(900);
+          await page.screenshot({ path: `${OUT}/${r.name}-scrolled-${w}.png`, fullPage: false });
+          await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+        }
+        if (process.env.SHOT_CLICK) {
+          await page.locator(process.env.SHOT_CLICK).first().click({ timeout: 5000 }).catch(() => {});
+          await sleep(500);
+          await page.screenshot({ path: `${OUT}/${r.name}-clicked-${w}.png`, fullPage: false });
+        }
+      }
     } catch (e) {
       results.push({ page: r.name, width: w, error: String(e).slice(0, 160) });
     }
