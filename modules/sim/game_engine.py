@@ -302,7 +302,9 @@ def _resolve_waivers(em: Emitter, snap: GameSnapshot, state: GameState, seed: in
     claims: dict[str, list[dict[str, Any]]] = {t: [] for t in snap.tids}
     for c in state.claims:
         claims[c["team"]].append(dict(c))
-    claimed = {c["add"] for cs in claims.values() for c in cs}
+    # wire_v 1: the AI wants the free agents it wants whether or not the user queued them, and the claims below settle in waiver order.
+    # Before it, the AI stepped around the user's targets, so the user won every contest whatever the priority.
+    claimed = set() if snap.settings.wire_v >= 1 else {c["add"] for cs in claims.values() for c in cs}
     for tid in waiver_order(snap, state):
         if snap.team(tid).is_user:
             continue

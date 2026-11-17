@@ -315,6 +315,26 @@ None in the sim engine. The nearest is an exploit (P1-1).
 Outputs vs the real panel (ppg at rank, 8+ games; panel mean of 2022-25): RB and WR match within noise in all seasons. QB12 is 13 percent low (the 33-QB harness pool), TE1 12 percent and
 TE12 10 percent low. Kicker spread is too steep (K1 +1.4, K12 -0.8; K1 to K12 5.0 ppg sim against 2.8 real), a player-model topic left alone here.
 
+## Sim P1 batch (owner approved 2026-11-16): `wire_v`, `need_v`, `cap_v`, `posture_v`
+
+Harness: `python -m modules.sim.calibration.realism_p1_report <table> --seeds 8 [--flags '{"wire_v": 0}']` (12-team redraft on the committed 2025 panel pool, user slot rotating, seeds 1-8).
+
+### `wire_v 1`: the waiver wire is contested (delivered, upgradable, week boundary)
+
+`_resolve_waivers` seeded the AI's excluded set with every player the user had queued, so the AI never wanted the user's targets and the user won every contest whatever the priority. With `wire_v 1` the AI
+generates its claims exactly as before (same persona gate, same need and roster-value scoring) but ignores the user's queue, and all claims, the user's included, settle in waiver order (worst record first, so priority
+rotates with the standings). The sim has no FAAB budget, so priority is the only resolver. An AI that loses a contest simply does not get the player (the old AI-versus-AI de-duplication is unchanged). Old saves keep the old
+path: three redraft seasons replay to pinned digests in `tests/test_sim_wire_v.py`.
+
+User queues the three most valuable free agents every week (312 claims over 8 seeds):
+
+| | `wire_v 0` | `wire_v 1` |
+| --- | --- | --- |
+| User claim win rate | 100% | 80.1% |
+| ... when the user has a top-half priority | 100% | 88.7% |
+| ... when the user has a bottom-half priority | 100% | 51.4% |
+| AI claims placed per game (won or lost) | 56.6 | 71.6 |
+
 ## Decisions needed (product)
 1. Ship the late-career age curve and a lower `REVERSION` (`stability_v 2`)? Done as an upgradable offseason change (it changes dynasty values for 27+ players, so it is not silent); the owner may still veto the Realism update copy.
 2. Cap rookie class strength (`rookie_v 1`)? Done as an upgradable offseason change (it lowers rookie pick values and the top of the draft board; real classes are far less top-heavy); the owner may still veto the Realism update copy.
