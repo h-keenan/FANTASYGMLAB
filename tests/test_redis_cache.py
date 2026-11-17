@@ -160,3 +160,35 @@ def test_set_redis_client_for_testing_overrides_env_derived_client(monkeypatch):
 
     monkeypatch.setenv("REDIS_URL", "redis://still-unused:6379/0")
     assert redis_cache.get_redis_client() is fake
+
+
+def test_caller_whose_first_read_predates_another_callers_store_does_not_recompute():
+    """Deterministic replay of the interleaving behind the flaky single-flight tests: caller B reads the
+    cache (miss), then caller A stores its result and releases the lock, then B wins the (now free) lock.
+    B must re-read the cache under the lock instead of computing a second time."""
+
+    import pickle
+
+    real = redis_cache.get_redis_client()
+
+    class StaleFirstRead:
+        def __init__(self):
+            self.reads = 0
+
+        def __getattr__(self, name):
+            return getattr(real, name)
+
+        def get(self, key):
+            self.reads += 1
+            if self.reads == 1:
+                real.set(key, pickle.dumps({"from": "A"}), ex=30)  # A finishes right after B's stale read
+                return None
+            return real.get(key)
+
+    redis_cache.set_redis_client_for_testing(StaleFirstRead())
+    calls = []
+    out = redis_cache.redis_single_flight_cache(
+        cache_key="k-stale", ttl_seconds=30, compute=lambda: calls.append(1) or {"from": "B"}
+    )
+    assert calls == []
+    assert out == {"from": "A"}

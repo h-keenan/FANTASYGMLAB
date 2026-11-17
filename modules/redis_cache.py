@@ -251,6 +251,18 @@ def redis_single_flight_cache(
 
         if acquired:
             try:
+                # Double-checked locking: the first read above can predate another caller's
+                # store-then-release. That caller's lock is gone by now, so we win it here and,
+                # without this re-read, would run `compute` a second time.
+                try:
+                    recheck = _read_cached()
+                except redis_exceptions.RedisError:
+                    recheck = None
+                if recheck is not None:
+                    try:
+                        return pickle.loads(recheck)
+                    except Exception:
+                        logger.exception("Corrupt cached entry for %s; recomputing.", cache_key)
                 result = compute()
                 # Cache write happens WHILE we still hold the lock, not
                 # after releasing it: releasing first would open a window

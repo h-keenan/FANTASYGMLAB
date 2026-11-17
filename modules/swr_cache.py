@@ -143,6 +143,14 @@ def redis_swr_cache(
             return compute()
         if acquired:
             try:
+                # Double-checked locking: the read above can predate another caller's store-then-release; that
+                # caller's lock is gone, so we win it here and must re-read before computing a second time.
+                try:
+                    recheck = _decode(client.get(cache_key))
+                except redis_exceptions.RedisError:
+                    recheck = None
+                if recheck is not None:
+                    return recheck[1]
                 result = compute()
                 _store(client, cache_key, result, stale_ttl_seconds, clock())
             finally:
