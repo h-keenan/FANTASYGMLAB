@@ -49,7 +49,8 @@ describe("SimRecentStrip (recent picks in the pinned clock area)", () => {
     render(<SimRecentStrip cards={[card(7, "Jahmyr Gibbs", "RB", "Dynasty Dogs", "A-"), card(6, "Zay Flowers", "WR", "Rivals", null)]} onOpenPlayer={onOpen} onFullBoard={onBoard} />);
     expect(screen.getAllByTestId("recent-pick-card")).toHaveLength(2);
     expect(screen.getAllByTestId("player-avatar-slot")).toHaveLength(2);
-    expect(screen.getAllByTestId("sim-team-identity")).toHaveLength(2);
+    expect(screen.getAllByTestId("recent-pick-card")[0]).toHaveTextContent("#7 Dogs");
+    expect(screen.getAllByTestId("recent-pick-card")[0]).toHaveTextContent("J. Gibbs");
     expect(screen.getAllByTestId("letter-grade")).toHaveLength(1);
     fireEvent.click(screen.getByLabelText("Pick 7: Jahmyr Gibbs"));
     expect(onOpen).toHaveBeenCalledTimes(1);

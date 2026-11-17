@@ -1,5 +1,6 @@
 import React, { useMemo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -53,6 +54,7 @@ export function TeamSheetFrame({
   tag,
   chips,
   managedBy,
+  managerIsAi = false,
   tabs,
 }: {
   id: string;
@@ -63,6 +65,8 @@ export function TeamSheetFrame({
   tag?: ReactNode;
   chips: TeamSheetChip[];
   managedBy?: string | null;
+  /** The manager is an AI: draws the small bot mark (lib/simManagerLabel.ts). */
+  managerIsAi?: boolean;
   tabs: TeamSheetTab[];
 }) {
   const { colors } = useThemeMode();
@@ -81,7 +85,12 @@ export function TeamSheetFrame({
               <ToneBadge key={c.label} label={c.label} color={toneColor(c.tone, colors)} size="xs" />
             ))}
           </View>
-          {managedBy ? <AppText style={styles.muted}>Managed by {managedBy}</AppText> : null}
+          {managedBy ? (
+            <View style={styles.managed} testID="team-sheet-manager">
+              <AppText style={styles.muted}>Managed by {managedBy}</AppText>
+              {managerIsAi ? <Ionicons name="hardware-chip-outline" size={14} color={colors.textTertiary} accessibilityLabel="AI manager" /> : null}
+            </View>
+          ) : null}
         </View>
       </View>
       <Tabs id={id} tabs={tabs} />
@@ -166,6 +175,7 @@ function createStyles(colors: ThemeColors) {
     grow: { flex: 1, minWidth: 0, gap: 4 },
     wrapRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
     title: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
+    managed: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     muted: { fontSize: 13.5, color: colors.textSecondary },
     small: { fontSize: 14, color: colors.textSecondary },
     facts: { flexDirection: 'row', gap: spacing.sm },

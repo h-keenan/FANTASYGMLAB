@@ -24,7 +24,8 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
   const styles = useMemo(() => createStyles(colors), [colors]);
   const you = game.you;
   const season = simCompactSeason(game.dynasty);
-  const showTeam = Boolean(you) && game.phase !== 'draft';
+  const drafting = game.phase === 'draft';
+  const showTeam = Boolean(you) && !drafting;
   return (
     <View style={styles.wrap} testID="sim-game-header">
       <View style={styles.bar}>
@@ -42,6 +43,9 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
             <SimTeamLogo name={you.name} size='chip' />
             <AppText style={styles.chipName}>{you.name}</AppText>
           </Pressable>
+        ) : drafting ? (
+          // The draft room's immersive minimal chrome: back + title on ONE line, no ribbon row under it.
+          <AppText style={[styles.week, { color: colors.accent }]} testID="game-heading">{simCompactWeek(game)}</AppText>
         ) : (
           <View style={styles.spacer} />
         )}
@@ -54,7 +58,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
         </Pressable>
       </View>
       {/* The glanceable ribbon (UI pass 7): week, season, record. One 52px row above it, like the Desk header. */}
-      <View style={styles.ribbon}>
+      {drafting ? null : <View style={styles.ribbon}>
         <View style={[styles.ribbonChip, { borderColor: colors.accent }]}>
           <AppText style={[styles.ribbonText, { color: colors.accent }]} testID="game-heading">{simCompactWeek(game)}</AppText>
         </View>
@@ -68,7 +72,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
             <AppText style={styles.ribbonText}>{simFmtRecord(you)}</AppText>
           </View>
         ) : null}
-      </View>
+      </View>}
     </View>
   );
 }

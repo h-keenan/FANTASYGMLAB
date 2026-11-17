@@ -45,6 +45,7 @@ export function TeamSheetFrame({
   tag,
   chips,
   managedBy,
+  managerIsAi = false,
   tabs,
 }: {
   id: string;
@@ -56,6 +57,8 @@ export function TeamSheetFrame({
   tag?: ReactNode;
   chips: TeamSheetChip[];
   managedBy?: string | null;
+  /** The manager is an AI: draws the small bot mark (lib/simManagerLabel.ts). */
+  managerIsAi?: boolean;
   tabs: TeamSheetTab[];
 }) {
   return (
@@ -70,7 +73,18 @@ export function TeamSheetFrame({
               <ToneBadge key={c.label} label={c.label} color={TONE_COLOR[c.tone]} size="xs" />
             ))}
           </div>
-          {managedBy ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Managed by {managedBy}</p> : null}
+          {managedBy ? (
+            <p className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="team-sheet-manager">
+              Managed by{" "}
+              {managerIsAi ? (
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="AI manager">
+                  <rect x="4" y="8" width="16" height="12" rx="3" />
+                  <path d="M12 4v4M9 13h.01M15 13h.01" />
+                </svg>
+              ) : null}
+              {managedBy}
+            </p>
+          ) : null}
         </div>
       </header>
       <Tabs id={id} ariaLabel="Team sections" tabs={tabs} />

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
 import { Collapse } from "@/components/ui/Presence";
 import { PositionBadge } from "@/components/PositionBadge";
+import { positionColorVar } from "@/lib/playerPresentation";
 import { simDraftRosterStrip } from "@/lib/simDraft";
 import { simHeadshotId, type SimGamePlayer, type SimSlot } from "@/lib/simGame";
 
@@ -19,42 +20,39 @@ const AVATAR = 28; // the dense avatar tier
 export function SimRosterStrip({ roster, slots, rosterLimit, bench, onOpen }: { roster: readonly SimGamePlayer[]; slots: readonly SimSlot[]; rosterLimit: number; bench?: number | null; onOpen: (player: SimGamePlayer) => void }) {
   const [open, setOpen] = useState(false);
   const strip = simDraftRosterStrip(roster, slots, rosterLimit, bench);
+  const needs = [...new Set(strip.slots.filter((c) => c.need).map((c) => c.label))];
   if (strip.slots.length === 0) return null;
   const toggle = () => setOpen((v) => !v);
   return (
     <div className="flex flex-col gap-1" data-testid="roster-strip">
-      <button type="button" onClick={toggle} aria-expanded={open} className="flex items-center justify-between gap-2" style={{ minHeight: "var(--touch-target-min)", color: "inherit" }} data-testid="roster-strip-toggle">
+      <button type="button" onClick={toggle} aria-expanded={open} className="flex items-center gap-2" style={{ minHeight: "var(--touch-target-min)", color: "inherit" }} data-testid="roster-strip-toggle">
         <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Your roster</span>
+        <span className="flex flex-1 flex-wrap items-center gap-1" data-testid="roster-strip-needs" aria-label={`Needs: ${needs.join(", ")}`}>
+          {needs.slice(0, 3).map((pos) => (
+            <span key={pos} className="px-1.5 text-[0.6875rem] font-extrabold" style={{ color: "var(--color-warning)", borderRadius: "var(--radius-pill)", border: "1px solid color-mix(in srgb, var(--color-warning) 45%, transparent)" }}>
+              {pos}
+            </span>
+          ))}
+          {needs.length > 3 ? <span className="text-[0.6875rem] font-extrabold" style={{ color: "var(--color-warning)" }}>+{needs.length - 3}</span> : null}
+        </span>
         <span className="text-xs font-bold tabular-nums" style={{ color: "var(--color-text-muted)" }} data-testid="roster-strip-bench">
           Bench {strip.bench.have}/{strip.bench.max} {open ? "▴" : "▾"}
         </span>
       </button>
-      <ul className="flex flex-wrap gap-x-2 gap-y-1" aria-label="Starting lineup slots" data-testid="roster-strip-slots">
+      {/* ONE fixed grid: every slot is the same size with the label at the same height, filled or empty, in lineup order on one row. */}
+      <ul className="grid gap-x-1" style={{ gridTemplateColumns: `repeat(${strip.slots.length}, minmax(0, 1fr))` }} aria-label="Starting lineup slots" data-testid="roster-strip-slots">
         {strip.slots.map((cell) => (
-          <li key={cell.key} className="flex flex-col items-center gap-0.5" style={{ width: 36 }} data-testid={cell.player ? "roster-slot-filled" : "roster-slot-empty"} data-need={cell.need ? "true" : undefined}>
+          <li key={cell.key} className="flex flex-col items-center gap-0.5" data-testid={cell.player ? "roster-slot-filled" : "roster-slot-empty"} data-need={cell.need ? "true" : undefined}>
             {cell.player ? (
-              <div className="flex flex-col items-center gap-0.5" aria-label={`${cell.label}: ${cell.player.name}, ${cell.player.pos}`}>
-                <PlayerAvatarSlot player={{ id: cell.player.id, name: cell.player.name, position: cell.player.pos, team: cell.player.team ?? null, headshotId: simHeadshotId(cell.player) }} tier="dense" onOpen={() => onOpen(cell.player!)} />
-                <PositionBadge position={cell.player.pos} />
-              </div>
+              <PlayerAvatarSlot player={{ id: cell.player.id, name: cell.player.name, position: cell.player.pos, team: cell.player.team ?? null, headshotId: simHeadshotId(cell.player) }} tier="dense" onOpen={() => onOpen(cell.player!)} />
             ) : (
-              <button type="button" onClick={toggle} aria-label={`${cell.label} slot empty${cell.need ? ", you need one" : ""}`} className="flex flex-col items-center gap-0.5" style={{ color: "inherit", minHeight: "var(--touch-target-min)" }}>
-                <span
-                  aria-hidden="true"
-                  className="flex items-center justify-center text-[0.6875rem] font-extrabold"
-                  style={{
-                    width: AVATAR,
-                    height: AVATAR,
-                    borderRadius: "50%",
-                    border: `1.5px dashed ${cell.need ? "var(--color-warning)" : "var(--color-border)"}`,
-                    color: cell.need ? "var(--color-warning)" : "var(--color-text-muted)",
-                  }}
-                >
-                  +
-                </span>
-                <span className="text-[0.6875rem] font-extrabold" style={{ color: cell.need ? "var(--color-warning)" : "var(--color-text-muted)" }}>{cell.label}</span>
+              <button type="button" onClick={toggle} aria-label={`${cell.label} slot empty${cell.need ? ", you need one" : ""}`} className="flex items-center justify-center text-[0.6875rem] font-extrabold" style={{ width: AVATAR, height: AVATAR, borderRadius: "50%", border: "1.5px dashed var(--color-warning)", color: "var(--color-warning)" }}>
+                +
               </button>
             )}
+            <span className="text-[0.6875rem] font-extrabold" style={{ color: cell.player ? `var(${positionColorVar(cell.player.pos)})` : "var(--color-warning)" }} aria-label={cell.player ? `${cell.label}: ${cell.player.name}, ${cell.player.pos}` : undefined}>
+              {cell.label}
+            </span>
           </li>
         ))}
       </ul>

@@ -1,20 +1,19 @@
 import { swipeLockProps } from './swipeLock';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import CompactModule from './CompactModule';
 import GlassCard from './GlassCard';
 import PlayerAvatarSlot from './PlayerAvatarSlot';
-import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import { LetterGrade } from './LetterGrade';
 import { MotionIn } from './Motion';
-import { SimTeamIdentity } from './SimTeamIdentity';
 import { Sheet } from './Sheet';
 import { SimDraftGrid } from './SimDraftGrid';
+import { shortPlayerName } from '../lib/playerNameDisplay';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { simDraftMiniBoard, simDraftMiniWindow, simDraftPickChip, simDraftProgress, simDraftRecentPicks, simRookieMiniBoard, simRookieRecentCards, simRookieRecentChips, type SimMiniCell, type SimRecentPickCard, type SimSurvival } from '../lib/simDraft';
+import { simDraftBoardParts, simDraftMiniBoard, simDraftMiniWindow, simDraftPickChip, simTeamNickname, simDraftProgress, simDraftRecentPicks, simRookieMiniBoard, simRookieRecentCards, simRookieRecentChips, type SimMiniCell, type SimRecentPickCard, type SimSurvival } from '../lib/simDraft';
 import type { SimDraftState, SimGamePlayer } from '../lib/simGame';
 import { positionColor, radii, spacing, type ThemeColors } from '../theme';
 
@@ -39,11 +38,7 @@ export function SimDraftOverview({ draft, teams, onFullBoard }: { draft: SimDraf
         id="draft.board"
         title="Draft board"
         defaultOpen
-        parts={[
-          { key: 'n', text: `${progress.made}/${progress.total} picks`, strong: true },
-          last ? { key: 'last', text: `last ${simDraftPickChip(last)}` } : null,
-          { key: 'mine', text: `you ${mine}`, tone: 'accent' },
-        ]}
+        parts={simDraftBoardParts(progress, last ? simDraftPickChip(last) : null, mine)}
       >
         <SimMiniBoard rows={win.rows} from={win.from} to={win.to} />
         <Pressable onPress={onFullBoard} accessibilityRole="button" style={styles.fullLink}>
@@ -85,33 +80,31 @@ export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: Si
         {cards.length === 0 ? (
           <AppText style={styles.muted}>No picks yet. The first ones land here.</AppText>
         ) : (
-          cards.map((card, i) => (
-            <MotionIn key={card.key} index={i} count={cards.length}>
-              <Pressable
-                disabled={!onOpenPlayer}
-                onPress={onOpenPlayer ? () => onOpenPlayer(card) : undefined}
-                accessibilityRole={onOpenPlayer ? 'button' : undefined}
-                accessibilityLabel={card.aria}
-                testID="recent-pick-card"
-              >
-                {/* One fixed layout, the same on every card: pick + team, avatar + name, position + grade. */}
-                <GlassCard radius="md" compact style={[styles.card, card.isYou && { borderColor: colors.accent }]}>
-                  <View style={styles.cardTop}>
-                    <AppText style={styles.pickNo}>{card.pickLabel}</AppText>
-                    {card.teamName ? <SimTeamIdentity name={card.teamName} size="chip" hideName /> : null}
-                  </View>
-                  <View style={styles.cardPlayer} testID="recent-pick-player">
-                    <PlayerAvatarSlot player={card.player} tier="dense" nonInteractive="the surrounding card button already opens this player" />
-                    <PlayerName name={card.player.name} style={styles.cardName} />
-                  </View>
-                  <View style={styles.cardBottom}>
+          cards.map((card, i) => {
+            const nick = simTeamNickname(card.teamName);
+            return (
+              <MotionIn key={card.key} index={i} count={cards.length}>
+                <Pressable
+                  disabled={!onOpenPlayer}
+                  onPress={onOpenPlayer ? () => onOpenPlayer(card) : undefined}
+                  accessibilityRole={onOpenPlayer ? 'button' : undefined}
+                  accessibilityLabel={card.aria}
+                  testID="recent-pick-card"
+                >
+                  {/* One compact line, the same order on every chip: avatar, J. Surname, position, grade, pick + team. */}
+                  <GlassCard radius="md" compact style={[styles.card, card.isYou && { borderColor: colors.accent }]}>
+                    <View style={styles.cardPlayer} testID="recent-pick-player">
+                      <PlayerAvatarSlot player={card.player} tier="dense" nonInteractive="the surrounding chip button already opens this player" />
+                      <AppText style={styles.cardName}>{shortPlayerName(card.player.name)}</AppText>
+                    </View>
                     <PositionBadge position={card.player.position} />
                     <LetterGrade grade={card.grade} size="xs" />
-                  </View>
-                </GlassCard>
-              </Pressable>
-            </MotionIn>
-          ))
+                    <AppText style={styles.pickNo}>{`${card.pickLabel}${nick ? ` ${nick}` : ''}`}</AppText>
+                  </GlassCard>
+                </Pressable>
+              </MotionIn>
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -192,11 +185,9 @@ function createStyles(colors: ThemeColors) {
     stripHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: colors.textTertiary },
     boardLink: { minHeight: 32, justifyContent: 'center' },
-    card: { width: 160, height: 112, justifyContent: 'space-between' },
-    cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 18 },
+    card: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 6 },
     cardPlayer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    cardName: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 22 },
+    cardName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     pickNo: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },
     survival: { fontSize: 12.5, color: colors.textSecondary },
     fullLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },

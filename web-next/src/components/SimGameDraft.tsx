@@ -394,7 +394,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       preview={
         (
           <div className="flex flex-col gap-2" data-testid="draft-pinned">
-            {draft.status !== "complete" && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, need)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} /> : null}
+            {draft.status !== "complete" && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, need)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} action={onClock && hint ? <Button size="sm" loading={busy === "pick"} onClick={() => pick(hint.player)}>Draft {draftLast}</Button> : null} /> : null}
             <SimRecentStrip
               cards={recentCards}
               onOpenPlayer={(card) => { const found = players[card.player.id]; if (found) ctx.openPlayer(found); }}
@@ -404,13 +404,6 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             <SimRosterStrip roster={draft.your_roster} slots={game.settings.slots} rosterLimit={game.settings.roster_limit} bench={game.settings.bench} onOpen={ctx.openPlayer} />
           </div>
         )
-      }
-      action={
-        onClock && hint ? (
-          <Button size="sm" loading={busy === "pick"} onClick={() => pick(hint.player)}>
-            Draft {draftLast}
-          </Button>
-        ) : null
       }
     >
       {onClock && hint ? (

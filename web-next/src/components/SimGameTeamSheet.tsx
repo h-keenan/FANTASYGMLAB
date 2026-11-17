@@ -15,6 +15,7 @@ import { teamSheetNextGameLine, type TeamSheetChip } from "@/lib/teamSheet";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { simListStats } from "@/lib/simDraft";
+import { simManagerLabel } from "@/lib/simManagerLabel";
 import { simGroupBenchByPosition } from "@/lib/simLeagueRosters";
 import {
   simFmtPts,
@@ -92,6 +93,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
     { label: "PF", value: record ? simFmtPts(record.pf) : "-" },
     { label: "Proj", value: simFmtPts(data.projected_total) },
   ];
+  const manager = simManagerLabel(team.owner, { isYou: team.is_you });
   const chips: TeamSheetChip[] = [{ label: `Power #${team.power_rank}`, tone: "premium" }];
   if (status) chips.push({ label: status, tone: record?.playoff_status === "out" || record?.playoff_status === "eliminated" ? "muted" : "success" });
   return (
@@ -102,7 +104,8 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
       nameTestId="team-sheet-name"
       tag={<ToneBadge label={team.persona.label} color="var(--color-accent)" size="xs" />}
       chips={chips}
-      managedBy={team.owner}
+      managedBy={manager?.text}
+      managerIsAi={manager?.isAi}
       tabs={[
           {
             key: "overview",

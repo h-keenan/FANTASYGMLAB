@@ -137,9 +137,9 @@ describe("draft summary line, mini board and sorts", () => {
     { pos: "RB", have: 0, starters: 2, tone: "danger" },
     { pos: "WR", have: 2, starters: 2, tone: "success" },
   ] as never;
-  it("on the clock: round/pick, status, biggest needs, progress; no countdown and no model number", () => {
+  it("on the clock: ONE short line (round/pick, you're up); needs are chips and progress lives on the board; no countdown or model number", () => {
     const text = compactSummaryText(simDraftSummaryParts(draft(), 12, needs));
-    expect(text).toBe("R1 P2 · You pick now · need RB/QB · 1/192");
+    expect(text).toBe("R1 P2 · You're up");
     expect(text).not.toMatch(/value/i);
   });
   it("waiting: how far away your pick is", () => {

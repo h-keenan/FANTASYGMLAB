@@ -21,7 +21,8 @@ export const SIM_ICON_STYLE = { width: "var(--touch-target-min)", height: "var(-
 export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: SimGame; onHub: () => void; onTeam: (teamId: string) => void; onMore: () => void; bell?: ReactNode }) {
   const you = game.you;
   const season = simCompactSeason(game.dynasty);
-  const showTeam = Boolean(you) && game.phase !== "draft";
+  const drafting = game.phase === "draft";
+  const showTeam = Boolean(you) && !drafting;
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
     let was = false;
@@ -50,6 +51,9 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
             <span className="min-w-0 flex-1 break-words text-sm font-extrabold leading-tight">{you.name}</span>
             <span className="sr-only">. Your team, open team</span>
           </button>
+        ) : drafting ? (
+          // The draft room's immersive minimal chrome: back + title on ONE line, no ribbon row under it.
+          <h2 className="min-w-0 flex-1 text-sm font-extrabold" style={{ color: "var(--color-accent)" }} data-testid="game-heading-phone">{simCompactWeek(game)}</h2>
         ) : (
           <span className="flex-1" />
         )}
@@ -68,7 +72,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
           </svg>
         </button>
       </div>
-      <div className="shell-header-ribbon" role="group" aria-label="This game at a glance">
+      {drafting ? null : <div className="shell-header-ribbon" role="group" aria-label="This game at a glance">
         <div className="shell-header-ribbon-inner" tabIndex={0}>
           <h2 className="shell-header-chip" style={{ color: "var(--color-accent)" }} data-testid="game-heading-phone">{simCompactWeek(game)}</h2>
           {season ? (
@@ -76,7 +80,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
           ) : null}
           {showTeam && you ? <span className="shell-header-chip" style={{ color: "var(--color-text-secondary)" }}>{simFmtRecord(you)}</span> : null}
         </div>
-      </div>
+      </div>}
     </header>
   );
 }
