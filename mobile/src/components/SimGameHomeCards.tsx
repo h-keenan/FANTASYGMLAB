@@ -1,3 +1,4 @@
+import { swipeLockProps } from './swipeLock';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -287,7 +288,7 @@ export function SimHotColdCard({ ctx, hotCold, onClaim }: { ctx: SimCtx; hotCold
     list.length === 0 ? null : (
       <View style={common.tight} key={title}>
         <SimSectionTitle glyph={glyph} tone={tone} title={title} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} accessibilityLabel={title}>
+        <ScrollView horizontal {...swipeLockProps} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} accessibilityLabel={title}>
           {list.map((t) => (
             <View key={t.player.id} style={styles.trendCard} testID="trend-row">
               <SimMiniPlayer player={t.player} onOpen={ctx.openPlayer} size={24} />

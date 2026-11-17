@@ -33,6 +33,7 @@ export const IDENTICAL = [
   "compactModule.ts",
   "playerDepthInjury.ts",
   "playerTap.ts",
+  "swipeTabs.ts",
   "statusHeader.ts",
   "connectFlow.ts",
   "recapCard.ts",

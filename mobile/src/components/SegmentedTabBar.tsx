@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import PressableScale from './PressableScale';
-import { useReducedMotion } from 'react-native-reanimated';
+import Reanimated, { useAnimatedStyle, useReducedMotion, useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import AppText from './AppText';
 import { PulseOnIncrease } from './Motion';
@@ -44,6 +44,7 @@ export default function SegmentedTabBar<T extends string>({
   slim = false,
   snap = false,
   showPro = false,
+  drag,
 }: {
   options: Array<SegmentedTabOption<T>>;
   active: T;
@@ -57,6 +58,8 @@ export default function SegmentedTabBar<T extends string>({
   snap?: boolean;
   /** The person is known not to be on Pro: options marked `pro` show the Pro marker before the tap. */
   showPro?: boolean;
+  /** Live swipe progress (-1..1, negative = toward the next tab) from the shared Tabs swipe: the indicator follows the finger. */
+  drag?: SharedValue<number>;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -80,6 +83,22 @@ export default function SegmentedTabBar<T extends string>({
     const config = { duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: false };
     Animated.parallel([Animated.timing(slideX, { toValue: target.x, ...config }), Animated.timing(slideW, { toValue: target.width, ...config })]).start();
   }, [target, reduceMotion, slideX, slideW]);
+  // Swipe-follow: how far the indicator travels toward each neighbour (measured), scaled by the live swipe progress.
+  const nextOff = useSharedValue(0);
+  const prevOff = useSharedValue(0);
+  const activeIndex = options.findIndex((o) => o.key === active);
+  useEffect(() => {
+    const cur = layouts[active];
+    const nxt = options[activeIndex + 1] ? layouts[options[activeIndex + 1].key] : undefined;
+    const prv = options[activeIndex - 1] ? layouts[options[activeIndex - 1].key] : undefined;
+    nextOff.value = cur && nxt ? nxt.x - cur.x : 0;
+    prevOff.value = cur && prv ? prv.x - cur.x : 0;
+  }, [layouts, active, activeIndex, options, nextOff, prevOff]);
+  const dragStyle = useAnimatedStyle(() => {
+    const p = drag ? drag.value : 0;
+    const k = Math.min(1, Math.abs(p) * 2.5);
+    return { transform: [{ translateX: (p < 0 ? nextOff.value : prevOff.value) * k }] };
+  });
   const scrollRef = useRef<ScrollView>(null);
   const [viewport, setViewport] = useState(0);
   const scrollX = useRef(0);
@@ -103,7 +122,11 @@ export default function SegmentedTabBar<T extends string>({
   const dense = !scrollable && options.length >= 5;
   const body = (
     <View style={[styles.track, scrollable && styles.trackScroll, slim && styles.trackSlim]} accessibilityRole="tablist">
-      {target ? <Animated.View pointerEvents="none" style={[styles.slider, slim && styles.sliderSlim, { left: 0, transform: [{ translateX: slideX }], width: slideW }]} /> : null}
+      {target ? (
+        <Reanimated.View pointerEvents="none" style={[StyleSheet.absoluteFill, dragStyle]}>
+          <Animated.View pointerEvents="none" style={[styles.slider, slim && styles.sliderSlim, { left: 0, transform: [{ translateX: slideX }], width: slideW }]} />
+        </Reanimated.View>
+      ) : null}
       {options.map((option) => {
         const isActive = option.key === active;
         // Icon always matches its label (labelActive / label styles below).

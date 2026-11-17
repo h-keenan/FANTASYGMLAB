@@ -1,3 +1,4 @@
+import { swipeLockProps } from './swipeLock';
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
@@ -40,7 +41,7 @@ export default function WaiverSuggestionsStrip({
   return (
     <View>
       <SectionHeading title="Waiver Suggestions" icon="swap-horizontal-outline" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionRow}>
+      <ScrollView horizontal {...swipeLockProps} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionRow}>
         {adds.slice(0, 3).map((player) => (
           <WaiverSuggestionCard key={player.player_id} player={player} onPress={() => onPressPlayer(player)} />
         ))}

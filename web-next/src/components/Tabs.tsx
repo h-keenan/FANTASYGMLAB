@@ -5,6 +5,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { PillRow } from "@/components/PillRow";
 import { readSavedTab, resolveTab, saveTab, tabDirection } from "@/lib/sessionTab";
 import { nextPanelMinHeight, stickyTabsOffset } from "@/lib/sheetTabs";
+import { decideSwipe, lockSwipeAxis, SWIPE_EDGE_GUARD, swipeMayStart, swipeProgress, swipeTargetKey, type SwipeAxis } from "@/lib/swipeTabs";
 import type { TabIconName } from "@/lib/tabIcons";
 
 export interface TabItem {
@@ -111,9 +112,135 @@ export function Tabs({
     return () => ro.disconnect();
   }, [sticky]);
 
+  // Swipe left/right to change tabs (an addition: the tablist stays buttons). The panel and the strip's underline follow
+  // the finger, then snap with a spring. Decisions come from lib/swipeTabs (shared with mobile). Never hijacks vertical
+  // scrolling, a touch that starts inside a horizontal scroller ([data-no-swipe] or overflow-x), or an OS edge back-swipe.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const live = useRef({ keys, current, select });
+  useEffect(() => {
+    live.current = { keys, current, select };
+  });
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const reduce = () => typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let g: { x: number; y: number; t: number; axis: SwipeAxis; dx: number; dy: number } | null = null;
+
+    function inHorizontalScroller(target: EventTarget | null): boolean {
+      let el = target instanceof Element ? target : null;
+      while (el && el !== root) {
+        if (el instanceof HTMLElement) {
+          if (el.hasAttribute("data-no-swipe") || el.getAttribute("role") === "tablist") return true;
+          const ox = getComputedStyle(el).overflowX;
+          if ((ox === "auto" || ox === "scroll") && el.scrollWidth > el.clientWidth + 1) return true;
+        }
+        el = el.parentElement;
+      }
+      return false;
+    }
+    function indicator(): HTMLElement | null {
+      return stripRef.current?.querySelector<HTMLElement>(".tab-indicator") ?? null;
+    }
+    function tabBox(key: string): { left: number; width: number } | null {
+      const el = stripRef.current?.querySelector<HTMLElement>(`[role="tab"][id$="-tab-${key}"]`);
+      return el ? { left: el.offsetLeft, width: el.offsetWidth } : null;
+    }
+    function follow(p: number) {
+      const { keys: ks, current: cur } = live.current;
+      const panel = panelRef.current;
+      if (panel) {
+        panel.style.transition = "none";
+        panel.style.transform = `translateX(${p * 56}px)`;
+        panel.style.opacity = String(1 - Math.abs(p) * 0.35);
+      }
+      const ind = indicator();
+      const from = tabBox(cur);
+      const to = tabBox(swipeTargetKey(ks, cur, p < 0 ? "next" : "prev"));
+      if (ind && from && to) {
+        const k = Math.min(1, Math.abs(p) * 2.5);
+        ind.style.transition = "none";
+        ind.style.width = `${from.width + (to.width - from.width) * k}px`;
+        ind.style.transform = `translateX(${from.left + (to.left - from.left) * k}px)`;
+      }
+    }
+    function settle(key: string) {
+      const panel = panelRef.current;
+      if (panel) {
+        panel.style.transition = "transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease";
+        panel.style.transform = "";
+        panel.style.opacity = "";
+      }
+      const ind = indicator();
+      const box = tabBox(key);
+      if (ind && box) {
+        ind.style.transition = "transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), width 320ms ease";
+        ind.style.width = `${box.width}px`;
+        ind.style.transform = `translateX(${box.left}px)`;
+      }
+    }
+    function onStart(e: TouchEvent) {
+      g = null;
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const ok = swipeMayStart({
+        startX: t.clientX,
+        viewportWidth: window.innerWidth,
+        inHorizontalScroller: inHorizontalScroller(e.target),
+        edgeGuard: SWIPE_EDGE_GUARD,
+      });
+      if (ok && live.current.keys.length > 1) g = { x: t.clientX, y: t.clientY, t: e.timeStamp, axis: "undecided", dx: 0, dy: 0 };
+    }
+    function onMove(e: TouchEvent) {
+      if (!g) return;
+      const t = e.touches[0];
+      g.dx = t.clientX - g.x;
+      g.dy = t.clientY - g.y;
+      if (g.axis === "undecided") g.axis = lockSwipeAxis(g.dx, g.dy);
+      if (g.axis === "vertical") {
+        g = null;
+        return;
+      }
+      if (g.axis !== "horizontal") return;
+      if (e.cancelable) e.preventDefault();
+      if (reduce()) return;
+      const { keys: ks, current: cur } = live.current;
+      const i = ks.indexOf(cur);
+      follow(swipeProgress(g.dx, root!.clientWidth, i > 0, i < ks.length - 1));
+    }
+    function onEnd(e: TouchEvent) {
+      const done = g;
+      g = null;
+      if (!done || done.axis !== "horizontal") return;
+      const { keys: ks, current: cur, select: pick } = live.current;
+      const i = ks.indexOf(cur);
+      const v = done.dx / Math.max(1, e.timeStamp - done.t);
+      const target = swipeTargetKey(ks, cur, decideSwipe(done.dx, done.dy, v, i > 0, i < ks.length - 1));
+      if (reduce()) {
+        if (target !== cur) pick(target);
+        return;
+      }
+      settle(target);
+      if (target !== cur) pick(target);
+    }
+    function onCancel() {
+      if (g?.axis === "horizontal") settle(live.current.current);
+      g = null;
+    }
+    root.addEventListener("touchstart", onStart, { passive: true });
+    root.addEventListener("touchmove", onMove, { passive: false });
+    root.addEventListener("touchend", onEnd, { passive: true });
+    root.addEventListener("touchcancel", onCancel, { passive: true });
+    return () => {
+      root.removeEventListener("touchstart", onStart);
+      root.removeEventListener("touchmove", onMove);
+      root.removeEventListener("touchend", onEnd);
+      root.removeEventListener("touchcancel", onCancel);
+    };
+  }, []);
+
   const tab = tabs.find((t) => t.key === current);
   return (
-    <div className="flex flex-col gap-3" data-testid="tabs">
+    <div ref={rootRef} className="flex flex-col gap-3" data-testid="tabs">
       <div ref={stripRef} className={sticky ? "tabs-strip tabs-sticky" : "tabs-strip"} data-sticky={sticky ? "true" : undefined}>
       <PillRow
         slim

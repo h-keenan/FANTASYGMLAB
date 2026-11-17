@@ -1,3 +1,4 @@
+import { swipeLockProps } from './swipeLock';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -91,7 +92,7 @@ export function SimDraftHero({
       {!done ? (
         <View style={styles.block}>
           <AppText style={styles.kicker}>Best available</AppText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} style={styles.stripBox}>
+          <ScrollView horizontal {...swipeLockProps} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} style={styles.stripBox}>
             {strip.map(({ pos, player }) => (
               <Pressable
                 key={pos}

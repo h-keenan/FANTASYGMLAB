@@ -1,3 +1,4 @@
+import { swipeLockProps } from './swipeLock';
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -51,7 +52,7 @@ function RosterStrip({ players, active, onPick }: { players: NewsStripPlayer[]; 
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <CompactModule id="news.roster" title={`Your roster · ${players.length} with news`} label="Your roster" parts={[{ key: 'count', text: `${players.length} with news`, tone: 'muted' }]} defaultOpen={active != null} testID="news-strip">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stripRow}>
+      <ScrollView horizontal {...swipeLockProps} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stripRow}>
         {players.map((p) => {
           const on = p.key === active;
           return (
