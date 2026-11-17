@@ -22,6 +22,7 @@ import InfoMark from '../components/InfoMark';
 import SectionHeading from '../components/SectionHeading';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import FilterDropdownButton from '../components/FilterDropdownButton';
+import { ViewTabs } from '../components/PageControlRow';
 import TeamAvatar from '../components/TeamAvatar';
 import PlayoffOddsPanel from './PlayoffOddsPanel';
 import { ReSettle } from '../components/Motion';
@@ -247,12 +248,11 @@ export default function TeamsScreen({ route, navigation }: Props) {
         <PageFamilyTabs family="league" active="rankings" leagueId={leagueId} leagueName={leagueName} />
         {tabOptions.length > 1 ? (
           <View style={styles.viewRow}>
-            <FilterDropdownButton<string>
-              label="View"
+            <ViewTabs<string>
               options={tabOptions.map((o) => o.label)}
               value={tabOptions.find((o) => o.key === activeTab)?.label ?? 'Rankings'}
-              allValue="Rankings"
               onChange={(label) => onChangeTab(tabOptions.find((o) => o.label === label)?.key ?? 'rankings')}
+              testID="league-view-select"
             />
           </View>
         ) : null}
