@@ -1,6 +1,6 @@
 /** Account deletion copy shared by the Account page. Mirrored in mobile/src/lib/accountDeletionCopy.ts. */
 export const DELETE_ACCOUNT_SUMMARY =
-  "Permanently deletes your account and everything tied to it: saved leagues, GM Targets, scouting reports, your Watchlist, decision history, notification settings and push tokens. This cannot be undone.";
+  "Permanently deletes your account and everything tied to it: saved leagues, your Watchlist, scouting reports, decision history, notification settings and push tokens. This cannot be undone.";
 
 export const DELETE_ACCOUNT_STRIPE_NOTE =
   "If you subscribe on the web, we cancel that subscription first, so you are not billed again.";
