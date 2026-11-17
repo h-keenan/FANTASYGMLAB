@@ -175,7 +175,8 @@ function InjuryExposureFact({ item }: { item: GmPlanInjuryItem }) {
 function TradeOpportunityCard({ item, detailsHref }: { item: GmPlanTradeItem; detailsHref?: string }) {
   const hasAssets = item.send_assets.length > 0 || item.receive_assets.length > 0;
   const injuryDisplay = item.their_player_injury_display || "";
-  const accent = injuryDisplay ? "var(--color-danger)" : "var(--color-accent)";
+  // One calm stripe: an injured target is named in the text, it does not turn the whole idea red.
+  const accent = "var(--color-accent)";
   const gain = item.trade_gain;
   const hasGain = gain !== null && gain !== undefined;
   const theirLabel = injuryDisplay ? `${item.their_player} (${injuryDisplay})` : item.their_player;

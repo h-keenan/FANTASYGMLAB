@@ -740,7 +740,7 @@ function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewD
       id={`gmplan.trade.${item.my_player_id}.${item.their_player_id}`}
       title={item.partner_team_name || 'Trade idea'}
       parts={summary}
-      accent={injury ? colors.danger : colors.accent}
+      accent={colors.accent}
       persist={false}
     >
       {send.length > 0 || receive.length > 0 ? (

@@ -281,6 +281,7 @@ export default function MultiTeamTradePanel({
     const order = analysisOrder(response);
     const ranked = analysisLayout(response.teams.length) === 'ranked';
     const vetoLocked = Boolean(response.veto_locked);
+    // verdict-color-ok: the balance class of a multi-team deal (balanced / tilted / lopsided), not a signed value delta
     const balanceColor = toneColor(response.summary.balance.id === 'balanced' ? 'success' : response.summary.balance.id === 'tilted' ? 'warning' : 'danger');
     return (
       <View style={styles.results} testID="multi-team-results">

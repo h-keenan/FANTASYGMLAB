@@ -1,4 +1,6 @@
 import { Button } from "@/components/Button";
+import { deltaBand } from "@/lib/verdictTone";
+import { bandColorVar } from "@/lib/verdictToneCss";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { TradeCompactCard, type TradeCardAsset } from "@/components/ui/TradeCompactCard";
 import { tradeIdeaGainText } from "@/lib/tradeIdeaSummary";
@@ -196,7 +198,7 @@ export function TradeIdeaCardView({
   }, [highlighted]);
   const gain = idea.trade_gain;
   const deltaText = formatTradeGain(gain);
-  const deltaColor = gain > 0 ? "var(--color-success)" : gain < 0 ? "var(--color-danger)" : "var(--color-text-secondary)";
+  const deltaColor = gain > 0 ? bandColorVar(deltaBand(gain)) : "var(--color-text-secondary)";
   const isLowConfidence = idea.confidence_label.trim().toLowerCase() === "low";
   const landedNames = (idea.landed_gm_target_player_ids || [])
     .map((playerId) => idea.package.receive.find((asset) => asset.player_id === playerId)?.name)

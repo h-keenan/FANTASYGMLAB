@@ -940,7 +940,7 @@ function TopPriorityTradeCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const presentation = item.presentation!;
   const gain = presentation.trade_gain;
-  const gainColor = gain > 0 ? colors.successBright : gain < 0 ? colors.danger : colors.textSecondary;
+  const gainColor = gain > 0 ? colors.successBright : colors.textSecondary;
   const gainChipColor = gain > 0 ? colors.successMuted : gain < 0 ? colors.dangerMuted : colors.backgroundElevated;
   const confidenceLevel = CONFIDENCE_LEVELS[presentation.trade_confidence_label?.toLowerCase()] ?? 1;
   const routeName = DESTINATION_ROUTE[item.destination];

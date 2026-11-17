@@ -20,5 +20,10 @@ describe("verdict colour guard", () => {
     expect(run('style={{ color: winPercent < 30 ? "var(--color-danger)" : "x" }}')).toHaveLength(1);
     expect(run('const tone = winPercent >= 55 ? "success" : "accent";')).toHaveLength(1);
     expect(run("color={probabilityColorVar(p)}")).toHaveLength(0);
+    // The GM Plan "-747": a negative trade gain toned "danger" and an injury-driven red stripe, neither using a verdict word.
+    expect(run('tone: input.gain > 0 ? "success" : input.gain < 0 ? "danger" : "muted",')).toHaveLength(1);
+    expect(run('const gainColor = gain > 0 ? colors.success : gain < 0 ? colors.danger : colors.textSecondary;')).toHaveLength(1);
+    expect(run('const accent = injuryDisplay ? "var(--color-danger)" : "var(--color-accent)";')).toHaveLength(1);
+    expect(run("tone: bandCompactTone(deltaBand(input.gain)),")).toHaveLength(0);
   });
 });
