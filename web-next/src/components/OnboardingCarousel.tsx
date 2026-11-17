@@ -224,7 +224,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
         {showValue ? <OnboardingValueSlides direction={direction} /> : null}
 
         {step === levelStep ? (
-          <div className="onboarding-section onboarding-section--center">
+          <div className="onboarding-section onboarding-section--center onboarding-section--choice">
             <span className="onboarding-eyebrow">One quick question</span>
             <h1 className="onboarding-headline onboarding-headline--sm">
               Which sounds most like <span className="onboarding-gradient">you</span>?

@@ -2643,9 +2643,12 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 .onboarding-row {
   display: flex;
   gap: var(--space-sm);
-  align-items: flex-start;
-  padding: var(--space-md);
+  align-items: center;
+  /* No padding of its own: .onboarding-pick already pads the card, and the
+     doubled padding was the empty band above each option's description. */
+  padding: 0;
 }
+.onboarding-row > svg { flex: 0 0 auto; }
 .onboarding-row-title {
   font-size: var(--font-size-body);
   font-weight: 700;
@@ -2653,8 +2656,15 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 .onboarding-row-body {
   font-size: var(--font-size-caption);
   color: var(--color-text-muted);
-  line-height: 1.5;
-  margin-top: 2px;
+  line-height: 1.45;
+  margin-top: 0;
+}
+/* Question step: center the block in the scroll region so the lower half is
+   not empty on tall phones (safe centering falls back to top-aligned
+   scrolling when the content is taller than the viewport). */
+.onboarding-section--choice {
+  justify-content: safe center;
+  padding-bottom: var(--space-lg);
 }
 .onboarding-feature {
   gap: var(--space-sm);
@@ -2751,7 +2761,7 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 .onboarding-pick {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   padding: var(--space-md);
   text-align: left;
   cursor: pointer;
