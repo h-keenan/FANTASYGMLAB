@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   createContext,
   useCallback,
   useContext,
@@ -113,7 +114,7 @@ export function ValuationLensProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getLens = useCallback(
-    (leagueId: string) => lenses[leagueId] ?? detectedDefaults[leagueId] ?? DEFAULT_LENS,
+    (leagueId: string) => lenses[leagueId] ?? detectedDefaults[leagueId] ?? readStoredLens(leagueId) ?? DEFAULT_LENS,
     [lenses, detectedDefaults],
   );
   const isLensReady = useCallback(
@@ -151,4 +152,15 @@ export function useValuationLens(leagueId: string) {
   }, [context, leagueId]);
 
   return { lens, setLens, lensReady };
+}
+
+/**
+ * Remounts its children when the league's lens changes. A page that starts its first fetch without waiting for lens detection
+ * (cold first visit: no remembered lens) puts its state-owning body inside this, so if detection then says the league is not
+ * Dynasty, the body starts over on the right lens (old state and in-flight requests are dropped) instead of showing the
+ * speculative Dynasty data. A page keeps showing its skeleton until `lensReady`, so a wrong-lens result never paints.
+ */
+export function KeyedByLens({ leagueId, children }: { leagueId: string; children: ReactNode }) {
+  const { lens } = useValuationLens(leagueId);
+  return <Fragment key={lens}>{children}</Fragment>;
 }

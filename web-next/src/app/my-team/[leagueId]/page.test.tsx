@@ -88,7 +88,7 @@ describe("MyTeamPage fetch order", () => {
     expect(content).toHaveAttribute("data-size", "2");
   });
 
-  it("fetches a redraft league once, with the redraft lens", async () => {
+  it("first visit to a redraft league: the speculative Dynasty fetch is replaced by a Non-Dynasty one and only that paints", async () => {
     mockLeagueType(0);
     vi.mocked(api.getMyTeam).mockResolvedValue(myTeam);
     vi.mocked(api.getMyTeamNeeds).mockResolvedValue({} as never);
@@ -99,8 +99,9 @@ describe("MyTeamPage fetch order", () => {
 
     await screen.findByTestId("my-team");
     for (const call of [api.getMyTeam, api.getMyTeamNeeds, api.getKeepers, api.getTeamRankings]) {
-      expect(call).toHaveBeenCalledTimes(1);
-      expect(call).toHaveBeenCalledWith("league-1", "Non-Dynasty");
+      // Not gated on detection: one speculative Dynasty request, then the corrected one (a remembered type needs only one).
+      expect(call).toHaveBeenCalledTimes(2);
+      expect(call).toHaveBeenLastCalledWith("league-1", "Non-Dynasty");
     }
   });
 });

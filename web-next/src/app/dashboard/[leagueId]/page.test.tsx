@@ -62,7 +62,7 @@ describe("DashboardPage fetch order", () => {
     expect(await screen.findByTestId("dashboard-content")).toHaveAttribute("data-has-rankings", "true");
   });
 
-  it("fetches a redraft league once, with the redraft lens", async () => {
+  it("first visit to a redraft league: the speculative Dynasty fetch is replaced by a Non-Dynasty one", async () => {
     mockLeagueType(0);
     vi.mocked(api.getDashboard).mockResolvedValue(dashboard);
     vi.mocked(api.getTeamRankings).mockResolvedValue(rankings);
@@ -70,10 +70,11 @@ describe("DashboardPage fetch order", () => {
     renderWithLens(<DashboardPage />);
 
     await screen.findByTestId("dashboard-content");
-    expect(api.getDashboard).toHaveBeenCalledTimes(1);
-    expect(api.getDashboard).toHaveBeenCalledWith("league-1", "Non-Dynasty", { deferTradeIdeas: true });
-    expect(api.getTeamRankings).toHaveBeenCalledTimes(1);
-    expect(api.getTeamRankings).toHaveBeenCalledWith("league-1", "Non-Dynasty");
+    // Not gated on detection: one speculative Dynasty request, then the corrected one (a remembered type needs only one).
+    expect(api.getDashboard).toHaveBeenCalledTimes(2);
+    expect(api.getDashboard).toHaveBeenLastCalledWith("league-1", "Non-Dynasty", { deferTradeIdeas: true });
+    expect(api.getTeamRankings).toHaveBeenCalledTimes(2);
+    expect(api.getTeamRankings).toHaveBeenLastCalledWith("league-1", "Non-Dynasty");
   });
 
   it("does not wait for league detection when an earlier visit remembered the type", async () => {

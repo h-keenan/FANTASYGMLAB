@@ -5,7 +5,7 @@ import { useSearchParams } from "@/lib/useSearchParams";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { useValuationLens } from "@/context/ValuationLensContext";
+import { KeyedByLens, useValuationLens } from "@/context/ValuationLensContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { api, type KeepersResponse, type MyTeamNeedsResponse, type MyTeamResponse, type TeamRanking } from "@/lib/api";
 import { MyTeamContent } from "@/components/MyTeamContent";
@@ -32,6 +32,15 @@ function MyTeamSkeleton({ leagueName }: { leagueName: string }) {
 }
 
 export default function MyTeamPage() {
+  const params = useParams<{ leagueId: string }>();
+  return (
+    <KeyedByLens leagueId={decodeURIComponent(params.leagueId)}>
+      <MyTeamPageBody />
+    </KeyedByLens>
+  );
+}
+
+function MyTeamPageBody() {
   const params = useParams<{ leagueId: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -72,9 +81,8 @@ export default function MyTeamPage() {
       router.replace("/");
       return;
     }
-    // First fetch waits only for the league type, so a redraft league is
-    // requested once (as Non-Dynasty), not once as Dynasty and again.
-    if (!lensReady) return;
+    // The first fetch does not wait for lens detection (see KeyedByLens / the Today page): it leaves at once; a redraft
+    // league flips the lens, the body remounts and fetches again, and the skeleton holds until `lensReady`.
     let cancelled = false;
 
     api
@@ -117,7 +125,7 @@ export default function MyTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, lensReady, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   const teamRanking: TeamRanking | null =
     myTeam?.roster_id && teamRankings
@@ -125,7 +133,7 @@ export default function MyTeamPage() {
       : null;
   const leagueSize = myTeam?.roster_id && teamRankings ? teamRankings.length : 0;
 
-  if (authLoading || (!myTeam && !error)) {
+  if (authLoading || (!myTeam && !error) || !lensReady) {
     return <MyTeamSkeleton leagueName={leagueName} />;
   }
 
