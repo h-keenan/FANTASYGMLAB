@@ -4,12 +4,11 @@ import { SimDraftGrid } from "@/components/SimDraftGrid";
 import { Sheet } from "@/components/ui/Sheet";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
-import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { LetterGrade } from "@/components/ui/LetterGrade";
-import { SimTeamIdentity } from "@/components/SimTeamIdentity";
+import { shortPlayerName } from "@/lib/playerNameDisplay";
 import { positionColorVar } from "@/lib/playerPresentation";
-import { simDraftMiniBoard, simDraftMiniWindow, simDraftPickChip, simDraftProgress, simDraftRecentPicks, simRookieMiniBoard, simRookieRecentCards, simRookieRecentChips, type SimMiniCell, type SimRecentPickCard, type SimSurvival } from "@/lib/simDraft";
+import { simDraftMiniBoard, simDraftBoardParts, simDraftMiniWindow, simDraftPickChip, simTeamNickname, simDraftProgress, simDraftRecentPicks, simRookieMiniBoard, simRookieRecentCards, simRookieRecentChips, type SimMiniCell, type SimRecentPickCard, type SimSurvival } from "@/lib/simDraft";
 import type { SimDraftState, SimGamePlayer } from "@/lib/simGame";
 
 /**
@@ -32,11 +31,7 @@ export function SimDraftOverview({ draft, teams, onFullBoard }: { draft: SimDraf
         title="Draft board"
         tone="accent"
         defaultOpen
-        parts={[
-          { key: "n", text: `${progress.made}/${progress.total} picks`, strong: true },
-          last ? { key: "last", text: `last ${simDraftPickChip(last)}` } : null,
-          { key: "mine", text: `you ${mine}`, tone: "accent" },
-        ]}
+        parts={simDraftBoardParts(progress, last ? simDraftPickChip(last) : null, mine)}
       >
         <SimMiniBoard rows={win.rows} from={win.from} to={win.to} />
         <button type="button" className="tap-link self-start text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }} onClick={onFullBoard}>
@@ -56,13 +51,13 @@ export function SimFullBoardSheet({ open, onClose, draft, teams, onOpen }: { ope
   );
 }
 
-const RECENT_CARD_WIDTH = 160;
-const RECENT_CARD_HEIGHT = 112;
+const RECENT_CHIP_HEIGHT = 44;
 
 /**
- * The latest picks as a horizontally scrolling strip of compact player cards (coridian_: "the prior picks with the prior
- * players taken"): one fixed glass card per pick (pick number and team logo, avatar and name, position badge and letter grade, same spots on every card). A card
- * opens the player; "Full board" opens the whole board. Lives in the pinned clock area (redraft and rookie drafts).
+ * The latest picks as ONE horizontally scrolling row of compact chips (coridian_: "just drafted could be condensed in half"):
+ * avatar, "J. Surname", position badge, letter grade, pick number and the picking team's nickname, one line each, same
+ * order on every chip. A chip opens the player; "Full board" opens the whole board. Lives in the pinned clock area
+ * (redraft and rookie drafts). Mobile twin: SimDraftOverview.tsx.
  */
 export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: SimRecentPickCard[]; onOpenPlayer?: (card: SimRecentPickCard) => void; onFullBoard?: () => void }) {
   return (
@@ -79,32 +74,32 @@ export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: Si
         {cards.length === 0 ? (
           <li className="text-xs" style={{ color: "var(--color-text-muted)", minHeight: 40, display: "flex", alignItems: "center" }}>No picks yet. The first ones land here.</li>
         ) : (
-          cards.map((card, i) => (
-            <li key={card.key} className={i === 0 ? "enter-rise shrink-0" : "shrink-0"} style={{ width: RECENT_CARD_WIDTH }} data-testid="recent-pick-card">
-              <button
-                type="button"
-                onClick={onOpenPlayer ? () => onOpenPlayer(card) : undefined}
-                disabled={!onOpenPlayer}
-                aria-label={card.aria}
-                className="glass-surface flex w-full flex-col justify-between gap-1.5 p-2 text-left"
-                style={{ height: RECENT_CARD_HEIGHT, borderRadius: "var(--radius-control)", borderColor: card.isYou ? "var(--color-accent)" : undefined, color: "inherit" }}
-              >
-                {/* One fixed layout, the same on every card: pick + team, avatar + name, position + grade. */}
-                <span className="flex items-center justify-between gap-1 text-[0.6875rem] font-extrabold tabular-nums" style={{ color: "var(--color-text-muted)", minHeight: 18 }}>
-                  <span>{card.pickLabel}</span>
-                  {card.teamName ? <SimTeamIdentity name={card.teamName} size="chip" hideName /> : <span aria-hidden="true" />}
-                </span>
-                <span className="flex min-w-0 items-center gap-2" data-testid="recent-pick-player">
-                  <PlayerAvatarSlot player={card.player} tier="dense" nonInteractive="the surrounding card button already opens this player" />
-                  <PlayerName name={card.player.name} className="min-w-0 flex-1 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
-                </span>
-                <span className="flex items-center justify-between gap-1" style={{ minHeight: 22 }}>
+          cards.map((card, i) => {
+            const nick = simTeamNickname(card.teamName);
+            return (
+              <li key={card.key} className={i === 0 ? "enter-rise shrink-0" : "shrink-0"} data-testid="recent-pick-card">
+                <button
+                  type="button"
+                  onClick={onOpenPlayer ? () => onOpenPlayer(card) : undefined}
+                  disabled={!onOpenPlayer}
+                  aria-label={card.aria}
+                  className="glass-surface flex items-center gap-1.5 whitespace-nowrap px-2 text-left"
+                  style={{ height: RECENT_CHIP_HEIGHT, borderRadius: "var(--radius-control)", borderColor: card.isYou ? "var(--color-accent)" : undefined, color: "inherit" }}
+                >
+                  <span className="flex items-center gap-1.5" data-testid="recent-pick-player">
+                    <PlayerAvatarSlot player={card.player} tier="dense" nonInteractive="the surrounding chip button already opens this player" />
+                    <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} title={card.player.name}>{shortPlayerName(card.player.name)}</span>
+                  </span>
                   <PositionBadge position={card.player.position} />
                   <LetterGrade grade={card.grade} size="xs" />
-                </span>
-              </button>
-            </li>
-          ))
+                  <span className="text-[0.6875rem] font-extrabold tabular-nums" style={{ color: "var(--color-text-muted)" }}>
+                    {card.pickLabel}
+                    {nick ? ` ${nick}` : ""}
+                  </span>
+                </button>
+              </li>
+            );
+          })
         )}
       </ol>
     </div>

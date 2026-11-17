@@ -528,7 +528,7 @@ describe("SimGameContent", () => {
     await openFirstGame();
     // Collapsed, the clock module is a dense status line with the pick action (not an empty header), and the draft
     // overview (recent picks + mini board) is on the page without opening a tab.
-    expect(await within(await screen.findByTestId("draft-clock-module")).findByTestId("compact-summary")).toHaveTextContent(/R1 P3 · You pick now/);
+    expect(await within(await screen.findByTestId("draft-clock-module")).findByTestId("compact-summary")).toHaveTextContent(/R1 P3 · You're up/);
     expect(screen.getByTestId("draft-overview")).toBeInTheDocument();
     expect(screen.getByTestId("mini-board")).toBeInTheDocument();
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(expect.arrayContaining(["Players", "Roster", "Picks"]));

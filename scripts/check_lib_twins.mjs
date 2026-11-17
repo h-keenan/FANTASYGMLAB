@@ -109,6 +109,7 @@ export const IDENTICAL = [
   "weeklyProjection.ts",
   "simReview.ts",
   "simDraft.ts",
+  "simManagerLabel.ts",
   "simGrade.ts",
   "simGameFlow.ts",
   "simScroll.ts",

@@ -389,7 +389,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         preview={
           (
             <View style={common.stack} testID="draft-pinned">
-              {draft.status !== 'complete' && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, needPills)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} /> : null}
+              {draft.status !== 'complete' && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, needPills)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} action={onClock && hint ? <Button size="sm" label={`Draft ${hintLast}`} loading={busy === 'pick'} onPress={() => pick(hint.player)} /> : null} /> : null}
               <SimRecentStrip
                 cards={recentCards}
                 onOpenPlayer={(card) => {
@@ -403,7 +403,6 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             </View>
           )
         }
-        action={onClock && hint ? <Button size="sm" label={`Draft ${hintLast}`} loading={busy === 'pick'} onPress={() => pick(hint.player)} /> : null}
       >
         {onClock && hint ? (
           <FadeInView>

@@ -263,13 +263,17 @@ export function simDraftSummaryParts(
     opts.picking
       ? { key: "state", text: "Picking...", tone: "action", strong: true }
       : onClock
-        ? { key: "state", text: "You pick now", tone: "action", strong: true }
+        ? { key: "state", text: "You're up", tone: "action", strong: true }
         : { key: "state", text: `${eta.label} ${eta.detail}`.trim() },
-    (() => {
-      const need = simDraftNeedLabel(needs);
-      return need ? { key: "need", text: need, tone: "warning" as const } : null;
-    })(),
-    { key: "n", text: `${progress.made}/${progress.total}`, tone: "muted" },
+  ]);
+}
+
+/** The draft board module's collapsed summary: progress, the last pick and how many picks you have made. */
+export function simDraftBoardParts(progress: { made: number; total: number }, lastChip: string | null, mine: number): CompactPart[] {
+  return compactParts([
+    { key: "n", text: `${progress.made}/${progress.total} picks`, strong: true },
+    lastChip ? { key: "last", text: `last ${lastChip}` } : null,
+    { key: "mine", text: `your picks: ${mine}`, tone: "accent" },
   ]);
 }
 
@@ -422,6 +426,12 @@ export function simDraftBarModel(
     grade: player.grade ?? null,
     fit: need ? `Fills your ${need.pos} need` : null,
   };
+}
+
+/** "Rockets" from "Dynasty Rockets": the last word of a team name, the readable team mark on a recent-pick chip. Null for no name. */
+export function simTeamNickname(name: string | null | undefined): string | null {
+  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  return words.length ? words[words.length - 1] : null;
 }
 
 /**
