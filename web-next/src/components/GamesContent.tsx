@@ -575,8 +575,9 @@ function MatchupPick({
 }) {
   const showPoints = phase !== "open";
   return (
-    <article className="glass-surface flex flex-col gap-2 p-3" data-testid="pickem-matchup">
-      <div className="grid grid-cols-2 gap-2">
+    <article className="glass-surface flex flex-col gap-1 p-1" data-testid="pickem-matchup">
+      {/* One card, both teams on ONE row (the shared matchup-row style): no inner bordered boxes; the picked team is a tint. */}
+      <div className="flex items-stretch gap-1">
         {matchup.teams.map((team) => {
           const picked = matchup.my_pick === team.roster_id;
           const won = matchup.winner_roster_id === team.roster_id;
@@ -587,29 +588,30 @@ function MatchupPick({
               disabled={phase !== "open"}
               aria-pressed={picked}
               onClick={() => onPick(matchup, team.roster_id)}
-              className="flex flex-col items-center gap-1 p-3 min-h-[var(--touch-target-min)]"
+              className="flex min-w-0 flex-1 items-center gap-2 px-2 text-left min-h-[var(--touch-target-min)]"
               style={{
-                border: `var(--border-width-default) solid ${picked ? "var(--color-accent)" : "var(--color-border)"}`,
                 background: picked ? "var(--color-accent-soft)" : "transparent",
+                borderRadius: "var(--radius-control)",
                 opacity: phase !== "open" && !picked && !won ? 0.8 : 1,
               }}
             >
-              <TeamAvatar avatarUrl={team.avatar_url} name={team.team_name} size={36} />
-              <span className="text-sm font-bold text-center break-words">{team.team_name}</span>
-              {showPoints ? (
-                <span className="text-xs" style={{ color: won ? "var(--color-success)" : "var(--color-text-muted)" }}>
-                  {team.points.toFixed(1)}
-                </span>
-              ) : null}
+              <TeamAvatar avatarUrl={team.avatar_url} name={team.team_name} size={28} />
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-bold">{team.team_name}</span>
+                {showPoints ? (
+                  <span className="text-xs" style={{ color: won ? "var(--color-success)" : "var(--color-text-muted)" }}>
+                    {team.points.toFixed(1)}
+                  </span>
+                ) : null}
+              </span>
             </button>
           );
         })}
       </div>
       {matchup.correct != null ? (
-        <ToneBadge
-          label={matchup.correct ? "Correct" : "Missed"}
-          color={matchup.correct ? "var(--color-success)" : "var(--color-danger)"}
-        />
+        <div className="px-2 pb-1">
+          <ToneBadge label={matchup.correct ? "Correct" : "Missed"} color={matchup.correct ? "var(--color-success)" : "var(--color-text-secondary)"} />
+        </div>
       ) : null}
     </article>
   );

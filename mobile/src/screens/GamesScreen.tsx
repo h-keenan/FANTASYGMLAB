@@ -440,7 +440,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
         <EmptyState icon="calendar-outline" title="No matchups this week" />
       ) : (
         data.matchups.map((matchup) => (
-          <GlassCard radius="md" key={matchup.matchup_id} style={styles.card2}>
+          <GlassCard radius="md" key={matchup.matchup_id} style={styles.pickCard}>
             <View style={styles.pickRow}>
               {matchup.teams.map((team) => {
                 const picked = matchup.my_pick === team.roster_id;
@@ -454,13 +454,15 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
                     onPress={() => pick(matchup, team.roster_id)}
                     style={[styles.pickTeam, picked && styles.pickTeamOn]}
                   >
-                    <TeamAvatar avatarId={team.avatar_url} name={team.team_name} size={36} />
-                    <AppText style={styles.teamName}>
-                      {team.team_name}
-                    </AppText>
-                    {phase !== 'open' ? (
-                      <AppText style={[styles.muted, won && { color: colors.success }]}>{team.points.toFixed(1)}</AppText>
-                    ) : null}
+                    <TeamAvatar avatarId={team.avatar_url} name={team.team_name} size={28} />
+                    <View style={styles.pickText}>
+                      <AppText style={styles.pickName} numberOfLines={1}>
+                        {team.team_name}
+                      </AppText>
+                      {phase !== 'open' ? (
+                        <AppText style={[styles.pickPoints, won && { color: colors.successBright }]}>{team.points.toFixed(1)}</AppText>
+                      ) : null}
+                    </View>
                   </PressableScale>
                 );
               })}
@@ -468,7 +470,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
             {matchup.correct != null ? (
               <ToneBadge
                 label={matchup.correct ? 'Correct' : 'Missed'}
-                color={matchup.correct ? colors.success : colors.danger}
+                color={matchup.correct ? colors.success : colors.textSecondary}
               />
             ) : null}
           </GlassCard>
@@ -523,6 +525,7 @@ function createStyles(colors: ThemeColors) {
     card2: {
       gap: spacing.sm,
     },
+    pickCard: { gap: spacing.xs, padding: spacing.xs },
     bigOdds: { fontSize: 37, fontWeight: '800' },
     alignEnd: { alignItems: 'flex-end', gap: 4 },
     rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
@@ -537,17 +540,21 @@ function createStyles(colors: ThemeColors) {
     rank: { width: 24, textAlign: 'center', fontSize: 14.5, fontWeight: '800', color: colors.textTertiary },
     teamName: { fontSize: 15.5, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
     metric: { fontSize: 16.5, fontWeight: '800' },
-    pickRow: { flexDirection: 'row', gap: spacing.sm },
+    // One card per matchup, both teams on ONE row (the shared matchup-row style): no inner bordered boxes; the picked team is a tint.
+    pickRow: { flexDirection: 'row', gap: spacing.xs },
     pickTeam: {
       flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.xs,
-      padding: spacing.md,
+      gap: spacing.sm,
+      paddingHorizontal: spacing.sm,
       minHeight: 44,
       borderRadius: radii.sm,
-      borderWidth: 1,
-      borderColor: colors.border,
     },
-    pickTeamOn: { borderColor: colors.accent, backgroundColor: colors.badgeBackground },
+    pickTeamOn: { backgroundColor: colors.badgeBackground },
+    pickText: { flex: 1, minWidth: 0 },
+    pickName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    pickPoints: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
   });
 }
