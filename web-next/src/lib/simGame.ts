@@ -3173,20 +3173,7 @@ export function simShortName(name: string, maxLength = 17): string {
 // ---------------------------------------------------------------------------
 // Dynasty: picks, offseason, rookie draft, summary (game engine 1.2.0)
 
-/** Endpoint paths for the dynasty and reserve routes (web and mobile call these through their own fetch). */
-export function simDynastyPaths(gameId: string) {
-  const base = `/v1/sim/games/${encodeURIComponent(gameId)}`;
-  return {
-    picks: `${base}/picks`,
-    rosterMove: `${base}/roster/move`,
-    offseason: (pos?: string) => `${base}/offseason${pos ? `?pos=${encodeURIComponent(pos)}` : ""}`,
-    rookieDraftStart: `${base}/offseason/rookie-draft/start`,
-    rookieDraftPick: `${base}/offseason/rookie-draft/pick`,
-    rookieDraftAuto: `${base}/offseason/rookie-draft/auto`,
-    startSeason: `${base}/offseason/start-season`,
-    dynasty: `${base}/dynasty`,
-  };
-}
+export { simDynastyPaths } from "./simPaths.ts";
 
 export type SimRookieClassStrength = "weak" | "average" | "strong";
 
