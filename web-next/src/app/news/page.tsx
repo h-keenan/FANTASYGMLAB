@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -8,12 +9,18 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { api, type AlertsResponse, type NewsResponse } from "@/lib/api";
 import { useDefaultLeague } from "@/lib/useDefaultLeague";
 import { NewsContent } from "@/components/NewsContent";
-import { NewsLeagueTab } from "@/components/NewsLeagueTab";
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 import { parseNewsTab, type NewsTab } from "@/lib/newsLinks";
 import { parseRecapsTab, parseRoundupWeek } from "@/lib/pageTabs";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { SkeletonCard } from "@/components/Skeleton";
+
+// Perf round 3: the League tab is never the default News view and drags in the whole Recaps screen, so it is its own chunk
+// (fetched when the tab mounts) instead of News first-load JS.
+const NewsLeagueTab = dynamic(() => import("@/components/NewsLeagueTab").then((m) => m.NewsLeagueTab), {
+  loading: () => <SkeletonCard lines={4} />,
+});
 
 // Like Portfolio, News has no [leagueId] segment — GET /v1/news is a
 // general, non-roster-scoped feed for anyone (see that endpoint's own docstring

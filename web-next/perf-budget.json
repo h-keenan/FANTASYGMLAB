@@ -31,7 +31,7 @@
   "/matchup/[leagueId]": 1066,
   "/methodology": 928,
   "/my-team/[leagueId]": 1041,
-  "/news": 989,
+  "/news": 985,
   "/player-compare/[leagueId]": 1008,
   "/players/[leagueId]": 996,
   "/players/[leagueId]/[playerId]": 1105,
