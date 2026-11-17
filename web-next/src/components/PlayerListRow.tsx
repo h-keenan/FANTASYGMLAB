@@ -182,7 +182,7 @@ export function PlayerListRow({
         <PositionBadge position={position} />
       </span>
       <span className="relative flex shrink-0 items-center justify-center" style={{ width: dims.avatar, height: dims.avatar }}>
-        <PlayerAvatar playerId={headshotId ?? null} size={dims.avatar} fallbackLabel={fallbackLabel ?? name.slice(0, 2)} />
+        <PlayerAvatar playerId={headshotId ?? null} size={dims.avatar} name={name} position={position} fallbackLabel={fallbackLabel} />
         {hurt ? <span aria-hidden="true" className="absolute right-0 top-0 rounded-full" style={{ width: 9, height: 9, background: "var(--color-danger)", boxShadow: "0 0 0 2px var(--color-surface)" }} /> : null}
       </span>
       <div className="flex min-w-0 flex-1 flex-col">

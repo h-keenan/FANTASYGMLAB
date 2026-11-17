@@ -46,7 +46,7 @@ function StoryLine({ story, rosterMap }: { story: RecapStory; rosterMap: RecapRo
   return (
     <View style={styles.storyLine}>
       {avatarId ? (
-        <TeamAvatar avatarId={avatarId} size={32} />
+        <TeamAvatar avatarId={avatarId} name={story.primary_team} size={32} />
       ) : (
         <View style={[styles.storyIconDisc, { backgroundColor: `${meta.color}26` }]}>
           <Ionicons name={meta.icon} size={14} color={meta.color} />

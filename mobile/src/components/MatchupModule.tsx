@@ -42,7 +42,7 @@ export function SwingPlayers({ swing, onOpenPlayer }: { swing: MatchupSwingPlaye
               {swing.map((p) => {
                 const body = (
                   <>
-                    <PlayerAvatar playerId={p.playerId} tier={p.tier} size={36} />
+                    <PlayerAvatar playerId={p.playerId} name={p.name} position={p.position} team={p.team} tier={p.tier} size={36} />
                     <View style={styles.swingText}>
                       <View style={styles.swingName}>
                         <AppText style={styles.swingNameText}>{playerSurname(p.name) || p.name}</AppText>
@@ -102,7 +102,7 @@ export function LatestBigPlay({ plays, mineName, opponentName }: { plays: Matchu
         const mine = play.side === 'mine';
         return (
           <View key={play.id} style={styles.bigRow} testID="matchup-big-play-item">
-            <PlayerAvatar playerId={play.player_id ?? ''} size={32} fallbackLabel={play.name.trim().slice(0, 1)} />
+            <PlayerAvatar playerId={play.player_id ?? ''} size={32} name={play.name} />
             <View style={styles.swingText}>
               <AppText style={styles.swingNameText}>{`${playerSurname(play.name) || play.name} · ${play.description}`}</AppText>
               <AppText style={styles.detail}>{`${feedAgeLabel(play.at, now)}${play.approx ? ' · approx.' : ''} · for ${mine ? mineName : opponentName}`}</AppText>

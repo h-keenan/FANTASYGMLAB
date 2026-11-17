@@ -48,7 +48,7 @@ function DropPlayerLine({
     <div className="flex flex-col gap-1" data-testid="drop-player">
       <span className="flex items-center gap-2 min-w-0">
         <PlayerTap player={{ id: player.player_id, name: player.name, position: player.position, team: player.team }} className="pointer-events-auto flex items-center gap-2 min-w-0 text-left">
-          <PlayerAvatar playerId={player.player_id} size={32} />
+          <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={32} />
           {lead ? (
             <span className="text-sm font-bold shrink-0" style={{ color: "var(--color-text-primary)" }}>
               {lead}{" "}
@@ -154,7 +154,7 @@ function SwapTile({ side, player, name, playerId, position, team }: { side: "add
     >
       <ToneBadge label={label} color={color} size="xs" />
       <PlayerTap player={{ id: playerId, name, position, team }} className="pointer-events-auto flex w-full min-w-0 flex-col items-center gap-1 text-center">
-        <PlayerAvatar playerId={playerId} size={44} />
+        <PlayerAvatar playerId={playerId} name={name} position={position} team={team} size={44} />
         <PlayerName name={name} className="text-sm font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
       </PlayerTap>
       <span className="flex items-center justify-center gap-1 flex-wrap">
@@ -262,7 +262,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
                   minHeight: "var(--touch-target-min)",
                 }}
               >
-                <PlayerAvatar playerId={alt.player_id} size={28} />
+                <PlayerAvatar playerId={alt.player_id} name={alt.name} position={alt.position} size={28} />
                 <PlayerName name={alt.name} className="text-xs font-bold max-w-[7.5rem]" style={{ color: "var(--color-text-primary)" }} />
                 <PositionBadge position={alt.position} />
               </button>
@@ -295,7 +295,7 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
         <ToneBadge label={badge.label} color={badge.color} />
         {drop ? (
           <PlayerTap player={{ id: drop.player_id, name: drop.name, position: drop.position }} className="pointer-events-auto flex items-center gap-2 min-w-0 text-left">
-            <PlayerAvatar playerId={drop.player_id} size={24} />
+            <PlayerAvatar playerId={drop.player_id} name={drop.name} position={drop.position} size={24} />
             <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>{drop.name}</span>
           </PlayerTap>
         ) : null}
@@ -385,7 +385,7 @@ export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: numbe
       <div className="pointer-events-none relative flex items-center gap-2 text-left w-full" style={{ minHeight: "var(--touch-target-min)" }}>
         <ToneBadge label="Drop" color="var(--color-danger)" />
         <PlayerTap player={{ id: drop.player_id, name: drop.name, position: drop.position }} className="pointer-events-auto flex min-w-0 flex-1 items-center gap-2 text-left">
-          <PlayerAvatar playerId={drop.player_id} size={24} />
+          <PlayerAvatar playerId={drop.player_id} name={drop.name} position={drop.position} size={24} />
           <span className="flex min-w-0 flex-col">
             <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>{drop.name}</span>
             <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>

@@ -17,7 +17,7 @@ export function PlayerAvatarSlot({ player, tier = "row", nonInteractive, onOpen,
   const size = avatarSize(tier);
   const slot = (
     <span className="relative flex shrink-0 items-center justify-center" style={{ width: size, height: size }} data-testid="player-avatar-slot" data-avatar-tier={tier}>
-      <PlayerAvatar playerId={playerHeadshotId(player)} tier={player.tier ?? undefined} size={size} fallbackLabel={playerInitials(player.name)} />
+      <PlayerAvatar playerId={playerHeadshotId(player)} tier={player.tier ?? undefined} size={size} fallbackLabel={playerInitials(player.name)} name={player.name} position={player.position} team={player.team} />
     </span>
   );
   return (

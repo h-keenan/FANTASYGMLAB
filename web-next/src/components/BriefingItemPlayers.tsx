@@ -101,7 +101,7 @@ export function BriefingItemPlayers({ item, sourceLabel }: { item: BriefingItem;
           <span style={{ color: "var(--color-text-muted)" }}>
             <PositionBadge position={item.route_player_position} />
           </span>
-          <PlayerAvatar playerId={item.route_player_id} tier={item.route_player_tier} size={32} />
+          <PlayerAvatar playerId={item.route_player_id} name={item.route_player_name} position={item.route_player_position} team={item.route_player_team} tier={item.route_player_tier} size={32} />
           <PlayerName name={item.route_player_name} className="max-w-[12rem]" style={{ color: "var(--color-text-muted)" }} />
           <PlayerInjuryBadge status={item.route_player_injury_status} />
           {item.route_player_team ? <span style={{ color: "var(--color-text-muted)" }}>· {item.route_player_team}</span> : null}
@@ -124,7 +124,7 @@ export function BriefingItemPlayers({ item, sourceLabel }: { item: BriefingItem;
           <span style={{ color: "var(--color-text-muted)" }}>
             <PositionBadge position={player.position} />
           </span>
-          <PlayerAvatar playerId={player.player_id} tier={player.player_tier} size={32} />
+          <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} tier={player.player_tier} size={32} />
           <PlayerName name={player.name} className="max-w-[12rem]" style={{ color: "var(--color-text-muted)" }} />
           <PlayerInjuryBadge status={player.injury_status} />
           {player.team ? <span style={{ color: "var(--color-text-muted)" }}>· {player.team}</span> : null}

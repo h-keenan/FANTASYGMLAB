@@ -15,7 +15,7 @@ export default function PlayerAvatarSlot({ player, tier = 'row', nonInteractive,
   const size = avatarSize(tier);
   const slot = (
     <View style={{ width: size, height: size }} testID="player-avatar-slot">
-      <PlayerAvatar playerId={playerHeadshotId(player)} tier={player.tier ?? undefined} size={size} fallbackLabel={playerInitials(player.name)} />
+      <PlayerAvatar playerId={playerHeadshotId(player)} tier={player.tier ?? undefined} size={size} fallbackLabel={playerInitials(player.name)} name={player.name} position={player.position} team={player.team} />
     </View>
   );
   return (

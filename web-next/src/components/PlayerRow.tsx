@@ -57,7 +57,7 @@ export function PlayerIdentity({
     <>
       {leading}
       <PositionBadge position={position} />
-      <PlayerAvatar playerId={playerId ?? undefined} tier={tier ?? undefined} size={avatarSize} fallbackLabel={fallbackLabel} />
+      <PlayerAvatar playerId={playerId ?? undefined} tier={tier ?? undefined} size={avatarSize} name={name} position={position} fallbackLabel={fallbackLabel} />
       <div className="flex flex-col gap-0.5 min-w-0">
         <PlayerName
           name={name}

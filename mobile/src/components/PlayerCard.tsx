@@ -190,7 +190,7 @@ export default function PlayerCard({
             <OverallRatingBadge rating={overallRating} positionRank={positionRank} />
           </View>
           <View style={styles.avatarWrap}>
-            <PlayerAvatar playerId={playerId} size={36} tier={tier} />
+            <PlayerAvatar playerId={playerId} name={name} position={position} size={36} tier={tier} />
             {injuryLabel ? <View style={[styles.injuryDot, { backgroundColor: colors.danger }]} /> : null}
           </View>
           <View style={styles.positionBadgeWrap}>

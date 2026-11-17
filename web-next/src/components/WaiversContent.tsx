@@ -431,7 +431,7 @@ function PlayerTile({ position, player, note }: { position: string; player: Waiv
     <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="min-w-[8.5rem]">
       <div className="glass-surface flex flex-col items-center gap-1 p-3">
         <PositionBadge position={position} />
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
+        <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} tier={player.tier} size={40} />
         <OvrGauge rating={player.overall_rating} size="md" />
         <PlayerName name={player.name || "Unknown"} className="text-[13px] font-extrabold text-center" style={{ color: "var(--color-text-primary)" }} />
         <div className="flex flex-col items-center gap-0.5">

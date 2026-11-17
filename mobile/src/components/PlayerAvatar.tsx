@@ -7,9 +7,9 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import AppText from './AppText';
 import type { ThemeColors } from '../theme';
 import { glowLayers } from '../lib/avatarGlow';
+import { pickAvatarSource } from '../lib/avatarFallback';
+import { positionBadgeColors } from '../theme';
 import { resolvePlayerTier, tierGlowIntensity, type TierGlowIntensity } from '../lib/playerTier';
-
-const SLEEPER_HEADSHOT_BASE = 'https://sleepercdn.com/content/nfl/players';
 
 // coridian_, 2026-10-19 (queued cosmetic, lowest priority): "an effect
 // around the prestige ring ... kind of a glowing effect, kind of a fire
@@ -69,6 +69,10 @@ interface PlayerAvatarProps {
   tier?: string | null;
   /** Initials (or a team code) shown in the ring when there is no photo to load. */
   fallbackLabel?: string | null;
+  /** Feed the shared fallback chain (lib/avatarFallback): monogram initials, position colour, defense team logo. */
+  name?: string | null;
+  position?: string | null;
+  team?: string | null;
   style?: StyleProp<ViewStyle>;
   /**
    * Fires once this avatar has "settled" — the headshot finished loading,
@@ -98,13 +102,14 @@ interface PlayerAvatarProps {
  * list screen, so `expo-image`'s disk cache (persists across app restarts,
  * unlike RN's own `Image`) avoids re-fetching the same photo every time.
  */
-export default function PlayerAvatar({ playerId, size = 40, tier, fallbackLabel, style, onLoadSettle }: PlayerAvatarProps) {
+export default function PlayerAvatar({ playerId, size = 40, tier, fallbackLabel, name, position, team, style, onLoadSettle }: PlayerAvatarProps) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // Keyed by id so a recycled list row that now shows another player retries
   // its photo instead of inheriting the previous player's failure.
-  const [failedId, setFailedId] = useState<string | null>(null);
-  const failed = !!playerId && failedId === playerId;
+  const [failed, setFailed] = useState<{ id: string | null | undefined; keys: string[] }>({ id: playerId, keys: [] });
+  const failedKeys = failed.id === playerId ? failed.keys : [];
+  const source = pickAvatarSource({ playerId, name, label: fallbackLabel, position, team }, failedKeys);
   const dimension = { width: size, height: size, borderRadius: size / 2 };
   const ringColor = tier ? resolvePlayerTier(tier, isDark).color : colors.border;
   const ring = { borderWidth: tier ? 2 : StyleSheet.hairlineWidth, borderColor: ringColor };
@@ -115,20 +120,21 @@ export default function PlayerAvatar({ playerId, size = 40, tier, fallbackLabel,
   // Nothing will ever load for this avatar — settle immediately so a caller
   // waiting on onLoadSettle (e.g. a share-card capture gate) doesn't hang.
   useEffect(() => {
-    if (!playerId) {
+    if (source.kind === 'monogram') {
       onLoadSettle?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerId]);
+  }, [source.key]);
 
-  if (!playerId || failed) {
+  if (source.kind === 'monogram') {
+    const tint = source.position ? positionBadgeColors(source.position, isDark, colors.textPrimary, colors.textTertiary) : null;
     return (
       <View style={[{ width: size, height: size }, style]}>
         {glowIntensity ? <PrestigeGlow size={size} color={ringColor} intensity={glowIntensity} /> : null}
-        <View style={[styles.fallback, dimension, ring]}>
-          {fallbackLabel && size >= 24 ? (
-            <AppText style={[styles.fallbackText, { fontSize: Math.max(9, Math.round(size * 0.34)) }]} numberOfLines={1} allowFontScaling={false}>
-              {fallbackLabel}
+        <View style={[styles.fallback, dimension, ring, tint ? { backgroundColor: tint.fill } : null]}>
+          {size >= 24 ? (
+            <AppText style={[styles.fallbackText, { fontSize: Math.max(12, Math.round(size * 0.34)) }, tint ? { color: tint.text } : null]} numberOfLines={1} allowFontScaling={false}>
+              {source.label}
             </AppText>
           ) : null}
         </View>
@@ -140,7 +146,7 @@ export default function PlayerAvatar({ playerId, size = 40, tier, fallbackLabel,
     <View style={[{ width: size, height: size }, style]}>
       {glowIntensity ? <PrestigeGlow size={size} color={ringColor} intensity={glowIntensity} /> : null}
       <Image
-        source={{ uri: `${SLEEPER_HEADSHOT_BASE}/${playerId}.jpg` }}
+        source={{ uri: source.url }}
         style={[dimension, ring] as StyleProp<ImageStyle>}
         cachePolicy="disk"
         // Checked ~45 real Sleeper headshots across positions/eras: every
@@ -154,11 +160,11 @@ export default function PlayerAvatar({ playerId, size = 40, tier, fallbackLabel,
         // headshot ships portrait-oriented, where it would anchor the
         // face/helmet instead of letting a center crop clip it. `contentFit`
         // is made explicit too so this isn't relying on expo-image's default.
-        contentFit="cover"
+        contentFit={source.kind === 'teamLogo' ? 'contain' : 'cover'}
         contentPosition="top"
         onLoad={() => onLoadSettle?.()}
         onError={() => {
-          setFailedId(playerId ?? null);
+          setFailed({ id: playerId, keys: [...failedKeys, source.key] });
           onLoadSettle?.();
         }}
       />

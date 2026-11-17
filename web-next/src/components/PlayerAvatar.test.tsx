@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { PlayerAvatar } from "./PlayerAvatar";
@@ -77,5 +77,27 @@ describe("PlayerAvatar shape", () => {
     expect(img.style.maxWidth).toBe("none");
     expect(img.style.flexShrink).toBe("0");
     expect(img.style.width).toBe(img.style.height);
+  });
+
+  // Batch F (2026-11): the fallback chain is headshot -> team logo (DEF) -> position-coloured monogram, never an empty disc.
+  it("falls back to a monogram when the headshot fails to load", () => {
+    const { container } = render(<PlayerAvatar playerId="4046" name="Patrick Mahomes" position="QB" />);
+    fireEvent.error(container.querySelector("img")!);
+    const disc = container.querySelector("[data-avatar-fallback]") as HTMLElement;
+    expect(container.querySelector("img")).toBeNull();
+    expect(disc.textContent).toBe("PM");
+    expect(disc.style.color).toContain("--color-position-qb");
+  });
+
+  it("shows the team logo for a defense, then the monogram if the logo fails", () => {
+    const { container } = render(<PlayerAvatar playerId="SF" name="49ers D/ST" position="DEF" team="SF" />);
+    expect(container.querySelector("img")?.getAttribute("src")).toContain("team_logos/nfl/sf.png");
+    fireEvent.error(container.querySelector("img")!);
+    expect(container.querySelector("[data-avatar-fallback]")?.textContent).toBe("4D");
+  });
+
+  it("gives a made-up player (no id) initials, not an empty circle", () => {
+    const { container } = render(<PlayerAvatar playerId={null} name="Ranked Player 0" position="WR" />);
+    expect(container.querySelector("[data-avatar-fallback]")?.textContent).toBe("R0");
   });
 });

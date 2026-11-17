@@ -72,6 +72,7 @@ export const IDENTICAL = [
   "money.ts",
   "playersModules.ts",
   "playerAnatomy.ts",
+  "avatarFallback.ts",
   "multiTeamIdeas.ts",
   "multiTeamTrade.ts",
   "insightLinks.ts",

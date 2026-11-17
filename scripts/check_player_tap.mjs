@@ -12,6 +12,9 @@
 //   4. Raw identity primitives (<PlayerAvatar>, <PlayerName>) outside the templates are a ratchet: only the files listed in
 //      RAW_ALLOWLIST (each with a reason: the file wires its own tap, or it is a screen that may not be tappable) may use
 //      them. A new file that draws a bare avatar or name must either use a template or be added here with a reason.
+//   5. Avatars always carry identity (the photo fallback chain, lib/avatarFallback.ts): every <PlayerAvatar> must pass
+//      `name` (and ideally `position`/`team`) and every <TeamAvatar> must pass `name`, so a missing photo becomes a monogram and
+//      never an empty circle. Files marked "exempt:" in RAW_ALLOWLIST (identity hidden on purpose) are skipped.
 //
 // Usage: node scripts/check_player_tap.mjs   (exit 1 on any violation)
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -147,6 +150,17 @@ export function checkSource(rel, src) {
           reason = def ? def[1] : null;
         }
         if (reason == null || reason.trim().length < 12) errors.push(`${rel}:${lineOf(src, m.index)} <${name}> nonInteractive needs a reason string of 12+ characters`);
+      }
+    }
+  }
+  // 5: avatars carry identity.
+  if (!/\/(PlayerAvatar|TeamAvatar)\.tsx$/.test(rel) && !String(RAW_ALLOWLIST[rel] ?? "").startsWith("exempt:")) {
+    for (const [tagName, props] of [["PlayerAvatar", ["name"]], ["TeamAvatar", ["name"]]]) {
+      const re = new RegExp(`<${tagName}(?=[\\s/>])`, "g");
+      let m;
+      while ((m = re.exec(src))) {
+        const tag = src.slice(m.index, tagEnd(src, m.index));
+        if (!props.some((pr) => new RegExp(`\\b${pr}=`).test(tag))) errors.push(`${rel}:${lineOf(src, m.index)} <${tagName}> needs ${props.map((x) => `\`${x}\``).join(" or ")} so a missing photo falls back to a monogram, not an empty circle`);
       }
     }
   }

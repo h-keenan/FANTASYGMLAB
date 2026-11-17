@@ -14,7 +14,7 @@ import type { SimDraftBarModel } from "@/lib/simDraft";
 export function SimDraftBar({ model, onOpen, grade }: { model: SimDraftBarModel; onOpen?: () => void; grade?: SimGradeInput | null }) {
   const body = (
     <>
-      <PlayerAvatar playerId={model.playerId} size={36} fallbackLabel={model.name.trim().slice(0, 1)} />
+      <PlayerAvatar playerId={model.playerId} size={36} name={model.name} position={model.position} team={model.team} />
       <span className="flex min-w-0 flex-1 flex-col text-left">
         <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
           Best available

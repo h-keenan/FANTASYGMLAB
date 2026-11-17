@@ -48,7 +48,7 @@ import { EventTypePill } from "@/components/EventTypeGlyph";
 function NewsIdentityRow({ identity }: { identity: NewsPlayerIdentity }) {
   const row = (
     <>
-      <PlayerAvatar playerId={identity.matched_player_id} size={36} />
+      <PlayerAvatar playerId={identity.matched_player_id} name={identity.matched_player} position={identity.matched_player_position} team={identity.matched_player_team} size={36} />
       <span className="flex flex-col min-w-0">
         <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
           {identity.matched_player}

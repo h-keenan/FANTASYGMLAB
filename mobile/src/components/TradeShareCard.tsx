@@ -100,7 +100,7 @@ function AssetRow({
     // One player on a side: a centered portrait card that fills the column.
     return (
       <View style={[styles.assetRow, styles.assetTall, { backgroundColor: SIDE_TINT[side], borderColor: `${SIDE_COLOR[side]}59` }]}>
-        <PlayerAvatar playerId={player.player_id} size={58} tier={player.tier} onLoadSettle={() => onAvatarSettle(trackKey)} />
+        <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={58} tier={player.tier} onLoadSettle={() => onAvatarSettle(trackKey)} />
         <PlayerName name={player.name ?? 'Unknown'} style={styles.assetNameTall} />
         <View style={styles.assetMetaRow}>
           <PositionBadge position={player.position} />
@@ -119,6 +119,9 @@ function AssetRow({
     <View style={[styles.assetRow, { backgroundColor: SIDE_TINT[side], borderColor: `${SIDE_COLOR[side]}59` }]}>
       <PlayerAvatar
         playerId={player.player_id}
+        name={player.name}
+        position={player.position}
+        team={player.team}
         size={34}
         tier={player.tier}
         onLoadSettle={() => onAvatarSettle(trackKey)}

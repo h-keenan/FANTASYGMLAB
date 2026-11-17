@@ -69,6 +69,7 @@ export default function WeeklyMatchupCard({
         <View style={styles.matchupValueSide}>
           <TeamAvatar
             avatarId={mine.avatar_url}
+            name={mine.team_name}
             size={40}
             style={StyleSheet.flatten([styles.matchupAvatar, { borderColor: colors.accent }])}
           />
@@ -79,6 +80,7 @@ export default function WeeklyMatchupCard({
         <View style={[styles.matchupValueSide, styles.matchupValueSideRight]}>
           <TeamAvatar
             avatarId={opponent.avatar_url}
+            name={opponent.team_name}
             size={40}
             style={StyleSheet.flatten([styles.matchupAvatar, { borderColor: colors.danger }])}
           />

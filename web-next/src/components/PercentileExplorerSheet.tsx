@@ -65,7 +65,7 @@ export function explorerEmptyCopy(reason: PercentileExplorerResponse["reason"], 
 function PlayerFace({ player, highlight }: { player: ExplorerPlayer; highlight: boolean }) {
   return (
     <span className={`pe-face${highlight ? " pe-face--me" : ""}`}>
-      <PlayerAvatar playerId={player.player_id} size={highlight ? 36 : 30} />
+      <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={highlight ? 36 : 30} />
     </span>
   );
 }
@@ -472,7 +472,7 @@ function PlayerList({
               onClick={() => onPick(player)}
               aria-label={`${isMe ? "Selected player " : "Compare with "}${player.name}`}
             >
-              <PlayerAvatar playerId={player.player_id} size={32} />
+              <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={32} />
               <span className="pe-row-id">
                 <span className="pe-row-name">
                   {abbreviatePlayerName(player.name)}
@@ -523,7 +523,7 @@ function CompareCard({
           onOpenPlayer?.({ player_id: player.player_id, name: player.name, team: player.team, position: player.position })
         }
       >
-        <PlayerAvatar playerId={player.player_id} size={40} />
+        <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={40} />
         <span className="pe-side-name">{abbreviatePlayerName(player.name)}</span>
       </button>
       <span className="pe-side-meta">{[player.team, player.position].filter(Boolean).join(" · ")}</span>

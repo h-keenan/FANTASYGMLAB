@@ -591,7 +591,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
                 style={[styles.teamPill, selectedTeamId === team.rosterId && styles.pillActive]}
                 onPress={() => setSelectedTeamId(team.rosterId)}
               >
-                <TeamAvatar avatarId={team.avatarId} size={16} />
+                <TeamAvatar avatarId={team.avatarId} name={team.ownerName} size={16} />
                 <AppText style={[styles.pillText, selectedTeamId === team.rosterId && styles.pillTextActive]} numberOfLines={1}>
                   {team.ownerName}
                 </AppText>

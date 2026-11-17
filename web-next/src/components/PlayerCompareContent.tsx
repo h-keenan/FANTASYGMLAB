@@ -204,7 +204,7 @@ function CompareSlot({
         {player ? (
           <>
             <span className="relative inline-flex">
-              <PlayerAvatar playerId={player.player_id} tier={player.tier} size={72} fallbackLabel={(player.name ?? "").split(" ").map((w) => w[0]).slice(0, 2).join("")} />
+              <PlayerAvatar playerId={player.player_id} tier={player.tier} size={72} name={player.name} position={player.position} team={player.team} />
               <span className="absolute -bottom-1 -right-3">
                 <OvrGauge rating={player.overall_rating ?? null} size="sm" />
               </span>
@@ -282,7 +282,7 @@ function OpponentChips({ label, players, onPick }: { label: string; players: Ran
               style={{ minHeight: "var(--touch-target-min)", borderRadius: "var(--radius-pill)" }}
               aria-label={`Compare with ${p.name}`}
             >
-              <PlayerAvatar playerId={p.player_id} tier={p.tier} size={32} fallbackLabel={(p.name ?? "").split(" ").map((w) => w[0]).slice(0, 2).join("")} />
+              <PlayerAvatar playerId={p.player_id} tier={p.tier} size={32} name={p.name} position={p.position} team={p.team} />
               <span className="flex flex-col leading-tight">
                 <PlayerName name={p.name} className="text-sm font-bold" />
                 <span className="text-xs tabular-nums" style={{ color: "var(--color-text-muted)" }}>

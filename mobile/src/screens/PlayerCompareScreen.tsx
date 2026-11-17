@@ -197,7 +197,7 @@ function CompareSlot({ label, player, onChoose, onInfo, testID }: { label: strin
         {player ? (
           <>
             <View>
-              <PlayerAvatar playerId={player.player_id} size={72} tier={player.tier} />
+              <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={72} tier={player.tier} />
               {player.overall_rating != null ? (
                 <View style={styles.slotGauge}>
                   <OvrGauge rating={player.overall_rating} size="sm" />
@@ -242,7 +242,7 @@ function OpponentChips({ label, players, onPick }: { label: string; players: Ran
       <View style={styles.chipWrap}>
         {players.map((p) => (
           <Pressable key={p.player_id} style={styles.oppChip} onPress={() => onPick(p)} accessibilityRole="button" accessibilityLabel={`Compare with ${p.name}`}>
-            <PlayerAvatar playerId={p.player_id} size={32} tier={p.tier} />
+            <PlayerAvatar playerId={p.player_id} name={p.name} position={p.position} team={p.team} size={32} tier={p.tier} />
             <View>
               <PlayerName name={p.name} style={styles.oppName} />
               <AppText style={styles.oppMeta}>

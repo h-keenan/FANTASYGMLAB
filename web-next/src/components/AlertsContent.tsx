@@ -65,7 +65,7 @@ import Link from "next/link";
 function AlertIdentityChip({ alert }: { alert: AlertItem }) {
   const row = (
     <>
-      <PlayerAvatar playerId={alert.matched_player_id} tier={alert.matched_player_tier} size={40} />
+      <PlayerAvatar playerId={alert.matched_player_id} name={alert.matched_player} position={alert.matched_player_position} tier={alert.matched_player_tier} size={40} />
       <span className="flex flex-col min-w-0">
         <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
           {alert.matched_player}

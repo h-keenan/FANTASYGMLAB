@@ -38,7 +38,7 @@ export function SwingPlayers({ swing, onOpenPlayer }: { swing: MatchupSwingPlaye
             {swing.map((p) => {
               const body = (
                 <>
-                  <PlayerAvatar playerId={p.playerId} tier={p.tier} size={36} fallbackLabel={p.name.trim().slice(0, 1)} />
+                  <PlayerAvatar playerId={p.playerId} tier={p.tier} size={36} name={p.name} position={p.position} team={p.team} />
                   <span className="flex min-w-0 flex-col text-left">
                     <span className="flex flex-wrap items-center gap-x-1">
                       <span className="min-w-0 break-words text-sm font-bold">{playerSurname(p.name) || p.name}</span>
@@ -111,7 +111,7 @@ export function LatestBigPlay({ plays, mineName, opponentName }: { plays: Matchu
           const mine = play.side === "mine";
           return (
             <li key={play.id} className="flex min-w-0 items-center gap-2" data-testid="matchup-big-play-item">
-              <PlayerAvatar playerId={play.player_id ?? ""} size={32} fallbackLabel={play.name.trim().slice(0, 1)} />
+              <PlayerAvatar playerId={play.player_id ?? ""} size={32} name={play.name} />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="break-words text-sm font-bold">
                   {playerSurname(play.name) || play.name} · {play.description}

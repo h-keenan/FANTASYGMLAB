@@ -59,7 +59,7 @@ export function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][
         className="inline-flex items-center gap-1 text-xs px-2 py-1"
         style={{ border: "var(--border-width-default) solid var(--color-border)" }}
       >
-        <PlayerAvatar playerId={asset.player_id} size={20} />
+        <PlayerAvatar playerId={asset.player_id} name={asset.name} size={20} />
         <PositionBadge position={asset.position} />
         <PlayerName name={asset.name} className="max-w-[10rem]" style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
       </span>
@@ -73,7 +73,7 @@ function TradePlayerRow({ asset }: { asset: HistoryTransaction["draft_picks"][nu
   const nameColor = asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)";
   const row = (
     <span className="flex items-center gap-2 min-w-0 w-full">
-      {asset.player_id ? <PlayerAvatar playerId={asset.player_id} size={24} /> : <span style={{ width: 24 }} />}
+      {asset.player_id ? <PlayerAvatar playerId={asset.player_id} name={asset.name} size={24} /> : <span style={{ width: 24 }} />}
       <PlayerName name={asset.name} className="text-sm font-bold" style={{ color: nameColor }} />
       {asset.team ? (
         <span className="text-xs font-normal shrink-0" style={{ color: "var(--color-text-muted)" }}>
@@ -121,7 +121,7 @@ function HistorySideBlock({ side, txType }: { side: HistorySide; txType: string 
       style={txType === "trade" ? { background: "var(--color-surface-muted)", padding: "0.5rem 0.75rem" } : undefined}
     >
       <div className="flex items-center gap-2 min-w-0">
-        <TeamAvatar avatarUrl={side.avatar_url} size={28} />
+        <TeamAvatar avatarUrl={side.avatar_url} name={side.team_name} size={28} />
         <div className="flex flex-col min-w-0">
           <span className="text-sm font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
             {side.team_name}
