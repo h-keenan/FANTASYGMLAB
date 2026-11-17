@@ -65,6 +65,7 @@ import {
   moveOverLine,
   moveSlotLabel,
   recordLabel,
+  winProbabilityNote,
   winProbabilityUnavailableMessage,
   type LineupPlayer,
   type VerdictTone,
@@ -500,7 +501,7 @@ function MatchupHero({
   return (
     <>
       <MatchupHeroCard model={model} bigPlays={matchup.live ? matchup.big_plays : undefined} onOpenPlayer={onOpenPlayer} action={<Button label="Open lineup" onPress={onOpenLineup} />} testID="matchup-hero" />
-      {myPct == null ? <AppText style={styles.oddsUnavailable}>{winProbabilityUnavailableMessage(matchup)}</AppText> : null}
+      {myPct == null ? <AppText style={styles.oddsUnavailable}>{winProbabilityUnavailableMessage(matchup)}</AppText> : winProbabilityNote(matchup) ? <AppText style={styles.oddsUnavailable}>{winProbabilityNote(matchup)}</AppText> : null}
     </>
   );
 }

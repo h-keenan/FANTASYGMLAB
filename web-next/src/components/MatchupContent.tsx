@@ -54,6 +54,7 @@ import {
   moveOverLine,
   moveSlotLabel,
   recordLabel,
+  winProbabilityNote,
   winProbabilityUnavailableMessage,
 } from "@/lib/matchupPresentation";
 import { compareLineupSlots, type SlotSortMode } from "@/lib/lineupSlots";
@@ -229,6 +230,10 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
       {myPct == null ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
           {winProbabilityUnavailableMessage(matchup)}
+        </p>
+      ) : winProbabilityNote(matchup) ? (
+        <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {winProbabilityNote(matchup)}
         </p>
       ) : null}
     </>
