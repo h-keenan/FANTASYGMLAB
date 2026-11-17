@@ -236,7 +236,7 @@ export default function PercentileExplorerSheet({
   const side = (player: ExplorerPlayer) => (
     <View style={styles.side}>
       <PressableScale style={styles.sideId} onPress={() => onOpenPlayer(player)} accessibilityLabel={`Open ${player.name}`}>
-        <PlayerAvatar playerId={player.player_id} size={36} />
+        <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={36} />
         <PlayerName name={player.name} style={styles.sideName} />
       </PressableScale>
       <AppText style={styles.sideMeta}>{[player.team, player.position].filter(Boolean).join(' · ')}</AppText>
@@ -261,7 +261,7 @@ export default function PercentileExplorerSheet({
           onPress={() => onPress(player)}
           accessibilityLabel={`${isMe ? 'Selected player ' : 'Compare with '}${player.name}`}
         >
-          <PlayerAvatar playerId={player.player_id} size={32} />
+          <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={32} />
           <View style={styles.rowId}>
             <View style={styles.rowNameLine}>
               <PlayerName name={player.name} style={styles.rowName} />
@@ -374,7 +374,7 @@ export default function PercentileExplorerSheet({
                             >
                               <PlayerName name={marker.name} style={[styles.markerName, (isMe || isMine) && { color: colors.accent }]} />
                               <View style={[styles.face, isPicked && styles.facePicked, isMe && styles.faceMe]}>
-                                <PlayerAvatar playerId={marker.player_id} size={isMe ? 36 : 30} />
+                                <PlayerAvatar playerId={marker.player_id} name={marker.name} position={marker.position} team={marker.team} size={isMe ? 36 : 30} />
                               </View>
                               <View style={styles.markerValueRow}>
                                 <AppText style={[styles.markerValue, isMe && { color: colors.accent }]}>

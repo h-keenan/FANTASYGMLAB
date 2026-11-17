@@ -216,7 +216,7 @@ export function SimPlayerChip({
   const handler = nonInteractive || inScope ? null : onOpen ?? openSheet;
   const body = (
     <View style={[styles.identity, muted && styles.muted]}>
-      <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
+      <PlayerAvatar playerId={simHeadshotId(player)} name={player.name} position={player.pos} team={player.team} size={size} />
       <View style={styles.identityText}>
         <PlayerName name={player.name} style={styles.playerName} />
         <View style={styles.sublineRow}>
@@ -807,7 +807,7 @@ export function SimMiniPlayer({
   const bye = player.status === 'bye';
   const body = (
     <View style={[styles.mini, align === 'right' && styles.miniRight]}>
-      <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
+      <PlayerAvatar playerId={simHeadshotId(player)} name={player.name} position={player.pos} team={player.team} size={size} />
       <View style={styles.miniText}>
         <PlayerName name={player.name} style={[styles.miniName, align === 'right' && styles.miniNameRight, (hurt || bye) && { color: colors.textTertiary }, hurt && { textDecorationLine: 'line-through' }]} />
         {hurt ? (

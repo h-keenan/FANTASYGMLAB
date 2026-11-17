@@ -390,7 +390,7 @@ export default function TradeIdeaCard({
           />
         ) : null}
         {idea.partner_team_avatar_url ? (
-          <TeamAvatar avatarId={idea.partner_team_avatar_url} size={36} />
+          <TeamAvatar avatarId={idea.partner_team_avatar_url} name={idea.partner_team_name} size={36} />
         ) : (
           <View style={styles.partnerAvatar}>
             <AppText style={styles.partnerInitial}>{idea.partner_team_name.charAt(0).toUpperCase()}</AppText>

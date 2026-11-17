@@ -429,6 +429,7 @@ function ScoreSide({
     <View style={styles.scoreSide}>
       <TeamAvatar
         avatarId={side.avatar_url}
+        name={side.team_name}
         size={56}
         style={StyleSheet.flatten([styles.scoreAvatar, { borderColor: accent }])}
       />

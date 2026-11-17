@@ -71,7 +71,7 @@ function WaiverSuggestionCard({ player, onPress }: { player: WaiverPriorityAdd; 
         )}
         <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
       </View>
-      <PlayerAvatar playerId={player.player_id} size={40} tier={player.tier} style={styles.suggestionAvatar} />
+      <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={40} tier={player.tier} style={styles.suggestionAvatar} />
       <View style={styles.suggestionPosBadgeWrap}>
         <PositionBadge position={player.position} size="sm" />
       </View>

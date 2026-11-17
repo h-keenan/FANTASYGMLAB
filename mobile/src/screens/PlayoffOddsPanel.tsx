@@ -193,7 +193,7 @@ function PlayoffOddsRow({
         isMine && styles.rowMine,
       ]}
     >
-      <TeamAvatar avatarId={item.avatar_url} size={36} style={styles.avatar} />
+      <TeamAvatar avatarId={item.avatar_url} name={item.team_name} size={36} style={styles.avatar} />
       <View style={styles.ownerGroup}>
         <View style={styles.nameRow}>
           <AppText style={styles.owner} numberOfLines={1}>

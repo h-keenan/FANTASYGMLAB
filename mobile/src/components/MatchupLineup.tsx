@@ -185,7 +185,7 @@ function CompactSide({
       accessibilityLabel={playerCardAriaLabel(card)}
     >
       {pulseKey > 0 ? <PulseRing pulseKey={pulseKey} /> : null}
-      <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} fallbackLabel={card.team} />
+      <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} name={card.name} position={card.position} team={card.team} />
       <View style={[styles.flex, { alignItems: align, gap: 1 }]}>
         <PlayerName name={card.name} style={[styles.sideName, mirror && { textAlign: 'right' }]} />
         <View style={[styles.statusRow, mirror && { flexDirection: 'row-reverse' }]}>

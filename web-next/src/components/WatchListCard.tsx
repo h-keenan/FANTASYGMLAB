@@ -91,7 +91,7 @@ export function WatchListCard({
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="bye-cover-fillins">
                   {bye.suggestions.map((fa) => (
                     <PlayerTap key={fa.player_id} player={{ id: fa.player_id, name: fa.name, position: fa.position, tier: fa.player_tier }} className="pointer-events-auto flex items-center gap-1.5 min-w-0 text-left">
-                      <PlayerAvatar playerId={fa.player_id} tier={fa.player_tier} size={24} />
+                      <PlayerAvatar playerId={fa.player_id} name={fa.name} position={fa.position} tier={fa.player_tier} size={24} />
                       <span className="text-xs font-semibold" style={{ color: "var(--color-text-primary)" }}>
                         {fa.name}
                       </span>

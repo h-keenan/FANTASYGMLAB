@@ -599,7 +599,7 @@ const TeamRowCard = React.memo(function TeamRowCard({
         item.isMine && styles.rowMine,
       ]}
     >
-      <TeamAvatar avatarId={item.avatarId} size={36} style={styles.avatar} />
+      <TeamAvatar avatarId={item.avatarId} name={item.teamName} size={36} style={styles.avatar} />
       <View style={styles.ownerGroup}>
         <View style={styles.nameRow}>
           <AppText style={styles.owner} numberOfLines={1}>

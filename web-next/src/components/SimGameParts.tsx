@@ -864,7 +864,7 @@ export function SimMiniPlayer({
   const bye = player.status === "bye";
   const body = (
     <span className={`flex w-full min-w-0 items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
+      <PlayerAvatar playerId={simHeadshotId(player)} name={player.name} position={player.pos} team={player.team} size={size} />
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
         <PlayerName name={player.name} className="text-xs font-bold" style={{ color: hurt || bye ? "var(--color-text-muted)" : undefined, textDecoration: hurt ? "line-through" : undefined }} />
         <span className={`flex items-center gap-1 text-[0.6875rem] ${align === "right" ? "justify-end" : ""}`} style={{ color: "var(--color-text-muted)" }}>

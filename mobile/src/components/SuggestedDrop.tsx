@@ -58,7 +58,7 @@ function DropPlayerLine({
       <View style={styles.nameRow}>
         <PlayerTap player={{ id: player.player_id, name: player.name, position: player.position, team: player.team }} style={{ flexShrink: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 }}>
-            <PlayerAvatar playerId={player.player_id} size={32} />
+            <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={32} />
             {lead ? <AppText style={styles.playerName}>{lead}</AppText> : null}
             <PlayerName name={player.name} style={[styles.playerName, { flexShrink: 1 }]} />
           </View>
@@ -114,7 +114,7 @@ function SwapTile({ side, player, name, playerId, position, team }: { side: 'add
       <ToneBadge label={label} color={color} size="xs" />
       <PlayerTap player={{ id: playerId, name, position, team }}>
         <View style={{ alignItems: 'center', gap: spacing.xs }}>
-          <PlayerAvatar playerId={playerId} size={44} />
+          <PlayerAvatar playerId={playerId} name={name} position={position} team={team} size={44} />
           <PlayerName name={name} style={[styles.playerName, { textAlign: 'center' }]} />
         </View>
       </PlayerTap>
@@ -185,7 +185,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
                 accessibilityRole="button"
                 accessibilityLabel={`Cut ${alt.name} instead`}
               >
-                <PlayerAvatar playerId={alt.player_id} size={28} />
+                <PlayerAvatar playerId={alt.player_id} name={alt.name} position={alt.position} size={28} />
                 <PlayerName name={alt.name} style={[styles.meta, { color: colors.textPrimary, fontWeight: '700', maxWidth: 110 }]} />
                 <PositionBadge position={alt.position} />
               </PressableScale>
@@ -229,7 +229,7 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
         <View style={[styles.badge, { borderColor: `${badge.color}70`, backgroundColor: `${badge.color}1A` }]}>
           <AppText style={[styles.badgeText, { color: badge.color }]}>{badge.label}</AppText>
         </View>
-        {drop ? <PlayerAvatar playerId={drop.player_id} size={24} /> : null}
+        {drop ? <PlayerAvatar playerId={drop.player_id} name={drop.name} position={drop.position} size={24} /> : null}
         {drop ? (
           <PlayerName name={label} style={[styles.playerName, { flex: 1 }]} />
         ) : (
@@ -274,7 +274,7 @@ export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: numbe
         <View style={[styles.badge, { borderColor: `${colors.danger}70`, backgroundColor: `${colors.danger}1A` }]}>
           <AppText style={[styles.badgeText, { color: colors.danger }]}>Drop</AppText>
         </View>
-        <PlayerAvatar playerId={drop.player_id} size={24} />
+        <PlayerAvatar playerId={drop.player_id} name={drop.name} position={drop.position} size={24} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <PlayerName name={drop.name} style={styles.playerName} />
           <AppText style={styles.meta}>{`${drop.position} · for ${count} adds below`}</AppText>

@@ -135,7 +135,9 @@ function CompactCard({ model, onPress, stats = [], trailing }: PlayerCardProps) 
             playerId={model.playerId}
             tier={model.tier}
             size={PLAYER_CARD_AVATAR_SIZE.compact}
-            fallbackLabel={model.team}
+            name={model.name}
+            position={model.position}
+            team={model.team}
           />
           <View style={styles.flex}>
             <PlayerName name={model.name} style={styles.name} />
@@ -170,7 +172,9 @@ function TileCard({ model, onPress, stats = [], trailing }: PlayerCardProps) {
             playerId={model.playerId}
             tier={model.tier}
             size={PLAYER_CARD_AVATAR_SIZE.card}
-            fallbackLabel={model.team}
+            name={model.name}
+            position={model.position}
+            team={model.team}
           />
           <OvrGauge rating={model.overallRating} size="md" reserveSpace />
         </View>
@@ -264,7 +268,9 @@ function MatchupCard({ model, onPress, editing, mirror = false, emphasis = 'even
             playerId={model.playerId}
             tier={model.tier}
             size={PLAYER_CARD_AVATAR_SIZE.matchup}
-            fallbackLabel={model.team}
+            name={model.name}
+            position={model.position}
+            team={model.team}
           />
           <View style={[styles.flex, { alignItems: align, gap: 3 }]}>
             <PlayerName name={model.name} style={[styles.name, mirror && styles.textRight]} />

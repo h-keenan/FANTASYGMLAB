@@ -27,7 +27,8 @@ export function TeamAvatar({
   ringColor?: string;
 }) {
   const [failed, setFailed] = useState(false);
-  const initials = teamInitials(name);
+  // Never an empty circle: a nameless team still shows "?".
+  const initials = teamInitials(name) || "?";
   // Same as PlayerAvatar: never squashed into an oval by preflight `img { max-width: 100% }` in a narrow column.
   const dimension = { width: size, height: size, borderRadius: "50%", maxWidth: "none", flexShrink: 0 };
 

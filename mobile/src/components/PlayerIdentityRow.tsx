@@ -274,7 +274,7 @@ export default function PlayerIdentityRow({
           </View>
         ) : null}
         <View style={styles.gridIdentityRow}>
-          <PlayerAvatar playerId={playerId} size={34} tier={tier} style={styles.gridAvatar} />
+          <PlayerAvatar playerId={playerId} name={name} position={position} team={team} size={34} tier={tier} style={styles.gridAvatar} />
           <View style={styles.gridBody}>
             <PlayerName name={name ?? 'Unknown player'} style={styles.gridName} />
             <View style={styles.metaRow}>
@@ -358,7 +358,7 @@ export default function PlayerIdentityRow({
           </AppText>
         </View>
       ) : null}
-      <PlayerAvatar playerId={playerId} size={38} tier={tier} style={styles.avatar} />
+      <PlayerAvatar playerId={playerId} name={name} position={position} team={team} size={38} tier={tier} style={styles.avatar} />
       <View style={styles.body}>
         <View style={styles.nameRow}>
           {/* PlayerName (not a plain numberOfLines AppText) so a name

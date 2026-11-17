@@ -104,7 +104,7 @@ export default function LeagueStandingStrips({
             })
           }
         >
-          <TeamAvatar avatarId={myTeam.avatarId} size={36} />
+          <TeamAvatar avatarId={myTeam.avatarId} name={myTeam.teamName} size={36} />
           <View style={styles.stripTextGroup}>
             <View style={styles.stripNameRow}>
               <AppText style={styles.stripName} numberOfLines={1}>

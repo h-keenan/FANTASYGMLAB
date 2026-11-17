@@ -224,7 +224,7 @@ export function TradeIdeaCardView({
       getLabel="You get"
       title={
         <span className="flex items-center gap-2 min-w-0">
-          <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
+          <TeamAvatar avatarUrl={idea.partner_team_avatar_url} name={idea.partner_team_name} size={24} />
           <span className="min-w-0 flex-1 break-words">{idea.partner_team_name}</span>
           <span className="shrink-0 font-black" style={{ color: deltaColor }}>{tradeIdeaGainText(gain)}</span>
         </span>
@@ -276,7 +276,7 @@ export function TradeIdeaCardView({
                 style={{ border: "var(--border-width-default) solid var(--color-accent)", borderRadius: "var(--radius-pill)", color: "var(--color-text-primary)" }}
               >
                 <PlayerTap player={{ id: playerId, name: asset.name ?? "Player", position: asset.position, team: asset.team }} className="inline-flex items-center gap-1 text-left">
-                  <PlayerAvatar playerId={playerId} size={22} />
+                  <PlayerAvatar playerId={playerId} name={asset.name} position={asset.position} team={asset.team} size={22} />
                   <PlayerName name={asset.name} className="max-w-[9rem]" />
                 </PlayerTap>
               </span>

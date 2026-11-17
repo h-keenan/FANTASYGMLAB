@@ -2,6 +2,8 @@
 
 import { useState, type CSSProperties, type ReactElement } from "react";
 
+import { pickAvatarSource } from "@/lib/avatarFallback";
+import { positionColorVar } from "@/lib/playerPresentation";
 import { resolvePlayerTier, tierGlowIntensity, type TierGlowIntensity } from "@/lib/playerTier";
 
 // Same escape hatch as OvrGauge.tsx's GaugeStyle — CSS custom properties
@@ -27,8 +29,6 @@ const GLOW_STYLE_BY_INTENSITY: Record<Exclude<TierGlowIntensity, null>, { min: s
 /** Initials font size as a share of the circle's inner width (the old px rule was size * 0.34 of the outer box). */
 export const INITIALS_FONT_CQW = 38;
 
-const SLEEPER_HEADSHOT_BASE = "https://sleepercdn.com/content/nfl/players";
-
 /**
  * Player headshot with a tier-colored "prestige" ring — ports mobile's
  * PlayerAvatar.tsx (same public Sleeper headshot CDN, same tier-ring
@@ -47,17 +47,25 @@ export function PlayerAvatar({
   tier,
   size = 32,
   fallbackLabel,
+  name,
+  position,
+  team,
 }: {
   playerId: string | null | undefined;
   tier?: string | null;
   size?: number;
   /** Initials (or a team code) shown in the ring when there is no photo to load. */
   fallbackLabel?: string | null;
+  /** Feeds the shared fallback chain (lib/avatarFallback): monogram initials, position colour, defense team logo. */
+  name?: string | null;
+  position?: string | null;
+  team?: string | null;
 }) {
   // Keyed by id so a recycled row that now shows a different player retries
   // its photo instead of inheriting the previous player's failure.
-  const [failedId, setFailedId] = useState<string | null>(null);
-  const failed = !!playerId && failedId === playerId;
+  const [failed, setFailed] = useState<{ id: string | null | undefined; keys: string[] }>({ id: playerId, keys: [] });
+  const failedKeys = failed.id === playerId ? failed.keys : [];
+  const source = pickAvatarSource({ playerId, name, label: fallbackLabel, position, team }, failedKeys);
   const tierIdentity = resolvePlayerTier(tier);
   const ringColor = `var(${tierIdentity.colorVar})`;
   // --sim-scale is set by the Fantasy Sim shell at desktop widths so photos grow with the screen; 1 everywhere else.
@@ -103,7 +111,9 @@ export function PlayerAvatar({
       avatar
     );
 
-  if (!playerId || failed) {
+  if (source.kind === "monogram") {
+    const posVar = positionColorVar(source.position);
+    const posColor = posVar ? `var(${posVar})` : "var(--color-text-muted)";
     return wrap(
       <span
         className="shrink-0"
@@ -114,8 +124,8 @@ export function PlayerAvatar({
           justifyContent: "center",
           overflow: "hidden",
           border: `${borderWidth}px solid ${ringColor}`,
-          background: "var(--color-surface-muted)",
-          color: "var(--color-text-muted)",
+          background: posVar ? `color-mix(in srgb, ${posColor} 18%, var(--color-surface-muted))` : "var(--color-surface-muted)",
+          color: posColor,
           // The circle's own CSS box is the size reference, not the `size` prop: a shell (the PQV header) may resize the circle
           // with CSS (112px full, 56px peek), and a font sized from the prop overflowed the smaller circle (coridian_, "pqv still
           // opens wrong", 2026-11-14). The label is sized in container-query units of this circle (cqw = 1% of its content width).
@@ -127,9 +137,9 @@ export function PlayerAvatar({
         aria-hidden
         data-avatar-fallback=""
       >
-        {fallbackLabel && size >= 24 ? (
+        {size >= 24 ? (
           <span data-avatar-initials="" style={{ fontSize: `max(9px, ${INITIALS_FONT_CQW}cqw)`, whiteSpace: "nowrap", maxWidth: "100%", overflow: "hidden" }}>
-            {fallbackLabel}
+            {source.label}
           </span>
         ) : null}
       </span>,
@@ -139,7 +149,7 @@ export function PlayerAvatar({
   return wrap(
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`${SLEEPER_HEADSHOT_BASE}/${playerId}.jpg`}
+      src={source.url}
       alt=""
       title={title}
       // Sleeper serves a ~350 px photo for every avatar (20-40 KB) even in a
@@ -149,9 +159,9 @@ export function PlayerAvatar({
       // so deferring the load shifts nothing.
       loading="lazy"
       decoding="async"
-      style={{ ...dimension, border: `${borderWidth}px solid ${ringColor}`, objectFit: "cover", objectPosition: "top" }}
+      style={{ ...dimension, border: `${borderWidth}px solid ${ringColor}`, objectFit: source.kind === "teamLogo" ? "contain" : "cover", objectPosition: "top", background: source.kind === "teamLogo" ? "var(--color-surface-muted)" : undefined }}
       className="shrink-0"
-      onError={() => setFailedId(playerId ?? null)}
+      onError={() => setFailed({ id: playerId, keys: [...failedKeys, source.key] })}
     />,
   );
 }

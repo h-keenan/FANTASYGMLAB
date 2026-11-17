@@ -276,7 +276,7 @@ function CompactSide({
   const dir = mirror ? " flex-row-reverse text-right" : "";
   const body = (
     <>
-      <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} fallbackLabel={card.team} />
+      <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} name={card.name} position={card.position} team={card.team} />
       <span className={`flex flex-col min-w-0 flex-1 gap-0.5${mirror ? " items-end" : ""}`}>
         <PlayerName name={card.name} className="text-[12px] font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
         <span className={`flex items-center gap-1 text-[0.6875rem] font-extrabold uppercase leading-none${mirror ? " flex-row-reverse" : ""}`} style={{ letterSpacing: "var(--letter-spacing-badge)" }}>

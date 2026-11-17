@@ -146,7 +146,7 @@ export default function PlayerListRow({
         <PositionBadge position={position ?? ''} />
       </View>
       <View style={{ width: dims.avatar, height: dims.avatar, alignItems: 'center', justifyContent: 'center' }}>
-        <PlayerAvatar playerId={headshotId ?? null} fallbackLabel={fallbackLabel ?? name.slice(0, 2)} size={dims.avatar} />
+        <PlayerAvatar playerId={headshotId ?? null} name={name} position={position} fallbackLabel={fallbackLabel} size={dims.avatar} />
         {hurt ? <View style={styles.hurtDot} /> : null}
       </View>
       <View style={styles.nameCol}>

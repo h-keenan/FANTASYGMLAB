@@ -297,7 +297,7 @@ function PortfolioLeagueCard({ league, signalsPending = false }: { league: Portf
               had no team logo at all. Same Sleeper CDN avatar the user's
               own roster already has everywhere else in the app (Trade Hub,
               Matchup, League Rankings) — not a new avatar source. */}
-          <TeamAvatar avatarUrl={league.team_avatar_url} size={32} />
+          <TeamAvatar avatarUrl={league.team_avatar_url} name={league.team_name} size={32} />
           <div className="flex flex-col min-w-0">
             <h3 style={{ font: "var(--font-card-title)" }}>
               {league.team_name || "Unclaimed team"} — {league.league_name}

@@ -157,6 +157,7 @@ function ScoreSide({
     <div className="flex-1 flex flex-col items-center text-center gap-1 min-w-0">
       <TeamAvatar
         avatarUrl={side.avatar_url}
+        name={side.team_name}
         size={56}
         ringColor={mine ? "var(--color-accent)" : "var(--color-border-strong)"}
       />

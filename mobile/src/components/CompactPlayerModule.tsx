@@ -83,7 +83,7 @@ export default function CompactPlayerModule({
       style={[styles.row, style]}
       {...(onPress ? { onPress, activeOpacity: 0.7 } : null)}
     >
-      <PlayerAvatar playerId={playerId} size={34} tier={tier} style={styles.avatar} />
+      <PlayerAvatar playerId={playerId} name={name} position={position} team={team} size={34} tier={tier} style={styles.avatar} />
       <View style={styles.body}>
         <PlayerName name={name ?? 'Unknown player'} style={styles.name} />
         <View style={styles.metaRow}>

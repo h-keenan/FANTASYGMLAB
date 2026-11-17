@@ -33,7 +33,8 @@ export default function TeamAvatar({ avatarId, name, size = 36, style }: TeamAva
   const dimension = { width: size, height: size, borderRadius: size / 2 };
 
   if (!avatarId || failed) {
-    const text = teamInitials(name);
+    // Never an empty circle: a nameless team still shows "?".
+    const text = teamInitials(name) || '?';
     return (
       <View style={[styles.fallback, dimension, style, text ? styles.fallbackCentered : null]}>
         {text ? <AppText style={{ fontSize: size * 0.38, fontWeight: '800', color: colors.textSecondary }}>{text}</AppText> : null}

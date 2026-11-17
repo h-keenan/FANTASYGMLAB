@@ -20,7 +20,7 @@ export function SimDraftBar({ model, onOpen, grade }: { model: SimDraftBarModel;
   const styles = useMemo(() => createStyles(colors), [colors]);
   const body = (
     <>
-      <PlayerAvatar playerId={model.playerId} size={36} />
+      <PlayerAvatar playerId={model.playerId} name={model.name} position={model.position} team={model.team} size={36} />
       <View style={styles.text}>
         <AppText style={styles.kicker}>Best available</AppText>
         <View style={styles.nameRow}>

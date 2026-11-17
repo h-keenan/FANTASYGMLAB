@@ -810,7 +810,7 @@ function BestAvailableCard({
         )}
         <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
       </View>
-      <PlayerAvatar playerId={player.player_id} size={36} tier={player.tier} style={styles.avatarWrap} />
+      <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={36} tier={player.tier} style={styles.avatarWrap} />
       {/* Shared PositionBadge (per-position semantic color, e.g. RB green /
           WR blue / TE orange) instead of a flat neutral pill — the concept
           gives each mini-card's position tag a distinct color, and
