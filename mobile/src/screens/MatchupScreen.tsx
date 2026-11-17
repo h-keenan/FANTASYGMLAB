@@ -4,7 +4,7 @@ import ManagerProfileModal from '../components/ManagerProfileModal';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import TickNumber from '../components/TickNumber';
-import PageTitle from '../components/PageTitle';
+import PageStatusLine from '../components/PageStatusLine';
 import ErrorState from '../components/ErrorState';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -265,10 +265,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
         >
           <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <PageFamilyTabs family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} padded={false} />
-          <View style={styles.titleRow}>
-            <PageTitle>Matchup</PageTitle>
-            {guillotine.week != null ? <AppText style={styles.weekLabel}>Week {guillotine.week}</AppText> : null}
-          </View>
+          <PageStatusLine context={guillotine.week != null ? <AppText style={styles.weekLabel}>Week {guillotine.week}</AppText> : null} testID="matchup-status-line" />
           <GuillotineCard data={guillotine} />
         </ScrollView>
       </View>
@@ -325,34 +322,28 @@ export default function MatchupScreen({ route, navigation }: Props) {
       >
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <PageFamilyTabs family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} padded={false} />
-        <View style={styles.titleRow}>
-          <PageTitle>Matchup</PageTitle>
-          {matchup.week != null ? <AppText style={styles.weekLabel}>Week {matchup.week}</AppText> : null}
-          {matchup.game_state === 'live' ? (
-            <View style={styles.liveBadge} accessibilityLabel="Games in progress">
-              <View style={styles.liveDot} />
-              <AppText style={styles.liveBadgeText}>LIVE</AppText>
-            </View>
-          ) : null}
-        </View>
-
-        {matchup.as_of_age_seconds != null ? (
-          <View style={styles.freshnessRow} accessibilityLiveRegion="polite">
-            <AppText style={{ color: colors.textSecondary, fontSize: 12.5 }}>
-              {freshnessLabel(dataAgeSeconds(matchup.as_of_age_seconds, matchupQuery.dataUpdatedAt, nowMs))}
-            </AppText>
-            <PressableScale
-              onPress={() => void matchupQuery.refetch()}
-              disabled={matchupQuery.isFetching}
-              accessibilityRole="button"
-              accessibilityLabel="Refresh live scores"
-            >
-              <AppText style={{ color: colors.accent, fontSize: 12.5 }}>
-                {matchupQuery.isFetching ? 'Refreshing…' : 'Refresh'}
-              </AppText>
-            </PressableScale>
-          </View>
-        ) : null}
+        <PageStatusLine
+          context={
+            <>
+              {matchup.week != null ? <AppText style={styles.weekLabel}>Week {matchup.week}</AppText> : null}
+              {matchup.game_state === 'live' ? (
+                <View style={styles.liveBadge} accessibilityLabel="Games in progress">
+                  <View style={styles.liveDot} />
+                  <AppText style={styles.liveBadgeText}>LIVE</AppText>
+                </View>
+              ) : null}
+            </>
+          }
+          freshness={
+            matchup.as_of_age_seconds != null
+              ? freshnessLabel(dataAgeSeconds(matchup.as_of_age_seconds, matchupQuery.dataUpdatedAt, nowMs))
+              : null
+          }
+          onRefresh={() => void matchupQuery.refetch()}
+          refreshing={matchupQuery.isFetching}
+          refreshLabel="Refresh live scores"
+          testID="matchup-status-line"
+        />
 
         <MatchupHero
           matchup={shown}
@@ -504,6 +495,7 @@ function MatchupHero({
     kickedOff: hasKickedOff(matchup),
     playersLeft: hasKickedOff(matchup) ? playersLeft : null,
     swing: matchupSwingPlayers(swingInputs, opponent.team_name),
+    omitWeek: true,
   });
   return (
     <>
@@ -959,7 +951,6 @@ function createStyles(colors: ThemeColors) {
     error: { color: colors.danger, textAlign: 'center' },
     notice: { color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
     bestBallNote: { color: colors.textSecondary, lineHeight: 20 },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     weekLabel: { fontSize: 15.5, fontWeight: '700', color: colors.textSecondary },
     liveBadge: {
       flexDirection: 'row',
@@ -1024,7 +1015,6 @@ function createStyles(colors: ThemeColors) {
     cellName: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, alignSelf: 'stretch' },
     textRight: { textAlign: 'right' },
     cellProjFinal: { fontSize: 12, color: colors.textSecondary },
-    freshnessRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     cellTeam: { fontSize: 12.5, color: colors.textTertiary, alignSelf: 'stretch' },
         cellPoints: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
     cellPointsWin: { fontWeight: '800', color: colors.accent },

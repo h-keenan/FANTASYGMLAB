@@ -37,6 +37,7 @@ import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPl
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
 import { freshnessLabel } from "@/lib/liveScores";
+import { PageStatusLine } from "@/components/ui/PageStatusLine";
 import { WeatherReasonChip } from "@/components/WeatherReasonChip";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import {
@@ -83,22 +84,43 @@ function signedTone(value: number | null | undefined): "positive" | "risk" | "ne
 
 const ManagerProfileSheet = dynamic(() => import("@/components/ManagerProfileSheet").then((m) => m.ManagerProfileSheet), { ssr: false });
 
-function MatchupHeader({ week, live, leagueName }: { week: number | null; live: boolean; leagueName: string }) {
+function MatchupHeader({
+  week,
+  live,
+  leagueName,
+  ageSeconds,
+  onRefresh,
+  refreshing,
+}: {
+  week: number | null;
+  live: boolean;
+  leagueName: string;
+  ageSeconds?: number | null;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
   const pageHelp = usePageHelp([BEGINNER_HELP.matchupIntro, BEGINNER_HELP.matchupWinProbability]);
+  // ONE compact line (PageStatusLine): "Week 10 . Live" left, "Updated 3m ago" + refresh icon right. The hero card does not repeat the week.
   return (
-    <header className="flex items-baseline gap-3 flex-wrap">
+    <>
       <PageTitle page="Matchup" leagueName={leagueName} info={pageHelp} />
-      {week != null ? (
-        <span className="text-sm font-bold" style={{ color: "var(--color-text-secondary)" }}>
-          Week {week}
-        </span>
-      ) : null}
-      {live ? (
-        <span className="self-center" aria-label="Games in progress">
-          <ToneBadge label="● Live" color="var(--color-success)" />
-        </span>
-      ) : null}
-    </header>
+      <PageStatusLine
+        context={
+          <>
+            {week != null ? <span>Week {week}</span> : null}
+            {live ? (
+              <span aria-label="Games in progress">
+                <ToneBadge label="● Live" color="var(--color-success)" />
+              </span>
+            ) : null}
+          </>
+        }
+        freshness={onRefresh ? (ageSeconds != null ? freshnessLabel(ageSeconds) : "Live scores") : null}
+        onRefresh={onRefresh}
+        refreshing={refreshing}
+        testId="matchup-freshness"
+      />
+    </>
   );
 }
 
@@ -186,6 +208,7 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
     kickedOff: hasKickedOff(matchup),
     playersLeft: hasKickedOff(matchup) ? playersLeft : null,
     swing: matchupSwingPlayers(swingInputs, opponent.team_name),
+    omitWeek: true,
   });
   return (
     <>
@@ -818,21 +841,7 @@ export function MatchupContent({
   return (
     <main className="page-shell page-shell-wide">
       {leagueId ? <PageTabBar family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} /> : null}
-      <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} />
-      {onRefresh ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="matchup-freshness">
-          <span aria-live="polite">{ageSeconds != null ? freshnessLabel(ageSeconds) : "Live scores"}</span>
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={refreshing}
-            className="inline-flex items-center underline"
-            style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)", padding: "0 0.5rem" }}
-          >
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-      ) : null}
+      <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} ageSeconds={ageSeconds} onRefresh={onRefresh} refreshing={refreshing} />
       <MatchupHero matchup={shown} />
       {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="unmapped-starters">

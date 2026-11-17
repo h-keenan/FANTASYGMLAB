@@ -355,26 +355,18 @@ export function PlayersContent({
         <ProspectsTab leagueId={leagueId} lens={lens} />
       ) : (
       <>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search players"
-              className="filter-input col-span-2 px-3 py-2 text-sm sm:flex-1 sm:min-w-[10rem]"
-            />
-            {/* Position is the filter people use most, so it stays one tap: a pill row that
-                applies at once. Filters keeps everything else (age, status, health, roster). */}
-            <div className="col-span-2 sm:col-span-1 sm:order-first min-w-0">
-              <PillRow
-                variant="scroll"
-                ariaLabel="Position"
-                options={positionOptions.map((pos) => ({ label: pos === "ALL" ? "All" : pos, value: pos }))}
-                active={position}
-                onSelect={setPosition}
+          {/* Batch B: two control rows instead of four. Row 1 = search + Filters; row 2 = position pills (one tap, applied at once) + the
+              Sort select. Filters keeps everything else (age, status, health, roster). The Raw/Percentile toggle only matters for a real
+              stat column (hidden for Value/OVR) and appears as a third row only then. */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-start gap-2">
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search players"
+                className="filter-input min-w-0 flex-1 px-3 py-2 text-sm"
               />
-            </div>
-            <div className="col-span-1">
               <FilterSheet
                 groups={filterGroups}
                 values={filterValues}
@@ -388,30 +380,31 @@ export function PlayersContent({
                 }}
               />
             </div>
-            {/* One control row: Filters and Sort sit together (was a second row).
-             Madden-style stat sort (Revision 20): Sort By picks the column
-              (Value/OVR, always present, plus whatever position-relevant
-              raw stats the current filter's pool carries — see
-              buildPlayersSortOptions), and the Raw/Percentile toggle picks
-              whether a stat column sorts/displays its season total or its
-              position-group percentile. The toggle only matters for a real
-              stat column, so it's hidden for Value/OVR rather than shown
-              disabled and confusing. */}
-          <div className="col-span-2 sm:col-span-1 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
-              Sort by
-            </span>
-            <select aria-label="Sort by"
-              value={activeSortOption.key}
-              onChange={(event) => setSortKey(event.target.value)}
-              className="filter-select px-3 py-2 text-sm"
-            >
-              {sortOptions.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <PillRow
+                  variant="scroll"
+                  ariaLabel="Position"
+                  options={positionOptions.map((pos) => ({ label: pos === "ALL" ? "All" : pos, value: pos }))}
+                  active={position}
+                  onSelect={setPosition}
+                />
+              </div>
+              {/* Madden-style stat sort (Revision 20): Value/OVR always, plus the position-relevant raw stats of the current pool. */}
+              <select
+                aria-label="Sort by"
+                value={activeSortOption.key}
+                onChange={(event) => setSortKey(event.target.value)}
+                className="filter-select shrink-0 px-3 py-2 text-sm"
+                style={{ maxWidth: "8.5rem" }}
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             {activeSortOption.supportsPercentile ? (
               <PillRow
                 options={[
@@ -422,7 +415,6 @@ export function PlayersContent({
                 onSelect={(value) => setSortMode(value as PlayersSortMode)}
               />
             ) : null}
-          </div>
           </div>
 
           {visible.length === 0 ? (

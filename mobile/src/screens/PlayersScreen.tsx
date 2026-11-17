@@ -28,7 +28,6 @@ import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAcco
 import type { PlayerFact } from '../lib/playerAnatomy';
 import { badgeFromInjury } from '../lib/playerBadges';
 import InfoMark from '../components/InfoMark';
-import SectionHeading from '../components/SectionHeading';
 import UsageTrendPill from '../components/UsageTrendPill';
 import ValuesCredit from '../components/ValuesCredit';
 import ViewModeToggle from '../components/ViewModeToggle';
@@ -449,16 +448,6 @@ export default function PlayersScreen({ route, navigation }: Props) {
         </ScrollView>
       ) : (
       <>
-      <SectionHeading
-        title="Player rankings"
-        info={
-          <InfoMark
-            label="player rankings"
-            lines={["Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap any player for the full breakdown."]}
-          />
-        }
-      />
-
       {error ? <ErrorState compact title="Couldn't load players" message={error} onRetry={() => setReloadToken((n) => n + 1)} /> : null}
 
       <GlassCard style={styles.discoveryCard}>
@@ -495,6 +484,13 @@ export default function PlayersScreen({ route, navigation }: Props) {
             }}
           />
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
+          <View style={styles.rankingsLabel}>
+            <AppText style={styles.rankingsLabelText}>Rankings</AppText>
+            <InfoMark
+              label="player rankings"
+              lines={["Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap any player for the full breakdown."]}
+            />
+          </View>
         </View>
       </GlassCard>
 
@@ -600,7 +596,10 @@ function createStyles(colors: ThemeColors) {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
+    alignItems: 'center',
   },
+  rankingsLabel: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs },
+  rankingsLabelText: { fontSize: 14, fontWeight: '700', color: colors.textSecondary },
   positionRow: { gap: spacing.xs, paddingVertical: 2 },
   positionPill: { minHeight: 44, paddingHorizontal: spacing.lg, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong },
   positionPillOn: { borderColor: colors.accent, backgroundColor: colors.accentMuted },

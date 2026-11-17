@@ -350,13 +350,15 @@ describe("PlayersContent", () => {
       expect(screen.queryByRole("link", { name: "Add to Trade" })).not.toBeInTheDocument();
     });
   });
-  it("lays out the filter bar as an aligned grid and keeps row stats/actions in one wrapping flow", () => {
+  it("folds the controls into two rows (search + Filters, positions + Sort) and keeps row stats/actions in one wrapping flow", () => {
     const { container } = render(<PlayersContent leagueId="L1" leagueName="Test League" data={DATA} rosters={[{ players: ["p1"] }]} />);
     const search = screen.getByPlaceholderText("Search players");
-    const bar = search.parentElement as HTMLElement;
-    expect(bar.className).toContain("grid-cols-2");
-    expect(search.className).toContain("col-span-2");
-    // The five facet selects are one Filters button now (FilterSheet); Sort sits in the same row (the one select).
+    const searchRow = search.parentElement as HTMLElement;
+    const bar = searchRow.parentElement as HTMLElement;
+    expect(bar.className).toContain("flex-col");
+    expect(search.className).toContain("flex-1");
+    expect(within(searchRow).getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
+    // The five facet selects are one Filters button now (FilterSheet); Sort sits with the position pills (the one select).
     expect(bar.querySelectorAll("select")).toHaveLength(1);
     expect(within(bar).getByRole("combobox", { name: "Sort by" })).toBeInTheDocument();
     expect(within(bar).getByRole("button", { name: /^Filters/ })).toBeInTheDocument();

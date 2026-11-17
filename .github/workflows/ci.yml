@@ -166,7 +166,8 @@ jobs:
     # No main route may scroll sideways on a phone: loads every route at 390px (Chromium, mobile emulation) against the
     # dev server with the module-scan fixtures and fails when document.scrollWidth > innerWidth, naming the elements that
     # hold the too-wide content. The app shell's overflow-x: clip backstop is switched off while measuring, so the check
-    # still catches the real bug. Local run: OVERFLOW=1 WIDTHS=390 node scripts/sim_layout_playwright/module_scan.mjs
+    # still catches the real bug. The same scan also fails a page whose first card/row starts more than 110px below the nav
+    # (batch B: one compact header + --page-top-gap; per-page ratchets in module_scan.mjs TOP_BUDGET_OVERRIDES). Local run: OVERFLOW=1 WIDTHS=390 node scripts/sim_layout_playwright/module_scan.mjs
     needs: [classify]
     if: needs.classify.outputs.web_next_changed == 'true'
     runs-on: ubuntu-latest
@@ -197,7 +198,7 @@ jobs:
         run: |
           nohup npx next dev -p 3231 > "$RUNNER_TEMP/next.log" 2>&1 &
           for _ in $(seq 1 90); do curl -s -o /dev/null -m 120 http://localhost:3231/news && break; sleep 2; done
-      - name: No route scrolls sideways at 390px
+      - name: No route scrolls sideways at 390px, first module within budget
         env:
           BROWSER: chromium
           BASE: http://localhost:3231

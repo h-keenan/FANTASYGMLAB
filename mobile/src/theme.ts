@@ -485,6 +485,9 @@ export const disabledOpacity = 0.5;
  */
 export const LINK_HIT_SLOP = { top: 14, bottom: 14, left: 12, right: 12 } as const;
 
+/** Batch B: the one small gap between the page chrome (header, tab strip, status line) and the first module. Web twin: --page-top-gap. */
+export const PAGE_TOP_GAP = 12;
+
 export const spacing = {
   xs: 4,
   sm: 8,

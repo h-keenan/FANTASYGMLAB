@@ -214,6 +214,8 @@ export interface MatchupCardInput {
   kickedOff: boolean;
   playersLeft: number | null;
   swing: MatchupSwingPlayer[];
+  /** The page's status line already says "Week N" (Matchup): the card must not repeat it. Today and Sim Home leave it on. */
+  omitWeek?: boolean;
 }
 
 export interface MatchupCardModel {
@@ -231,7 +233,7 @@ export interface MatchupCardModel {
 
 export function matchupCardModel(input: MatchupCardInput): MatchupCardModel {
   const state = input.final ? "FINAL" : input.live ? "LIVE" : null;
-  const kicker = [input.week != null ? `WEEK ${input.week}` : "THIS WEEK", state].filter(Boolean).join(" · ");
+  const kicker = [input.omitWeek ? null : input.week != null ? `WEEK ${input.week}` : "THIS WEEK", state ?? (input.omitWeek ? "HEAD TO HEAD" : null)].filter(Boolean).join(" · ");
   const wp = input.winPercent != null ? Math.round(input.winPercent) : null;
   const win = wp != null ? { pct: wp, label: `${wp}% win`, tone: (wp >= 55 ? "success" : wp <= 45 ? "danger" : "accent") as "success" | "danger" | "accent" } : null;
   const useReal = input.kickedOff && input.myScore != null && input.opponentScore != null;
