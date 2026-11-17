@@ -342,7 +342,7 @@ const PAGE_CHECK = () => {
   out.recRowMaxH = Math.max(0, ...[...document.querySelectorAll('[data-testid="waiver-rec-row"]')].map((e) => Math.round(e.getBoundingClientRect().height)));
   const tl = [...document.querySelectorAll('[role="tablist"]')].filter((el) => el.getBoundingClientRect().height > 0);
   // The page tab row count: filter rows (aria-labelled pill rows) and view toggles inside a module are not page tabs.
-  out.tablists = tl.filter((el) => !el.getAttribute("aria-label")?.match(/^(Position|Recommendation filter|What you want back|Season|Filter history|Recap week|Sample league views)$/) && !el.closest('[data-testid^="matchup-"],[data-testid^="players-"]')).length;
+  out.tablists = tl.filter((el) => !el.getAttribute("aria-label")?.match(/^(Position|Recommendation filter|What you want back|Season|Filter history|Recap week|Sample league views)$/) && !el.closest('[data-testid^="matchup-"],[data-testid^="players-"],[data-testid="view-tabs"]')).length; // ViewTabs is the page's own view row (the family strip is the footer pill on phones), counted by the guard in check_view_select, not here
   out.tablistLabels = tl.map((el) => `${el.getAttribute("aria-label") || ""}|${[...el.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim()).join("/")}|inModule=${Boolean(el.closest('[data-testid^="matchup-"],[data-testid^="players-"]'))}`);
   return out;
 };
