@@ -529,3 +529,36 @@ The prior alone, on all projected player-weeks (it is a small cohort, so the agg
 * Rest-of-season totals use point estimates (see Fix 1). Trade grading and lineup pricing still use `ppg` (point); `mean_ppg` is available in `baseline_weekly_points`
   for a deliberate follow-up, which would also re-price positions against each other (a +15% TE lift vs +2% QB moves relative values).
 * Sim WR/TE swings (P1 item 6) ship in a separate change; see the Sim subsection below when present.
+
+## Round 2 (P1 fixes): Sim WR/TE stability_v 3
+
+Part B's P1 (a): WR/TE persistence. New upgradable flag `stability_v` 3 (season boundary, like 1 and 2); saves on 0, 1 or 2 replay
+exactly as before (the stability_v 2 pool digest at season 4 is pinned in `tests/test_sim_stability_v.py` and was checked against
+`origin/main`). Sample: **16 seeds x 5 dynasty seasons** per configuration (Part B used 6), real = nflverse 2015-2025.
+
+**What was measured, and what the cause is.** Calibration sweeps (16 seeds each) on the pieces that act on a projection:
+a smaller yearly projection redraw (0.10 to 0.05 and 0) and a stronger last-season carry (WR 0.8 to 1.0, TE 0.7 to 0.9) did little
+beyond sampling noise (WR p10 0.51 to 0.55-0.56, TE 0.49-0.52), so they are **not** in v3. What moves the tail is the pull toward the
+typical starter (`REVERSION_V2` WR 0.45 / TE 0.35 per year): a star's projection fell before his season did, so the next-year ratio
+carried two drops. v3 lowers it to WR 0.25 / TE 0.30 (QB / RB unchanged).
+
+| | QB p10 | RB p10 | WR p10 | TE p10 | WR median | share < 0.7 (QB/RB/WR/TE) | breakouts / busts per season (WR) | (TE) |
+|---|---|---|---|---|---|---|---|---|
+| real 2015-2025 | 0.73 | 0.61 | 0.61 | 0.58 | 0.875 | 7 / 20 / 17 / 19% | 2.2 / 3.2 | 1.7 / 2.9 |
+| stability_v 2 (before) | 0.68 | 0.54 | 0.51 | 0.52 | 0.84 | 12 / 24 / 28 / 27% | 3.7 / 4.9 | 2.0 / 2.8 |
+| **stability_v 3 (after)** | 0.68 | 0.58 | 0.57 | 0.56 | 0.85 | 11 / 21 / 25 / 23% | 3.3 / 4.5 | 2.1 / 2.7 |
+
+In-season top-12 realized / projected p10 (`season_variance_report`, 16 seeds; model-8 target real QB 0.66 / RB 0.72 / WR 0.73 /
+TE 0.63): v2 0.64 / 0.68 / 0.67 / 0.63, v3 0.64 / 0.67 / 0.66 / 0.64. Unchanged (the season draw is the frozen player model).
+Level (mean ppg of the WR / TE top 12 in the sim): 18.9 / 12.4 before, 19.3 / 12.5 after (real 18.5 / 12.7). The pull is also what holds the league's level, so a lighter
+pull lifts it a little (about +2% at WR top 12). Candidates that pulled less were rejected on that: WR 0.15 / TE 0.10 gave another 0.02 of p10 but drifted the 15-season
+WR / TE top-12 level to 1.19x / 1.23x of season 1 (v2: 1.08x / 1.05x) and failed `test_twelve_seasons_hold_equilibrium` (TE 1.43x in one season); WR 0.25 / TE 0.20 still
+reached TE 1.31x in one season of that test, so TE is set to 0.30 (WR 0.25 / TE 0.25-0.30 measured 1.11-1.14x over 15 seasons).
+
+**Partial fix, honest.** WR p10 0.51 to 0.57 (real 0.61), share under 0.7 28% to 25% (real 17%), TE 0.52 to 0.56 (real 0.58),
+27% to 23% (19%). The remaining WR/TE gap is the in-season bust draw of the frozen `player-model-8` (a WR's season multiplier p10 is already
+0.66 against 0.73 real): closing it needs a new player model (player-model-9), not a flag. RB busts per season (4.3 against real 3.3)
+and WR breakouts (3.3 against 2.2) stay too high for the same reason. QB and RB next-year stats do not regress (QB p10 0.68 to 0.68, RB 0.54 to 0.58).
+
+Reproduce: `python -m modules.sim.calibration.real_history_report --real /tmp/real_rows.json --seeds 16 --configs "model-8 default" "stability_v 2 (previous default)"`
+and `python -m modules.sim.calibration.season_variance_report --seeds 16 --stability 2|3`.

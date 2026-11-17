@@ -77,6 +77,13 @@ REVERSION = 0.40  # share of the gap (log projection vs the position's typical s
 # result is 0.66-0.77 in the panel against 0.40-0.50 for stability_v 1) while the level of every position's top 12 and depth stays where the season-1 pool put it.
 OUTCOME_WEIGHT_V2 = {"QB": 0.7, "RB": 1.0, "WR": 0.8, "TE": 0.7}
 REVERSION_V2 = {"QB": 0.15, "RB": 0.10, "WR": 0.45, "TE": 0.35}
+# stability_v 3: WR / TE persistence (docs/audits/2026-11-projections-backtest.md, Part B and Round 2). Against 11 real seasons the top-12 WR / TE next / this ppg tail was
+# too fat (p10 0.51 / 0.52 against 0.61 / 0.58, share under 0.7 28% / 27% against 17% / 19%, WR median 0.84 against 0.875) with too many breakouts and busts. The cause is the
+# pull toward the typical starter (``REVERSION_V2``): a receiver or tight end whose projection sits above a typical starter lost 45% / 35% of the gap every year ON TOP of his
+# age curve, so a star's projection fell before his season did and the next year's ratio carried two drops. v3 keeps the carry (``OUTCOME_WEIGHT_V2``) and lowers the pull for
+# WR / TE only (QB and RB are within the real interval already and keep the v2 values). A yearly projection redraw sd (0.10) and a stronger carry were tried and did nothing
+# measurable, so they are not part of v3.
+REVERSION_V3 = {**REVERSION_V2, "WR": 0.25, "TE": 0.30}
 OUTCOME_CLIP = (-1.0, 0.6) # a 70-point season does not become next year's projection; a lost job (collapse) is remembered at most this hard
 FUTURE_YEARS = 4
 FUTURE_DISCOUNT = 0.9

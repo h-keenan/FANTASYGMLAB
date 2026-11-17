@@ -117,7 +117,7 @@ FLAGS: dict[str, dict[str, Any]] = {
     },
     "stability_v": {
         "label": "A league that stays balanced",
-        "body": "A good or bad season now carries into a player's next projection, young backs, receivers and tight ends keep improving through their early years, rookie classes refill the depth that retirements take, and AI managers trade players (not picks) with each other at market value so talent stops piling up on a few teams. New rookie classes also vary more in year one. Veteran backs, receivers and tight ends decline more gently from 25 on, and last season's result carries further into their next projection.",
+        "body": "A good or bad season now carries into a player's next projection, young backs, receivers and tight ends keep improving through their early years, rookie classes refill the depth that retirements take, and AI managers trade players (not picks) with each other at market value so talent stops piling up on a few teams. New rookie classes also vary more in year one. Veteran backs, receivers and tight ends decline more gently from 25 on, and last season's result carries further into their next projection. Receivers and tight ends who finish near the top also hold their level better from one year to the next.",
         "dynasty_only": False,
     },
     "vorp_v": {

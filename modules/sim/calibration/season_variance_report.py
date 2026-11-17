@@ -84,11 +84,12 @@ def main() -> None:
     ap.add_argument("--seeds", type=int, default=4)
     ap.add_argument("--seasons", type=int, default=5)
     ap.add_argument("--seed0", type=int, default=0)
+    ap.add_argument("--stability", type=int, default=None, help="stability_v for the sim games (default: the current default)")
     ap.add_argument("--off", action="store_true", help="zero the player-model-8 star terms (player-model-7 behaviour)")
     args = ap.parse_args()
     if args.off:
         player_model.SEASON = replace(player_model.SEASON, bust_sd_star=0.0, pu_star=0.0)
-    runs = [dynasty_run.run(s, args.seasons, profiles=True) for s in range(1 + args.seed0, 1 + args.seed0 + args.seeds)]
+    runs = [dynasty_run.run(s, args.seasons, profiles=True, flags={"stability_v": args.stability} if args.stability is not None else None) for s in range(1 + args.seed0, 1 + args.seed0 + args.seeds)]
     real, sim = real_tables(), sim_tables(runs)
     print(f"== {args.seeds} seeds x {args.seasons} seasons, {'star terms OFF (model-7)' if args.off else 'player-model-8'}")
     print("mean team score per week: %.2f" % np.mean([x for s in runs for r in s for x in r["weekly"]]))

@@ -38,15 +38,15 @@ def old():
 def test_gate_and_serialization():
     for raw in ({}, {"mode": "dynasty", "seasons": 3}):
         s = GameSettings.parse(raw)
-        assert STABILITY_VERSION == 2 and s.stability_v == 2 and s.stable and s.stable2 and s.to_dict()["stability_v"] == 2
-        assert GameSettings.from_dict(s.to_dict()).stability_v == 2
+        assert STABILITY_VERSION == 3 and s.stability_v == 3 and s.stable and s.stable2 and s.stable3 and s.to_dict()["stability_v"] == 3
+        assert GameSettings.from_dict(s.to_dict()).stability_v == 3
     d = GameSettings.parse({}).to_dict()
     mid = GameSettings.from_dict({**d, "stability_v": 1})  # a save made while stability_v 1 was current: the first generation of the rules, not the second
-    assert mid.stability_v == 1 and mid.stable and not mid.stable2 and mid.to_dict()["stability_v"] == 1
+    assert mid.stability_v == 1 and mid.stable and not mid.stable2 and not mid.stable3 and mid.to_dict()["stability_v"] == 1
     d.pop("stability_v")
     old = GameSettings.from_dict(d)
     assert old.stability_v == 0 and not old.stable and not old.stable2 and "stability_v" not in old.to_dict()
-    assert rules.UPGRADABLE_FLAGS["stability_v"] == (2, rules.SEASON) and "stability_v" in rules.FLAGS
+    assert rules.UPGRADABLE_FLAGS["stability_v"] == (3, rules.SEASON) and "stability_v" in rules.FLAGS
 
 
 def test_old_curves_and_progress_unchanged_by_default():
@@ -188,20 +188,43 @@ def test_ten_seasons_stay_stationary_under_v2(new2):
 
 
 def test_a_stability_1_dynasty_upgrades_to_2_at_the_next_offseason_and_replays():
-    """A save made on stability_v 1 (everything else current) is offered exactly stability_v 2; seasons already built stay as they were, the next ones age under the
+    """A save made on stability_v 1 (everything else current) is offered exactly stability_v 3; seasons already built stay as they were, the next ones age under the
     flatter curves, and the log replays to the same digest."""
 
     from tests import test_sim_realism_update as ru
 
     mid = replace(GameSettings.parse({"mode": "dynasty", "seasons": 4, "start_year": 2026, "rookie_rounds": 2, "scoring": "ppr", "user_slot": 4}), stability_v=1)
-    assert rules.pending_flags(mid, []) == {"stability_v": 2}
+    assert rules.pending_flags(mid, []) == {"stability_v": 3}
     snap, state, em = ru._dynasty((1, "offseason"), 4, ru.MODEL, mid)
     plain = ru._dynasty(None, 4, ru.MODEL, mid)[0]
     (entry,) = state.rules
-    assert entry["flags"] == {"stability_v": 2} and entry["bounds"] == {"stability_v": "season"} and entry["view_from"] == 3
+    assert entry["flags"] == {"stability_v": 3} and entry["bounds"] == {"stability_v": "season"} and entry["view_from"] == 3
     view = snap.under(state.rules)
     for season in (1, 2):
         assert dict(view.season_view(season).players) == dict(plain.season_view(season).players)
-    assert view.season_view(2).settings.stability_v == 1 and view.season_view(3).settings.stability_v == 2
+    assert view.season_view(2).settings.stability_v == 1 and view.season_view(3).settings.stability_v == 3
     assert dict(view.season_view(3).players) != dict(plain.season_view(3).players)
     assert ru._replay(snap, em) == state.digest()
+
+
+# ------------------------------------------------------------------------------------------------ stability_v 3
+
+
+def test_v3_lightens_only_the_wr_te_pull():
+    for pos in ("QB", "RB"):
+        assert aging.REVERSION_V3[pos] == aging.REVERSION_V2[pos], pos
+    for pos in ("WR", "TE"):
+        assert aging.REVERSION_V3[pos] < aging.REVERSION_V2[pos], pos
+    assert aging.REVERSION_V2 == {"QB": 0.15, "RB": 0.10, "WR": 0.45, "TE": 0.35}  # the generation a stability_v 2 save is on is untouched
+
+
+def test_a_stability_2_save_replays_exactly_as_it_did_and_3_differs():
+    """Season 1 is the real pool; from season 2 a v3 game ages WR / TE under the lighter pull, a v2 game exactly as it did before v3 existed."""
+
+    v2, v3 = _panel_root(3, 2), _panel_root(3, 3)
+    assert _digest(v2, 1) == _digest(v3, 1)
+    assert _digest(v2, 4) == "d92d072e4e4053f2"
+    assert _digest(v3, 2) != _digest(v2, 2) and _digest(v3, 4) != _digest(v2, 4)
+    a, b = v2.season_view(2).players, v3.season_view(2).players  # QB / RB projections are unchanged in the first offseason (same carry, same pull); only WR / TE move
+    assert all(a[pid].mean == b[pid].mean for pid in a if pid in b and a[pid].pos in ("QB", "RB") and not pid.startswith("R"))
+    assert any(a[pid].mean != b[pid].mean for pid in a if pid in b and a[pid].pos in ("WR", "TE"))

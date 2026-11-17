@@ -41,13 +41,13 @@ def talent_center(root: GameSnapshot, anchor_rows: Mapping[str, Mapping[str, Any
 
 
 def next_projection_shift(
-    root: GameSnapshot, prev: GameSnapshot, season: int, anchor_rows: Mapping[str, Mapping[str, Any]], level_ranks: Mapping[str, int], *, v2: bool = False,
+    root: GameSnapshot, prev: GameSnapshot, season: int, anchor_rows: Mapping[str, Mapping[str, Any]], level_ranks: Mapping[str, int], *, v2: bool = False, v3: bool = False,
 ) -> dict[str, float]:
     """``{pid: log multiplier}`` to apply to each QB/RB/WR/TE's projection on top of his age curve, going into dynasty season ``season``.
 
     The realized side is read from the same season profile the engine played (``ScoringSession`` keys it by the game's season seed and the
     player), so it is a pure function of the save and costs nothing when the season was just played (the session is cached on the snapshot).
-    ``v2`` (stability_v 2): the carry and the pull are per position (``aging.OUTCOME_WEIGHT_V2`` / ``REVERSION_V2``), fitted to the panel's persistence."""
+    ``v2`` (stability_v 2): the carry and the pull are per position (``aging.OUTCOME_WEIGHT_V2`` / ``REVERSION_V2``), fitted to the panel's persistence; ``v3`` (stability_v 3) uses ``aging.REVERSION_V3`` (a lighter pull for WR / TE)."""
 
     from modules.sim.game_dynasty import season_seed
     from modules.sim.game_engine import session_for
@@ -70,8 +70,9 @@ def next_projection_shift(
     out: dict[str, float] = {}
     for pid, v in raw.items():
         p = prev.players[pid]
+        rv = aging.REVERSION_V3 if v3 else aging.REVERSION_V2
         weight = aging.OUTCOME_WEIGHT_V2.get(p.pos, aging.OUTCOME_WEIGHT) if v2 else aging.OUTCOME_WEIGHT
-        reversion = aging.REVERSION_V2.get(p.pos, aging.REVERSION) if v2 else aging.REVERSION
+        reversion = rv.get(p.pos, aging.REVERSION) if v2 else aging.REVERSION
         shift = weight * min(hi, max(lo, v - center[p.pos]))
         if p.pos in pull:
             shift -= reversion * max(0.0, math.log(max(0.5, p.mean)) - pull[p.pos])  # one-sided: only a projection above the typical starter regresses down

@@ -488,7 +488,7 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
     roles = _roles(prev) if gen.settings.aging_curves else {}
     stable = gen.settings.stable
     knots_v = 3 if gen.settings.stable2 else 2 if stable else None  # stability_v 2: the flatter late-career knots and the per-position carry (see aging)
-    outcomes = outcomes_mod.next_projection_shift(root, prev, season, _anchor(root), LEVEL_RANKS, v2=gen.settings.stable2) if stable else {}
+    outcomes = outcomes_mod.next_projection_shift(root, prev, season, _anchor(root), LEVEL_RANKS, v2=gen.settings.stable2, v3=gen.settings.stable3) if stable else {}
     for pid in prev.pids:
         p = prev.players[pid]
         r = rng.stream(season - 1, "gage", aging.stable_key(pid))
