@@ -110,5 +110,17 @@ export const GUARD = (opts) => {
       if ((Math.max(r.width, ow) < MIN - 0.5 || Math.max(r.height, oh) < MIN - 0.5) && !inProse && !(el.closest("label") && el.matches("input"))) push("hit-target", el, `${Math.round(r.width)}x${Math.round(r.height)}`);
     }
   }
+  // Bottom pill (web twin of mobile BottomPill): the capsule and every tab must sit inside the viewport and no label may spill out of its tab,
+  // at any text size (the 200% scan is where it used to overflow by 15-40px).
+  for (const bar of document.querySelectorAll(".bottom-tab-bar")) {
+    const br = bar.getBoundingClientRect();
+    if (br.width === 0) continue;
+    if (br.left < -0.5 || br.right > W + 0.5) push("bar-overflow", bar, `pill ${Math.round(br.left)}..${Math.round(br.right)} outside 0..${W}`);
+    for (const tab of bar.querySelectorAll(".bottom-tab")) {
+      const tr = tab.getBoundingClientRect();
+      if (tr.right > br.right + 0.5 || tr.left < br.left - 0.5) push("bar-overflow", tab, `tab ${Math.round(tr.left)}..${Math.round(tr.right)} outside pill ${Math.round(br.left)}..${Math.round(br.right)}`);
+      if (tab.scrollWidth > tab.clientWidth + 1) push("bar-overflow", tab, `content ${tab.scrollWidth} > tab ${tab.clientWidth}`);
+    }
+  }
   return out;
 };
