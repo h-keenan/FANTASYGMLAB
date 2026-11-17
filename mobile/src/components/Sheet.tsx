@@ -1,6 +1,5 @@
 import React, { useMemo, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppText from './AppText';
@@ -8,6 +7,7 @@ import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissShe
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useOverlay } from '../lib/useOverlay';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import { SheetHeader } from './SheetChrome';
 
 export type SheetProps = {
   open: boolean;
@@ -61,19 +61,7 @@ export function Sheet({ open, onClose, title, description, children, footer, hid
             </Pressable>
           ) : null}
           <View style={styles.header} accessibilityViewIsModal>
-            <View style={styles.headerText}>
-              <AppText
-                accessibilityRole="header"
-                style={hideTitle ? styles.srOnly : styles.title}
-                numberOfLines={2}
-              >
-                {title}
-              </AppText>
-              {description ? <AppText style={styles.description}>{description}</AppText> : null}
-            </View>
-            <Pressable onPress={overlay.closeAll} hitSlop={10} style={styles.close} accessibilityRole="button" accessibilityLabel={`Close ${title}`}>
-              <Ionicons name="close" size={18} color={colors.textSecondary} />
-            </Pressable>
+            <SheetHeader title={title} subtitle={description} hideTitle={hideTitle} onClose={overlay.closeAll} />
           </View>
           <SheetScrollView
             contentContainerStyle={[styles.content, !footer && { paddingBottom: spacing.xl + insets.bottom }]}

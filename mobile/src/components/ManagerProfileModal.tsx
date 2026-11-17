@@ -24,6 +24,7 @@ import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import CompactPlayerCard from './CompactPlayerCard';
 import { SkeletonText } from './Skeleton';
+import { SheetCloseButton } from './SheetChrome';
 
 interface Props {
   visible: boolean;
@@ -213,9 +214,7 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.closeRow}>
-            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-              <Ionicons name="close" size={20} color={colors.textSecondary} />
-            </Pressable>
+            <SheetCloseButton label="Close" onClose={onClose} />
           </View>
           <ScrollView style={styles.body}>
             <TeamSheetFrame

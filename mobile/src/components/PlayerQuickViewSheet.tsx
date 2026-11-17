@@ -58,6 +58,7 @@ import { playerSubRatings } from '../lib/subRatings';
 import { navigationRef } from '../navigation/navigationRef';
 import { nextSheetSnap, orderPlayerSheetTabs, peekSheetHeight, type SheetSnap } from '../lib/playerAnatomy';
 import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
+import { SheetCloseButton } from './SheetChrome';
 
 type ExplorerTarget = { key: string; label: string };
 
@@ -490,15 +491,7 @@ export default function PlayerQuickViewSheet({
               <AppText style={styles.kicker} numberOfLines={1}>
                 {request.sourceLabel ?? ''}
               </AppText>
-              <Pressable
-                onPress={onClose}
-                hitSlop={10}
-                style={styles.closeButton}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-              >
-                <Ionicons name="close" size={18} color={colors.textSecondary} />
-              </Pressable>
+              <SheetCloseButton label="Close" onClose={onClose} />
             </View>
 
             <PlayerHero

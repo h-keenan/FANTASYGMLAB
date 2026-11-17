@@ -7,6 +7,7 @@ import { OverlayBack } from "@/components/OverlayBack";
 import { SheetHandle } from "@/components/SheetHandle";
 import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+import { SheetCloseButton } from "@/components/ui/SheetChrome";
 
 /**
  * The shell for a hand-built pop-up (`.pqv-backdrop` + `.pqv-modal`): registers with THE overlay stack (one pop-up at a
@@ -75,9 +76,7 @@ export function PopupShell({
       >
         <SheetHandle />
         <OverlayBack overlay={overlay} />
-        <button ref={closeRef} type="button" className="pqv-close" aria-label={closeLabel ?? `Close ${title}`} onClick={overlay.closeAll}>
-          ×
-        </button>
+        <SheetCloseButton ref={closeRef} label={closeLabel ?? `Close ${title}`} onClose={overlay.closeAll} />
         {children}
       </div>
     </div>

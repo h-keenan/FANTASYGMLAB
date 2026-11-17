@@ -29,6 +29,7 @@ import {
   type SheetFilters,
   type SheetItem,
 } from "@/lib/tradeSheetPicker";
+import { SheetHeader } from "@/components/ui/SheetChrome";
 
 /**
  * The shared trade piece picker. Tapping a side of a trade (You send / You get,
@@ -176,22 +177,13 @@ export function TradePickerSheet<T = unknown>({
       >
         <SheetHandle />
         <OverlayBack overlay={overlay} />
-        <header className="tps-header">
-          <span aria-hidden="true" className="inline-block shrink-0" style={{ width: 8, height: 8, borderRadius: "50%", background: toneColor }} />
-          <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-base font-extrabold truncate">
-              {title}
-            </h2>
-            {subtitle ? (
-              <p className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
-                {subtitle}
-              </p>
-            ) : null}
-          </div>
-          <button type="button" className="pqv-close tps-close" aria-label={`Close ${title}`} onClick={overlay.closeAll}>
-            ×
-          </button>
-        </header>
+        <SheetHeader
+          titleId={titleId}
+          title={title}
+          subtitle={subtitle}
+          leading={<span aria-hidden="true" className="mt-1.5 inline-block shrink-0" style={{ width: 8, height: 8, borderRadius: "50%", background: toneColor }} />}
+          onClose={overlay.closeAll}
+        />
 
         {!single && chosen.length > 0 ? (
           <ul className="tps-chips" aria-label="Selected">

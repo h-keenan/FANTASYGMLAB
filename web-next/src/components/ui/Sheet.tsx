@@ -18,6 +18,7 @@ import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 
 import "./ui.css";
+import { SheetHeader } from "@/components/ui/SheetChrome";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -163,21 +164,7 @@ export function Sheet({
       >
         <SheetHandle />
         <OverlayBack overlay={overlay} />
-        <header className="ui-sheet-header">
-          <div className="min-w-0 flex-1">
-            <h2 id={titleId} className={hideTitle ? "sr-only" : "ui-sheet-title"}>
-              {title}
-            </h2>
-            {description ? (
-              <p id={descId} className="ui-sheet-desc">
-                {description}
-              </p>
-            ) : null}
-          </div>
-          <button ref={closeRef} type="button" className="ui-sheet-close" aria-label={`Close ${title}`} onClick={overlay.closeAll}>
-            <span aria-hidden="true">×</span>
-          </button>
-        </header>
+        <SheetHeader titleId={titleId} title={title} subtitle={description} subtitleId={descId} hideTitle={hideTitle} onClose={overlay.closeAll} closeRef={closeRef} />
         <div className="ui-sheet-body">{children}</div>
         {footer ? <div className="ui-sheet-footer">{footer}</div> : null}
       </div>

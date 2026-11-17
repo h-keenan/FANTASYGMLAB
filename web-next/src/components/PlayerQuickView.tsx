@@ -52,6 +52,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { BadgeLegendSheet, PlayerBadges } from "@/components/ui/PlayerBadge";
 import { badgeFromInjury, badgeFromTag } from "@/lib/playerBadges";
 import { SkeletonBlock } from "@/components/Skeleton";
+import { SheetCloseButton } from "@/components/ui/SheetChrome";
 
 // The radar is the only thing here that needs recharts (~110 KB gzip); this file
 // is also imported statically by the full Player Profile page. The placeholder
@@ -390,15 +391,7 @@ export function PlayerQuickView({
         <div className="pqv-sweep" aria-hidden="true" />
         <SheetHandle snap={snap} onSnap={setSnap} />
         <OverlayBack overlay={overlay} />
-        <button
-          ref={closeButtonRef}
-          type="button"
-          className="pqv-close"
-          aria-label="Close player details"
-          onClick={overlay.closeAll}
-        >
-          ×
-        </button>
+        <SheetCloseButton ref={closeButtonRef} label="Close player details" onClose={overlay.closeAll} />
 
         <div className="pqv-scroll" ref={scrollRef}>
 

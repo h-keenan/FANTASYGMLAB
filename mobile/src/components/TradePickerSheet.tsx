@@ -30,6 +30,7 @@ import {
 } from '../lib/tradeSheetPicker';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 import PlayerName from './PlayerName';
+import { SheetCloseButton } from './SheetChrome';
 
 /**
  * The shared trade piece picker (mirrors web-next's TradePickerSheet). Tapping
@@ -159,9 +160,7 @@ export default function TradePickerSheet<T = unknown>({
                 </AppText>
               ) : null}
             </View>
-            <Pressable onPress={onClose} style={styles.close} accessibilityRole="button" accessibilityLabel={`Close ${title}`}>
-              <Ionicons name="close" size={20} color={colors.textSecondary} />
-            </Pressable>
+            <SheetCloseButton label={`Close ${title}`} onClose={onClose} />
           </View>
 
           {!single && chosen.length > 0 ? (
