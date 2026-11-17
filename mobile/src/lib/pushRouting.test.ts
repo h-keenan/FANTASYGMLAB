@@ -44,7 +44,7 @@ test('player pushes deep-link to PlayerDetail', () => {
 });
 
 test('league-level pushes route to the Dashboard landing', () => {
-  assert.deepEqual(resolvePushTapTarget({ league_id: 'L1', league_name: 'X', category: 'recap' }), {
+  assert.deepEqual(resolvePushTapTarget({ league_id: 'L1', league_name: 'X', category: 'top_priority' }), {
     screen: 'Dashboard',
     leagueId: 'L1',
     leagueName: 'X',
@@ -81,6 +81,16 @@ test('weekly roundup push opens News > My League on the Roundup tab', () => {
     leagueId: 'L1',
     leagueName: 'X',
     recapsTab: 'roundup',
+  });
+});
+
+test('recap push opens News > My League on the Recap tab, not the dashboard', () => {
+  assert.deepEqual(resolvePushTapTarget({ league_id: 'L1', league_name: 'X', category: 'recap' }), {
+    screen: 'News',
+    initialTab: 'league',
+    leagueId: 'L1',
+    leagueName: 'X',
+    recapsTab: 'recap',
   });
 });
 

@@ -25,6 +25,7 @@ def _base(monkeypatch):
     notification_events.reset_for_tests()
     monkeypatch.setattr(push_triggers, "fetch_push_timezones", lambda config: {})
     monkeypatch.setattr(push_triggers, "count_recent_pushes", lambda config, user_id, now=None: 0)
+    monkeypatch.setattr(push_triggers, "count_pushes_today", lambda config, user_id, now=None: 0)
     monkeypatch.setattr(push_triggers, "_utcnow", lambda: NOON_NY)
     from modules import trade_hub_engine
 
@@ -33,7 +34,7 @@ def _base(monkeypatch):
     notification_events.reset_for_tests()
 
 
-def _run(*, users=("u1",), settings_rows=None, env=None, expo=None, events_response=None, leagues=("league-1",), roster_players=("p1", "p2")):
+def _run(*, users=("u1",), log_rows=None, settings_rows=None, env=None, expo=None, events_response=None, leagues=("league-1",), roster_players=("p1", "p2")):
     """Run one sweep with every user rostering `roster_players` in each league.
     Returns (stats, posts, counters)."""
 
@@ -49,7 +50,7 @@ def _run(*, users=("u1",), settings_rows=None, env=None, expo=None, events_respo
         "user_settings": settings_rows or [],
         "gm_targets": [],
         "team_stance": [{"user_id": u, "league_id": lg} for u in users for lg in leagues],
-        "push_notification_log": [],
+        "push_notification_log": list(log_rows or []),
     }
 
     def fake_get(url, **kwargs):
@@ -241,3 +242,146 @@ def test_user_order_rotates_each_slot_so_nobody_is_starved():
 
 def test_receipt_poll_is_a_noop_without_the_flag():
     assert push_triggers.run_receipt_poll(environ=ENV) == {"enabled": False}
+
+
+# --- dedupe, daily cap, quiet hours (notifications audit 2026-11) -----------
+
+
+def test_already_logged_injury_is_never_pushed_again():
+    log = [{"user_id": "u1", "recommendation_id": "injury:p1:out", "league_id": "league-1"}]
+    stats, posts, _ = _run(log_rows=log)
+    assert stats["pushes_sent"] == 0 and not _expo_posts(posts)
+
+
+def test_same_player_in_two_leagues_is_one_item_not_a_plus_one_more():
+    stats, posts, _ = _run(leagues=("league-1", "league-2"))
+    sent = _expo_posts(posts)
+    assert len(sent) == 1
+    msg = sent[0][1][0]
+    assert msg["body"] == "Hurt Guy is now Out"
+    assert "more update" not in msg["body"]
+    log_posts = [p for p in posts if p[0].endswith("/push_notification_log")]
+    ids = [row["recommendation_id"] for _url, rows in log_posts for row in rows]
+    assert len(ids) == len(set(ids))
+
+
+def test_second_sweep_after_a_logged_push_sends_nothing():
+    stats, posts, _ = _run()
+    logged = [p for p in posts if p[0].endswith("/push_notification_log")]
+    rows = [row for _url, batch in logged for row in batch]
+    assert rows and stats["pushes_sent"] == 1
+    stats2, posts2, _ = _run(log_rows=rows)
+    assert stats2["pushes_sent"] == 0 and not _expo_posts(posts2)
+
+
+def test_daily_cap_blocks_noncritical_but_keeps_one_critical_slot(monkeypatch):
+    # Default daily cap is 2: the last slot is reserved for critical categories.
+    monkeypatch.setattr(push_triggers, "count_pushes_today", lambda config, user_id, now=None: 1)
+    stats, posts, _ = _run()  # injury is critical: uses the reserved slot
+    assert stats["pushes_sent"] == 1
+    monkeypatch.setattr(push_triggers, "count_pushes_today", lambda config, user_id, now=None: 2)
+    stats, posts, _ = _run()
+    assert stats["pushes_sent"] == 0 and stats["capped"] == 1
+
+
+def test_unreadable_daily_count_holds_the_push(monkeypatch):
+    monkeypatch.setattr(push_triggers, "count_pushes_today", lambda config, user_id, now=None: None)
+    stats, posts, _ = _run()
+    assert stats["pushes_sent"] == 0 and not _expo_posts(posts)
+
+
+@pytest.mark.parametrize(
+    "zone",
+    ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Pacific/Honolulu", "Europe/London"],
+)
+def test_no_push_is_ever_allowed_inside_a_users_local_quiet_window(zone):
+    """Every UTC hour of a DST and a non-DST day, per zone: if the decider allows
+    a push, the user's local hour is outside 22:00-08:00."""
+
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from modules import notification_decider as nd
+    from modules import notification_prefs as np_
+
+    item = {"category": "watch", "league_id": "L", "recommendation_id": "w"}
+    for day in (datetime(2026, 7, 15, tzinfo=timezone.utc), datetime(2026, 12, 15, tzinfo=timezone.utc)):
+        for hour in range(24):
+            now = day + timedelta(hours=hour)
+            local_hour = push_triggers._local_hour(zone, now)
+            assert local_hour == now.astimezone(ZoneInfo(zone)).hour
+            decision = nd.decide(
+                [item], prefs=np_.default_prefs(), now=now, local_hour=local_hour,
+                sent_this_week_fn=lambda: 0, default_cap=4,
+            )
+            if local_hour >= 22 or local_hour < 8:
+                assert not decision.allowed and decision.held == "quiet_hours"
+            else:
+                assert decision.allowed
+
+
+def test_unknown_timezone_is_read_conservatively():
+    """No device timezone on file: the sweep reads US Eastern, so the morning
+    end of quiet hours is widened to keep a Pacific user's 5am out."""
+
+    from modules import notification_decider as nd
+    from modules import notification_prefs as np_
+
+    item = {"category": "watch", "league_id": "L", "recommendation_id": "w"}
+
+    def run(hour, tz_known):
+        return nd.decide(
+            [item], prefs=np_.default_prefs(), now=NOON_NY, local_hour=hour,
+            sent_this_week_fn=lambda: 0, default_cap=4, tz_known=tz_known,
+        )
+
+    assert run(9, True).allowed
+    assert run(9, False).held == "quiet_hours"  # 9am ET is 6am PT
+    assert run(10, False).held == "quiet_hours"
+    assert run(11, False).allowed
+
+
+def test_push_copy_has_no_em_dashes():
+    stats, posts, _ = _run()
+    for _url, body in _expo_posts(posts):
+        for msg in body:
+            text = msg["title"] + msg["body"]
+            assert "—" not in text and "–" not in text
+    item = push_triggers.gm_stance_reminder_push_item(league_id="L", league_name="n", leagues_with_stance=set())
+    assert item and "—" not in item["headline"]
+
+
+def _briefing_items(league):
+    waiver = Mock(category="top_priority", headline="Add a free agent", recommendation_id="w1",
+                  route_player_id="", route_player_name="", destination="waivers")
+    trade = Mock(category="watch", headline="A trade idea is ready", recommendation_id="t1",
+                 route_player_id="", route_player_name="", destination="trade_hub")
+    players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 50}])
+    with patch("modules.sleeper.get_rosters", return_value=[{"roster_id": 1, "owner_id": "su", "players": ["p1"]}]), patch(
+        "modules.dashboard_engine.compose_next_move_briefing", return_value=Mock(items=[waiver, trade])
+    ):
+        return push_triggers.league_briefing_push_items(
+            league_id="L", sleeper_user_id="su", players_df=players_df, score_field="dynasty_score", league=league
+        )
+
+
+def test_offseason_waiver_add_is_not_pushed_but_in_season_is():
+    assert [i["recommendation_id"] for i in _briefing_items({"name": "X", "status": "complete"})] == ["t1"]
+    assert [i["recommendation_id"] for i in _briefing_items({"name": "X", "status": "in_season"})] == ["w1", "t1"]
+
+
+def test_sweep_script_exits_nonzero_when_it_failed_closed(monkeypatch):
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "run_push_trigger_sweep", Path(__file__).resolve().parents[1] / "scripts" / "run_push_trigger_sweep.py"
+    )
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    monkeypatch.setattr(push_triggers, "run_trade_outcome_followup_sweep", lambda **kw: {})
+    monkeypatch.setattr(push_triggers, "run_receipt_poll", lambda **kw: {})
+    monkeypatch.setattr(push_triggers, "run_push_trigger_sweep", lambda **kw: {"configured": True, "ok": False})
+    assert script.main() == 1
+    monkeypatch.setattr(push_triggers, "run_push_trigger_sweep", lambda **kw: {"configured": True, "ok": True})
+    assert script.main() == 0

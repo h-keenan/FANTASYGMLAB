@@ -94,6 +94,7 @@ WAIVER_REMINDER_START_HOUR_ET = 12
 _ET = "America/New_York"
 DEFAULT_WEEKLY_PUSH_CAP = 4
 WEEKLY_CAP_WINDOW = timedelta(days=7)
+DAILY_CAP_WINDOW = timedelta(hours=24)
 QUIET_HOURS_START = 22  # local hour, inclusive
 QUIET_HOURS_END = 8  # local hour, exclusive
 DEFAULT_TIMEZONE = "America/New_York"
@@ -403,7 +404,7 @@ def gm_stance_reminder_push_item(
         "league_id": league_id,
         "league_name": league_name,
         "category": "gm_stance_reminder",
-        "headline": "Tell us if you're rebuilding, competing, or balanced — it shapes your trade suggestions.",
+        "headline": "Tell us if you are rebuilding, competing, or balanced. It shapes your trade suggestions.",
         "recommendation_id": f"gm_stance_reminder:{league_id}",
     }
 
@@ -555,8 +556,11 @@ def is_quiet_hours(tz_name: str, now: datetime | None = None) -> bool:
     return current.hour >= QUIET_HOURS_START or current.hour < QUIET_HOURS_END
 
 
-def count_recent_pushes(config: PushTriggerConfig, user_id: str, now: datetime | None = None) -> int | None:
-    """Pushes sent to this user in the last 7 days, from push_notification_log.
+def count_recent_pushes(
+    config: PushTriggerConfig, user_id: str, now: datetime | None = None, window: timedelta = WEEKLY_CAP_WINDOW
+) -> int | None:
+    """Pushes sent to this user inside the trailing ``window`` (default 7 days),
+    from push_notification_log.
 
     A batched push writes all its rows in ONE insert, so they share a
     sent_at (the DB's now()); distinct sent_at values == distinct pushes.
@@ -565,7 +569,7 @@ def count_recent_pushes(config: PushTriggerConfig, user_id: str, now: datetime |
 
     if not config.configured or not user_id:
         return None
-    cutoff = ((now or _utcnow()) - WEEKLY_CAP_WINDOW).isoformat()
+    cutoff = ((now or _utcnow()) - window).isoformat()
     try:
         response = requests.get(
             f"{config.url}/rest/v1/{NOTIFICATION_LOG_TABLE}",
@@ -584,6 +588,23 @@ def count_recent_pushes(config: PushTriggerConfig, user_id: str, now: datetime |
     if not isinstance(rows, list):
         return None
     return len({str(row.get("sent_at")) for row in rows if isinstance(row, Mapping) and row.get("sent_at")})
+
+
+def count_pushes_today(config: PushTriggerConfig, user_id: str, now: datetime | None = None) -> int | None:
+    """Pushes sent to this user in the trailing 24 hours (None = unreadable)."""
+
+    return count_recent_pushes(config, user_id, now, window=DAILY_CAP_WINDOW)
+
+
+def load_daily_push_cap(*, environ: dict | None = None, secrets: Any = None) -> int:
+    """Per-user pushes allowed in a rolling 24h (PUSH_DAILY_CAP, default 2)."""
+
+    raw = app_config.config_value("PUSH_DAILY_CAP", environ=environ, secrets=secrets)
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return notification_decider.DEFAULT_DAILY_CAP
+    return value if 1 <= value <= 20 else notification_decider.DEFAULT_DAILY_CAP
 
 
 def _priority(item: Mapping[str, Any]) -> int:
@@ -768,6 +789,10 @@ def league_briefing_push_items(
     items: list[dict[str, Any]] = []
     for item in briefing.items:
         if item.category not in PUSH_CATEGORIES or not item.recommendation_id:
+            continue
+        # Nothing processes between seasons, so a "grab this free agent" push
+        # in February is noise. The same advice stays visible on the page.
+        if item.destination == "waivers" and not league_calendar.is_in_season(league):
             continue
         item_names = set(private_names)
         presentation = getattr(item, "presentation", None)
@@ -1241,6 +1266,7 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
 
     config = load_push_trigger_config(environ=environ, secrets=secrets)
     weekly_cap = load_weekly_push_cap(environ=environ, secrets=secrets)
+    daily_cap = load_daily_push_cap(environ=environ, secrets=secrets)
     shards, shard_index = load_sweep_shard(environ=environ, secrets=secrets)
     time_budget = load_sweep_time_budget(environ=environ, secrets=secrets)
     events_on = notification_events.events_enabled(environ=environ, secrets=secrets)
@@ -1473,6 +1499,9 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                 item for item in push_items if push_item_allowed(preferences, user_id=user_id, category=item["category"])
             )
 
+        # The same player on two of the user's leagues yields one injury id:
+        # push it once, not "X is out (+1 more update)" about the same X.
+        candidates = list({item["recommendation_id"]: item for item in reversed(candidates)}.values())[::-1]
         # ONE dedupe read per user (not one per league).
         already_sent = already_notified_batch(
             config,
@@ -1484,13 +1513,18 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             continue
 
         now = _utcnow()
-        tz_name = user_prefs.get("timezone") or timezones.get(user_id, DEFAULT_TIMEZONE)
+        tz_name = user_prefs.get("timezone") or timezones.get(user_id, "")
+        tz_known = bool(tz_name)
+        tz_name = tz_name or DEFAULT_TIMEZONE
         sent_count_holder: dict[str, int | None] = {}
 
         def sent_this_week(_uid=user_id) -> int | None:
             if "n" not in sent_count_holder:
                 sent_count_holder["n"] = count_recent_pushes(config, _uid)
             return sent_count_holder["n"]
+
+        def sent_today(_uid=user_id) -> int | None:
+            return count_pushes_today(config, _uid)
 
         decision = notification_decider.decide(
             candidates,
@@ -1500,6 +1534,9 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             sent_this_week_fn=sent_this_week,
             default_cap=weekly_cap,
             roster_ids_by_league=roster_ids_by_league,
+            sent_today_fn=sent_today,
+            daily_cap=daily_cap,
+            tz_known=tz_known,
         )
         for _item, reason in decision.suppressed:
             stats["suppressed"][reason] = stats["suppressed"].get(reason, 0) + 1
@@ -1646,6 +1683,7 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
 
     config = load_push_trigger_config(environ=environ, secrets=secrets)
     weekly_cap = load_weekly_push_cap(environ=environ, secrets=secrets)
+    daily_cap = load_daily_push_cap(environ=environ, secrets=secrets)
     stats: dict[str, Any] = {
         "ok": True,
         "configured": config.configured,
@@ -1689,12 +1727,17 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
             continue
         user_prefs = user_notification_prefs.get(user_id) or notification_prefs.default_prefs()
         now = _utcnow()
-        tz_name = user_prefs.get("timezone") or timezones.get(user_id, DEFAULT_TIMEZONE)
+        tz_name = user_prefs.get("timezone") or timezones.get(user_id, "")
+        tz_known = bool(tz_name)
+        tz_name = tz_name or DEFAULT_TIMEZONE
 
         def _count(_uid=user_id) -> int | None:
             if _uid not in sent_counts:
                 sent_counts[_uid] = count_recent_pushes(config, _uid)
             return sent_counts[_uid]
+
+        def _today(_uid=user_id) -> int | None:
+            return count_pushes_today(config, _uid)
 
         league_id = _safe_text(row.get("league_id"))
         followup_item = {"category": "trade_followup", "league_id": league_id}
@@ -1705,6 +1748,9 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
             local_hour=_local_hour(tz_name, now),
             sent_this_week_fn=_count,
             default_cap=weekly_cap,
+            sent_today_fn=_today,
+            daily_cap=daily_cap,
+            tz_known=tz_known,
         )
         if not decision.allowed:
             stats["held"] += 1  # not marked: retried at the next sweep
@@ -1717,7 +1763,7 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
             result = push_tokens.send_expo_push_notifications(
                 tokens,
                 title=PUSH_TITLE_BY_CATEGORY["trade_followup"],
-                body="You shared a trade recently \u2014 let us know if it went through.",
+                body="You shared a trade recently. Tell us if it went through.",
                 data={
                     "type": "trade_outcome_followup",
                     "category": "trade_followup",
