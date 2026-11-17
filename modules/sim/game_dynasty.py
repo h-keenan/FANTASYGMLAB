@@ -193,14 +193,21 @@ def _scarcity(response: float, slot: int, pos: str = "") -> float:
     return 1.0 + (response - 1.0) * min(1.0, (slot - 1) / (SUPPLY_FULL_SLOT - 1))
 
 
-def _depth_response(mean: float, slot: int, mid: float, ref: float) -> float:
+DEPTH_CAP_QB = 0.95  # stability_v 4: a quarterback class is one to four players and the middle one is a bridge starter (QB13-24 are about 0.9 x the 12th), so its depth response reaches 0.95 x the 12th veteran, still never above him (a higher cap put 1.2 rookie QBs a class into the top 12 against 0.4 real)
+
+
+def _depth_cap(settings: Any, pos: str) -> float:
+    return DEPTH_CAP_QB if pos == "QB" and settings.stable4 else DEPTH_CAP
+
+
+def _depth_response(mean: float, slot: int, mid: float, ref: float, cap: float = DEPTH_CAP) -> float:
     """rookie_v 1: the middle-tier response (``mid``, from ``_class_aware_supply``) as it reaches class slot ``slot``: none through ``ROOKIE_MID_SLOTS[0]``,
     full from ``ROOKIE_MID_SLOTS[1]`` down, and never past ``DEPTH_CAP`` x the position's 12th veteran ``ref`` (depth comes from usable players being drawn
     out of the middle of the class and the undrafted, not from stars)."""
 
     lo, hi = ROOKIE_MID_SLOTS
     deep = 1.0 + (mid - 1.0) * min(1.0, max(0.0, (slot - lo) / (hi - lo)))
-    return min(mean * deep, max(mean, DEPTH_CAP * ref))
+    return min(mean * deep, max(mean, cap * ref))
 
 
 def _class_aware_supply(
@@ -242,7 +249,7 @@ def _class_aware_supply(
             continue
 
         def level(m: float, pos: str = pos, lo: int = lo, hi: int = hi) -> float:
-            means = sorted(held[pos] + [_depth_response(v * _scarcity(supply.get(pos, 1.0), j, pos), j, m, ref12[pos]) for j, v in slots.get(pos, ())], reverse=True)[lo - 1: hi]
+            means = sorted(held[pos] + [_depth_response(v * _scarcity(supply.get(pos, 1.0), j, pos), j, m, ref12[pos], _depth_cap(base.settings, pos)) for j, v in slots.get(pos, ())], reverse=True)[lo - 1: hi]
             return sum(means) / len(means) if means else 0.0
 
         m_lo, m_hi = MID_BAND
@@ -369,7 +376,7 @@ def rookie_class(
             boost = 1.0
         else:
             if s.rookie_sized:  # rookie_v 1+: scarcity draws more usable players out of the middle of the class; it does not make the best rookies better than a real class's best
-                mean = max(1.5, _depth_response(ref12[pos] * _slot_curve(j) * factor * jitter * _scarcity(supply.get(pos, 1.0), j, pos), j, supply_mid.get(pos, 1.0), ref12[pos]))
+                mean = max(1.5, _depth_response(ref12[pos] * _slot_curve(j) * factor * jitter * _scarcity(supply.get(pos, 1.0), j, pos), j, supply_mid.get(pos, 1.0), ref12[pos], _depth_cap(s, pos)))
             else:
                 deep = 1.0 + (supply_mid.get(pos, 1.0) - 1.0) * min(1.0, max(0.0, (j - MID_SLOT_LO) / (MID_SLOT_HI - MID_SLOT_LO)))
                 mean = max(1.5, ref12[pos] * SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER) * factor * jitter * supply.get(pos, 1.0) * deep)
@@ -494,7 +501,7 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
         r = rng.stream(season - 1, "gage", aging.stable_key(pid))
         z, u = float(r.standard_normal()), float(r.random())
         own = scouting.step_ratio(p.extra, p.extra.get("years_exp", 0.0)) if gen.settings.rookie_curves else None
-        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=gen.settings.league_anchor, aging_v=gen.settings.aging_v, role=roles.get(pid, 0.5), knots_v=knots_v, outcome=outcomes.get(pid, 0.0), ceiling=_anchor_top(root).get(p.pos) if stable else None)
+        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=gen.settings.league_anchor, aging_v=gen.settings.aging_v, role=roles.get(pid, 0.5), knots_v=knots_v, outcome=outcomes.get(pid, 0.0), ceiling=_anchor_top(root).get(p.pos) if stable else None, market_exp=aging.MARKET_EXP_V4 if gen.settings.stable4 else None)
         if gen.settings.league_anchor:  # nobody runs far past the best the league ever had: compress above it (no unbounded drift at the top)
             top = _anchor_top(root).get(p.pos)
             if top and mean > top:

@@ -67,6 +67,10 @@ AGE_KNOTS_V3: dict[str, tuple[tuple[float, float], ...]] = {
 RETIRE_AGE = {"QB": 38.0, "RB": 31.0, "WR": 34.0, "TE": 34.5, "K": 41.0, "DEF": 99.0}
 RETIRE_SCALE = 1.7
 MARKET_HALF_LIFE = 0.6  # how much of the PPG change carries into dynasty market value (exponent)
+# stability_v 4: a market that follows production. A pool's price of a level of production is steeply convex (log market on log projection: 1.5-1.7 in the
+# season-1 pool of RBs and WRs), but a veteran's market only took 0.6 of each year's change, so over 30 seasons the price flattened (WR 1.7 -> 1.3, TE 1.3 -> 0.9)
+# and the top 30 markets fell 15 percent with production unchanged. Carrying the change at the pool's own elasticity keeps the price curve where it started.
+MARKET_EXP_V4 = 1.5
 # stability_v 1: how much of a season's result (realized / projected points per game, centered on the position's typical result) is carried into the
 # next projection. A projection is a posterior: last year's production is evidence about talent, so a 22-year-old who broke out is projected higher
 # next year, not pulled back to his old number. Weighted by OUTCOME_WEIGHT because one season is also mostly noise (roughly the weight real
@@ -172,7 +176,7 @@ def retire_prob_v1(pos: str, age: float, role: float, quality: float, ratio: flo
 
 def progress(
     pos: str, age: float, mean: float, sd: float, market: float, z: float, u_ret: float, mult: float | None = None,
-    flat_k: bool = False, aging_v: int = 0, role: float = 0.5, knots_v: int | None = None, outcome: float = 0.0, ceiling: float | None = None,
+    flat_k: bool = False, aging_v: int = 0, role: float = 0.5, knots_v: int | None = None, outcome: float = 0.0, ceiling: float | None = None, market_exp: float | None = None,
 ) -> tuple[float, float, float, float, bool]:
     """One offseason for one player. ``z`` is a standard normal and ``u_ret`` a
     uniform from the player's own stream. ``mult`` replaces the plain age curve for a
@@ -194,7 +198,7 @@ def progress(
     new_age = age + 1.0
     # Dynasty market value follows the production change and the new age.
     shift = (future_factor(pos, new_age) / future_factor(pos, age)) ** 0.5  # the market's own age belief is the original curve in every version
-    new_market = max(0.0, min(100.0, market * (ratio ** MARKET_HALF_LIFE) * shift))
+    new_market = max(0.0, min(100.0, market * (ratio ** (MARKET_HALF_LIFE if market_exp is None else market_exp)) * shift))
     quality = max(0.0, min(1.0, market / 100.0))
     if aging_v >= 1:
         retired = u_ret < retire_prob_v1(pos, new_age, role, quality, ratio)
