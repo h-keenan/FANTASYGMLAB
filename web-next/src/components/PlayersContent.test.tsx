@@ -355,8 +355,9 @@ describe("PlayersContent", () => {
     const row = screen.getByTestId("players-controls");
     expect(within(row).getByPlaceholderText("Search")).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
-    // Only the Players / Prospects view select is on the page; Sort moved into the sheet.
-    expect(container.querySelectorAll("select")).toHaveLength(1);
+    // The Players / Prospects view is compact tabs (no select on the page); Sort moved into the sheet.
+    expect(container.querySelectorAll("select")).toHaveLength(0);
+    expect(within(row).getByRole("tab", { name: "Prospects" })).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Sort by" })).not.toBeInTheDocument();
     expect(container.innerHTML).not.toContain("max-sm:w-full");
   });

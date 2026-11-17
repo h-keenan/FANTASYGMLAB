@@ -21,7 +21,7 @@ import { HighlightTarget } from "@/components/HighlightTarget";
 import { InfoMark } from "@/components/ui/InfoMark";
 import { OvrGauge } from "@/components/OvrGauge";
 import { FilterSheet } from "@/components/ui/FilterSheet";
-import { ViewSelect } from "@/components/ui/ViewSelect";
+import { ViewTabs } from "@/components/ui/ViewTabs";
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from "@/lib/filterSheet";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerTap } from "@/components/ui/PlayerOpenContext";
@@ -716,7 +716,7 @@ export function WaiversContent({
       </header>
 
       <div className="flex flex-wrap items-center gap-2" data-testid="waiver-controls">
-        <ViewSelect
+        <ViewTabs
           value={tab}
           options={TAB_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
           onChange={(value) => setTab(value as WaiverTab)}

@@ -17,7 +17,7 @@ import NewsDigest from '../components/NewsDigest';
 import { NOT_READY_MESSAGES } from '../components/AlertsSection';
 import LeagueRecapPanel from '../components/LeagueRecapPanel';
 import FilterDropdownButton from '../components/FilterDropdownButton';
-import PageControlRow, { ViewSelect } from '../components/PageControlRow';
+import PageControlRow, { ViewTabs } from '../components/PageControlRow';
 import { getLastLeague, type LastLeague } from '../lib/lastLeague';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -164,7 +164,7 @@ export default function NewsScreen({ route }: { route?: { params?: NewsParams } 
 /** The News section select (NFL / My League): first control in the page's one control row. */
 function SectionSelect({ tab, onTab }: { tab: NewsTab; onTab: (tab: NewsTab) => void }) {
   return (
-    <ViewSelect<NewsSection>
+    <ViewTabs<NewsSection>
       label="Section"
       options={NEWS_SECTIONS}
       value={tab === 'league' ? 'My League' : 'NFL'}

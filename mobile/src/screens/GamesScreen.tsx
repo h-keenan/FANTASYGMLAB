@@ -16,7 +16,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import PageFamilyTabs from '../components/PageFamilyTabs';
-import PageControlRow, { ViewSelect } from '../components/PageControlRow';
+import PageControlRow, { ViewTabs } from '../components/PageControlRow';
 import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -81,7 +81,7 @@ export default function GamesScreen({ route, navigation }: Props) {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         <PageFamilyTabs family="league" active="games" leagueId={leagueId} leagueName={leagueName} padded={false} />
         <PageControlRow testID="games-controls">
-          <ViewSelect<string>
+          <ViewTabs<string>
             options={['Season Outlook', "Pick'em"]}
             value={tab === 'pickem' ? "Pick'em" : 'Season Outlook'}
             onChange={(label) => setTab(label === "Pick'em" ? 'pickem' : 'sim')}

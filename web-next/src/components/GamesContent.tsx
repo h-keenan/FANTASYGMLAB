@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { Input } from "@/components/Input";
 import { RankingRow } from "@/components/LeagueRankingsContent";
-import { ViewSelect } from "@/components/ui/ViewSelect";
+import { ViewTabs } from "@/components/ui/ViewTabs";
 import { PageControlsRow } from "@/components/ui/PageControls";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { PlayerRow } from "@/components/PlayerRow";
@@ -71,7 +71,7 @@ export function GamesContent({ leagueId, leagueName, initialTab }: { leagueId: s
       {leagueId ? <PageTabBar family="league" active="games" leagueId={leagueId} leagueName={leagueName} /> : null}
       <PageTitle page="Games" leagueName={leagueName} />
       <PageControlsRow testId="games-controls">
-        <ViewSelect
+        <ViewTabs
           value={tab}
           options={[
             { value: "sim", label: "Season Outlook" },

@@ -86,6 +86,8 @@ jobs:
         run: node scripts/check_selection_submit.mjs
       - name: Check verdict and probability colours use the shared map
         run: node scripts/check_verdict_colors.mjs
+      - name: Check short view switches are tabs, not dropdowns
+        run: node scripts/check_view_select.mjs
       - name: Check the legacy header is retired
         run: node scripts/check_legacy_header.mjs
       - name: Onboarding copy has no em-dashes

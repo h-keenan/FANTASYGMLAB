@@ -86,6 +86,7 @@ export function LeagueRoundupTab({ leagueId, initialWeek }: { leagueId: string; 
     <div className="flex flex-col gap-4" style={{ opacity: loading ? 0.6 : 1 }}>
       {weeks.length > 1 ? (
         <PageControl>
+          {/* view-select-ok: weeks (5+ and growing) */}
           <ViewSelect
             label="Roundup week"
             className="min-w-0 flex-1"

@@ -8,7 +8,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { api, type CollegeProspect, type CollegeProspectsResponse, MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION } from "@/lib/api";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { PillRow } from "@/components/PillRow";
-import { ViewSelect } from "@/components/ui/ViewSelect";
+import { ViewTabs } from "@/components/ui/ViewTabs";
 import { PageControl } from "@/components/ui/PageControls";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -382,24 +382,24 @@ export function CollegeScoutingContent({
           {/* One control row (UI audit batch H): both views are compact selects side by side, not two stacked pill rows plus a paragraph. */}
           <>
             <PageControl>
-              <ViewSelect
+              <ViewTabs
                 label="Show"
                 className="min-w-0 flex-1"
                 value={filter}
                 options={[
-                  { value: "all", label: "All prospects" },
-                  { value: "watchlist", label: "My watchlist" },
+                  { value: "all", label: "All" },
+                  { value: "watchlist", label: "Watchlist" },
                 ]}
                 onChange={(value) => setFilter(value as FilterKey)}
               />
               {lens ? (
-                <ViewSelect
+                <ViewTabs
                   label="Scouting view"
                   className="min-w-0 flex-1"
                   value={view}
                   options={[
-                    { value: "base", label: "Best available" },
-                    { value: "league", label: "For my league" },
+                    { value: "base", label: "Best" },
+                    { value: "league", label: "My league" },
                   ]}
                   onChange={(value) => setView(value === "league" ? "league" : "base")}
                 />

@@ -14,7 +14,7 @@ import PlayerAccordionRow, { usePlayerAccordion } from './PlayerAccordionRow';
 import { PresenceSwap } from './Presence';
 import RoundupPanel from './RoundupPanel';
 import RecapSharePreviewModal from './RecapSharePreviewModal';
-import PageControlRow, { ViewSelect, WeekSelect } from './PageControlRow';
+import PageControlRow, { ViewTabs, WeekSelect } from './PageControlRow';
 import { SkeletonModule, SkeletonPage, SkeletonRegion, SkeletonStatusHeader } from './Skeleton';
 import StatusHeader from './StatusHeader';
 import TeamAvatar from './TeamAvatar';
@@ -124,7 +124,7 @@ export default function LeagueRecapPanel({
   const openTeam = (rosterId: string, fallbackName: string) => setProfile({ rosterId, teamName: rosterMap[rosterId]?.teamName || fallbackName });
 
   const viewSelect = (
-    <ViewSelect<RecapView>
+    <ViewTabs<RecapView>
       options={RECAP_VIEWS}
       value={tab === 'roundup' ? 'Roundup' : 'Recaps'}
       onChange={(label) => setTab(label === 'Roundup' ? 'roundup' : 'recap')}
