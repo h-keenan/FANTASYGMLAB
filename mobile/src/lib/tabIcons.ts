@@ -43,7 +43,7 @@ export const TAB_ICONS = {
   news: "newspaper-outline",
   // League / recaps / season in review
   standings: "podium-outline",
-  scores: "american-football-outline",
+  scores: "custom-scoreboard",
   feed: "list-outline",
   awards: "medal-outline",
   recaps: "newspaper-outline",
@@ -97,6 +97,12 @@ export const CUSTOM_TAB_GLYPHS: Record<string, CustomGlyphElement[]> = {
     { tag: "rect", attrs: { x: 64, y: 96, width: 384, height: 352, rx: 48 } },
     { tag: "path", attrs: { d: "M64 208h384M160 48v80M352 48v80" } },
     { tag: "path", attrs: { d: "M224 272l96 56-96 56z" } },
+  ],
+  // Scoreboard: a framed board with two score blocks and a divider, on two posts. Replaces the football glyph that read as a soccer ball.
+  "custom-scoreboard": [
+    { tag: "rect", attrs: { x: 48, y: 96, width: 416, height: 240, rx: 36 } },
+    { tag: "path", attrs: { d: "M256 144v144M160 336v80M352 336v80M112 416h96M304 416h96" } },
+    { tag: "path", attrs: { d: "M132 192h60M132 240h60M320 192h60M320 240h60" } },
   ],
 };
 

@@ -699,6 +699,26 @@
   transform: translateY(var(--dock-shift, 0px));
 }
 .bottom-stack[data-dock="fixed"] > * { pointer-events: auto; }
+/* Hide on scroll down (useFooterHideOnScroll sets data-footer-hidden on <html>). Slides the children only, so the dock's measured
+   height (--bottom-clearance) and the page layout never change. Stays up while the menu is open or focus is inside. Reduce Motion:
+   no slide, just the state (visibility). */
+.bottom-stack[data-dock="fixed"] > * {
+  transition: transform var(--motion-base, 240ms) var(--ease-out, ease-out), visibility 0s;
+}
+html[data-footer-hidden] .bottom-stack[data-dock="fixed"]:not(:focus-within):not(:has([data-mode="menu"])) > * {
+  transform: translateY(calc(100% + env(safe-area-inset-bottom, 0px) + 12px));
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform var(--motion-base, 240ms) var(--ease-out, ease-out), visibility 0s var(--motion-base, 240ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bottom-stack[data-dock="fixed"] > *,
+  html[data-footer-hidden] .bottom-stack[data-dock="fixed"] > * { transition: none; }
+  html[data-footer-hidden] .bottom-stack[data-dock="fixed"]:not(:focus-within):not(:has([data-mode="menu"])) > * { transform: none; }
+}
+/* Icons were thinner than their bold labels: a heavier stroke, and the label's own tone (currentColor, no opacity). */
+.bottom-tab-icon svg [stroke-width] { stroke-width: 40; }
+.bottom-tab-icon { color: inherit; opacity: 1; }
 /* The game's navigation orb is a slot inside the action bar's one row (Sim to | orb | Advance), in flow: nothing overlaps content or clips. */
 /* The "advance anyway?" confirm is a transient bubble above the phone pill, out of flow: the dock's height (published as --bottom-clearance and
    measured by a ResizeObserver) never changes when it opens or closes, so the page behind and the pill itself do not jump around the Advance tap. */
@@ -998,6 +1018,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 /* Four or more page tabs: the primary keeps its icon and gives the label to the strip (aria-label still names it). */
+/* Selection mode: the page tabs step aside and the submit takes the row beside the orb, so the whole label reads. */
+.pill-layer--context[data-selecting] .pill-tabs, .pill-layer--context[data-selecting] .pill-divider { display: none; }
+.pill-layer--context[data-selecting] .pill-primary { flex: 1 1 auto; justify-content: center; margin-left: 0; }
+.pill-primary[aria-busy] { opacity: 0.7; }
 .pill-primary[data-compact] { width: var(--touch-target-min); min-width: var(--touch-target-min); height: var(--touch-target-min); min-height: var(--touch-target-min); padding: 0; justify-content: center; }
 .pill-primary[data-compact] .pill-primary-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 /* Four or more page tabs: tighter type and padding so they fit one 390px row as short labels; at 360 the strip scrolls. */

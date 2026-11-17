@@ -43,6 +43,8 @@ import { selectedItems, type SheetItem } from "@/lib/tradeSheetPicker";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TickNumber } from "@/components/TickNumber";
 import { TradesTabBar } from "@/components/TradesTabBar";
+import { selectionPrimary } from "@/lib/bottomNav";
+import { usePillState } from "@/lib/useBottomPillContext";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { PostureChip } from "@/components/PostureChip";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
@@ -694,6 +696,7 @@ export function TradeAnalyzerContent({
   const { openPlayer } = usePlayerQuickView();
   const [selectedTeamId, setSelectedTeamId] = useState(ALL_TEAMS_ID);
   const [analyzing, setAnalyzing] = useState(false);
+  const { barPresent } = usePillState();
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [limitWall, setLimitWall] = useState<LimitWallModel | null>(null);
@@ -958,11 +961,14 @@ export function TradeAnalyzerContent({
     ? `Analyze Trade (${sendAssets.length} for ${receiveAssets.length})`
     : "Analyze Trade";
 
+  // Selection mode: once assets are picked the footer's primary IS the submit ("3 selected · Analyze trade").
+  const footerPrimary = selectionPrimary({ count: canAnalyze ? sendAssets.length + receiveAssets.length : 0, verb: "Analyze trade", glyph: "analyzer", busy: analyzing, onPress: () => void analyze() });
+
   const activeTeamLabel = otherTeams.find((t) => t.rosterId === selectedTeamId)?.label ?? "team";
 
   return (
     <main className="page-shell">
-      <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_analyzer" />
+      <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_analyzer" primary={footerPrimary} />
       <header className="flex flex-col gap-1">
         <PageTitle page="Trade Analyzer" leagueName={leagueName} />
         {multiTeamAvailable ? <TradeModeToggle mode={tradeMode} onChange={setTradeMode} /> : null}
@@ -1008,7 +1014,7 @@ export function TradeAnalyzerContent({
         sendLabel={analyzing ? "Analyzing…" : analyzeLabel}
         buildingAction={
           canAnalyze ? (
-            <Button onClick={analyze} loading={analyzing}>
+            barPresent ? null : <Button onClick={analyze} loading={analyzing}>
               {analyzing ? "Analyzing…" : analyzeLabel}
             </Button>
           ) : (

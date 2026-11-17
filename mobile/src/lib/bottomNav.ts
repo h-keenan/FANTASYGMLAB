@@ -13,6 +13,8 @@ export type BottomTab = {
   glyph: TabIconName;
   /** Count shown on the tab (0 or undefined hides it). */
   badge?: number;
+  /** What the count is made of ("2 waiver results, 1 new injury"); read out instead of the bare number. */
+  badgeSummary?: string;
   /** Route for tabs that navigate (the site shell); in-page tabs leave it off. */
   href?: string;
   /** Paid tab: the bar shows the Pro marker (to anyone not on Pro) before the tap, same as the More rows. */
@@ -29,9 +31,9 @@ export function bottomTabBadgeText(count: number | null | undefined): string | n
 }
 
 /** Accessible name: the label plus the count in words, so a badge is never icon-only. `showPro` adds ", Pro feature" for a paid tab. */
-export function bottomTabAriaLabel(tab: Pick<BottomTab, "label" | "badge" | "pro">, showPro = false): string {
+export function bottomTabAriaLabel(tab: Pick<BottomTab, "label" | "badge" | "pro" | "badgeSummary">, showPro = false): string {
   const text = bottomTabBadgeText(tab.badge);
-  const base = text ? `${tab.label}, ${Math.floor(tab.badge ?? 0)} new` : tab.label;
+  const base = text ? `${tab.label}, ${tab.badgeSummary || `${Math.floor(tab.badge ?? 0)} new`}` : tab.label;
   return showPro && tab.pro ? `${base}, Pro feature` : base;
 }
 
@@ -123,7 +125,7 @@ export function simOrbAriaLabel(currentLabel: string, inbox: number | null | und
 // ---- Smart pill: page context (web components/BottomPillContext.tsx + BottomTabBar; mobile components/BottomPill.tsx) ----
 
 /** One page-level tab shown in the pill's page segment (the page-family tabs: Lineup | Players | Waivers | Matchup). */
-export type PillContextTab = { key: string; label: string; /** Paid tab: wears the Pro marker for anyone not on Pro. */ pro?: boolean; /** Short form for the tight pill ("Hist."); the full label stays the accessible name. */ short?: string; glyph?: TabIconName; badge?: number; /** Web: the tab is a route, rendered as a link (client navigation, opens in a new tab on demand). onSelect still fires. */ href?: string };
+export type PillContextTab = { key: string; label: string; /** Paid tab: wears the Pro marker for anyone not on Pro. */ pro?: boolean; /** Short form for the tight pill ("Hist."); the full label stays the accessible name. */ short?: string; glyph?: TabIconName; badge?: number; /** App only: a long-press quick action ("Trades" -> "New trade"). Web tabs are links (iOS long-press opens the preview sheet), so web ignores it. */ shortcut?: TabShortcut; /** Web: the tab is a route, rendered as a link (client navigation, opens in a new tab on demand). onSelect still fires. */ href?: string };
 
 /** The one primary action of a page (Auto-set, New trade, Claim). Rendered as the accent chip at the end of the segment. */
 export type PillContextAction = { key: string; label: string; glyph?: TabIconName; disabled?: boolean; busy?: boolean; onPress: () => void; /** Web: render as a link to this route (onPress still fires). */ href?: string };
@@ -207,6 +209,8 @@ export function pillChipTextWidth(label: string, hasGlyph: boolean): number {
 export function pillPrimaryCompact(ctx: Pick<PillContext, "tabs" | "primary">, segmentW: number): boolean {
   const p = ctx.primary;
   if (!p || !p.glyph) return false;
+  // The selection submit ("3 selected · Find trades") always reads as text: the page tabs step aside for it instead.
+  if (p.key === SELECTION_ACTION_KEY) return false;
   if (ctx.tabs.length >= 4) return true;
   const tabsW = ctx.tabs.reduce((n, t) => n + pillTextWidth(pillTabText(t)) + 16, 0) + Math.max(0, ctx.tabs.length - 1) * 2;
   return tabsW + pillChipTextWidth(p.label, true) > segmentW;
@@ -248,4 +252,85 @@ export function simPillPlan(opts: { context: PillContext | null | undefined; sim
   const p = ctx?.primary;
   const inlineAction = p && (!p.disabled || p.busy) ? p : null;
   return { segment: null, inlineAction, simTo: opts.simToAvailable && !opts.paywalled && !inlineAction, advance: true };
+}
+
+// ---- Selection mode, hide on scroll, reselect to top (2026-11-17, owner-approved smart footer upgrade) ----
+
+/** Key of the primary action while a list has a selection (the footer's "3 selected · Find trades"). */
+export const SELECTION_ACTION_KEY = "selection";
+
+/** "3 selected · Find trades": the count the person built, then what the button does. */
+export function selectionActionLabel(count: number, verb: string): string {
+  return `${Math.max(0, Math.floor(count))} selected · ${verb}`;
+}
+
+/**
+ * The footer's primary action for a pick-from-a-list + submit screen. With a selection it IS the submit button (enabled,
+ * busy while submitting); with none it reverts to `fallback` (the page's usual primary, or nothing). One footer, never a
+ * second sticky bar (docs/ui-patterns.md "Smart footer rules", scripts/check_selection_submit.mjs).
+ */
+export function selectionPrimary(opts: {
+  count: number;
+  verb: string;
+  onPress: () => void;
+  glyph?: TabIconName;
+  busy?: boolean;
+  disabled?: boolean;
+  fallback?: PillContextAction;
+}): PillContextAction | undefined {
+  if (!(opts.count > 0)) return opts.fallback;
+  return { key: SELECTION_ACTION_KEY, label: selectionActionLabel(opts.count, opts.verb), glyph: opts.glyph, busy: opts.busy, disabled: opts.disabled, onPress: opts.onPress };
+}
+
+/** True while the primary is the selection action: the footer stays visible then (hide-on-scroll pauses). */
+export function isSelectionAction(p: Pick<PillContextAction, "key"> | null | undefined): boolean {
+  return p?.key === SELECTION_ACTION_KEY;
+}
+
+/** Scroll distance (px) in one direction before the footer reacts, so a jitter or a small flick never toggles it. */
+export const FOOTER_HIDE_THRESHOLD_PX = 12;
+/** Within this distance of the top the footer is always shown. */
+export const FOOTER_ALWAYS_SHOW_TOP_PX = 48;
+
+/**
+ * Hide-on-scroll state machine. Down past the threshold hides, up past the threshold shows, near the top always shows,
+ * and `pinned` (a selection exists, the menu is open) keeps it shown. `anchorY` is the scroll offset where the current
+ * direction started; the caller stores the returned `anchorY` and `hidden` and feeds them back with the next `y`.
+ */
+export function nextFooterScroll(
+  prev: { hidden: boolean; lastY: number; anchorY: number; dir?: number },
+  y: number,
+  pinned: boolean,
+): { hidden: boolean; lastY: number; anchorY: number; dir: number } {
+  if (pinned || y <= FOOTER_ALWAYS_SHOW_TOP_PX) return { hidden: false, lastY: y, anchorY: y, dir: 0 };
+  const dir = y > prev.lastY ? 1 : y < prev.lastY ? -1 : (prev.dir ?? 0);
+  if (dir === 0) return { ...prev, lastY: y, dir };
+  // A turn restarts the measure from where it turned, so only a real run in one direction crosses the threshold.
+  const anchorY = dir === (prev.dir ?? 0) ? prev.anchorY : prev.lastY;
+  const moved = y - anchorY;
+  const hidden = moved >= FOOTER_HIDE_THRESHOLD_PX ? true : moved <= -FOOTER_HIDE_THRESHOLD_PX ? false : prev.hidden;
+  return { hidden, lastY: y, anchorY, dir };
+}
+
+/** Footer tab long-press shortcut (app only; web tabs are links and iOS long-press on a link opens the preview sheet). */
+export type TabShortcut = { label: string; onPress: () => void };
+
+/** Sources of the More tab's count (waiver results, new roster injuries, Sim week ready). Each is a count the owning page already loaded. */
+export type MoreBadgeSources = { waiverResults?: number; rosterInjuries?: number; simWeekReady?: number };
+
+/** The More count: the sum of the sources (a source that is 0, missing or not a number adds nothing). */
+export function moreBadgeTotal(src: MoreBadgeSources): number {
+  return [src.waiverResults, src.rosterInjuries, src.simWeekReady].reduce<number>((n, v) => n + (v && v > 0 && Number.isFinite(v) ? Math.floor(v) : 0), 0);
+}
+
+/** Spoken breakdown for the More badge ("2 waiver results, 1 injury"), so the number is never unexplained. */
+export function moreBadgeSummary(src: MoreBadgeSources): string {
+  const parts: string[] = [];
+  const w = Math.floor(src.waiverResults ?? 0);
+  const i = Math.floor(src.rosterInjuries ?? 0);
+  const s = Math.floor(src.simWeekReady ?? 0);
+  if (w > 0) parts.push(`${w} waiver result${w === 1 ? "" : "s"}`);
+  if (i > 0) parts.push(`${i} new injur${i === 1 ? "y" : "ies"}`);
+  if (s > 0) parts.push("Sim week ready");
+  return parts.join(", ");
 }

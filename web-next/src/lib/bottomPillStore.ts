@@ -17,7 +17,7 @@ let state: PillState = { ctx: null, barPresent: false };
 const listeners = new Set<() => void>();
 
 const signature = (c: PillContext | null) =>
-  c ? JSON.stringify([c.id, c.label, c.activeKey, c.tabs.map((t) => [t.key, t.label, t.short, t.glyph, t.badge, t.href]), c.primary && [c.primary.key, c.primary.label, c.primary.glyph, c.primary.disabled, c.primary.busy, c.primary.href]]) : "";
+  c ? JSON.stringify([c.id, c.label, c.activeKey, c.tabs.map((t) => [t.key, t.label, t.short, t.glyph, t.badge, t.href, t.shortcut?.label]), c.primary && [c.primary.key, c.primary.label, c.primary.glyph, c.primary.disabled, c.primary.busy, c.primary.href]]) : "";
 
 function publish(next: PillState) {
   const changed = signature(next.ctx) !== signature(state.ctx) || next.barPresent !== state.barPresent;
@@ -31,6 +31,7 @@ function proxied(ctx: PillContext | null): PillContext | null {
   if (!n) return null;
   return {
     ...n,
+    tabs: n.tabs.map((t) => (t.shortcut ? { ...t, shortcut: { label: t.shortcut.label, onPress: () => latest?.tabs.find((x) => x.key === t.key)?.shortcut?.onPress() } } : t)),
     onSelect: (key) => latest?.onSelect(key),
     primary: n.primary ? { ...n.primary, onPress: () => latest?.primary?.onPress() } : undefined,
   };

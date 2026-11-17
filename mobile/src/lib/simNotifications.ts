@@ -38,6 +38,19 @@ export function simNotifUnread(items: readonly SimNotification[], cursor: number
   return items.reduce((n, item) => n + (item.seq > cursor ? 1 : 0), 0);
 }
 
+/**
+ * The More badge's sources, from the notifications the bell already loaded (no extra request): unread waiver results
+ * (claim won / lost), unread injuries on the roster, and whether this week's recap is unread ("Sim week ready").
+ */
+export function simMoreBadgeSources(items: readonly SimNotification[], cursor: number): { waiverResults: number; rosterInjuries: number; simWeekReady: number } {
+  const fresh = items.filter((i) => i.seq > cursor);
+  return {
+    waiverResults: fresh.filter((i) => i.kind === "claim_won" || i.kind === "claim_lost").length,
+    rosterInjuries: fresh.filter((i) => i.kind === "injury").length,
+    simWeekReady: fresh.some((i) => i.kind === "recap") ? 1 : 0,
+  };
+}
+
 /** The new cursor when everything is read: the response's latest seq (never moves backwards). */
 export function simNotifMarkAllRead(cursor: number, latestSeq: number): number {
   return Math.max(cursor, latestSeq);

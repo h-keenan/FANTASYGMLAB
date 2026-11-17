@@ -8,6 +8,7 @@ import { TabGlyph } from "@/components/TabGlyph";
 import { PillOrb } from "@/components/ui/PillOrb";
 import {
   activeBottomTab,
+  isSelectionAction,
   bottomTabAriaLabel,
   bottomTabBadgeText,
   normalizePillContext,
@@ -25,6 +26,7 @@ import {
 
 import "./ui.css";
 import { usePresence } from "@/lib/usePresence";
+import { scrollPageToTop } from "@/lib/useFooterHideOnScroll";
 
 /**
  * Phone bottom pill (approved: option B + the V2 "smart pill", docs/audits/2026-11-smart-pill-options.html).
@@ -138,6 +140,8 @@ export function BottomTabBar({
               </>
             );
             const pick = () => {
+              // Reselecting the lit tab scrolls the page to the top (a link to the same route does not remount it).
+              if (tab.key === current) scrollPageToTop();
               onSelect?.(tab.key);
               if (menuOpen) closeMenu(false);
             };
@@ -264,7 +268,7 @@ export function PillContextLayer({
 
   const primary = context.primary;
   return (
-    <div ref={layerRef} className="pill-layer pill-layer--context" inert={hidden || leaving} data-leaving={leaving ? "" : undefined} data-testid="pill-context-layer">
+    <div ref={layerRef} className="pill-layer pill-layer--context" inert={hidden || leaving} data-leaving={leaving ? "" : undefined} data-selecting={isSelectionAction(primary) ? "" : undefined} data-testid="pill-context-layer">
       {orb}
       {orb ? <span className="pill-divider" aria-hidden="true" /> : null}
       <div ref={listRef} role="tablist" aria-label={context.label} className="pill-tabs" data-dense={context.tabs.length >= 4 ? "" : undefined} data-testid="pill-tabs">
@@ -283,7 +287,10 @@ export function PillContextLayer({
               tabIndex={on ? 0 : -1}
               data-tab={t.key}
               aria-label={pro ? `${t.label}, Pro feature` : t.short ? t.label : undefined}
-              onClick={() => context.onSelect(t.key)}
+              onClick={() => {
+                if (on) scrollPageToTop();
+                context.onSelect(t.key);
+              }}
               onKeyDown={(e: React.KeyboardEvent) => {
                 const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
                 if (!dir) return;
@@ -315,6 +322,7 @@ export function PillContextLayer({
           disabled={primary.disabled || primary.busy}
           aria-busy={primary.busy || undefined}
           data-testid="pill-primary"
+          data-selection={isSelectionAction(primary) ? "" : undefined}
           onClick={primary.onPress}
         >
           {primary.glyph ? <TabGlyph name={primary.glyph} size={16} /> : null}

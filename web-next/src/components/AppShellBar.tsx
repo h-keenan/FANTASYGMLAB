@@ -8,6 +8,9 @@ import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { NavProMarker } from "@/components/NavProMarker";
 import { BottomDock } from "@/components/ui/BottomDock";
 import { BottomTabBar } from "@/components/ui/BottomTabBar";
+import { isSelectionAction, moreBadgeSummary, moreBadgeTotal } from "@/lib/bottomNav";
+import { useShellBadges } from "@/lib/shellBadgeStore";
+import { useFooterHideOnScroll } from "@/lib/useFooterHideOnScroll";
 import { Sheet } from "@/components/ui/Sheet";
 import { useAuth } from "@/context/AuthContext";
 import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
@@ -44,7 +47,8 @@ function ShellBarInner() {
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const { leagueId, leagueName } = shellLeagueContext(params?.leagueId ? decodeURIComponent(params.leagueId) : null, searchParams, UNNAMED_LEAGUE);
-  const tabs = shellTabs({ leagueId, leagueName });
+  const moreBadges = useShellBadges();
+  const tabs = shellTabs({ leagueId, leagueName }).map((t) => (t.key === "more" ? { ...t, badge: moreBadgeTotal(moreBadges), badgeSummary: moreBadgeSummary(moreBadges) } : t));
   const active = shellActiveTab(pathname, Boolean(leagueId));
   const [moreOpen, setMoreOpen] = useState(false);
   const pill = useSyncExternalStore(subscribePill, getPillState, getServerPillState);
@@ -62,6 +66,8 @@ function ShellBarInner() {
       setPillBarPresent(false);
     };
   }, []);
+  // Hide on scroll down, back on scroll up; a selection (the primary is the submit) keeps the footer in place.
+  useFooterHideOnScroll(isSelectionAction(pill.ctx?.primary));
   return (
     <>
       <BottomDock className="md:hidden" testId="shell-bottom-stack">

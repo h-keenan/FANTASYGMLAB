@@ -57,6 +57,8 @@ import {
 import { useGmStance } from '../context/GmStanceContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
+import SelectionActionBar from '../components/SelectionActionBar';
+import { swipeLockProps } from '../components/swipeLock';
 import { trackUse } from '../lib/analytics';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { valueDirectionLabel } from '../lib/tradeValue';
@@ -574,7 +576,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       {otherTeams.length > 0 ? (
         <View style={styles.partnerBlock}>
           <AppText style={styles.partnerLabel}>TRADING WITH</AppText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.partnerRow} keyboardShouldPersistTaps="handled">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.partnerRow} keyboardShouldPersistTaps="handled" {...swipeLockProps}>
             <PressableScale
               accessibilityRole="button"
               accessibilityState={{ selected: selectedTeamId === ALL_TEAMS_ID }}
@@ -615,7 +617,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         sendLabel={analyzing ? 'Analyzing…' : analyzeLabel}
         buildingAction={
           quickMode ? undefined : canAnalyze ? (
-            <Button label={analyzeLabel} onPress={analyze} loading={analyzing} style={styles.analyzeButton} />
+            // The sticky SelectionActionBar below the list carries the submit; no second button here.
+            <AppText style={styles.analyzeHint}>{sendCount} for {receiveCount} ready. Analyze from the bar below.</AppText>
           ) : (
             <AppText style={styles.analyzeHint}>Add players or picks to analyze.</AppText>
           )
@@ -749,12 +752,14 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       <GridBackground />
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance }]}
+        contentContainerStyle={[styles.resultsList, { paddingBottom: !quickMode && canAnalyze ? spacing.lg : orbClearance }]}
         keyboardShouldPersistTaps="handled"
       >
         {header}
         <ValuesCredit />
       </ScrollView>
+      {/* Selection mode: the one sticky submit sits below the list, clear of the orb. */}
+      {!quickMode ? <SelectionActionBar count={canAnalyze ? sendCount + receiveCount : 0} verb="Analyze trade" busy={analyzing} onPress={analyze} /> : null}
       {sheetSide ? (
         <TradePickerSheet
           key={sheetSide}

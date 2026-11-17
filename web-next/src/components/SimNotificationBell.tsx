@@ -9,6 +9,7 @@ import { SIM_ICON_BTN, SIM_ICON_STYLE } from "@/components/SimGameHeader";
 import { SimGlyph } from "@/components/SimGlyph";
 import { Sheet } from "@/components/ui/Sheet";
 import { api } from "@/lib/api";
+import { setShellBadges } from "@/lib/shellBadgeStore";
 import type { SimGlyphName } from "@/lib/simGame";
 import {
   simNotifBadge,
@@ -20,6 +21,7 @@ import {
   simNotifTargetTab,
   simNotifTime,
   simNotifUnread,
+  simMoreBadgeSources,
   type SimNotifTab,
   type SimNotification,
 } from "@/lib/simNotifications";
@@ -71,6 +73,11 @@ export function useSimNotifications(ctx: SimCtx) {
   }, [gameId, key]);
 
   const unread = useMemo(() => simNotifUnread(items, cursor), [items, cursor]);
+  // The shell's More tab carries the same unread items (waiver results, new injuries, Sim week ready): publish, never refetch.
+  useEffect(() => {
+    setShellBadges("sim", simMoreBadgeSources(items, cursor));
+  }, [items, cursor]);
+  useEffect(() => () => setShellBadges("sim", null), []);
   const markAllRead = useCallback(() => {
     const next = simNotifMarkAllRead(cursor, latest);
     setCursorState({ id: gameId, value: next });
