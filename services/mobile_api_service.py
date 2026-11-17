@@ -176,6 +176,7 @@ from modules import (
     community_trades,
     dashboard_engine,
     draft_assistant,
+    draft_capital,
     draft_center_cards,
     espn_leagues,
     external_leagues,
@@ -3350,10 +3351,12 @@ def get_league_team_sheet(
                     players_lookup=sleeper.get_players(),
                     projection_context=context,
                 )
+                # A team total is a sum, so it uses the mean-calibrated estimate (the median-like
+                # point_estimate under-sums a lineup by 6-8 points); older payloads fall back to it.
                 points = [
-                    float((p.get("projection") or {}).get("point_estimate"))
-                    for p in side.get("starters") or []
-                    if isinstance((p.get("projection") or {}).get("point_estimate"), (int, float))
+                    float(_proj.get("mean_estimate") if isinstance(_proj.get("mean_estimate"), (int, float)) else _proj.get("point_estimate"))
+                    for _proj in ((p.get("projection") or {}) for p in side.get("starters") or [])
+                    if isinstance(_proj.get("mean_estimate"), (int, float)) or isinstance(_proj.get("point_estimate"), (int, float))
                 ]
                 projected_total = round(sum(points), 1) if points else None
         except Exception:
@@ -9823,6 +9826,9 @@ def _projection_summary_dict(result: dict[str, Any]) -> dict[str, Any]:
     summary: dict[str, Any] = {
         "status": status,
         "point_estimate": None,
+        # Mean-calibrated twin of point_estimate: the number to SUM into team totals / win probability
+        # (point_estimate stays the median-like number for single-player start/sit).
+        "mean_estimate": None,
         "low": None,
         "high": None,
         "confidence": None,
@@ -9832,6 +9838,7 @@ def _projection_summary_dict(result: dict[str, Any]) -> dict[str, Any]:
         summary.update(
             {
                 "point_estimate": result.get("point_estimate"),
+                "mean_estimate": result.get("mean_estimate"),
                 "low": result.get("low"),
                 "high": result.get("high"),
                 "confidence": result.get("confidence"),
@@ -9875,6 +9882,8 @@ def _weekly_projection_for_player(
         team_qb_pass_attempts_by_team=team_qb_pass_attempts_by_team,
         scoring_settings=scoring_settings,
         prior_weekly_rows=(prior_weekly_by_player or {}).get(str(player_id)),
+        team_history=player_projections.team_history_for_player(str(player_id), season),
+        inactive_weeks=record.get("inactive_weeks") if isinstance(record, dict) else None,
     )
     summary = _projection_summary_dict(result)
     return _with_game_weather(summary, result)
@@ -10012,7 +10021,7 @@ EXTERNAL_API_KEY_ENV = "FANTASYDESK_EXTERNAL_API_KEY"
 # *field* change (adding/renaming/removing a key) is a separate, breaking-
 # vs-non-breaking concern this constant does not track — see
 # docs/external-api-contract.md's versioning policy for both.
-EXTERNAL_PROJECTIONS_MODEL_VERSION = "v2"
+EXTERNAL_PROJECTIONS_MODEL_VERSION = "v3.4"
 
 # Sleeper's own player_id already *is* this app's canonical player id (see
 # modules.player_identity.SUPPORTED_DIRECT_PLATFORMS) — this is reported so
@@ -10287,6 +10296,7 @@ def _external_projection_payload(
         payload.update(
             {
                 "projected_points": result.get("point_estimate"),
+                "projected_points_mean": result.get("mean_estimate"),
                 "low": result.get("low"),
                 "high": result.get("high"),
                 "confidence": result.get("confidence"),
@@ -10402,6 +10412,8 @@ def get_external_week_projections(
             player_weekly_rows=weekly_rows or [],
             defense_strength=defense_strength,
             team_qb_pass_attempts_by_team=team_qb_pass_attempts,
+            team_history=player_projections.team_history_for_player(str(player_id), resolved_season),
+            inactive_weeks=record.get("inactive_weeks") if isinstance(record, dict) else None,
         )
         payload = _external_projection_payload(player_id, resolved_season, int(week), result)
         items.append(payload)
@@ -15749,6 +15761,11 @@ def _project_real_starter_row(
     )
     fields.update(_player_game_state(fields.get("team"), projection_context))
     fields["slot"] = slot
+    projection_status = str((fields["projection"] or {}).get("status") or "") if fields["projection"] is not None else ""
+    if projection_status and projection_status not in ("ok", "bye_week"):
+        # An unmodeled starter is imputed at a replacement week; his draft round (nflverse contracts file, disk
+        # cache only) picks the anchor (modules.matchup_win_probability.REPLACEMENT_WEEK_BY_ROUND).
+        fields["draft_round"] = draft_capital.draft_round_for(fields.get("name"), fields.get("position"))
     return fields
 
 

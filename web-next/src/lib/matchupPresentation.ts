@@ -218,8 +218,11 @@ export type LineupPlayer = MatchupStarter | MatchupRealStarter;
 /** One player's number for the lineup table: his real points once his own
  * game has started, this week's projection before that. Mirrors
  * modules.matchup_win_probability.starter_expected_points, so the table,
- * the edges and the win probability agree. */
-export function lineupPlayerPoints(player: LineupPlayer): {
+ * the edges and the win probability agree. `basis` "mean" reads the
+ * mean-calibrated `mean_estimate` (what team totals and the win probability
+ * sum; falls back to `point_estimate`), "point" the median-like number used
+ * for single-player start/sit. */
+export function lineupPlayerPoints(player: LineupPlayer, basis: "point" | "mean" = "point"): {
   value: number | null;
   kind: "pts" | "proj" | null;
   note: "bye" | null;
@@ -228,7 +231,8 @@ export function lineupPlayerPoints(player: LineupPlayer): {
   if (player.game_started === true && actual != null) return { value: actual, kind: "pts", note: null };
   const projection = player.projection;
   if (projection?.status === "ok" && projection.point_estimate != null) {
-    return { value: projection.point_estimate, kind: "proj", note: null };
+    const value = basis === "mean" && projection.mean_estimate != null ? projection.mean_estimate : projection.point_estimate;
+    return { value, kind: "proj", note: null };
   }
   if (projection?.status === "bye_week") return { value: null, kind: null, note: "bye" };
   return { value: null, kind: null, note: null };
@@ -297,10 +301,11 @@ export function rowWinner(mine: number | null, opponent: number | null): "mine" 
   return diff > 0 ? "mine" : diff < 0 ? "opponent" : "tie";
 }
 
-/** Column totals for the lineup table (players with a number only) and my margin. */
+/** Column totals for the lineup table (players with a number only) and my margin. A total is a sum, so it adds the
+ * mean-calibrated projections (the same basis as the server's win probability), not the median-like per-player numbers. */
 export function lineupTotals(rows: LineupComparisonRow[]): { mine: number; opponent: number; margin: number } {
   const sum = (cell: LineupPlayer | "empty" | null) =>
-    cell && cell !== "empty" ? (lineupPlayerPoints(cell).value ?? 0) : 0;
+    cell && cell !== "empty" ? (lineupPlayerPoints(cell, "mean").value ?? 0) : 0;
   const mine = rows.reduce((acc, row) => acc + sum(row.mine), 0);
   const opponent = rows.reduce((acc, row) => acc + sum(row.opponent), 0);
   return { mine, opponent, margin: mine - opponent };

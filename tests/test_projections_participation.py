@@ -95,7 +95,7 @@ def test_durability_curve_is_monotone_and_position_specific():
         assert values[0] == 1.0 and values == sorted(values, reverse=True)
         assert values[-1] > 0.65
     assert pp._durability_multiplier("QB", 12) < pp._durability_multiplier("WR", 12)
-    assert pp._durability_multiplier("K", 6) == 1.0
+    assert pp._durability_multiplier("K", 6) < 1.0  # v3.4: kickers get cut (round 2)
 
 
 def test_game_time_probabilities_are_calibrated():

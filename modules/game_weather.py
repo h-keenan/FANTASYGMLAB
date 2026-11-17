@@ -47,19 +47,30 @@ MAX_HORIZON = timedelta(days=7)
 WINDOW_HOURS = 4  # kickoff hour through +3h, matching the research window
 
 # Effect of each condition on a player's weekly points, as a fraction (-0.08
-# = 8% fewer points), AFTER shrinkage. Filled from docs/weather-effects.md.
-# Missing position/condition = no measured effect = no adjustment.
+# = 8% fewer points), AFTER shrinkage. Rain and cold come from
+# docs/weather-effects.md (adopted cells only: harmful effect with z <= -2.5,
+# same sign in both halves of 2011-2025, wind/cold corroborated by
+# stadium-reported numbers). Missing position/condition = no measured effect =
+# no adjustment; RB has none.
+#
+# Wind (2026-11, docs/audits/2026-11-projections-backtest.md "Round 2"): the
+# 2011-2025 reanalysis-wind study did not replicate with stadium-reported wind,
+# but a point-in-time replay of the production projection on observed STADIUM
+# wind (outdoor games only, domes and closed roofs excluded; 2016-2022 fit,
+# 2023-26 holdout) shows a real shortfall in games with wind >= 15 mph relative
+# to calmer games: QB -3%, WR -5%, TE -12% (-26% at 20+), K -7%, RB none. Each
+# cell is shrunk empirically toward the previous table value (prior sd 5 points:
+# weight 25 / (25 + se^2), se 3-7 points), so a noisy cell moves only part of
+# the way, then scaled by 0.75 because the product applies a FORECAST wind that
+# is noisier than the observed wind the effect was measured on (attenuation),
+# and the total is still capped at MAX_TOTAL_REDUCTION. Deliberately modest: the
+# aim is bias near zero in windy games (it does not flip sign), not a swing to
+# the other side. K and the TE 20+ cell keep their earlier, already-shrunk values.
 WEATHER_EFFECTS: dict[str, dict[str, float]] = {
-    # Adopted cells only (docs/weather-effects.md): harmful effect with
-    # z <= -2.5, same sign in both halves of 2011-2025, and (wind/cold)
-    # corroborated by stadium-reported game-day numbers. RB has none: nothing
-    # measured clears the bar, so RBs are never adjusted. QB/WR wind is absent
-    # on purpose: the reanalysis-wind effect did not replicate with
-    # stadium-reported wind.
-    "QB": {"rain_light": -0.070, "rain_heavy": -0.119, "cold_le32": -0.081},
-    "WR": {"rain_heavy": -0.107},
-    "TE": {"wind_20p": -0.161, "rain_heavy": -0.105},
-    "K": {"wind_15_19": -0.075, "cold_le32": -0.091},
+    "QB": {"rain_light": -0.070, "rain_heavy": -0.119, "cold_le32": -0.081, "wind_15_19": -0.015},
+    "WR": {"rain_heavy": -0.107, "wind_15_19": -0.025, "wind_20p": -0.030},
+    "TE": {"wind_15_19": -0.020,"wind_20p": -0.161, "rain_heavy": -0.105},
+    "K": {"wind_15_19": -0.070, "wind_20p": -0.086, "cold_le32": -0.091},
 }
 
 # A heavier tier with no measured effect of its own inherits the lighter
@@ -500,7 +511,7 @@ def apply_weather(
     }
     if applied:
         block["points_before"] = summary.get("point_estimate")
-        for key in ("point_estimate", "low", "high"):
+        for key in ("point_estimate", "mean_estimate", "low", "high"):
             if isinstance(summary.get(key), (int, float)):
                 summary[key] = round(float(summary[key]) * adjustment["multiplier"], 1)
     summary["weather"] = block

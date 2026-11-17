@@ -137,7 +137,7 @@ def projected_final(starter: dict[str, Any], *, now: datetime | None = None) -> 
     return None if raw is None else round(raw, 1)
 
 
-def _projected_final_raw(starter: dict[str, Any], *, now: datetime | None = None) -> float | None:
+def _projected_final_raw(starter: dict[str, Any], *, now: datetime | None = None, basis: str = "point") -> float | None:
     """Live projected final points for one starter, or None when there is no
     live in-progress game to project (not started, final, unknown clock) or
     nothing real to project from. Pure arithmetic on fields already in the
@@ -153,7 +153,7 @@ def _projected_final_raw(starter: dict[str, Any], *, now: datetime | None = None
         return None
     if _has_exited(starter):
         return float(actual)
-    moments = _projection_moments(starter)
+    moments = _projection_moments(starter, basis=basis)
     if moments is None:
         return None
     mean = moments[0]
@@ -164,11 +164,18 @@ def _projected_final_raw(starter: dict[str, Any], *, now: datetime | None = None
     return float(actual) + remaining_estimate
 
 
-def _projection_moments(starter: dict[str, Any]) -> tuple[float, float] | None:
+def _projection_moments(starter: dict[str, Any], basis: str = "point") -> tuple[float, float] | None:
+    """(mean, variance) of a starter's projected week. ``basis="mean"`` reads the mean-calibrated
+    ``mean_estimate`` (the right number to SUM into a team total / win probability; falls back to the point
+    estimate for a projection that does not carry one), ``"point"`` the median-like ``point_estimate`` (start/sit
+    and any single-player number)."""
+
     projection = starter.get("projection") or {}
     if projection.get("status") != "ok":
         return None
     point_estimate = projection.get("point_estimate")
+    if basis == "mean" and isinstance(projection.get("mean_estimate"), (int, float)):
+        point_estimate = projection.get("mean_estimate")
     low = projection.get("low")
     high = projection.get("high")
     if not (
@@ -181,7 +188,7 @@ def _projection_moments(starter: dict[str, Any]) -> tuple[float, float] | None:
     return float(point_estimate), half_width * half_width
 
 
-def starter_expected_points(starter: dict[str, Any], *, now: datetime | None = None) -> float | None:
+def starter_expected_points(starter: dict[str, Any], *, now: datetime | None = None, basis: str = "point") -> float | None:
     """One starter's expected weekly points under this module's model (his
     real score once his game has started, his projection's point estimate
     otherwise), or None when he isn't modeled at all.
@@ -191,11 +198,13 @@ def starter_expected_points(starter: dict[str, Any], *, now: datetime | None = N
     change to `_starter_distribution` without a second copy of its rules.
     """
 
-    mean, _variance, modeled = _starter_distribution(starter, now=now)
+    mean, _variance, modeled = _starter_distribution(starter, now=now, basis=basis)
     return mean if modeled else None
 
 
-def _starter_distribution(starter: dict[str, Any], *, now: datetime | None = None) -> tuple[float, float, bool]:
+def _starter_distribution(
+    starter: dict[str, Any], *, now: datetime | None = None, basis: str = "mean"
+) -> tuple[float, float, bool]:
     """One starter's (mean, variance, modeled) contribution to his team's
     weekly point total: real points so far plus the remaining share of his
     projection (see the module docstring). `modeled` is False when neither
@@ -203,7 +212,7 @@ def _starter_distribution(starter: dict[str, Any], *, now: datetime | None = Non
     (0.0, 0.0, False), never a guessed number.
     """
 
-    moments = _projection_moments(starter)
+    moments = _projection_moments(starter, basis=basis)
     actual_points = starter.get("actual_points")
     has_actual = starter.get("game_started") is True and isinstance(actual_points, (int, float))
 
@@ -230,7 +239,7 @@ def _starter_distribution(starter: dict[str, Any], *, now: datetime | None = Non
     if _has_exited(starter) and starter.get("game_final") is not True:
         # Left the game hurt: nothing more to come, so no remaining variance.
         return float(actual_points), 0.0, True
-    final = _projected_final_raw(starter, now=now)
+    final = _projected_final_raw(starter, now=now, basis=basis)
     if final is None:
         final = float(actual_points) + remaining * projection_mean
     return final, remaining * projection_variance, True
@@ -240,17 +249,42 @@ def _starter_distribution(starter: dict[str, Any], *, now: datetime | None = Non
 # returning player, no recent-game data). Counting him as 0 points moved a
 # mirror matchup to ~37% when the truth is 50%, so he is imputed at a
 # documented replacement-level week for his position with a wide spread.
-# (mean, sd) in PPR points per game; the means are the replacement anchors of
-# trade_lineup_model.STATIC_ANCHORS, the sds are typical weekly spread at that
-# level. Not calibrated to the league's scoring: the result flags the
-# uncertainty (``imputed_starters`` / ``note``) rather than hiding it.
+# (mean, sd) in PPR points per game, not calibrated to the league's scoring: the
+# result flags the uncertainty (``imputed_starters`` / ``note``) rather than
+# hiding it.
+#
+# Without any other information the anchors are the replacement levels of
+# trade_lineup_model.STATIC_ANCHORS, except QB, which the 2016-26 point-in-time
+# backtest (docs/audits/2026-11-projections-backtest.md "Round 2") put at about
+# 8 for a QB with no NFL history who plays (first-round QBs 7.9, later rounds
+# 4.5-6.5), not the 12.0 starter-level anchor.
 REPLACEMENT_WEEK: dict[str, tuple[float, float]] = {
-    "QB": (12.0, 7.0),
+    "QB": (8.0, 7.0),
     "RB": (4.5, 4.5),
     "WR": (5.0, 4.5),
     "TE": (3.5, 3.5),
     "K": (7.0, 3.5),
 }
+
+# When his NFL draft capital is known (``starter["draft_round"]``: 1-7, 0 = undrafted) the anchor follows it:
+# realized weekly PPR of no-history players who played (2016-22 fit, 2023-26 validation: RB R1 12.8 vs
+# R4+ 3.2, WR 7.9 vs 2.7, TE 7.6 vs 2.4, QB 7.9 vs 4.7). Rounds 4-7 share one row; the spread keeps the
+# empirical sd. Positions / rounds not listed use ``REPLACEMENT_WEEK``.
+REPLACEMENT_WEEK_BY_ROUND: dict[str, dict[int, tuple[float, float]]] = {
+    "QB": {1: (8.0, 7.5), 2: (6.0, 7.5), 3: (6.0, 6.0), 4: (4.7, 6.0), 0: (4.5, 6.0)},
+    "RB": {1: (11.5, 5.5), 2: (6.0, 5.5), 3: (5.0, 5.5), 4: (3.2, 4.4), 0: (2.6, 4.3)},
+    "WR": {1: (8.0, 7.3), 2: (5.5, 5.2), 3: (4.5, 5.0), 4: (2.7, 4.0), 0: (2.3, 3.8)},
+    "TE": {1: (8.0, 6.5), 2: (3.0, 3.1), 3: (2.8, 3.5), 4: (2.2, 3.2), 0: (1.5, 2.7)},
+}
+
+
+def _draft_round_bucket(starter: dict[str, Any]) -> int | None:
+    """1, 2, 3, 4 (rounds 4-7) or 0 (undrafted) from ``starter["draft_round"]``; None when unknown."""
+
+    raw = starter.get("draft_round")
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or raw != raw or raw < 0:
+        return None
+    return 0 if raw == 0 else min(int(raw), 4)
 
 
 def _fallback_distribution(starter: dict[str, Any]) -> tuple[float, float] | None:
@@ -264,6 +298,9 @@ def _fallback_distribution(starter: dict[str, Any]) -> tuple[float, float] | Non
     if position not in REPLACEMENT_WEEK:
         return None
     mean, sd = REPLACEMENT_WEEK[position]
+    bucket = _draft_round_bucket(starter)
+    if bucket is not None:
+        mean, sd = (REPLACEMENT_WEEK_BY_ROUND.get(position) or {}).get(bucket, (mean, sd))
     return mean, sd * sd
 
 

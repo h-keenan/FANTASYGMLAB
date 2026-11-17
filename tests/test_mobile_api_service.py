@@ -5750,6 +5750,7 @@ def test_schedule_attaches_a_projection_to_each_unplayed_non_bye_week(monkeypatc
         "week": 3,
         "opponent": "MIA",
         "point_estimate": 14.2,
+        "mean_estimate": 15.1,
         "low": 9.8,
         "high": 18.6,
         "confidence": "medium",
@@ -5790,6 +5791,7 @@ def test_schedule_attaches_a_projection_to_each_unplayed_non_bye_week(monkeypatc
     assert projection == {
         "status": "ok",
         "point_estimate": 14.2,
+        "mean_estimate": 15.1,
         "low": 9.8,
         "high": 18.6,
         "confidence": "medium",
@@ -5853,6 +5855,7 @@ def test_schedule_projection_honors_an_edge_case_status_without_a_fabricated_num
     assert projection == {
         "status": "insufficient_player_data",
         "point_estimate": None,
+        "mean_estimate": None,
         "low": None,
         "high": None,
         "confidence": None,
@@ -13294,6 +13297,7 @@ def test_matchup_real_starters_carry_a_per_game_projection(monkeypatch):
     assert projection == {
         "status": "ok",
         "point_estimate": 18.4,
+        "mean_estimate": None,
         "low": 14.0,
         "high": 22.8,
         "confidence": "high",
@@ -13305,7 +13309,7 @@ def test_matchup_real_starters_carry_a_per_game_projection(monkeypatch):
     # The suggested season-value lineup's starters carry the same
     # projection shape too, not just the real lineup.
     suggested_starter = body["my_team"]["starters"][0]
-    assert suggested_starter["projection"] == fake_projection
+    assert suggested_starter["projection"] == {**fake_projection, "mean_estimate": None}
 
     # Shared inputs computed once for the whole request (both rosters).
     # The suggested lineup is this week's lineup, so every roster player is
