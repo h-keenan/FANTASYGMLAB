@@ -27,12 +27,13 @@ export function SimRosterStrip({ roster, slots, rosterLimit, bench, onOpen }: { 
     <div className="flex flex-col gap-1" data-testid="roster-strip">
       <button type="button" onClick={toggle} aria-expanded={open} className="flex items-center gap-2" style={{ minHeight: "var(--touch-target-min)", color: "inherit" }} data-testid="roster-strip-toggle">
         <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Your roster</span>
-        <span className="flex flex-1 flex-wrap items-center gap-1" data-testid="roster-strip-needs">
-          {needs.map((pos) => (
+        <span className="flex flex-1 flex-wrap items-center gap-1" data-testid="roster-strip-needs" aria-label={`Needs: ${needs.join(", ")}`}>
+          {needs.slice(0, 3).map((pos) => (
             <span key={pos} className="px-1.5 text-[0.6875rem] font-extrabold" style={{ color: "var(--color-warning)", borderRadius: "var(--radius-pill)", border: "1px solid color-mix(in srgb, var(--color-warning) 45%, transparent)" }}>
-              Need {pos}
+              {pos}
             </span>
           ))}
+          {needs.length > 3 ? <span className="text-[0.6875rem] font-extrabold" style={{ color: "var(--color-warning)" }}>+{needs.length - 3}</span> : null}
         </span>
         <span className="text-xs font-bold tabular-nums" style={{ color: "var(--color-text-muted)" }} data-testid="roster-strip-bench">
           Bench {strip.bench.have}/{strip.bench.max} {open ? "▴" : "▾"}

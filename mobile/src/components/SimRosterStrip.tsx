@@ -30,12 +30,13 @@ export function SimRosterStrip({ roster, slots, rosterLimit, bench, onOpen }: { 
     <View style={styles.wrap} testID="roster-strip">
       <Pressable onPress={toggle} accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`Your roster, bench ${strip.bench.have} of ${strip.bench.max}`} style={styles.head} testID="roster-strip-toggle">
         <AppText style={styles.kicker}>Your roster</AppText>
-        <View style={styles.needs} testID="roster-strip-needs">
-          {needs.map((pos) => (
+        <View style={styles.needs} testID="roster-strip-needs" accessibilityLabel={`Needs: ${needs.join(", ")}`}>
+          {needs.slice(0, 3).map((pos) => (
             <View key={pos} style={[styles.needChip, { borderColor: colors.warning }]}>
-              <AppText style={[styles.needText, { color: colors.warning }]}>{`Need ${pos}`}</AppText>
+              <AppText style={[styles.needText, { color: colors.warning }]}>{pos}</AppText>
             </View>
           ))}
+          {needs.length > 3 ? <AppText style={[styles.needText, { color: colors.warning }]}>{`+${needs.length - 3}`}</AppText> : null}
         </View>
         <AppText style={styles.bench} testID="roster-strip-bench">{`Bench ${strip.bench.have}/${strip.bench.max} ${open ? '▴' : '▾'}`}</AppText>
       </Pressable>
