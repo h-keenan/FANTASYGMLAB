@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { InteractionManager, Platform } from 'react-native';
 import Purchases, {
   INTRO_ELIGIBILITY_STATUS,
   PURCHASES_ERROR_CODE,
@@ -26,31 +26,59 @@ const PREMIUM_ENTITLEMENT_ID = PRO_ENTITLEMENT_ID;
 
 let configured = false;
 
+// Configuration is deferred past the first frame (`scheduleRevenueCatConfigure`), so every reader awaits `settled()` instead of
+// reading `configured` directly: an entitlement/offering/identify call made before the SDK is configured waits for it rather than
+// answering "Free" / "not available" (which would flash a paying user's tags, or drop the logIn).
+let configureScheduled = false;
+let markSettled: () => void = () => {};
+const settledPromise = new Promise<void>((resolve) => {
+  markSettled = resolve;
+});
+
+async function settled(): Promise<boolean> {
+  if (!configured && configureScheduled) await settledPromise;
+  return configured;
+}
+
 /** Call once at app startup, after we know whether an SDK key exists for this platform. */
 export function configureRevenueCat(): void {
-  if (configured) return;
-  const apiKey = Platform.select({
-    ios: env.revenueCatIosKey,
-    android: env.revenueCatAndroidKey,
-    default: '',
-  });
-  if (!apiKey) {
-    // Web/dev fallback or a platform without a key yet — purchases simply
-    // won't be available; entitlement still comes from Supabase profiles.
-    return;
+  try {
+    if (configured) return;
+    const apiKey = Platform.select({
+      ios: env.revenueCatIosKey,
+      android: env.revenueCatAndroidKey,
+      default: '',
+    });
+    if (!apiKey) {
+      // Web/dev fallback or a platform without a key yet — purchases simply
+      // won't be available; entitlement still comes from Supabase profiles.
+      return;
+    }
+    Purchases.configure({ apiKey });
+    configured = true;
+  } finally {
+    markSettled();
   }
-  Purchases.configure({ apiKey });
-  configured = true;
+}
+
+/**
+ * Configure RevenueCat after the first frame instead of in the first effect: the native SDK start-up (store connection, receipt
+ * check) used to run in the launch window. Readers wait for it through `settled()`, so behaviour is unchanged, only later.
+ */
+export function scheduleRevenueCatConfigure(): void {
+  if (configured || configureScheduled) return;
+  configureScheduled = true;
+  InteractionManager.runAfterInteractions(() => configureRevenueCat());
 }
 
 /** Attach the signed-in Supabase user id so RevenueCat and our backend agree on identity. */
 export async function identifyRevenueCatUser(supabaseUserId: string): Promise<void> {
-  if (!configured) return;
+  if (!(await settled())) return;
   await Purchases.logIn(supabaseUserId);
 }
 
 export async function signOutRevenueCatUser(): Promise<void> {
-  if (!configured) return;
+  if (!(await settled())) return;
   await Purchases.logOut();
 }
 
@@ -58,7 +86,7 @@ export async function signOutRevenueCatUser(): Promise<void> {
  * from RevenueCat. Not configured (no SDK key for this platform) resolves
  * Free, matching every other "not configured" fallback in this module. */
 export async function getEntitlementTier(): Promise<EntitlementTier> {
-  if (!configured) return FREE;
+  if (!(await settled())) return FREE;
   const info = await Purchases.getCustomerInfo();
   return resolveEntitlementTier(info);
 }
@@ -82,7 +110,7 @@ export async function hasFrontOfficeEntitlement(): Promise<boolean> {
 
 /** The current offering (dashboard-configured), or null if unavailable. */
 export async function getCurrentOffering(): Promise<PurchasesOffering | null> {
-  if (!configured) return null;
+  if (!(await settled())) return null;
   const offerings = await Purchases.getOfferings();
   return offerings.current;
 }
@@ -93,7 +121,7 @@ export async function getCurrentOffering(): Promise<PurchasesOffering | null> {
  * callers treat a missing key as 'unknown' (which shows no trial on iOS).
  */
 export async function getIntroEligibility(productIds: string[]): Promise<Record<string, IntroEligibility>> {
-  if (!configured || productIds.length === 0) return {};
+  if (productIds.length === 0 || !(await settled())) return {};
   try {
     const result = await Purchases.checkTrialOrIntroductoryPriceEligibility(productIds);
     const out: Record<string, IntroEligibility> = {};
@@ -115,7 +143,7 @@ export async function getIntroEligibility(productIds: string[]): Promise<Record<
 
 /** ISO end of an in-progress store trial (active entitlement in a TRIAL period), else null. */
 export async function activeTrialEnd(): Promise<string | null> {
-  if (!configured) return null;
+  if (!(await settled())) return null;
   try {
     const info = await Purchases.getCustomerInfo();
     const entitlement = info.entitlements.active[PRO_ENTITLEMENT_ID];
@@ -145,7 +173,7 @@ export interface PurchaseOutcome {
 
 /** Buy a package and report a plain outcome — callers don't need to know RevenueCat's error shape. */
 export async function purchasePackage(pack: PurchasesPackage): Promise<PurchaseOutcome> {
-  if (!configured) {
+  if (!(await settled())) {
     return { purchased: false, cancelled: false, errorMessage: 'Purchases are not available on this build.' };
   }
   try {
@@ -163,7 +191,7 @@ export async function purchasePackage(pack: PurchasesPackage): Promise<PurchaseO
 
 /** Re-sync entitlement state without a purchase — used after "Restore purchases". */
 export async function restorePurchases(): Promise<boolean> {
-  if (!configured) return false;
+  if (!(await settled())) return false;
   const info = await Purchases.restorePurchases();
   return isAtLeast(resolveEntitlementTier(info), PRO);
 }
@@ -182,7 +210,7 @@ export async function restorePurchases(): Promise<boolean> {
  * null when there's no lapsed-trial history at all.
  */
 export async function lapsedTrialExpiration(): Promise<string | null> {
-  if (!configured) return null;
+  if (!(await settled())) return null;
   const info = await Purchases.getCustomerInfo();
   const entitlement = info.entitlements.all[PRO_ENTITLEMENT_ID];
   if (!entitlement || entitlement.isActive || entitlement.periodType !== 'TRIAL') return null;

@@ -5,10 +5,11 @@ import { isProOrNull, planOf } from '../lib/plan';
 import { trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import FreeLimitNote from '../components/FreeLimitNote';
 import { clearPendingReferralCode, getPendingReferralCode } from '../lib/referralCapture';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  InteractionManager,
   Linking,
   RefreshControl,
   SectionList,
@@ -59,7 +60,9 @@ import {
 } from '../lib/connectFlow';
 import { glanceSectionState } from '../lib/leaguesGlance';
 import { useOrbClearance } from '../lib/orbLayout';
-import PortfolioStanding, { type PortfolioStandingHandle } from '../components/PortfolioStanding';
+import type { PortfolioStandingHandle } from '../components/PortfolioStanding';
+// Lazy: the standing section (31 KB) sits below the fold, so its module is evaluated after the first interactions.
+const PortfolioStanding = lazy(() => Promise.resolve(require('../components/PortfolioStanding')));
 import { lapsedTrialExpiration } from '../lib/revenuecat';
 import { getShownTrialLapseExpiration, setShownTrialLapseExpiration } from '../lib/trialLapsedSeen';
 import { maskShowcaseFields, maskShowcaseText } from '../lib/showcaseMode';
@@ -491,6 +494,11 @@ export default function HomeScreen({ navigation, route }: Props) {
   // Scroll to the standing section once the list has laid it out (the footer reports its offset).
   const listRef = useRef<FlatList<SavedLeague>>(null);
   const standingRef = useRef<PortfolioStandingHandle>(null);
+  const [standingReady, setStandingReady] = useState(false);
+  useEffect(() => {
+    const handle = InteractionManager.runAfterInteractions(() => setStandingReady(true));
+    return () => handle.cancel();
+  }, []);
   const standingY = useRef<number | null>(null);
   const scrollToStanding = useCallback(() => {
     if (focusStanding && standingY.current != null) listRef.current?.scrollToOffset({ offset: standingY.current, animated: true });
@@ -642,7 +650,11 @@ export default function HomeScreen({ navigation, route }: Props) {
                   scrollToStanding();
                 }}
               >
-                <PortfolioStanding ref={standingRef} />
+                {standingReady ? (
+                  <Suspense fallback={null}>
+                    <PortfolioStanding ref={standingRef} />
+                  </Suspense>
+                ) : null}
               </View>
             ) : null}
             {glanceState === 'locked' ? (

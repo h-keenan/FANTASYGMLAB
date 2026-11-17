@@ -1,7 +1,7 @@
 import type { TabIconName } from '../lib/tabIcons';
 import { useNotice } from '../components/NoticeToast';
 import { ProjectionWeatherChip } from '../components/WeatherReasonChip';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import {
   Linking,
   ScrollView,
@@ -23,7 +23,8 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import MetricCard from '../components/MetricCard';
-import PercentileExplorerSheet from '../components/PercentileExplorerSheet';
+// Lazy: mounted only when a stat row is tapped (29 KB), so its module is evaluated then.
+const PercentileExplorerSheet = lazy(() => Promise.resolve(require('../components/PercentileExplorerSheet')));
 import { type ExplorerPlayer } from '../lib/percentileExplorer';
 import PlayerHero from '../components/PlayerHero';
 import ToneBadge from '../components/ToneBadge';
@@ -1625,6 +1626,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     </ScrollView>
     </View>
     {explorer ? (
+      <Suspense fallback={null}>
       <PercentileExplorerSheet
         playerId={player.player_id}
         statKey={explorer.key}
@@ -1633,6 +1635,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         onClose={() => setExplorer(null)}
         onOpenPlayer={openExplorerPlayer}
       />
+      </Suspense>
     ) : null}
     <NewsImpactModal visible={newsModalOpen} items={newsItems} onClose={() => setNewsModalOpen(false)} />
     <PlayerSharePreviewModal

@@ -28,7 +28,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import UpdateRequiredGate from './src/components/UpdateRequiredGate';
 import { initErrorReporter } from './src/lib/errorReporter';
-import { configureRevenueCat } from './src/lib/revenuecat';
+import { scheduleRevenueCatConfigure } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
 import { startAnalytics } from './src/lib/analytics';
 import { startReferralCapture } from './src/lib/referralCapture';
@@ -78,7 +78,7 @@ function AppContent() {
   }, [fontsLoaded]);
 
   useEffect(() => {
-    configureRevenueCat();
+    scheduleRevenueCatConfigure(); // after the first frame; readers in lib/revenuecat wait for it
     void initAds();
     // No-op unless the build sets EXPO_PUBLIC_ANALYTICS_ENABLED=1 (ships dark).
     const stopAnalytics = startAnalytics();
