@@ -360,15 +360,21 @@ def fetch_all_prospects(
 
     if not auth_supabase.is_configured(config):
         return [], "not_configured"
-    try:
-        response = requests.get(
-            auth_supabase.rest_api_url(config, PROSPECTS_TABLE, "select=id,name,position,school,draft_year"),
-            headers=auth_supabase.auth_headers(config, access_token),
-            timeout=timeout,
-        )
-    except Exception:
-        return [], "not_available"
-    if response.status_code >= 400:
+    response = None
+    # Ask for the post-draft flag first; fall back to the base columns when the
+    # optional migration (docs/supabase_college_prospects_ingest.sql) is absent.
+    for select in ("select=id,name,position,school,draft_year,drafted", "select=id,name,position,school,draft_year"):
+        try:
+            response = requests.get(
+                auth_supabase.rest_api_url(config, PROSPECTS_TABLE, select),
+                headers=auth_supabase.auth_headers(config, access_token),
+                timeout=timeout,
+            )
+        except Exception:
+            return [], "not_available"
+        if response.status_code < 400:
+            break
+    if response is None or response.status_code >= 400:
         return [], "not_available"
     try:
         rows = response.json()
@@ -376,6 +382,8 @@ def fetch_all_prospects(
         return [], "not_available"
     if not isinstance(rows, list):
         return [], "not_available"
+    # Drafted prospects are retired (hidden), never deleted.
+    rows = [r for r in rows if not (isinstance(r, dict) and r.get("drafted") is True)]
     return _filter_scouting_relevant_prospects(rows), ""
 
 

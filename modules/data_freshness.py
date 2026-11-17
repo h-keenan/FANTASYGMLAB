@@ -126,6 +126,42 @@ def _self_heal_summary() -> dict[str, Any] | None:
     return {k: status.get(k) for k in ("state", "started_at", "finished_at", "seasons") if k in status}
 
 
+COLLEGE_PROSPECTS_STATUS_FILE = "college_prospects_ingest_status.json"
+COLLEGE_PROSPECTS_MAX_AGE_HOURS = 24 * 9  # weekly Monday run + Actions lag
+
+
+def college_prospects_row(now: float, data_dir: str, in_season: bool) -> dict[str, Any]:
+    """Status of the Actions-only prospect ingest (college-prospect-ingest.yml).
+
+    Reads the status file the job commits; fails if the job stopped or the
+    class listing came back empty/errored."""
+
+    import datetime as _dt
+    import json
+
+    base: dict[str, Any] = {"name": "college_prospects", "cadence": "weekly Mon + daily Apr-May (draft window)", "max_age_hours": COLLEGE_PROSPECTS_MAX_AGE_HOURS, "producer": "college-prospect-ingest.yml / modules.college_prospect_ingest"}
+    path = os.path.join(data_dir, COLLEGE_PROSPECTS_STATUS_FILE)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            status = json.load(fh)
+        as_of = _dt.datetime.fromisoformat(status["ran_at"]).timestamp()
+    except (OSError, ValueError, KeyError, TypeError):
+        base.update(status="warn", as_of=None, age_hours=None, detail="no ingest status file yet (job has not run)")
+        return base
+    age = max(0.0, (now - as_of) / 3600.0)
+    base.update(as_of=as_of, age_hours=round(age, 1))
+    classes = (status.get("classes") or {}).get("status")
+    if classes in ("empty", "error") or status.get("ok") is False:
+        base.update(status="fail", detail=f"last ingest unhealthy (classes={classes}, error={status.get('error')})")
+    elif age > COLLEGE_PROSPECTS_MAX_AGE_HOURS:
+        base.update(status=_age_status(age, COLLEGE_PROSPECTS_MAX_AGE_HOURS, in_season), detail=f"{age:.1f}h old (limit {COLLEGE_PROSPECTS_MAX_AGE_HOURS}h)")
+    elif classes == "skipped_no_key":
+        base.update(status="warn", detail="CFBD_API_KEY secret not set; class listing skipped")
+    else:
+        base.update(status="ok", detail=f"{age:.1f}h old; classes={classes}")
+    return base
+
+
 def build_report(now: float | None = None, data_dir: str = "data") -> dict[str, Any]:
     now = time.time() if now is None else now
     in_season = _in_season()
@@ -134,6 +170,10 @@ def build_report(now: float | None = None, data_dir: str = "data") -> dict[str, 
         rows.append(weekly_stats_row(now, in_season))
     except Exception as exc:  # a broken check must itself be visible, not silent
         rows.append({"name": "weekly_stats", "status": "fail", "detail": f"completeness check errored: {type(exc).__name__}"})
+    try:
+        rows.append(college_prospects_row(now, data_dir, in_season))
+    except Exception as exc:
+        rows.append({"name": "college_prospects", "status": "fail", "detail": f"check errored: {type(exc).__name__}"})
     return {
         "checked_at": now,
         "in_season": in_season,

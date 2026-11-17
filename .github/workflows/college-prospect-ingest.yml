@@ -1,0 +1,69 @@
+name: College Prospect Ingest
+
+# Fully automated college prospect catalog (public.college_prospects). Runs ONLY
+# here in Actions and writes to Supabase; the production API just reads the table
+# and needs no new env var. See modules/college_prospect_ingest.py.
+#
+#   - Mondays 09:00 UTC, all year: class listing (next two draft classes) from
+#     College Football Data when the CFBD_API_KEY secret is set (clean skip if
+#     not), then post-draft retirement from nflverse (keyless).
+#   - Daily 09:30 UTC in April and May (NFL draft window): retirement only, so
+#     drafted prospects drop off the list within a day of the draft.
+#
+# Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (same as other jobs),
+# CFBD_API_KEY (class listing). Never deletes rows; upserts on conflict (id).
+# The run writes data/college_prospects_ingest_status.json, which the freshness
+# report (modules/data_freshness.py) reads to alert if the job stops or is empty.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+    - cron: "30 9 * 4,5 *"
+  workflow_dispatch:
+    inputs:
+      force_classes:
+        description: "Run the CFBD class listing even if it is not Monday"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: college-prospect-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Ingest prospects
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+          INPUT_FORCE: ${{ inputs.force_classes }}
+        run: |
+          args=""
+          [ "$INPUT_FORCE" = "true" ] && args="--force-classes"
+          python scripts/run_college_prospect_ingest.py $args
+      - name: Commit status file
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/college_prospects_ingest_status.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(data): college prospect ingest status"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
