@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 
 // Byte-identical in both trees (generated files and imports-free pure modules).
 export const IDENTICAL = [
+  "accountDeletionCopy.ts",
   "adpPresentation.ts",
   "prospectProfile.ts",
   "appHeader.ts",

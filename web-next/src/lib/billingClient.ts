@@ -21,10 +21,14 @@ export type BillingBackend = "supabase" | "fastapi";
 export const BILLING_BACKEND: BillingBackend =
   process.env.NEXT_PUBLIC_BILLING_BACKEND === "fastapi" ? "fastapi" : "supabase";
 
-export type BillingFunction = "billing-plans" | "create-checkout-session" | "billing-portal-session";
+export type BillingFunction =
+  | "billing-plans"
+  | "create-checkout-session"
+  | "billing-portal-session"
+  | "delete-account";
 
 /** Deprecated FastAPI route for each function (rollback path only). */
-const FASTAPI_PATHS: Record<BillingFunction, string> = {
+const FASTAPI_PATHS: Record<Exclude<BillingFunction, "delete-account">, string> = {
   "billing-plans": "/v1/billing/plans",
   "create-checkout-session": "/v1/billing/checkout",
   "billing-portal-session": "/v1/billing/portal",
@@ -33,7 +37,8 @@ const FASTAPI_PATHS: Record<BillingFunction, string> = {
 const REQUEST_TIMEOUT_MS = 30_000;
 
 export function billingEndpoint(name: BillingFunction, backend: BillingBackend = BILLING_BACKEND): string {
-  if (backend === "fastapi") return `${env.apiBaseUrl}${FASTAPI_PATHS[name]}`;
+  // delete-account has no deprecated FastAPI route: always the Supabase function.
+  if (backend === "fastapi" && name !== "delete-account") return `${env.apiBaseUrl}${FASTAPI_PATHS[name]}`;
   return `${env.supabaseUrl.replace(/\/+$/, "")}/functions/v1/${name}`;
 }
 

@@ -112,6 +112,7 @@ function renderAccount() {
         onRetryReferral={() => {}}
         onOpenBillingPortal={async () => {}}
         onExportData={async () => {}}
+        onDeleteAccount={async () => {}}
         onSignOut={() => {}}
       />,
     ),

@@ -50,8 +50,14 @@ import NotificationControls from '../components/NotificationControls';
 import GuestCreateAccountModal from '../components/GuestCreateAccountModal';
 import Input from '../components/Input';
 import HelpLink from '../components/HelpLink';
-import { supportMailto } from '../lib/support';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
+import {
+  APP_STORE_SUBSCRIPTIONS_URL,
+  DELETE_ACCOUNT_APP_STORE_NOTE,
+  DELETE_ACCOUNT_FAILED,
+  DELETE_ACCOUNT_STRIPE_NOTE,
+  DELETE_ACCOUNT_SUMMARY,
+} from '../lib/accountDeletionCopy';
 import { ACCOUNT_SECTION_TITLE } from '../lib/accountSections';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
@@ -73,7 +79,7 @@ const DENSITY_OPTIONS: Array<{ value: UiDensity; label: string; description: str
 // Onboarding's "How much dynasty experience do you have?" answer, changeable
 // here later. Copy only (lib/experienceCopy.ts); an unanswered account shows
 // as Veteran dynasty manager because that's exactly how it behaves. Same
-// wording as the onboarding picker (EXPERIENCE_LEVEL_OPTIONS) — this used to
+// wording as the onboarding picker (EXPERIENCE_LEVEL_OPTIONS) - this used to
 // spell its own "Beginner"/"Advanced" labels, which didn't match onboarding's
 // "New to dynasty"/"I know my stuff" for the same two values. Fixed 2026-10-27.
 const EXPERIENCE_OPTIONS: Array<{ value: ExperienceLevel; label: string; description: string }> = (
@@ -267,7 +273,7 @@ export default function MoreScreen({ navigation }: Props) {
   const [guestUpgradeOpen, setGuestUpgradeOpen] = useState(false);
   const { showcaseMode, setShowcaseMode } = useShowcaseMode();
   const { status: collegeInterestStatus, respond: respondToCollegeInterest } = useCollegeInterest();
-  // Dev/founder accounts only (lib/showcaseMode.ts allowlist) — the row
+  // Dev/founder accounts only (lib/showcaseMode.ts allowlist) - the row
   // doesn't exist for anyone else, so there's nothing for a normal user to
   // stumble into.
   const showcaseAvailable = isShowcaseModeAvailable(session?.user?.email, session?.user?.app_metadata);
@@ -332,7 +338,7 @@ export default function MoreScreen({ navigation }: Props) {
       // Share the export as an actual .json file, not a raw-text message.
       // A real account's export (13 tables, potentially years of Decision
       // Memory/scouting rows) can run well past what Share.share's text
-      // `message` reliably delivers — Android's Binder IPC caps an Intent's
+      // `message` reliably delivers - Android's Binder IPC caps an Intent's
       // extras around 1MB, so a large export silently failed to hand off
       // to Messages/Mail/etc. with no distinguishable error. Writing to a
       // file and sharing *that* (same expo-sharing pattern the Player/Trade/
@@ -350,7 +356,7 @@ export default function MoreScreen({ navigation }: Props) {
           dialogTitle: 'My FantasyDesk data',
         });
       } else {
-        // Rare fallback (file sharing unavailable on this device) — same
+        // Rare fallback (file sharing unavailable on this device) - same
         // text-message share this screen used before.
         await Share.share({ title: 'My FantasyDesk data', message: json });
       }
@@ -362,7 +368,7 @@ export default function MoreScreen({ navigation }: Props) {
   };
 
   // Compliant cancellation path for IAP is the platform's own subscription
-  // settings, not a custom in-app flow (Apple/Google require this) — this
+  // settings, not a custom in-app flow (Apple/Google require this) - this
   // just saves the "your device's account settings" instruction on the
   // Paywall from being a manual hunt.
   // Free accounts get the upgrade path (web: "You're on the Free plan" + Upgrade to Pro); Pro goes to the store's settings.
@@ -388,18 +394,30 @@ export default function MoreScreen({ navigation }: Props) {
     navigation.navigate(screen, league);
   };
 
-  // TEMPORARY: self-service deletion is disabled (delete-account edge
-  // function reverted); route the user to support instead.
   const onDeleteAccount = () => {
     Alert.alert(
-      'Delete account',
-      'Self-service account deletion is temporarily unavailable. Email support@fantasydesk.app and we will delete your account and all data, and cancel any web subscription. A subscription bought through the App Store or Google Play must be cancelled in your store account.',
+      'Delete account?',
+      `${DELETE_ACCOUNT_SUMMARY}\n\n${DELETE_ACCOUNT_STRIPE_NOTE}\n\n${DELETE_ACCOUNT_APP_STORE_NOTE}`,
       [
-        { text: 'Close', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Email support',
+          text: 'Open Subscriptions',
           onPress: () => {
-            void Linking.openURL(supportMailto({ topic: 'delete_account' })).catch(() => {});
+            void Linking.openURL(APP_STORE_SUBSCRIPTIONS_URL).catch(() => {});
+          },
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            const { error } = await deleteAccount();
+            setDeleting(false);
+            if (error) {
+              notify.alert('Could not delete account', error || DELETE_ACCOUNT_FAILED);
+            }
+            // On success there's nothing else to do here - clearing the
+            // session flips RootNavigator back to the Auth stack on its own.
           },
         },
       ],
@@ -615,7 +633,7 @@ export default function MoreScreen({ navigation }: Props) {
 
         {/* Discoverability audit (2026-09-26): saying "Not for me" (or just
             dismissing) the one-time Dashboard prompt permanently hid College
-            Prospects with no way back — the only revisit path in the whole
+            Prospects with no way back - the only revisit path in the whole
             app was reinstalling. "Replay intro tutorial" below already
             establishes the pattern of a small always-available link back to a
             one-time choice; this mirrors it for the college-football opt-in
@@ -763,7 +781,7 @@ export default function MoreScreen({ navigation }: Props) {
 
         {/* Destructive action gets its own visually distinct surface
             (danger border/tint) rather than sitting in the neutral Account
-            card above — Magna Carta §17: destructive actions should look
+            card above - Magna Carta §17: destructive actions should look
             distinct, not just be a row with red text among routine ones. */}
         <AnimatedCard style={styles.dangerCard}>
           <SettingsRow
@@ -807,7 +825,7 @@ export default function MoreScreen({ navigation }: Props) {
 }
 
 /**
- * One selectable choice card (Density/Explanations/Theme) — a compact label + supporting
+ * One selectable choice card (Density/Explanations/Theme) - a compact label + supporting
  * description, active state rendered as an accent-tinted fill + border
  * (same "illuminated" language SegmentedTabBar uses for its active segment)
  * rather than a plain border-color swap. Kept local: SegmentedTabBar itself
@@ -840,7 +858,7 @@ function OptionCard({
 }
 
 /**
- * One settings-list row — icon-in-circle (or none for indented toggle rows
+ * One settings-list row - icon-in-circle (or none for indented toggle rows
  * that already share a parent icon), label, optional description, optional
  * right-side control (chevron/switch/spinner), optional bottom divider.
  * Mirrors the AlertRow/LineupRow local-row convention already established
@@ -870,7 +888,7 @@ function SettingsRow({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // Color-system audit (2026-09-25): `disabled` previously reached
-  // TouchableOpacity only — it blocked the tap but changed nothing visible,
+  // TouchableOpacity only - it blocked the tap but changed nothing visible,
   // so a disabled row was indistinguishable from an enabled one (the
   // "disabled elements still look intentionally disabled" dark/light-mode
   // check both brief's checklist and Magna Carta §48 call for). Label/icon
@@ -925,7 +943,7 @@ function createStyles(colors: ThemeColors) {
       marginBottom: spacing.xs,
     },
     // One grouped surface per section with hairline dividers between rows,
-    // instead of a separately bordered/backgrounded row per item — Magna
+    // instead of a separately bordered/backgrounded row per item - Magna
     // Carta §12, same `groupCard` pattern MyTeamScreen/AlertsScreen use.
     relinkError: { fontSize: 13.5, color: colors.danger, marginTop: spacing.sm, lineHeight: 18 },
     identityValue: { fontSize: 15.5, fontWeight: '600', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },

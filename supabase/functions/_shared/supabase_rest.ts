@@ -104,7 +104,16 @@ export function profilePatcher(
               ins = await insert(rest);
             }
           }
-          if (ins.status >= 400) return { ok: false, error: "Supabase entitlement profile create failed." };
+          if (ins.status >= 400) {
+            // The auth user no longer exists (self-service account deletion cancels the
+            // Stripe subscription first, so its `subscription.deleted` webhook arrives
+            // after the user is gone). Nothing to entitle: ack so Stripe stops retrying.
+            const insMsg = (await errorMessage(ins.clone())).toLowerCase();
+            if (ins.status === 409 || insMsg.includes("foreign key") || insMsg.includes("23503")) {
+              return { ok: true, error: "" };
+            }
+            return { ok: false, error: "Supabase entitlement profile create failed." };
+          }
         }
       }
     } catch { /* a non-JSON success body (older stubs) is treated as applied */ }
@@ -226,4 +235,37 @@ export function revenueCatStore(cfg: SupabaseConfig, fetchFn: FetchFn): BillingS
       ],
     }),
   };
+}
+
+/** Remove the auth user (cascades to every app table). 404 = already deleted, which is success (idempotent retry). */
+export async function deleteAuthUser(cfg: SupabaseConfig, fetchFn: FetchFn, userId: string): Promise<void> {
+  const res = await fetchFn(`${cfg.url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: serviceHeaders(cfg),
+  });
+  if (res.status >= 400 && res.status !== 404) throw new HttpError(502, "Could not delete the account. Please try again.");
+}
+
+/**
+ * Tables with a user reference that does NOT cascade from auth.users: feedback_reports
+ * (user_id is set null, so message/email would survive) and billing_webhook_events
+ * (user_id is plain text). Deleted explicitly before the auth user. Best effort: a
+ * failure here is logged and never blocks the deletion itself.
+ */
+export const NON_CASCADING_USER_TABLES = ["feedback_reports", "billing_webhook_events"] as const;
+
+export async function deleteNonCascadingUserRows(cfg: SupabaseConfig, fetchFn: FetchFn, userId: string): Promise<string[]> {
+  const failed: string[] = [];
+  for (const table of NON_CASCADING_USER_TABLES) {
+    try {
+      const res = await fetchFn(`${cfg.url}/rest/v1/${table}?user_id=eq.${encodeURIComponent(userId)}`, {
+        method: "DELETE",
+        headers: serviceHeaders(cfg),
+      });
+      if (res.status >= 400) failed.push(table);
+    } catch {
+      failed.push(table);
+    }
+  }
+  return failed;
 }
