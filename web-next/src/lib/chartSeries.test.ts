@@ -57,12 +57,30 @@ describe("gaps: bye, injured and missed weeks", () => {
     expect(t.segments).toHaveLength(1);
   });
   it("a one-week island between two gaps is its own run (a dot, bridged both sides)", () => {
-    const t = prepareSeries([row(1, 4), row(2, null), row(3, 6), row(4, null), row(5, 8)]);
+    const t = prepareSeries([row(1, 4), row(2, null, "bye"), row(3, 6), row(4, null, "injured"), row(5, 8)]);
     expect(t.segments.map((seg) => seg.length)).toEqual([1, 1, 1]);
     expect(t.bridges).toHaveLength(2);
   });
+  it("never bridges a missing (no data) week: a visible break with a no-data marker", () => {
+    const t = prepareSeries([row(1, 4), row(2, null), row(3, 6), row(4, null, "bye"), row(5, 8)]);
+    expect(t.bridges.map((b) => [b.from.x, b.to.x])).toEqual([[3, 5]]);
+    expect(t.gaps.find((g) => g.x === 2)).toMatchObject({ kind: "missing", bridged: false, between: false });
+    expect(t.gaps.find((g) => g.x === 4)).toMatchObject({ kind: "bye", bridged: true, between: true });
+  });
+  it("one unknown week in a span breaks the whole span (no dashed slope over data we lack)", () => {
+    const t = prepareSeries([row(1, 4), row(2, null, "bye"), row(3, null), row(4, 8)]);
+    expect(t.bridges).toHaveLength(0);
+    expect(t.gaps.every((g) => !g.between)).toBe(true);
+  });
+  it("extends the x axis to the current week", () => {
+    const t = prepareSeries([row(1, 4), row(2, 6), row(3, 5), row(4, 7)], { xMax: 11 });
+    expect(t.xDomain).toEqual([1, 11]);
+    expect(t.xTicks[t.xTicks.length - 1]).toBe(11);
+  });
   it("describes the gap kinds", () => {
-    expect(gapCaption(s)).toBe("Dashed: bye, injured or missed weeks");
+    expect(gapCaption(s)).toBe("Dashed: bye, injured or inactive weeks");
+    expect(gapCaption(prepareSeries([row(1, 1), row(2, null), row(3, 2)]))).toBe("x: no data");
+    expect(gapCaption(prepareSeries([row(1, 1), row(2, null, "bye"), row(3, null), row(4, 2)]))).toBe("Dashed: bye week · x: no data");
     expect(gapCaption(prepareSeries([row(1, 1), row(2, null, "bye"), row(3, 2)]))).toBe("Dashed: bye week");
     expect(gapCaption(prepareSeries([row(1, 1), row(2, 2)]))).toBeNull();
   });
@@ -168,5 +186,16 @@ describe("weeklyGapRows", () => {
     const s = prepareSeries(weeklyGapRows([{ week: 1, points: 10 }, { week: 3, points: 14 }, { week: 4, points: 12 }, { week: 5, points: 15 }], [2]));
     expect(s.gaps.map((g) => [g.x, g.kind])).toEqual([[2, "bye"]]);
     expect(prepareSeries(weeklyGapRows([{ week: 1, points: 25.7 }])).status).toBe("single");
+  });
+});
+
+describe("weeklyGapRows through the current week", () => {
+  it("marks completed unknown weeks missing, known ones bye/inactive, and leaves the week in progress open", () => {
+    const rows = weeklyGapRows([{ week: 1, points: 8 }, { week: 2, points: 2 }, { week: 9, points: 15 }], [10], "Wk", { inactiveWeeks: [5, 6, 7, 8], throughWeek: 11 });
+    expect(rows.map((r) => [r.x, r.y, r.gap])).toEqual([
+      [1, 8, "missing"], [2, 2, "missing"], [3, null, "missing"], [4, null, "missing"],
+      [5, null, "inactive"], [6, null, "inactive"], [7, null, "inactive"], [8, null, "inactive"],
+      [9, 15, "missing"], [10, null, "bye"],
+    ]);
   });
 });

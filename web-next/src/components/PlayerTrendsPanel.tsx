@@ -36,7 +36,7 @@ export function PlayerTrendsPanel({
   gradientId?: string;
 }) {
   usePreloadWeeklyPointsChart();
-  const [weeklyStats, setWeeklyStats] = useState<{ season: number; weeks: WeeklyStatPoint[] } | null>(null);
+  const [weeklyStats, setWeeklyStats] = useState<{ season: number; weeks: WeeklyStatPoint[]; inactiveWeeks: number[]; byeWeek: number | null; throughWeek: number | null } | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [currentSeasonAnchor, setCurrentSeasonAnchor] = useState<number | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -53,7 +53,7 @@ export function PlayerTrendsPanel({
       .getPlayerWeeklyStats(playerId, selectedSeason ?? undefined)
       .then((response) => {
         if (cancelled) return;
-        setWeeklyStats({ season: response.season, weeks: response.weeks });
+        setWeeklyStats({ season: response.season, weeks: response.weeks, inactiveWeeks: response.inactive_weeks ?? [], byeWeek: response.bye_week ?? null, throughWeek: response.through_week ?? null });
         setLoadError(false);
         if (selectedSeason == null) setCurrentSeasonAnchor(response.season);
       })
@@ -112,7 +112,7 @@ export function PlayerTrendsPanel({
           </Select>
         ) : null}
       </div>
-      <WeeklyPointsPanel name={name} weeks={weeklyStats.weeks} season={weeklyStats.season} gradientId={gradientId} />
+      <WeeklyPointsPanel name={name} weeks={weeklyStats.weeks} season={weeklyStats.season} gradientId={gradientId} byeWeeks={weeklyStats.byeWeek ? [weeklyStats.byeWeek] : []} inactiveWeeks={weeklyStats.inactiveWeeks} throughWeek={weeklyStats.throughWeek} />
     </section>
   );
 }

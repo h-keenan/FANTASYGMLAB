@@ -15,6 +15,8 @@ def _serial_reference(fake, season, weeks):
             payload = fake("sleeper_player_stats_week", f"{sleeper.SLEEPER_BASE}/stats/nfl/regular/{season}/{week}", timeout=20)
         except Exception:
             continue
+        if isinstance(payload, list) and not payload:
+            payload = {}  # an unplayed week: a real, empty week
         if isinstance(payload, dict):
             out.append((week, payload))
     return out
@@ -33,7 +35,7 @@ def test_parallel_fetch_matches_serial_loop_including_failures_and_order(monkeyp
     monkeypatch.setattr(sleeper, "_request_json", fake)
     expected = _serial_reference(fake, 2026, range(1, 19))
     assert sleeper._fetch_weekly_stat_payloads(2026, range(1, 19)) == expected
-    assert [week for week, _ in expected] == [w for w in range(1, 19) if w not in (4, 7)]
+    assert [week for week, _ in expected] == [w for w in range(1, 19) if w != 4]
 
 
 def test_parallel_fetch_overlaps_network_latency(monkeypatch):

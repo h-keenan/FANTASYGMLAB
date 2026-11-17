@@ -2,7 +2,7 @@
 
 import { TrendChart } from "@/components/ui/TrendChart";
 import type { WeeklyStatPoint } from "@/lib/api";
-import { weeklyGapRows, type ChartBandPoint, type ChartInputPoint } from "@/lib/chartSeries";
+import { weeklyGapRows, type ChartBandPoint, type ChartInputPoint, type WeeklyGapOptions } from "@/lib/chartSeries";
 import type { WeeklyProjectionPoint } from "@/lib/weeklyProjection";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
 
@@ -19,8 +19,8 @@ import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
 export { CHART_HEIGHT };
 
 /** Rows for the shared chart: every week from the first to the last played one, gaps explicit. */
-export function weeklyChartPoints(weeks: readonly WeeklyStatPoint[], byeWeeks: readonly number[] = [], xLabel = "Wk"): ChartInputPoint[] {
-  return weeklyGapRows(weeks.map((w) => ({ week: w.week, points: w.fantasy_points_ppr })), byeWeeks, xLabel);
+export function weeklyChartPoints(weeks: readonly WeeklyStatPoint[], byeWeeks: readonly number[] = [], xLabel = "Wk", options: WeeklyGapOptions = {}): ChartInputPoint[] {
+  return weeklyGapRows(weeks.map((w) => ({ week: w.week, points: w.fantasy_points_ppr })), byeWeeks, xLabel, options);
 }
 
 export function WeeklyPointsPanel({
@@ -32,6 +32,8 @@ export function WeeklyPointsPanel({
   emptyText,
   xLabel = "Week",
   byeWeeks = [],
+  inactiveWeeks = [],
+  throughWeek = null,
 }: {
   name: string;
   weeks: WeeklyStatPoint[];
@@ -46,6 +48,10 @@ export function WeeklyPointsPanel({
   xLabel?: string;
   /** Weeks the player's team is off: a played-range hole on one of these is labelled "Bye week", not "No game". */
   byeWeeks?: readonly number[];
+  /** Weeks the provider confirms he did not play (his team did): a dashed, labelled gap, not missing data. */
+  inactiveWeeks?: readonly number[];
+  /** Current NFL week: the x axis runs to here; completed weeks with no data show a "no data" break. */
+  throughWeek?: number | null;
   /** Kept for call-site compatibility; the shared chart ids its own gradient. */
   gradientId?: string;
 }) {
@@ -59,7 +65,8 @@ export function WeeklyPointsPanel({
         {name}
       </div>
       <TrendChart
-        points={weeklyChartPoints(weeks, byeWeeks, xLabel === "Week" ? "Wk" : xLabel)}
+        points={weeklyChartPoints(weeks, byeWeeks, xLabel === "Week" ? "Wk" : xLabel, { inactiveWeeks, throughWeek })}
+        xMax={throughWeek}
         band={band}
         name={name}
         unit={pointsLabel}

@@ -55,6 +55,8 @@ export interface TrendChartProps {
   /** Exact y domain, e.g. [1, teams] for a rank. */
   yDomain?: [number, number] | null;
   yTickCount?: number;
+  /** Extend the x axis to at least here (the current week) even with no row that far. */
+  xMax?: number | null;
   /** Rank-style axis: low values at the top. */
   invertY?: boolean;
   smooth?: boolean;
@@ -85,7 +87,7 @@ function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
 }
 
 export function TrendChart(props: TrendChartProps) {
-  const { points, band = null, name, unit = "", xNoun = "week", formatX = (x) => String(x), formatY = DEFAULT_FORMAT, variant = "full", includeZero = false, yPad = 0, clamp = null, yDomain = null, yTickCount = 4, invertY = false, smooth = true, emptyText, pointColor, testId } = props;
+  const { points, band = null, name, unit = "", xNoun = "week", formatX = (x) => String(x), formatY = DEFAULT_FORMAT, variant = "full", includeZero = false, yPad = 0, clamp = null, yDomain = null, yTickCount = 4, xMax = null, invertY = false, smooth = true, emptyText, pointColor, testId } = props;
   const compact = variant === "compact";
   const height = props.height ?? (compact ? 44 : 160);
   const pad = compact ? COMPACT_PAD : FULL_PAD;
@@ -96,8 +98,8 @@ export function TrendChart(props: TrendChartProps) {
   const selected = pick.points === points ? pick.key : null;
   const setSelected = (next: string | null | ((cur: string | null) => string | null)) => setPick({ points, key: typeof next === "function" ? next(selected) : next });
 
-  const options: PrepareOptions = { includeZero, yPad, clamp, yDomain, yTickCount, band };
-  const series = useMemo(() => prepareSeries(points, options), [points, band, includeZero, yPad, clamp, yDomain, yTickCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  const options: PrepareOptions = { includeZero, yPad, clamp, yDomain, yTickCount, band, xMax };
+  const series = useMemo(() => prepareSeries(points, options), [points, band, includeZero, yPad, clamp, yDomain, yTickCount, xMax]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const summary = chartSummary(series, name, unit, xNoun, formatY);
 
@@ -188,9 +190,13 @@ export function TrendChart(props: TrendChartProps) {
               .map((s) => (
                 <path key={`l${s[0].x}`} className="trend-draw" pathLength={1} d={linePath(s.map((p) => ({ x: scales.x(p.x), y: scales.y(p.y) })), smooth)} fill="none" stroke="var(--color-accent)" strokeWidth={compact ? 1.75 : 2} strokeLinecap="round" strokeLinejoin="round" />
               ))}
-            {series.gaps.map((g) => (
-              <circle key={`gm${g.x}`} cx={scales.x(g.x)} cy={scales.y(g.y)} r={compact ? 2.5 : 3.5} fill="var(--color-bg)" stroke="var(--color-text-muted)" strokeWidth={1.5} data-testid="trend-gap-marker" />
-            ))}
+            {series.gaps.map((g) =>
+              g.kind === "missing" ? (
+                <path key={`gm${g.x}`} d={`M ${scales.x(g.x) - 3} ${scales.y(g.y) - 3} L ${scales.x(g.x) + 3} ${scales.y(g.y) + 3} M ${scales.x(g.x) + 3} ${scales.y(g.y) - 3} L ${scales.x(g.x) - 3} ${scales.y(g.y) + 3}`} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" fill="none" data-testid="trend-nodata-marker" />
+              ) : (
+                <circle key={`gm${g.x}`} cx={scales.x(g.x)} cy={scales.y(g.y)} r={compact ? 2.5 : 3.5} fill="var(--color-bg)" stroke="var(--color-text-muted)" strokeWidth={1.5} data-testid="trend-gap-marker" />
+              ),
+            )}
             {series.played.map((p, i) => {
               const isLast = i === series.played.length - 1;
               if (compact && !isLast) return null;

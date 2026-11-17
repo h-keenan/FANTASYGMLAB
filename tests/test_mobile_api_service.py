@@ -17022,3 +17022,32 @@ def test_trade_analyzer_flags_a_roster_full_trade_and_prices_the_cut(monkeypatch
     assert "forced_assets" not in overflow
     # An even swap fits the roster: nothing to say.
     assert post(["my_bench_rb"]).json()["roster_overflow"] is None
+
+
+def test_weekly_stats_reports_inactive_weeks_bye_and_through_week(monkeypatch):
+    """A healthy scratch is a confirmed non-appearance, not "no data"; the chart also gets the bye + current week."""
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_weekly = {
+        "9001": {
+            "stats_season": 2026,
+            "weekly": [
+                {"week": 1, "games_played": 1, "fantasy_points_ppr": 8.2},
+                {"week": 9, "games_played": 1, "fantasy_points_ppr": 15.6},
+            ],
+            "inactive_weeks": [5, 6, 7, 8],
+        }
+    }
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.default_player_stats_season", return_value=2026):
+            with patch("modules.sleeper.get_season_player_stats", return_value=fake_weekly):
+                with patch("modules.sleeper.get_players", return_value={"9001": {"team": "DEN"}}):
+                    with patch("services.mobile_api_service._quick_view_bye", return_value=(10, False)):
+                        with patch("modules.season_clock.nfl_week", return_value=11):
+                            response = client.get("/v1/players/9001/weekly-stats", headers={"Authorization": "Bearer good-token"})
+    body = response.json()
+    assert [w["week"] for w in body["weeks"]] == [1, 9]
+    assert body["inactive_weeks"] == [5, 6, 7, 8]
+    assert body["bye_week"] == 10
+    assert body["through_week"] == 11

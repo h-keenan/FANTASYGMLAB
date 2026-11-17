@@ -354,6 +354,7 @@ def _aggregate_player_week_stats(
     aggregate: Dict[str, Dict[str, Any]] = {}
     observed_fields: Dict[str, set[str]] = {}
     weekly_rows: Dict[str, List[Dict[str, Any]]] = {}
+    inactive_rows: Dict[str, set[int]] = {}
 
     for index, item in enumerate(weekly_payloads):
         if isinstance(item, tuple) and len(item) == 2:
@@ -384,6 +385,12 @@ def _aggregate_player_week_stats(
                 week_row = _extract_week_observation(week_number, raw_stats)
                 if week_row is not None:
                     weekly_rows.setdefault(player_key, []).append(week_row)
+                if not week_row_played(week_row):
+                    # Sleeper lists the player for a week his team played but gives
+                    # him no ``gp`` (healthy scratch / inactive / out): a CONFIRMED
+                    # non-appearance, not a hole in our data. A bye week has no
+                    # entry at all, so it is never confused with this.
+                    inactive_rows.setdefault(player_key, set()).add(int(week_number))
 
     cleaned: Dict[str, Dict[str, Any]] = {}
     integer_fields = {
@@ -427,6 +434,10 @@ def _aggregate_player_week_stats(
             if weeks:
                 # Stable week order; drop empty-only noise later in recency filter.
                 result["weekly"] = sorted(weeks, key=lambda row: int(row.get("week") or 0))
+            played_weeks = {int(row.get("week") or 0) for row in weeks if week_row_played(row)}
+            inactive = sorted(w for w in inactive_rows.get(player_id, ()) if w not in played_weeks)
+            if inactive and len(result) > 1:
+                result["inactive_weeks"] = inactive
 
         if len(result) > 1:
             cleaned[player_id] = result
@@ -699,6 +710,8 @@ def _fetch_weekly_stat_payloads(season: int, weeks: Iterable[int]) -> List[Any]:
             )
         except Exception:
             return None
+        if isinstance(payload, list) and not payload:
+            return {}  # Sleeper answers [] for a week that has not been played: a real, empty week
         return payload if isinstance(payload, dict) else None
 
     if len(week_list) <= 1:
@@ -713,6 +726,116 @@ def _fetch_weekly_stat_payloads(season: int, weeks: Iterable[int]) -> List[Any]:
             jobs = [(contextvars.copy_context(), week) for week in week_list]
             payloads = list(executor.map(lambda job: job[0].run(_one, job[1]), jobs))
     return [(week, payload) for week, payload in zip(week_list, payloads) if payload is not None]
+
+
+# --- completeness manifest -------------------------------------------------
+# The aggregate used to be written whenever ANY week fetched, so a rebuild in which
+# some weeks failed (timeout, 429, 5xx) persisted a partial season as "fresh" for the
+# whole TTL (12 h in season, 30 days after the regular season, 180 days for prior
+# seasons) with nothing recording which weeks were missing. Every rebuild now also
+# writes a small sidecar listing the weeks that were actually obtained, so a read can
+# tell "complete" from "partial" and an audit can alert on the latter.
+STATS_MANIFEST_SCHEMA = 2
+STATS_INCOMPLETE_RETRY_SECONDS = 10 * 60
+_stats_rebuild_attempted_at: Dict[str, float] = {}
+
+
+def stats_manifest_path(cache_path: str) -> str:
+    base = cache_path[: -len(".json")] if cache_path.endswith(".json") else cache_path
+    return f"{base}.weeks.json"
+
+
+def expected_stats_weeks(season: int) -> int:
+    """Highest NFL week of ``season`` that should already have Sleeper stats (0 = none yet).
+
+    Prior seasons and a finished active season: all 18. In season: through the
+    current week (its stats are partial but must exist once games have started).
+    """
+
+    try:
+        clock = season_clock.season_clock()
+    except Exception:
+        return 0
+    season_i = int(season)
+    if season_i > clock.season:
+        return 0
+    if season_i < clock.season or clock.phase == season_clock.PHASE_POST:
+        return 18
+    if clock.phase == season_clock.PHASE_REGULAR:
+        return max(0, min(18, int(clock.week or 0)))
+    return 18 if clock.phase == season_clock.PHASE_OFFSEASON and clock.season == season_i and False else 0
+
+
+def read_stats_manifest(cache_path: str) -> Dict[str, Any] | None:
+    try:
+        with open(stats_manifest_path(cache_path), "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _write_stats_manifest(cache_path: str, season: int, requested: Iterable[int], obtained: Iterable[int]) -> None:
+    got = sorted({int(w) for w in obtained})
+    manifest = {
+        "schema": STATS_MANIFEST_SCHEMA,
+        "season": int(season),
+        "built_at": time.time(),
+        "weeks_ok": got,
+        "weeks_failed": sorted({int(w) for w in requested} - set(got)),
+    }
+    try:
+        tmp_path = f"{stats_manifest_path(cache_path)}.{os.getpid()}.{threading.get_ident()}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        os.replace(tmp_path, stats_manifest_path(cache_path))
+    except Exception:
+        pass
+
+
+def missing_expected_weeks(season: int, manifest: Dict[str, Any] | None) -> List[int]:
+    """Weeks that should exist for ``season`` but were never obtained (all of them when no manifest)."""
+
+    expected = expected_stats_weeks(season)
+    have = {int(w) for w in (manifest or {}).get("weeks_ok", []) if isinstance(w, (int, float))}
+    return [w for w in range(1, expected + 1) if w not in have]
+
+
+def season_stats_completeness(season: int | None = None) -> Dict[str, Any]:
+    """Never-fetching report on the on-disk aggregate: which expected weeks it holds.
+
+    ``status``: ``complete`` | ``incomplete`` | ``unverified`` (cache written before
+    manifests existed) | ``absent``. Used by the freshness audit and the backfill.
+    """
+
+    selected = int(season or default_player_stats_season())
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
+    expected = expected_stats_weeks(selected)
+    if not os.path.exists(cache_path):
+        return {"season": selected, "status": "absent", "expected_through": expected, "missing_weeks": list(range(1, expected + 1)), "age_seconds": None}
+    manifest = read_stats_manifest(cache_path)
+    age = time.time() - os.path.getmtime(cache_path)
+    if manifest is None or int(manifest.get("schema") or 0) < STATS_MANIFEST_SCHEMA:
+        return {"season": selected, "status": "unverified", "expected_through": expected, "missing_weeks": [], "age_seconds": age}
+    missing = missing_expected_weeks(selected, manifest)
+    return {"season": selected, "status": "incomplete" if missing else "complete", "expected_through": expected, "missing_weeks": missing, "age_seconds": age}
+
+
+def _stats_cache_needs_rebuild(cache_path: str, selected_season: int) -> bool:
+    """True when a TTL-fresh aggregate is nevertheless known (or unverifiable) to be
+    missing weeks, rate-limited so a persistently failing provider is retried every
+    ``STATS_INCOMPLETE_RETRY_SECONDS``, not on every request."""
+
+    manifest = read_stats_manifest(cache_path)
+    if manifest is None or int(manifest.get("schema") or 0) < STATS_MANIFEST_SCHEMA:
+        # Written before manifests existed: unverifiable, so left to its normal TTL
+        # (and ``scripts/backfill_weekly_stats.py``); reads must not start refetching
+        # every legacy file at once.
+        return False
+    if not missing_expected_weeks(selected_season, manifest):
+        return False
+    last = _stats_rebuild_attempted_at.get(cache_path, 0.0)
+    return time.time() - last >= STATS_INCOMPLETE_RETRY_SECONDS
 
 
 _SEASON_STATS_FALLBACK_MAX_ENTRIES = 3
@@ -762,7 +885,7 @@ def _read_fresh_season_stats(cache_path: str, selected_season: int, keep_weekly:
     if os.path.exists(cache_path):
         try:
             cache_age = time.time() - os.path.getmtime(cache_path)
-            if cache_age < _player_stats_cache_ttl(selected_season):
+            if cache_age < _player_stats_cache_ttl(selected_season) and not _stats_cache_needs_rebuild(cache_path, selected_season):
                 try:
                     mtime_ns = os.stat(cache_path).st_mtime_ns
                 except Exception:
@@ -843,7 +966,17 @@ def get_season_player_stats(
 def _rebuild_season_player_stats(
     cache_path: str, selected_season: int, *, keep_weekly: bool, max_week: int
 ) -> Dict[str, Dict[str, Any]]:
-    weekly_payloads = _fetch_weekly_stat_payloads(selected_season, range(1, max(1, int(max_week)) + 1))
+    requested_weeks = list(range(1, max(1, int(max_week)) + 1))
+    _stats_rebuild_attempted_at[cache_path] = time.time()
+    weekly_payloads = _fetch_weekly_stat_payloads(selected_season, requested_weeks)
+    obtained_weeks = [int(item[0]) for item in weekly_payloads if isinstance(item, tuple) and len(item) == 2]
+
+    # Never replace a more complete season with a less complete rebuild (a provider
+    # blip must not erase weeks we already hold).
+    prior_manifest = read_stats_manifest(cache_path)
+    prior_ok = {int(w) for w in (prior_manifest or {}).get("weeks_ok", [])}
+    if weekly_payloads and prior_ok and len(set(obtained_weeks)) < len(prior_ok) and os.path.exists(cache_path):
+        weekly_payloads = []
 
     if weekly_payloads:
         aggregated = _aggregate_player_week_stats(
@@ -856,6 +989,7 @@ def _rebuild_season_player_stats(
             with open(tmp_path, "w", encoding="utf-8") as handle:
                 json.dump(aggregated, handle)
             os.replace(tmp_path, cache_path)  # atomic: other workers never read a half-written file
+            _write_stats_manifest(cache_path, selected_season, requested_weeks, obtained_weeks)
             fresh_mtime_ns = os.stat(cache_path).st_mtime_ns
             with _season_stats_memo_lock:
                 _season_stats_memo[cache_path] = aggregated

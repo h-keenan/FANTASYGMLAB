@@ -47,6 +47,7 @@ export default function PlayerTrendsPanel({
   const [defaultYear, setDefaultYear] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [weeks, setWeeks] = useState<WeeklyStatPoint[] | null>(null);
+  const [context, setContext] = useState<{ inactiveWeeks: number[]; byeWeek: number | null; throughWeek: number | null }>({ inactiveWeeks: [], byeWeek: null, throughWeek: null });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export default function PlayerTrendsPanel({
       .then((result) => {
         if (cancelled) return;
         setWeeks(result.weeks);
+        setContext({ inactiveWeeks: result.inactive_weeks ?? [], byeWeek: result.bye_week ?? null, throughWeek: result.through_week ?? null });
         setSelectedYear((current) => current ?? result.season);
         setDefaultYear((current) => current ?? result.season);
       })
@@ -98,7 +100,7 @@ export default function PlayerTrendsPanel({
           ))}
         </View>
       ) : null}
-      {loading || weeks === null ? <SkeletonChart /> : <WeeklyPointsChart weeks={weeks} />}
+      {loading || weeks === null ? <SkeletonChart /> : <WeeklyPointsChart weeks={weeks} byeWeeks={context.byeWeek ? [context.byeWeek] : []} inactiveWeeks={context.inactiveWeeks} throughWeek={context.throughWeek} />}
     </View>
   );
 }
