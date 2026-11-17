@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -67,7 +68,13 @@ export default function PlayerHero({
   compact = false,
   children,
   info,
+  metaLine = null,
+  teamLogo = null,
 }: {
+  /** College prospect: replaces "Age N" in the meta pill with his class / size line. */
+  metaLine?: string | null;
+  /** College prospect: the school's logo beside the school name. */
+  teamLogo?: string | null;
   /** Shown in the tap-the-Value popover (for example the value history chart). */
   /** Fantasy Sim: replaces the Value and Usage tiles (the sim shows neither the model's value nor a real usage feed). */
   simTiles?: { label: string; value: string; note: string }[] | null;
@@ -171,9 +178,10 @@ export default function PlayerHero({
           <View style={styles.metaRow}>
             <PositionBadge position={position} size="md" />
             <View style={styles.metaPill}>
+              {teamLogo ? <Image source={{ uri: teamLogo }} style={styles.teamLogo} contentFit="contain" accessibilityLabel="" /> : null}
               <AppText style={styles.metaPillText}>{team || (usageLoading ? '—' : 'FA')}</AppText>
               <AppText style={styles.metaPillDot}>•</AppText>
-              <AppText style={styles.metaPillText}>Age {age ?? (usageLoading ? '—' : 'N/A')}</AppText>
+              <AppText style={styles.metaPillText}>{metaLine ?? `Age ${age ?? (usageLoading ? '—' : 'N/A')}`}</AppText>
             </View>
             {rookie ? <PlayerBadge kind="rookie" detail={rookie.detail} /> : null}
             {bye.label ? (
@@ -341,6 +349,7 @@ function createStyles(colors: ThemeColors) {
     name: { flexShrink: 1, fontSize: 29, fontWeight: '800', color: colors.textPrimary, lineHeight: 32, letterSpacing: -0.3 },
     rookieLine: { fontSize: 13.5, color: colors.textSecondary },
     metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
+    teamLogo: { width: 16, height: 16 },
     metaPill: {
       flexDirection: 'row',
       alignItems: 'center',

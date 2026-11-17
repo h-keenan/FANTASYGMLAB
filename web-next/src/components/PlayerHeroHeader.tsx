@@ -56,7 +56,13 @@ export function PlayerHeroHeader({
   valueChart = null,
   ovrChart = null,
   gradeTile = null,
+  metaLine = null,
+  teamLogo = null,
 }: {
+  /** College prospect: replaces "Age N" in the meta pill with his class / size line (the one place his header differs). */
+  metaLine?: string | null;
+  /** College prospect: the school's logo beside the school name. */
+  teamLogo?: string | null;
   /** Shown in the tap-the-Value popover (for example the value history chart). */
   valueChart?: ReactNode;
   /** Shown in the tap-the-Player-score popover (for example the model radar). */
@@ -144,9 +150,10 @@ export function PlayerHeroHeader({
           <div className="pqv-meta">
             <PositionBadge position={position} />
             <span className="pqv-meta-pill">
+              {teamLogo ? <img src={teamLogo} alt="" width={16} height={16} style={{ width: 16, height: 16, objectFit: "contain", maxWidth: "none" }} data-testid="pqv-team-logo" /> : null}
               <span>{team || (loadingIdentity ? "—" : "FA")}</span>
               <span aria-hidden="true">•</span>
-              <span>Age {age ?? (loadingIdentity ? "—" : "N/A")}</span>
+              <span>{metaLine ?? `Age ${age ?? (loadingIdentity ? "—" : "N/A")}`}</span>
             </span>
             {rookie ? (
               <span data-testid="pqv-rookie-badge" title={rookie.detail ?? undefined}><PlayerBadge kind="rookie" detail={rookie.detail} /></span>

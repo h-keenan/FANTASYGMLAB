@@ -15,6 +15,8 @@ vi.mock("@/lib/api", async () => {
       removeProspectFromWatchlist: vi.fn().mockResolvedValue({ ok: true, reason: "" }),
       submitScoutingReport: vi.fn().mockResolvedValue({ ok: true, reason: "" }),
       deleteScoutingReport: vi.fn().mockResolvedValue({ ok: true, reason: "" }),
+      getProspectProfile: vi.fn().mockResolvedValue({ ok: true, seasons: [], weekly: null, advanced: null, recruiting: null, adp: null, bio: {} }),
+      getMe: vi.fn().mockResolvedValue({ user: { entitlement: "premium", profile_status: "ok" } }),
     },
   };
 });
@@ -111,6 +113,7 @@ describe("CollegeScoutingContent", () => {
     render(<CollegeScoutingContent data={data} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Scout Grade Me" }));
+    await screen.findByTestId("prospect-report-form");
     fireEvent.click(screen.getByRole("tab", { name: "4" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit grade" }));
 
@@ -122,27 +125,51 @@ describe("CollegeScoutingContent", () => {
     expect(await screen.findByText("Saved — thanks for scouting.")).toBeInTheDocument();
   });
 
-  it("warns instead of saving when Submit is pressed with no grade chosen", () => {
+  it("warns instead of saving when Submit is pressed with no grade chosen", async () => {
     const data = response([prospect({ name: "No Grade Yet" })]);
     render(<CollegeScoutingContent data={data} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Scout No Grade Yet" }));
+    await screen.findByTestId("prospect-report-form");
     const submit = screen.getByRole("button", { name: "Submit grade" });
     expect(submit).toBeDisabled();
     expect(api.submitScoutingReport).not.toHaveBeenCalled();
   });
 
-  it("calls deleteScoutingReport when Remove my report is pressed", () => {
+  it("calls deleteScoutingReport when Remove my report is pressed", async () => {
     const data = response([
       prospect({ name: "Remove Me", my_report: { grade: 3, round_projection: null, note: "" } }),
     ]);
     render(<CollegeScoutingContent data={data} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Edit your grade — Remove Me" }));
+    await screen.findByTestId("prospect-report-form");
     fireEvent.click(screen.getByRole("button", { name: "Remove my report" }));
     expect(api.deleteScoutingReport).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(api.deleteScoutingReport).toHaveBeenCalledWith("pr1");
+  });
+
+  it("opens the shared player sheet with Overview, Stats and Profile tabs when a prospect is tapped", async () => {
+    render(<CollegeScoutingContent data={response([prospect({ name: "Sheet Me", position: "QB", school: "Texas", draft_year: 2027 })])} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Scout Sheet Me" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Stats" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Profile" })).toBeInTheDocument();
+    // No ADP in the off-season: say so, never a number.
+    expect(screen.getByText("No ADP yet")).toBeInTheDocument();
+  });
+
+  it("hands a drafted, mapped prospect off to the normal NFL player card instead of the college sheet", () => {
+    render(<CollegeScoutingContent data={response([prospect({ name: "Now A Pro", sleeper_player_id: "12345" })])} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Scout Now A Pro" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

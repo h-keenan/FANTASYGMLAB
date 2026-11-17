@@ -3,20 +3,24 @@
 import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
 import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
+import dynamic from "next/dynamic";
 import { useMemo, useState, type ReactNode } from "react";
 
-import { api, type CollegeProspect, type CollegeProspectsResponse, MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION } from "@/lib/api";
+import { api, type CollegeProspect, type CollegeProspectsResponse, MAX_GRADE } from "@/lib/api";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
-import { PillRow } from "@/components/PillRow";
 import { ViewTabs } from "@/components/ui/ViewTabs";
 import { PageControl } from "@/components/ui/PageControls";
-import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
+import { draftFromProspect, type ReportDraft, type ReportFlash } from "@/components/ProspectReportForm";
+import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
+import { handOffPlayerId } from "@/lib/prospectProfile";
 import { ToneBadge } from "@/components/ToneBadge";
 import { prospectFit, rankByFit, type ScoutingLens } from "@/lib/scoutingLens";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { confidenceColor } from "@/lib/waiversPresentation";
 import { aggregateText, classLabel, scoutingConfidenceLabel } from "@/lib/collegeScoutingPresentation";
-import { Collapse } from "@/components/ui/Presence";
+
+// The prospect sheet is the shared player quick view: load it on demand, not with the board.
+const ProspectSheet = dynamic(() => import("@/components/ProspectSheet").then((m) => m.ProspectSheet), { ssr: false });
 
 /**
  * Ports modules/college_scouting_ui.py's render_college_scouting_workspace /
@@ -43,50 +47,18 @@ import { Collapse } from "@/components/ui/Presence";
  * CollegeProspect row.
  */
 
-const GRADE_OPTIONS = Array.from({ length: MAX_GRADE - MIN_GRADE + 1 }, (_, i) => MIN_GRADE + i);
-const ROUND_OPTIONS = [0, ...Array.from({ length: MAX_ROUND_PROJECTION - MIN_ROUND_PROJECTION + 1 }, (_, i) => MIN_ROUND_PROJECTION + i)];
-const NOTE_MAX_LENGTH = 280;
-
 type FilterKey = "all" | "watchlist";
-
-interface ReportDraft {
-  grade: number | null;
-  roundProjection: number | null;
-  note: string;
-}
-
-function draftFromProspect(prospect: CollegeProspect): ReportDraft {
-  return {
-    grade: prospect.my_report?.grade ?? null,
-    roundProjection: prospect.my_report?.round_projection ?? null,
-    note: prospect.my_report?.note ?? "",
-  };
-}
 
 function ProspectCard({
   prospect,
-  expanded,
-  draft,
-  flash,
-  busy,
-  onToggleExpanded,
   onToggleWatchlist,
-  onDraftChange,
-  onSubmit,
-  onRemove,
+  onOpen,
   lens,
 }: {
   lens?: ScoutingLens | null;
   prospect: CollegeProspect;
-  expanded: boolean;
-  draft: ReportDraft;
-  flash: { tone: "success" | "error" | "warning"; message: string } | null;
-  busy: boolean;
-  onToggleExpanded: () => void;
   onToggleWatchlist: () => void;
-  onDraftChange: (next: ReportDraft) => void;
-  onSubmit: () => void;
-  onRemove: () => Promise<boolean>;
+  onOpen: () => void;
 }) {
   const aggregate = prospect.aggregate;
   const hasReport = prospect.my_report != null;
@@ -98,11 +70,12 @@ function ProspectCard({
     >
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          {/* Prospects have no NFL headshot yet: id null keeps the avatar on initials. */}
+          {/* Prospects have no NFL headshot yet: id null keeps the avatar on initials. The whole card opens his sheet. */}
           <CompactPlayerCard
             player={{ id: null, name: prospect.name, position: prospect.position }}
             detail={classLabel(prospect.school, prospect.draft_year)}
             testId="prospect-player"
+            onOpen={onOpen}
           />
         </div>
         {fit && (fit.needsPosition || fit.pickNote) ? (
@@ -146,110 +119,13 @@ function ProspectCard({
         </button>
         <button
           type="button"
-          onClick={onToggleExpanded}
+          onClick={onOpen}
           className="px-2 py-1 text-xs font-bold"
           style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-border)" }}
         >
-          {expanded ? "Close" : hasReport ? `Edit your grade — ${prospect.name}` : `Scout ${prospect.name}`}
+          {hasReport ? `Edit your grade — ${prospect.name}` : `Scout ${prospect.name}`}
         </button>
       </div>
-
-      <Collapse open={expanded}>
-        <div className="flex flex-col gap-3 pt-2" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
-          {flash ? (
-            <p
-              className="text-xs font-bold"
-              style={{
-                color:
-                  flash.tone === "success"
-                    ? "var(--color-success)"
-                    : flash.tone === "warning"
-                      ? "var(--color-action)"
-                      : "var(--color-danger)",
-              }}
-              role="status"
-            >
-              {flash.message}
-            </p>
-          ) : null}
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>
-              Overall grade (1 = pass, 5 = elite)
-            </span>
-            <PillRow
-              options={GRADE_OPTIONS.map((value) => ({ label: String(value), value: String(value) }))}
-              active={draft.grade != null ? String(draft.grade) : ""}
-              onSelect={(value) => onDraftChange({ ...draft, grade: Number(value) })}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>
-              Round projection (optional)
-            </span>
-            <PillRow
-              options={ROUND_OPTIONS.map((value) => ({
-                label: value === 0 ? "No projection" : `Round ${value}`,
-                value: String(value),
-              }))}
-              active={String(draft.roundProjection ?? 0)}
-              onSelect={(value) => onDraftChange({ ...draft, roundProjection: Number(value) === 0 ? null : Number(value) })}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>
-              Note (optional)
-            </span>
-            <textarea
-              value={draft.note}
-              onChange={(event) => onDraftChange({ ...draft, note: event.target.value.slice(0, NOTE_MAX_LENGTH) })}
-              placeholder="What stands out on tape?"
-              maxLength={NOTE_MAX_LENGTH}
-              rows={3}
-              className="text-sm px-2 py-1.5"
-              style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text-primary)",
-                border: "var(--border-width-default) solid var(--color-border)",
-              }}
-            />
-            <span className="text-xs self-end" style={{ color: "var(--color-text-muted)" }}>
-              {draft.note.length}/{NOTE_MAX_LENGTH}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={busy || draft.grade == null}
-              className="px-3 py-1.5 text-xs font-bold"
-              style={{
-                background: "var(--color-accent)",
-                color: "var(--color-on-accent)",
-                opacity: busy || draft.grade == null ? 0.6 : 1,
-              }}
-            >
-              {hasReport ? "Update grade" : "Submit grade"}
-            </button>
-            {hasReport ? (
-              <ConfirmInPlace
-                variant="row"
-                mode="ask"
-                size="sm"
-                label="Remove my report"
-                prompt="Remove your report?"
-                confirmLabel="Remove"
-                errorText="Could not remove your grade. Try again in a moment."
-                disabled={busy}
-                onConfirm={onRemove}
-              />
-            ) : null}
-          </div>
-        </div>
-      </Collapse>
     </article>
   );
 }
@@ -272,9 +148,10 @@ export function CollegeScoutingContent({
 }) {
   const [prospects, setProspects] = useState<CollegeProspect[]>(data.prospects);
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const { openPlayer } = usePlayerQuickView();
   const [drafts, setDrafts] = useState<Record<string, ReportDraft>>({});
-  const [flashes, setFlashes] = useState<Record<string, { tone: "success" | "error" | "warning"; message: string }>>({});
+  const [flashes, setFlashes] = useState<Record<string, ReportFlash>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [view, setView] = useState<"base" | "league">("base");
@@ -298,14 +175,17 @@ export function CollegeScoutingContent({
       });
   };
 
-  const toggleExpanded = (prospect: CollegeProspect) => {
-    if (expandedId === prospect.id) {
-      setExpandedId(null);
+  const openSheet = (prospect: CollegeProspect) => {
+    // Drafted and mapped: the normal NFL player card, not a college sheet.
+    const nflId = handOffPlayerId(prospect);
+    if (nflId) {
+      openPlayer({ player_id: nflId, name: prospect.name, position: prospect.position, sourceLabel: "Drafted prospect" });
       return;
     }
     setDrafts((prev) => ({ ...prev, [prospect.id]: prev[prospect.id] ?? draftFromProspect(prospect) }));
-    setExpandedId(prospect.id);
+    setOpenId(prospect.id);
   };
+  const openProspect = openId ? prospects.find((row) => row.id === openId) ?? null : null;
 
   const submitReport = (prospect: CollegeProspect) => {
     const draft = drafts[prospect.id] ?? draftFromProspect(prospect);
@@ -423,15 +303,8 @@ export function CollegeScoutingContent({
                 <ModuleErrorBoundary key={prospect.id} name="prospect_card">
                 <ProspectCard
                   prospect={prospect}
-                  expanded={expandedId === prospect.id}
-                  draft={drafts[prospect.id] ?? draftFromProspect(prospect)}
-                  flash={flashes[prospect.id] ?? null}
-                  busy={busyId === prospect.id}
-                  onToggleExpanded={() => toggleExpanded(prospect)}
                   onToggleWatchlist={() => toggleWatchlist(prospect)}
-                  onDraftChange={(next) => setDrafts((prev) => ({ ...prev, [prospect.id]: next }))}
-                  onSubmit={() => submitReport(prospect)}
-                  onRemove={() => removeReport(prospect)}
+                  onOpen={() => openSheet(prospect)}
                   lens={lens && view === "league" ? lens : null}
                 />
                 </ModuleErrorBoundary>
@@ -440,6 +313,20 @@ export function CollegeScoutingContent({
           )}
         </div>
       )}
+      {openProspect ? (
+        <ProspectSheet
+          key={openProspect.id}
+          prospect={openProspect}
+          draft={drafts[openProspect.id] ?? draftFromProspect(openProspect)}
+          flash={flashes[openProspect.id] ?? null}
+          busy={busyId === openProspect.id}
+          onDraftChange={(next) => setDrafts((prev) => ({ ...prev, [openProspect.id]: next }))}
+          onSubmit={() => submitReport(openProspect)}
+          onRemove={() => removeReport(openProspect)}
+          onToggleWatchlist={() => toggleWatchlist(openProspect)}
+          onClose={() => setOpenId(null)}
+        />
+      ) : null}
     </Shell>
   );
 }
