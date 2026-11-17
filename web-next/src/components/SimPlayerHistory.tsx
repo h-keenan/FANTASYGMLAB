@@ -16,6 +16,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { simSeasonText, type SimPlayerHistoryResponse } from "@/lib/simGame";
 import { simDraftSlotText, simHistoryText, simWhenLabel } from "@/lib/simHistory";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 /**
  * A player's History tab in the Fantasy Sim quick view: where he came from (the round and pick he was drafted at, or
@@ -47,7 +48,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
   if (failed) {
     return (
       <div className="flex flex-col items-start gap-2">
-        <p className="pqv-status-text">Could not load this player&apos;s history.</p>
+        <p className="pqv-status-text">{SIM_LOAD_ERROR.playerHistory}</p>
         <Button size="sm" variant="secondary" onClick={() => { setFailed(false); setAttempt((n) => n + 1); }}>Try again</Button>
       </div>
     );

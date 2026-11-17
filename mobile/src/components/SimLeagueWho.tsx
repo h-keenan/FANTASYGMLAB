@@ -15,9 +15,10 @@ import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
 import { simListStats } from '../lib/simDraft';
 import { simBlockEntryCount, simBlockNote, simRosterEntries, simRosterPositions, simTeamsByPower, type SimRosterPosFilter } from '../lib/simLeagueRosters';
 import type { SimLeagueRostersState } from '../lib/useSimLeagueRosters';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 function Loading({ state, onRetry }: { state: SimLeagueRostersState; onRetry: () => void }) {
-  if (state.status === 'error') return <ErrorState title="The rosters did not load" message="Check your connection and try again." onRetry={onRetry} />;
+  if (state.status === 'error') return <ErrorState title={SIM_LOAD_ERROR.rosters} message="Check your connection and try again." onRetry={onRetry} />;
   return <SkeletonCard rows={6} />;
 }
 

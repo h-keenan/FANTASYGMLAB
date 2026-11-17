@@ -31,6 +31,7 @@ import {
   type SimPosFilter,
 } from '../lib/simGame';
 import { radii, type ThemeColors } from '../theme';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -267,7 +268,7 @@ export function SimDraftBoard({
       ) : state === 'error' ? (
         <EmptyState
           icon="cloud-offline-outline"
-          title="Players did not load"
+          title={SIM_LOAD_ERROR.players}
           subtitle="Check your connection and try again."
           actionLabel="Try again"
           onPressAction={() => {

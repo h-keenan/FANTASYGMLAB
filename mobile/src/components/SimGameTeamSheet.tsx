@@ -29,6 +29,7 @@ import {
   simOutLine,
 } from '../lib/simGame';
 import { spacing } from '../theme';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 const SIM_ROSTER_POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
 
@@ -63,7 +64,7 @@ export function SimTeamSheet({ ctx, teamId, onClose, onTrade }: { ctx: SimCtx; t
   return (
     <SimSheet title={data?.team ? `${data.team.name} scouting report` : 'Team scouting report'} onClose={onClose}>
       {failed ? (
-        <ErrorState title="Team did not load" message="Check your connection and try again." onRetry={() => { setFailed(false); setAttempt((n) => n + 1); }} />
+        <ErrorState title={SIM_LOAD_ERROR.team} message="Check your connection and try again." onRetry={() => { setFailed(false); setAttempt((n) => n + 1); }} />
       ) : !data?.team ? (
         <SkeletonCard rows={4} />
       ) : (

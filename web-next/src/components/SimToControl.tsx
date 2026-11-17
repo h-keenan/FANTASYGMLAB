@@ -30,6 +30,7 @@ import {
   simToWeekLine,
   type SimToPrefs,
 } from "@/lib/simTo";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 export interface SimToRequest {
   option: SimToOption;
@@ -92,7 +93,7 @@ export function SimToSheet({ ctx, open, onClose, onRun }: { ctx: SimCtx; open: b
     <Sheet open={open} onClose={onClose} title="Sim to..." description="Play several weeks at once. It stops early when you have something to decide.">
       <div className="flex flex-col gap-3" data-testid="sim-to-sheet">
         {failed ? (
-          <p className="text-sm font-bold">Could not load the options. Try again in a moment.</p>
+          <p className="text-sm font-bold">{SIM_LOAD_ERROR.options}</p>
         ) : !options ? (
           <SkeletonRows count={3} />
         ) : options.length === 0 ? (

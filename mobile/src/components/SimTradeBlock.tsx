@@ -16,6 +16,7 @@ import { api } from '../lib/api';
 import { simListStats } from '../lib/simDraft';
 import { simGradeCompare } from '../lib/simGrade';
 import { simBlockable, simIsPick, simPicksOf, type SimBlockResponse, type SimGamePlayer, type SimPickAsset, type SimPos, type SimTradeAsset } from '../lib/simGame';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 type Hint = SimPos | 'any';
 const HINTS: { key: Hint; label: string }[] = [{ key: 'any', label: 'Any' }, ...(['QB', 'RB', 'WR', 'TE'] as const).map((p) => ({ key: p as Hint, label: p }))];
@@ -88,7 +89,7 @@ export function SimBlockView({ ctx, onMakeOffer }: { ctx: SimCtx; onMakeOffer: (
   if (failed) {
     return (
       <ErrorState
-        title="Your block did not load"
+        title={SIM_LOAD_ERROR.block}
         message="Check your connection and try again."
         onRetry={() => {
           setFailed(false);

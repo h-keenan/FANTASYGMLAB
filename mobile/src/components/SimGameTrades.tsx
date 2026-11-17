@@ -69,6 +69,7 @@ import type { ThemeColors } from '../theme';
 import { playerSurname } from '../lib/playerNameDisplay';
 import { Collapse, PresenceList, PresenceSwap } from './Presence';
 import TradeResolvedRow from './TradeResolvedRow';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 /** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
 function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
@@ -178,7 +179,7 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
   if (failed) {
     return (
       <ErrorState
-        title="Your inbox did not load"
+        title={SIM_LOAD_ERROR.inbox}
         message="Check your connection and try again."
         onRetry={() => {
           setFailed(false);
@@ -411,7 +412,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
     return <EmptyState icon="lock-closed-outline" title="Trades are closed" subtitle={closed} />;
   }
   if (teamsFailed) {
-    return <ErrorState title="Teams did not load" message={teamsFailed} onRetry={() => {
+    return <ErrorState title={SIM_LOAD_ERROR.teams} message={teamsFailed} onRetry={() => {
           setTeamsAttempt((n) => n + 1);
         }} />;
   }

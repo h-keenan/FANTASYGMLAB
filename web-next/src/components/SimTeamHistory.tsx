@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import { simSeasonText, type SimTeamHistoryPick, simPlayerAnatomyRef, type SimTeamHistoryResponse } from "@/lib/simGame";
 import { simDraftSlotText, simSeasonRecord, simTeamMoveText, simWhenLabel } from "@/lib/simHistory";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
   return (
@@ -58,7 +59,7 @@ export function SimTeamHistory({ gameId, teamId }: { gameId: string; teamId: str
   if (failed) {
     return (
       <div className="flex flex-col items-start gap-2 py-2">
-        <p className="text-sm font-bold">Could not load this team&apos;s history.</p>
+        <p className="text-sm font-bold">{SIM_LOAD_ERROR.teamHistory}</p>
         <Button size="sm" variant="secondary" onClick={() => { setFailed(false); setAttempt((n) => n + 1); }}>Try again</Button>
       </div>
     );

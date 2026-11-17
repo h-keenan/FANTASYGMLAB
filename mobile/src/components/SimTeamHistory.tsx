@@ -15,6 +15,7 @@ import { api } from '../lib/api';
 import { simPlayerAnatomyRef, simSeasonText, type SimTeamHistoryPick, type SimTeamHistoryResponse } from '../lib/simGame';
 import { simDraftSlotText, simSeasonRecord, simTeamMoveText, simWhenLabel } from '../lib/simHistory';
 import CompactPlayerCard from './CompactPlayerCard';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
   const { colors } = useThemeMode();
@@ -64,7 +65,7 @@ export function SimTeamHistory({ gameId, teamId }: { gameId: string; teamId: str
   if (failed) {
     return (
       <ErrorState
-        title="History did not load"
+        title={SIM_LOAD_ERROR.teamHistory}
         message="Check your connection and try again."
         onRetry={() => {
           setFailed(false);

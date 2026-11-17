@@ -27,6 +27,7 @@ import {
   type SimTeamRosterResponse,
   simOutLine,
 } from "@/lib/simGame";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 const SIM_ROSTER_POS_ORDER = ["QB", "RB", "WR", "TE", "K", "DEF"] as const;
 
@@ -63,7 +64,7 @@ export function SimTeamSheet({ ctx, teamId, onClose, onTrade }: { ctx: SimCtx; t
     <SimSheet title={title} onClose={onClose} labelledBy="sim-team-sheet-title">
       {failed ? (
         <div className="flex flex-col items-start gap-2 py-4">
-          <p className="text-sm font-bold">Could not load this team.</p>
+          <p className="text-sm font-bold">{SIM_LOAD_ERROR.team}</p>
           <Button size="sm" variant="secondary" onClick={() => { setFailed(false); setAttempt((n) => n + 1); }}>Try again</Button>
         </div>
       ) : !data || !team ? (

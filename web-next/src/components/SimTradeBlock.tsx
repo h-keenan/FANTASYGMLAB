@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import { simListStats } from "@/lib/simDraft";
 import { simGradeCompare } from "@/lib/simGrade";
 import { simBlockable, simIsPick, simPicksOf, type SimBlockResponse, type SimGamePlayer, type SimPickAsset, type SimPos, type SimTradeAsset } from "@/lib/simGame";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 type Hint = SimPos | "any";
 const HINTS: { label: string; value: Hint }[] = [{ label: "Any", value: "any" }, ...(["QB", "RB", "WR", "TE"] as const).map((p) => ({ label: p, value: p as Hint }))];
@@ -82,7 +83,7 @@ export function SimBlockView({ ctx, onMakeOffer }: { ctx: SimCtx; onMakeOffer: (
   const candidates = useMemo(() => roster.filter((p) => !onIds.has(p.id) && simBlockable(ctx.game.settings, p.pos)).sort((a, b) => simGradeCompare(a, b) || (b.ros_mean ?? 0) - (a.ros_mean ?? 0)), [roster, onIds, ctx.game.settings]);
   const myPicks = simPicksOf(picks, teamId).filter((p) => !onIds.has(p.id));
 
-  if (failed) return <EmptyState title="Could not load your block" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setFailed(false); setAttempt((n) => n + 1); }} />;
+  if (failed) return <EmptyState title={SIM_LOAD_ERROR.block} subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setFailed(false); setAttempt((n) => n + 1); }} />;
   if (!block) return <SkeletonCard lines={5} />;
   if (!block.enabled) return <EmptyState title="No trade block in this game" subtitle="This game was started before the trade block existed." />;
   const full = (block.mine?.length ?? 0) >= (block.max_items ?? 8);

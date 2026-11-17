@@ -36,3 +36,32 @@ export function adpContext(f: AdpFields): string {
   const { real, est } = adpParts(f);
   return real ? (est ? `${real} · ${est} (?)` : real) : '';
 }
+
+export const ROOKIE_BOARD_TITLE = "Rookie Board vs ADP";
+export const ROOKIE_BOARD_NO_ADP_NOTE = "Rookie ADP is published only during rookie-draft season. Our rookie ranks are shown without a market number.";
+
+export interface RookieBoardRowFields {
+  name: string;
+  adp: number | null;
+  verdict?: string | null;
+  delta?: number | null;
+}
+
+export interface RookieBoardSummaryPart {
+  key: string;
+  text: string;
+  strong?: boolean;
+  tone?: "accent" | "muted";
+}
+
+/** The collapsed summary chips of the rookie board, shared by web and app: count with ADP, the top value pick, the basis. */
+export function rookieBoardSummaryParts(rows: readonly RookieBoardRowFields[]): RookieBoardSummaryPart[] {
+  const withAdp = rows.filter((row) => row.adp != null);
+  const topValue = withAdp.filter((row) => row.verdict === "value").sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0))[0];
+  const parts: Array<RookieBoardSummaryPart | null> = [
+    { key: "n", text: withAdp.length ? `${withAdp.length} with ADP` : "No ADP yet", strong: true },
+    topValue ? { key: "v", text: `Value: ${topValue.name} (${deltaText(topValue.delta)})`, tone: "accent" } : null,
+    { key: "s", text: "Our rank vs market", tone: "muted" },
+  ];
+  return parts.filter((part): part is RookieBoardSummaryPart => part != null);
+}

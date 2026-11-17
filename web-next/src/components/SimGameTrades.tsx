@@ -64,6 +64,7 @@ import {
 import { playerSurname } from "@/lib/playerNameDisplay";
 import { Collapse, PresenceList, PresenceSwap } from "@/components/ui/Presence";
 import { TradeResolvedRow } from "@/components/ui/TradeResolvedRow";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 /** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
 function SimTeamScout({ teamId, name }: { teamId: string; name: string }) {
@@ -170,7 +171,7 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
     }
   }
 
-  if (failed) return <EmptyState title="Could not load your inbox" subtitle="Check your connection and try again." />;
+  if (failed) return <EmptyState title={SIM_LOAD_ERROR.inbox} subtitle="Check your connection and try again." />;
   if (!items) return <SkeletonCard lines={4} />;
   const shown = simKeepResolved(items, resolved);
   if (shown.length === 0) {
@@ -381,7 +382,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   }
   // The partner list never renders empty without saying why.
   if (teamsError && !teams) {
-    return <EmptyState title="Could not load the teams" subtitle={teamsError} actionLabel="Try again" onAction={() => setTeamsAttempt((n) => n + 1)} />;
+    return <EmptyState title={SIM_LOAD_ERROR.teams} subtitle={teamsError} actionLabel="Try again" onAction={() => setTeamsAttempt((n) => n + 1)} />;
   }
   if (!teams) return <SkeletonRows count={4} />;
   if (teams.length === 0) return <EmptyState title="No teams to trade with" subtitle="This league has no other teams to trade with right now." />;

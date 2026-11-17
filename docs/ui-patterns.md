@@ -27,6 +27,17 @@ Ground rules for every pattern here:
 | `CompactModule` | `ui/CompactModule.tsx` | `CompactModule.tsx` | `compactModule.ts` (+ `simSummaries.ts`, `simDraft.ts`) | built (Phase 1 of `docs/audits/2026-11-information-architecture.md`); Sim home folds and the Sim draft room use it; `Collapsible` is superseded (SimFold renders CompactModule) |
 | `Skeleton` set | `components/Skeleton.tsx` (+ `LoadingScreen`) | `components/Skeleton.tsx` (+ `screens/LoadingScreen.tsx`) | none (visual only) | built; see "Loading identity" |
 
+## Copy casing and shared copy (web + app, 2026-11-17)
+
+- **Sentence case** for section and module headings, buttons and labels: capitalize the first word and proper nouns only
+  ("Choose your plan", "What you want back"). Named product surfaces and glossary terms keep their own capitalization
+  ("Playoff Odds", "Roster Power"). The uppercase look of a section title is CSS/`textTransform`, never typed into the string.
+- **Copy that both clients show lives in a lib twin** and is imported by both, so it cannot drift: `simErrorCopy.ts` (Fantasy Sim load
+  errors), `leagueStandings.ts` (Standings title, note, summary), `accountSections.ts` (Account section titles and order),
+  `adpPresentation.ts` (rookie board title and summary chips), `rosterBasis.ts` (My Team roster order and best-ball roster).
+- **Guard**: `scripts/check_copy_casing.mjs` fails when the same heading appears in web and app differing only by case. It also runs in the
+  mobile test job (`mobile/src/lib/copyCasing.test.ts`). Add a lowercased name to its `ALLOW` set only for a named surface.
+
 ## Loading identity
 
 Every loading state is a content-shaped skeleton from ONE set, never a splash, a spinner on an empty screen or a "Loading..." line.

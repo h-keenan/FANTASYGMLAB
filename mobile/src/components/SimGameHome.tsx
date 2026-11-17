@@ -52,6 +52,7 @@ import {
 } from '../lib/simGame';
 import type { SimTab } from '../lib/simGameFlow';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 /**
  * The game's landing tab: this week's head-to-head, what to do this week,
@@ -116,7 +117,7 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   if (failed && !home) {
     return (
       <ErrorState
-        title="Home did not load"
+        title={SIM_LOAD_ERROR.home}
         message={failed}
         onRetry={() => {
           setFailed(null);

@@ -2,7 +2,7 @@
 
 import { AdpCredit, AdpInline } from "@/components/AdpInline";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { deltaText } from "@/lib/adpPresentation";
+import { deltaText, ROOKIE_BOARD_NO_ADP_NOTE, ROOKIE_BOARD_TITLE, rookieBoardSummaryParts } from "@/lib/adpPresentation";
 import type { RookieAdpBoard as RookieAdpBoardData } from "@/lib/api";
 
 const VERDICT_LABEL: Record<string, string> = {
@@ -19,21 +19,16 @@ const VERDICT_LABEL: Record<string, string> = {
 export function RookieAdpBoard({ board }: { board: RookieAdpBoardData | undefined }) {
   if (!board || board.rows.length === 0) return null;
   const withAdp = board.rows.filter((row) => row.adp != null);
-  const topValue = withAdp.filter((row) => row.verdict === "value").sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0))[0];
   return (
     <CompactModule
       id="draft.rookie-adp-board"
-      title="Rookie Board vs ADP"
+      title={ROOKIE_BOARD_TITLE}
       persist={false}
-      parts={[
-        { key: "n", text: withAdp.length ? `${withAdp.length} with ADP` : "No ADP yet", strong: true },
-        topValue ? { key: "v", text: `Value: ${topValue.name} (${deltaText(topValue.delta)})`, tone: "accent" } : null,
-        { key: "s", text: "Our rank vs market", tone: "muted" },
-      ]}
+      parts={rookieBoardSummaryParts(board.rows)}
     >
       {withAdp.length === 0 ? (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Rookie ADP is published only during rookie-draft season. Our rookie ranks are shown without a market number.
+          {ROOKIE_BOARD_NO_ADP_NOTE}
         </p>
       ) : null}
       <div className="flex flex-col" data-testid="rookie-adp-board">

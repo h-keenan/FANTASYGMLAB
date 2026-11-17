@@ -50,6 +50,7 @@ import {
   type SimPosFilter,
 } from '../lib/simGame';
 import { spacing } from '../theme';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 /**
  * Searchable, filterable, sortable list of every player in the game: owner
@@ -171,7 +172,7 @@ export function SimPlayerBrowser({
       ) : state === 'error' ? (
         <EmptyState
           icon="cloud-offline-outline"
-          title="Players did not load"
+          title={SIM_LOAD_ERROR.players}
           subtitle="Check your connection and try again."
           actionLabel="Try again"
           onPressAction={() => {
@@ -378,7 +379,7 @@ function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePla
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const styles = useMemo(() => createStyles(), []);
   const body = detail.data;
-  if (detail.failed) return <EmptyState icon="alert-circle-outline" title="Could not load the outlook" subtitle="Close the sheet and open him again." />;
+  if (detail.failed) return <EmptyState icon="alert-circle-outline" title={SIM_LOAD_ERROR.outlook} subtitle="Close the sheet and open him again." />;
   if (!body) return <SkeletonCard rows={2} />;
   const ros = body.ros ?? null;
   const series = simWeeklySeries(body);

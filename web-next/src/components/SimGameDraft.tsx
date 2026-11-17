@@ -40,6 +40,7 @@ import {
   type SimGamePlayer,
 } from "@/lib/simGame";
 import { playerSurname } from "@/lib/playerNameDisplay";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 type Panel = "board" | "queue" | "roster" | "picks";
 
@@ -225,7 +226,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     );
   }
   if (loadState === "error" || !draft) {
-    return <EmptyState title="Could not load the draft" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setLoadState("loading"); setAttempt((n) => n + 1); }} />;
+    return <EmptyState title={SIM_LOAD_ERROR.draft} subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setLoadState("loading"); setAttempt((n) => n + 1); }} />;
   }
 
   const onClock = Boolean(draft.on_the_clock?.is_you) && draft.status === "in_progress";

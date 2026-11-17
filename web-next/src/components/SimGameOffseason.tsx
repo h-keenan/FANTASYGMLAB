@@ -62,6 +62,7 @@ import {
   simOverLimitNote,
 } from "@/lib/simGame";
 import { playerSurname } from "@/lib/playerNameDisplay";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 type Busy = "start" | "pick" | "auto" | "season" | null;
 
@@ -150,7 +151,7 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
     );
   }
   if (state === "error" || !off) {
-    return <EmptyState title="Could not load the offseason" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setState("loading"); setAttempt((n) => n + 1); }} />;
+    return <EmptyState title={SIM_LOAD_ERROR.offseason} subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setState("loading"); setAttempt((n) => n + 1); }} />;
   }
 
   const steps = offseasonStepper(simOffseasonSteps(off.stage));

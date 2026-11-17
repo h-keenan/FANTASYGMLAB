@@ -50,6 +50,7 @@ import {
   simLimitBlocks,
   simOverLimitNote,
 } from "@/lib/simGame";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 /** Lineup, bench and this week's matchup. Every change saves at once (PUT /lineup). */
 /** Sim Players opens on the waiver wire (owner request); the last view picked is remembered for the rest of the session. */
@@ -162,7 +163,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
     );
   }
   if (state === "error" || !lineup?.slots) {
-    return <EmptyState title="Could not load your lineup" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setState("loading"); setAttempt((n) => n + 1); }} />;
+    return <EmptyState title={SIM_LOAD_ERROR.lineup} subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setState("loading"); setAttempt((n) => n + 1); }} />;
   }
 
   const slots = lineup.slots;

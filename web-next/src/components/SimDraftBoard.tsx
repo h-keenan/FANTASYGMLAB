@@ -25,6 +25,7 @@ import {
   type SimPlayerSort,
   type SimPosFilter,
 } from "@/lib/simGame";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 /**
  * One sim player-list row: a thin mapping from a sim player onto the shared
@@ -202,7 +203,7 @@ export function SimDraftBoard({
       {state === "loading" && items.length === 0 ? (
         <SkeletonRows count={6} />
       ) : state === "error" ? (
-        <EmptyState title="Could not load players" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => setAttempt((n) => n + 1)} />
+        <EmptyState title={SIM_LOAD_ERROR.players} subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => setAttempt((n) => n + 1)} />
       ) : items.length === 0 ? (
         <EmptyState title="No players left that match" subtitle="Try a different search or filter." />
       ) : (
