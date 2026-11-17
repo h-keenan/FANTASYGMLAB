@@ -1,9 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { AlertRow } from "@/components/AlertsContent";
 import { EmptyState } from "@/components/EmptyState";
 import { SheetHandle } from "@/components/SheetHandle";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +15,9 @@ import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/Skeleton";
+
+// Rows render only inside the opened dropdown, so their module (AlertsContent) loads on first open.
+const AlertRow = dynamic(() => import("@/components/AlertsContent").then((m) => m.AlertRow), { ssr: false });
 
 /**
  * The header bell. Tapping it opens a dropdown over the current page (a top

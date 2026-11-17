@@ -3,10 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { LeagueCrest } from "@/components/LeagueCrest";
-import { LeagueSwitcherSheet } from "@/components/LeagueSwitcherSheet";
 import { SHELL_PAGE_INFO_SLOT_ID } from "@/components/PageTitle";
 import { headerShowsTitle, headerTemplateFor, ribbonCollapsed, type HeaderChip } from "@/lib/appHeader";
 import { useHeaderChips } from "@/lib/headerContext";
@@ -37,6 +37,10 @@ const CHIP_COLOR: Record<string, string> = {
  *    search and the bell.
  * Phones only; Header hides its own row below 768px when this renders, so there is exactly one header.
  */
+// The switcher sheet (with its pill row) is only needed once the crest is tapped, so its code loads on first open instead of in
+// every route's first-load JS.
+const LeagueSwitcherSheet = dynamic(() => import("@/components/LeagueSwitcherSheet").then((m) => m.LeagueSwitcherSheet), { ssr: false });
+
 export function ShellHeader({ actions }: { actions: ReactNode }) {
   const { barVisible } = useShellNav();
   const pathname = usePathname();
@@ -44,6 +48,7 @@ export function ShellHeader({ actions }: { actions: ReactNode }) {
   const searchParams = useSearchParams();
   const chips = useHeaderChips();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [switcherSeen, setSwitcherSeen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { leagueId, leagueName: paramName } = shellLeagueContext(params?.leagueId ? decodeURIComponent(params.leagueId) : null, searchParams, UNNAMED_LEAGUE);
   const saved = useSavedLeagues(barVisible && Boolean(leagueId));
@@ -101,7 +106,7 @@ export function ShellHeader({ actions }: { actions: ReactNode }) {
               <span id={SHELL_PAGE_INFO_SLOT_ID} className="inline-flex" />
             </div>
             {leagueId ? (
-              <button type="button" onClick={() => setSwitcherOpen(true)} aria-label={`${leagueName}. Switch league`} aria-haspopup="dialog" className="shell-header-crest">
+              <button type="button" onClick={() => { setSwitcherSeen(true); setSwitcherOpen(true); }} aria-label={`${leagueName}. Switch league`} aria-haspopup="dialog" className="shell-header-crest">
                 <LeagueCrest leagueId={leagueId} name={leagueName} size={32} />
               </button>
             ) : null}
@@ -117,7 +122,7 @@ export function ShellHeader({ actions }: { actions: ReactNode }) {
         <div className="flex shrink-0 items-center">{actions}</div>
       </div>
       {template === "root" && chips.length > 0 ? <Ribbon chips={chips} /> : null}
-      {leagueId ? <LeagueSwitcherSheet open={switcherOpen} onClose={() => setSwitcherOpen(false)} leagueId={leagueId} leagueName={leagueName} leagues={saved.rows} status={saved.status} onRetry={saved.reload} /> : null}
+      {leagueId && (switcherOpen || switcherSeen) ? <LeagueSwitcherSheet open={switcherOpen} onClose={() => setSwitcherOpen(false)} leagueId={leagueId} leagueName={leagueName} leagues={saved.rows} status={saved.status} onRetry={saved.reload} /> : null}
     </header>
   );
 }

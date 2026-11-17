@@ -80,6 +80,9 @@ describe("requestCache", () => {
     expect(isCacheablePath("/v1/leagues/123/rankings?lens=Dynasty&limit=300")).toBe(true);
     expect(isCacheablePath("/v1/leagues/123/draft-picks?lens=Dynasty")).toBe(true);
     expect(isCacheablePath("/v1/leagues/123/rosters")).toBe(true);
+    expect(isCacheablePath("/v1/leagues/123/trade-ideas/multi?lens=Dynasty")).toBe(true);
+    expect(isCacheablePath("/v1/players/value-signals")).toBe(true);
+    expect(isCacheablePath("/v1/leagues/123/trade-ideas/multi/extra")).toBe(false);
     expect(isCacheablePath("/v1/leagues/123/idp/values?include_below=true")).toBe(true);
     expect(isCacheablePath("/v1/leagues/123/dashboard")).toBe(false);
     expect(isCacheablePath("/v1/me")).toBe(false);

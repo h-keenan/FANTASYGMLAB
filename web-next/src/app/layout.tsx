@@ -15,7 +15,7 @@ import { PasswordRecoveryGate } from "@/components/PasswordRecoveryGate";
 import { PrivacyPill } from "@/components/PrivacyMode";
 import { Header } from "@/components/Header";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
-import { TradeOutcomePrompt } from "@/components/TradeOutcomePrompt";
+import { DeferredTradeOutcomePrompt } from "@/components/DeferredTradeOutcomePrompt";
 import { BRAND_NAME } from "@/lib/brand";
 import { THEME_BOOT_SCRIPT } from "@/lib/displayPreferences";
 import { OG_IMAGE } from "@/lib/seo/site";
@@ -102,7 +102,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 {/* "Did this trade happen?" follow-up, mounted once at the root
                     like mobile's RootNavigator does. Decides for itself
                     whether to show; see that component's doc comment. */}
-                <TradeOutcomePrompt />
+                <DeferredTradeOutcomePrompt />
                 <PrivacyPill />
                 <PasswordRecoveryGate />
               </PlayerQuickViewProvider>

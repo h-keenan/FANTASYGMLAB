@@ -30,7 +30,10 @@ const CACHEABLE_PATH = new RegExp(
   "^/v1/leagues/[^/?]+/(rankings|draft-picks|rosters|idp/values)(\\?|$)" +
     // Fantasy Sim Home + lineup: opening a game starts them early (SimGameContent.openGame) and the tabs reuse the answer.
     // A game only changes through a write (any non-GET clears this cache), so a few seconds of reuse is exact.
-    "|^/v1/sim/games/[0-9a-f-]{36}/(home|lineup)$",
+    "|^/v1/sim/games/[0-9a-f-]{36}/(home|lineup)$" +
+    // Trade Hub: the page starts these two beside the hub request (they used to wait for the hub to render first, a serial
+    // 2nd round trip behind the slowest request on the page); the sections mounted later reuse the answer.
+    "|^/v1/leagues/[^/?]+/trade-ideas/multi(\\?|$)|^/v1/players/value-signals$",
 );
 
 const inflight = new Map<string, Promise<unknown>>();
