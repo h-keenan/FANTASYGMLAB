@@ -61,6 +61,9 @@ import { positionColor, radii, spacing, type ThemeColors } from '../theme';
 import { playerSurname } from '../lib/playerNameDisplay';
 
 /** Lineup, bench and this week's matchup. Every change saves at once (PUT /lineup). */
+/** Sim Players opens on the waiver wire (owner request); the last view picked is remembered for the rest of the session. */
+let lastSimPlayersMode: 'all' | 'waivers' = 'waivers';
+
 export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void }) {
   const { gameId, game, call } = ctx;
   const { colors } = useThemeMode();
@@ -466,7 +469,8 @@ export function SimPlayersTab({
   const { gameId, game, call } = ctx;
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
-  const [mode, setMode] = useState<'all' | 'waivers'>('all');
+  const [mode, setModeState] = useState<'all' | 'waivers'>(() => lastSimPlayersMode);
+  const setMode = (next: 'all' | 'waivers') => { lastSimPlayersMode = next; setModeState(next); };
   const [roster, setRoster] = useState<SimGamePlayer[]>([]);
   const [claiming, setClaiming] = useState<SimGamePlayer | null>(null);
   const teamId = game.you?.team_id;
@@ -512,8 +516,8 @@ export function SimPlayersTab({
     <View style={common.stack}>
       <SegmentedTabBar<'all' | 'waivers'>
         options={[
-          { key: 'all', label: 'All players', glyph: 'team' },
           { key: 'waivers', label: `Waivers${claims.length ? ` ${claims.length}` : ''}`, glyph: 'addDrop' },
+          { key: 'all', label: 'All players', glyph: 'team' },
         ]}
         active={mode}
         onChange={setMode}
