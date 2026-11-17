@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
+import { ButtonLink } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { NavProMarker } from "@/components/NavProMarker";
+import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
 import { SectionHeading } from "@/components/SectionHeading";
 import { StatStrip, type StatStripItem } from "@/components/StatStrip";
 import { api, type TeamSnapshot } from "@/lib/api";
@@ -14,11 +17,12 @@ import { useSavedLeagues } from "@/lib/useSavedLeagues";
 
 /**
  * Portfolio's Free state: the first (only) saved league's real standing from the same Today snapshot, then the Pro part
- * locked and named. Renders nothing until the standing loads (or when there is no league): the upsell card below it is
- * always the fallback, so a failure here never blanks the page.
+ * locked and named. Renders nothing until the standing loads: the upsell card below it is always the fallback, so a
+ * failure here never blanks the page. A brand-new account with no saved league gets the connect / sample-league next step
+ * (first-time-user audit 2026-11-17: it used to see only the Pro upsell and no way forward).
  */
 export function PortfolioFreeStanding() {
-  const { rows } = useSavedLeagues(true);
+  const { rows, status } = useSavedLeagues(true);
   const first = rows[0] ?? null;
   const [snapshot, setSnapshot] = useState<TeamSnapshot | null>(null);
   useEffect(() => {
@@ -34,6 +38,18 @@ export function PortfolioFreeStanding() {
       cancelled = true;
     };
   }, [first]);
+  if (status === "ready" && !first) {
+    return (
+      <EmptyState title="No saved league yet" subtitle="Connect a league to see your record and rank here, or look around a sample league first.">
+        <div className="mt-2 flex flex-col items-start gap-1">
+          <ButtonLink href="/connect-league" size="sm">
+            Connect a league
+          </ButtonLink>
+          <SampleLeagueLink />
+        </div>
+      </EmptyState>
+    );
+  }
   if (!first || !snapshot) return null;
   const items: StatStripItem[] = [
     { glyph: "record", label: "Record", value: portfolioRecordText(snapshot) },
