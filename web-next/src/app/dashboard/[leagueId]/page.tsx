@@ -5,7 +5,7 @@ import { useSearchParams } from "@/lib/useSearchParams";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { useValuationLens } from "@/context/ValuationLensContext";
+import { KeyedByLens, useValuationLens } from "@/context/ValuationLensContext";
 import type { TeamStatusPrefetch } from "@/lib/useTeamStatusData";
 import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { DashboardContent } from "@/components/DashboardContent";
@@ -15,6 +15,15 @@ import { SkeletonModule, SkeletonRegion, SkeletonStatusHeader } from "@/componen
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function DashboardPage() {
+  const params = useParams<{ leagueId: string }>();
+  return (
+    <KeyedByLens leagueId={decodeURIComponent(params.leagueId)}>
+      <DashboardPageBody />
+    </KeyedByLens>
+  );
+}
+
+function DashboardPageBody() {
   const params = useParams<{ leagueId: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -43,9 +52,10 @@ export default function DashboardPage() {
       router.replace("/");
       return;
     }
-    // First fetch waits only for the league type, so a redraft league is
-    // requested once (as Non-Dynasty), not once as Dynasty and again.
-    if (!lensReady) return;
+    // The first fetch does NOT wait for lens detection (a cold first visit used to idle a whole round trip, and a cold
+    // /leagues/{id}, before anything left): it goes out with the current lens at once. A Dynasty league (the common case)
+    // keeps that lens and the data stands; a redraft league flips the lens, KeyedByLens remounts this body, and the page
+    // fetches again. The skeleton below holds until `lensReady`, so speculative data never paints on the wrong lens.
     let cancelled = false;
     const rankings = api.getTeamRankings(leagueId, lens);
     rankings.catch(() => {
@@ -104,13 +114,13 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, lensReady, router, retryToken]);
+  }, [authLoading, session, leagueId, lens, router, retryToken]);
 
   if (authLoading) {
     return <LoadingScreen label="Today" layout="dashboard" />;
   }
 
-  if (!data && !error) {
+  if ((!data && !error) || !lensReady) {
     // Show what is ready first: the page frame with height-reserving
     // skeletons, and League Pulse as soon as its own request lands, instead
     // of a splash until the slowest request finishes.
