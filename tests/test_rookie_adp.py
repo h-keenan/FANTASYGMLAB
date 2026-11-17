@@ -159,3 +159,20 @@ def test_est_sf_only_in_superflex_leagues_and_labelled(monkeypatch):
     assert fields["adp"] == 6.0 and fields["adp_label"] == "1QB ADP"
     assert fields["adp_est_sf"] == 3.0 and fields["adp_est_sf_label"] == "Est. SF"
     assert api._adp_fields("q", 2, snap["players"], {})["adp_est_sf"] is None
+
+
+def test_find_prospect_adp_matches_by_name_and_position_only_when_unambiguous():
+    snap = {
+        "as_of": "2027-04-20",
+        "total_drafts": 40,
+        "rows": [
+            {"name": "Arch Manning", "position": "QB", "sleeper_id": None, "adp": 1.4, "adp_formatted": "1.04", "times_drafted": 38},
+            {"name": "Sam Same", "position": "WR", "sleeper_id": None, "adp": 5.0},
+            {"name": "Sam Same", "position": "WR", "sleeper_id": None, "adp": 7.0},
+        ],
+    }
+    hit = rookie_adp.find_prospect_adp("Arch Manning Jr.", "QB", snapshot=snap)
+    assert hit["adp"] == 1.4 and hit["label"] == "1QB ADP" and hit["source"]["as_of"] == "2027-04-20"
+    assert rookie_adp.find_prospect_adp("Arch Manning", "WR", snapshot=snap) is None  # wrong position
+    assert rookie_adp.find_prospect_adp("Sam Same", "WR", snapshot=snap) is None  # ambiguous: never guessed
+    assert rookie_adp.find_prospect_adp("Arch Manning", "QB", snapshot={}) is None  # off-season: "No ADP yet"

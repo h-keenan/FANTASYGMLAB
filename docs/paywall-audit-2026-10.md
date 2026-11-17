@@ -28,6 +28,7 @@ Tiers: Free, Pro (`premium.PRO`, stored as raw `premium`), Front Office. Pro and
 | Playoff Odds | `GET .../playoff-odds` | nothing (locked payload: `reason: premium_required`, `is_premium: false`, `upsell`, no teams) | `_is_pro_caller` before the simulation (fixed 2026-10-23) |
 | Draft Center | `GET .../draft-center` | nothing (locked payload, no posture/cards) | profile entitlement check before any valuation work (fixed 2026-10-23) |
 | College Scouting | `GET /scouting/prospects`, `POST /scouting/prospects/{id}/report`, `POST /scouting/watchlist/{id}` | nothing (locked payload; writes return `ok:false, premium_required`). Deleting your own report/follow stays open so a lapsed account can clean up | `_is_pro_caller` (fixed 2026-10-23) |
+| Prospect detail sheet | `GET /scouting/prospects/{id}/profile` | basics (college season lines, weekly log, bio, recruiting, rookie ADP) | advanced metrics (PPA, usage) withheld server-side unless `_is_pro_caller`; `advanced_locked` drives the client lock (2026-11) |
 | Team Rankings, My Team Needs, Team Situation | various | full data | intentionally Free (owner 2026-10-23) |
 
 ## Leaks found and fixed (all server-side)

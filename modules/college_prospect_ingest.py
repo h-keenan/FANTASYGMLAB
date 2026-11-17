@@ -17,6 +17,30 @@ Two independent steps
    Prospects list. Rows are NEVER deleted: a delete would cascade to users'
    scouting reports and watchlists.
 
+3. **Stats + profile** (same key, same Monday run, after the class listing).
+   Fills ``public.college_prospect_stats`` (docs/supabase_college_prospect_stats.sql)
+   for the prospects found in step 1: per-season passing/rushing/receiving lines
+   (the season-stat feeds step 1 already pulled), PPA + usage, the current
+   season's weekly game log, and recruiting (stars, national rank, hometown).
+   CFBD free tier = 1000 calls/month, so every call goes through ``CallBudget``:
+   bulk endpoints only (no per-player calls), game logs fetch just the newest
+   two weeks once a season is partly stored, prior seasons + recruiting refresh
+   only on the first Monday of the month, and the offseason skips the rest.
+   The month-to-date count lives in the status file and caps the run
+   (``MONTHLY_CALL_CAP``). Skipped cleanly when the table is not migrated yet.
+
+3. **Stats + profile** (same key, same Monday run, after the class listing).
+   Fills ``public.college_prospect_stats`` (docs/supabase_college_prospect_stats.sql)
+   for the prospects found in step 1: per-season passing/rushing/receiving lines
+   (the season-stat feeds step 1 already pulled), PPA + usage, the current
+   season's weekly game log, and recruiting (stars, national rank, hometown).
+   CFBD free tier = 1000 calls/month, so every call goes through ``CallBudget``:
+   bulk endpoints only (no per-player calls), game logs fetch just the newest
+   two weeks once a season is partly stored, prior seasons + recruiting refresh
+   only on the first Monday of the month, and the offseason skips the rest.
+   The month-to-date count lives in the status file and caps the run
+   (``MONTHLY_CALL_CAP``). Skipped cleanly when the table is not migrated yet.
+
 NO FABRICATED DATA (#887): every row comes from a cited source; the source is
 stored per row (``source`` / ``source_url``) when the optional columns from
 ``docs/supabase_college_prospects_ingest.sql`` exist. Before that migration
@@ -39,6 +63,7 @@ from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Seque
 import requests
 
 PROSPECTS_TABLE = "college_prospects"
+STATS_TABLE = "college_prospect_stats"
 CFBD_BASE = "https://api.collegefootballdata.com"
 NFLVERSE_DRAFT_PICKS_URL = "https://github.com/nflverse/nflverse-data/releases/download/draft_picks/draft_picks.csv"
 SLEEPER_PLAYERS_URL = "https://api.sleeper.app/v1/players/nfl"
@@ -147,8 +172,39 @@ def parse_roster(
         year = draft_year_for(row.get("year"), season)
         if not name or not school or year not in draft_years:
             continue
-        out.append({"name": name, "position": position, "school": school, "draft_year": year, "cfbd_id": str(pid)})
+        city = str(row.get("homeCity") or "").strip()
+        state = str(row.get("homeState") or "").strip()
+        out.append(
+            {
+                "name": name,
+                "position": position,
+                "school": school,
+                "draft_year": year,
+                "cfbd_id": str(pid),
+                "class_year": _int_or_none(row.get("year")),
+                "height_in": _int_or_none(row.get("height")),
+                "weight_lb": _int_or_none(row.get("weight")),
+                "hometown": ", ".join(p for p in (city, state) if p) or None,
+                "recruit_ids": [str(r) for r in (row.get("recruitIds") or [])],
+            }
+        )
     return out
+
+
+def _int_or_none(value: Any) -> Optional[int]:
+    try:
+        number = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
+def _num_or_none(value: Any) -> Optional[float]:
+    try:
+        number = float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        return None
+    return number if number == number else None
 
 
 def cfbd_source(season: int, cfbd_id: str) -> Tuple[str, str]:
@@ -170,13 +226,29 @@ def _cfbd_get(path: str, params: Mapping[str, Any], key: str, timeout: float = 3
 
 
 def fetch_candidates(
-    key: str, season: int, *, getter: Callable[..., Any] = _cfbd_get, delay: float = 0.2, log: Callable[[str], None] = print
+    key: str,
+    season: int,
+    *,
+    getter: Callable[..., Any] = _cfbd_get,
+    delay: float = 0.2,
+    log: Callable[[str], None] = print,
+    sink: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
+    """Candidates for the next two draft classes. ``sink`` (optional) receives the
+    raw season-stat rows and school logos these same calls already returned, so the
+    stats step costs no extra CFBD calls for them."""
+
     draft_years = target_draft_years(season)
     producers: set = set()
+    stat_rows: List[Mapping[str, Any]] = []
     for category in MIN_SEASON_YARDS:
-        producers |= parse_production(getter("/stats/player/season", {"year": season, "category": category}, key))
+        rows = getter("/stats/player/season", {"year": season, "category": category}, key)
+        stat_rows.extend(rows or [])
+        producers |= parse_production(rows)
     teams = getter("/teams/fbs", {"year": season}, key)
+    if sink is not None:
+        sink["season_stat_rows"] = stat_rows
+        sink["logos"] = {t.get("school"): (t.get("logos") or [None])[0] for t in teams if t.get("school")}
     candidates: List[Dict[str, Any]] = []
     for team in teams:
         school = team.get("school")
@@ -221,6 +293,8 @@ def reconcile(
             "source": source,
             "source_url": url,
             "ingested_at": now_iso,
+            "cfbd_id": c["cfbd_id"],
+            "_meta": {k: c.get(k) for k in ("class_year", "height_in", "weight_lb", "hometown", "recruit_ids")},
         }
     return list(rows.values())
 
@@ -360,6 +434,428 @@ def fetch_sleeper_gsis_map(timeout: float = 60) -> Dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# Stats + profile step (CFBD, call-budgeted)
+# ---------------------------------------------------------------------------
+MONTHLY_CALL_CAP = 900  # of CFBD's 1000/month free tier: 100 spare for manual runs
+CLASS_LISTING_CALLS_ESTIMATE = 150  # 3 season-stat feeds + teams + ~136 FBS rosters
+RUN_STATS_CALL_CAP = 40  # the stats step alone never spends more than this in one run
+GAME_LOG_RECENT_WEEKS = 2  # once a season is partly stored, refetch only the newest weeks
+LAST_REGULAR_WEEK = 15
+
+# CFBD statType -> compact key, per category. Only real CFBD stat names; nothing derived here.
+STAT_KEYS: Dict[str, Dict[str, str]] = {
+    "passing": {"COMPLETIONS": "cmp", "ATT": "att", "YDS": "yds", "TD": "td", "INT": "int", "PCT": "pct", "YPA": "ypa"},
+    "rushing": {"CAR": "car", "YDS": "yds", "TD": "td", "YPC": "ypc", "LONG": "long"},
+    "receiving": {"REC": "rec", "YDS": "yds", "TD": "td", "YPR": "ypr", "LONG": "long"},
+}
+# /games/players box-score "types" -> the same compact keys
+BOX_KEYS: Dict[str, Dict[str, str]] = {
+    "passing": {"YDS": "yds", "TD": "td", "INT": "int", "AVG": "ypa"},
+    "rushing": {"CAR": "car", "YDS": "yds", "TD": "td", "AVG": "ypc", "LONG": "long"},
+    "receiving": {"REC": "rec", "YDS": "yds", "TD": "td", "AVG": "ypr", "LONG": "long"},
+}
+RATE_KEYS = ("pct", "ypa", "ypc", "ypr")
+
+
+class BudgetExceeded(RuntimeError):
+    pass
+
+
+class CallBudget:
+    """Counts CFBD calls and refuses to exceed ``cap`` (raises ``BudgetExceeded``)."""
+
+    def __init__(self, cap: int) -> None:
+        self.cap = int(cap)
+        self.used = 0
+
+    def wrap(self, getter: Callable[..., Any]) -> Callable[..., Any]:
+        def counted(path: str, params: Mapping[str, Any], key: str, *args: Any, **kwargs: Any) -> Any:
+            if self.used >= self.cap:
+                raise BudgetExceeded(path)
+            self.used += 1
+            return getter(path, params, key, *args, **kwargs)
+
+        return counted
+
+
+def month_key(today: _dt.date) -> str:
+    return today.strftime("%Y-%m")
+
+
+def month_calls_so_far(previous_status: Optional[Mapping[str, Any]], today: _dt.date) -> int:
+    usage = (previous_status or {}).get("cfbd_usage") or {}
+    return int(usage.get("calls") or 0) if usage.get("month") == month_key(today) else 0
+
+
+def in_season(today: _dt.date) -> bool:
+    """Games are being played or just finished (Aug 1 - Jan 25)."""
+
+    return today.month >= 8 or (today.month == 1 and today.day <= 25)
+
+
+def is_slow_refresh(today: _dt.date, *, have_rows: bool, force: bool) -> bool:
+    """Prior seasons + recruiting barely change: first Monday of the month, first fill, or a manual run."""
+
+    return force or not have_rows or today.day <= 7
+
+
+def current_week(today: _dt.date, season: int) -> int:
+    """Rough CFB regular-season week (0-15) from the calendar; only bounds which weeks to ask for."""
+
+    return max(0, min(LAST_REGULAR_WEEK, (today - _dt.date(season, 8, 24)).days // 7))
+
+
+def _stat_value(key: str, value: float) -> Any:
+    return round(value, 2) if key in RATE_KEYS or not float(value).is_integer() else int(value)
+
+
+def parse_season_stats(rows: Iterable[Mapping[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """CFBD /stats/player/season rows -> {playerId: {"team", "passing": {...}, "rushing": {...}, "receiving": {...}}}."""
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in rows or []:
+        category = str(row.get("category") or "").lower()
+        keys = STAT_KEYS.get(category)
+        if keys is None or row.get("playerId") is None:
+            continue
+        key = keys.get(str(row.get("statType") or "").upper())
+        value = _num_or_none(row.get("stat"))
+        if key is None or value is None:
+            continue
+        entry = out.setdefault(str(row["playerId"]), {"team": row.get("team")})
+        entry.setdefault(category, {})[key] = _stat_value(key, value)
+    return out
+
+
+def _round_map(values: Mapping[str, Any]) -> Dict[str, float]:
+    return {k: round(float(v), 3) for k, v in (values or {}).items() if _num_or_none(v) is not None}
+
+
+def parse_ppa(rows: Iterable[Mapping[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """CFBD /ppa/players/season -> {playerId: {"avg": {...}, "total": {...}}} (predicted points added)."""
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in rows or []:
+        if row.get("id") is None:
+            continue
+        out[str(row["id"])] = {"avg": _round_map(row.get("averagePPA") or {}), "total": _round_map(row.get("totalPPA") or {})}
+    return out
+
+
+def parse_usage(rows: Iterable[Mapping[str, Any]]) -> Dict[str, Dict[str, float]]:
+    """CFBD /player/usage -> {playerId: {"overall": share of team plays, "pass": ..., "rush": ...}}."""
+
+    out: Dict[str, Dict[str, float]] = {}
+    for row in rows or []:
+        if row.get("id") is None:
+            continue
+        usage = _round_map(row.get("usage") or {})
+        if usage:
+            out[str(row["id"])] = usage
+    return out
+
+
+def parse_game_week(games: Iterable[Mapping[str, Any]], week: int, wanted: set) -> Dict[str, Dict[str, Any]]:
+    """CFBD /games/players for one week -> {playerId: {"week", "opponent", category: {...}}} for ``wanted`` ids."""
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for game in games or []:
+        teams = game.get("teams") or []
+        for team in teams:
+            opponent = next((t.get("team") for t in teams if t is not team), None)
+            for cat in team.get("categories") or []:
+                category = str(cat.get("name") or "").lower()
+                keys = BOX_KEYS.get(category)
+                if keys is None:
+                    continue
+                for typ in cat.get("types") or []:
+                    key = keys.get(str(typ.get("name") or "").upper())
+                    if key is None:
+                        continue
+                    for athlete in typ.get("athletes") or []:
+                        pid = str(athlete.get("id")) if athlete.get("id") is not None else ""
+                        value = _num_or_none(athlete.get("stat"))
+                        if pid not in wanted or value is None:
+                            continue
+                        entry = out.setdefault(pid, {"week": week, "opponent": opponent})
+                        entry.setdefault(category, {})[key] = _stat_value(key, value)
+    return out
+
+
+def parse_recruits(rows: Iterable[Mapping[str, Any]]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    """CFBD /recruiting/players -> (by recruit id, by athlete id) compact records."""
+
+    by_recruit: Dict[str, Dict[str, Any]] = {}
+    by_athlete: Dict[str, Dict[str, Any]] = {}
+    for row in rows or []:
+        record = {
+            "year": _int_or_none(row.get("year")),
+            "stars": _int_or_none(row.get("stars")),
+            "rating": _num_or_none(row.get("rating")),
+            "national_rank": _int_or_none(row.get("ranking")),
+            "high_school": str(row.get("school") or "").strip() or None,
+            "city": str(row.get("city") or "").strip() or None,
+            "state": str(row.get("stateProvince") or "").strip() or None,
+        }
+        if record["stars"] is None and record["national_rank"] is None:
+            continue
+        if row.get("id") is not None:
+            by_recruit[str(row["id"])] = record
+        if row.get("athleteId") is not None:
+            by_athlete[str(row["athleteId"])] = record
+    return by_recruit, by_athlete
+
+
+def merge_seasons(existing: Optional[Sequence[Mapping[str, Any]]], new_entries: Mapping[int, Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    """Replace/add season entries by year, newest first. Older seasons already stored are kept."""
+
+    by_year: Dict[int, Dict[str, Any]] = {}
+    for entry in existing or []:
+        if isinstance(entry, Mapping) and _int_or_none(entry.get("season")):
+            by_year[int(entry["season"])] = dict(entry)
+    for year, entry in new_entries.items():
+        by_year[int(year)] = {"season": int(year), **entry}
+    return [by_year[y] for y in sorted(by_year, reverse=True)]
+
+
+def merge_game_log(existing: Optional[Mapping[str, Any]], season: int, new_games: Iterable[Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Keep the stored weeks of ``season``, replace/add the newly fetched ones (by week)."""
+
+    games: Dict[int, Dict[str, Any]] = {}
+    if existing and existing.get("season") == season:
+        for g in existing.get("games") or []:
+            if g.get("week") is not None:
+                games[int(g["week"])] = dict(g)
+    for g in new_games:
+        games[int(g["week"])] = dict(g)
+    if not games:
+        return None
+    return {"season": season, "games": [games[w] for w in sorted(games)]}
+
+
+def _stats_url(url: str, query: str = "") -> str:
+    return _table_url(url, query).replace(f"/{PROSPECTS_TABLE}", f"/{STATS_TABLE}", 1)
+
+
+def select_existing_stats(url: str, key: str) -> Optional[Dict[str, Dict[str, Any]]]:
+    """Stored stats rows by prospect id, or None when the table is not migrated yet."""
+
+    r = requests.get(_stats_url(url, "select=prospect_id,seasons,game_log,recruiting&limit=10000"), headers=_headers(key), timeout=30)
+    if r.status_code >= 400:
+        return None
+    return {str(row["prospect_id"]): row for row in r.json() if isinstance(row, dict) and row.get("prospect_id")}
+
+
+def upsert_stats(url: str, key: str, rows: Sequence[Mapping[str, Any]], *, batch: int = 100) -> int:
+    """Upsert on prospect_id. Rows are grouped by key set so a partial refresh never nulls
+    a column it did not send. Returns rows sent."""
+
+    groups: Dict[frozenset, List[Mapping[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault(frozenset(row), []).append(row)
+    sent = 0
+    for group in groups.values():
+        for i in range(0, len(group), batch):
+            chunk = list(group[i : i + batch])
+            r = requests.post(_stats_url(url, "on_conflict=prospect_id"), headers=_headers(key, upsert=True), data=json.dumps(chunk), timeout=60)
+            r.raise_for_status()
+            sent += len(chunk)
+    return sent
+
+
+def stats_source(season: int, cfbd_id: str) -> Tuple[str, str]:
+    return (
+        f"College Football Data API (season stats, PPA, usage, game logs, recruiting; {season} season), player {cfbd_id}",
+        f"https://collegefootballdata.com/player/{cfbd_id}",
+    )
+
+
+def build_stats_rows(
+    prospects: Sequence[Mapping[str, Any]],
+    *,
+    season: int,
+    sink: Mapping[str, Any],
+    existing: Mapping[str, Mapping[str, Any]],
+    ppa: Optional[Mapping[str, Mapping[str, Any]]],
+    usage: Optional[Mapping[str, Mapping[str, Any]]],
+    game_weeks: Optional[Mapping[str, Mapping[str, Any]]],
+    prior_seasons: Optional[Mapping[int, Mapping[str, Mapping[str, Any]]]],
+    recruits: Optional[Tuple[Mapping[str, Any], Mapping[str, Any]]],
+    now_iso: str,
+) -> List[Dict[str, Any]]:
+    """One stats row per prospect. ``None`` for a piece = it was not fetched this run, so the
+    column is left out of the row entirely (the stored value stays)."""
+
+    current = parse_season_stats(sink.get("season_stat_rows") or [])
+    logos = sink.get("logos") or {}
+    rows: List[Dict[str, Any]] = []
+    for p in prospects:
+        cid = str(p.get("cfbd_id") or "")
+        pid = p["id"]
+        if not cid:
+            continue
+        meta = p.get("_meta") or {}
+        old = existing.get(pid) or {}
+        entries: Dict[int, Dict[str, Any]] = {}
+        if cid in current:
+            entries[season] = {"team": p.get("school"), **{k: v for k, v in current[cid].items() if k != "team"}}
+        for year, by_player in (prior_seasons or {}).items():
+            if cid in by_player:
+                entries[year] = {"team": by_player[cid].get("team"), **{k: v for k, v in by_player[cid].items() if k != "team"}}
+        source, source_url = stats_source(season, cid)
+        row: Dict[str, Any] = {
+            "prospect_id": pid,
+            "cfbd_player_id": cid,
+            "stats_season": season,
+            "class_year": meta.get("class_year"),
+            "height_in": meta.get("height_in"),
+            "weight_lb": meta.get("weight_lb"),
+            "hometown": meta.get("hometown"),
+            "school_logo_url": logos.get(p.get("school")),
+            "seasons": merge_seasons(old.get("seasons"), entries),
+            "source": source,
+            "source_url": source_url,
+            "ingested_at": now_iso,
+        }
+        if ppa is not None or usage is not None:
+            has_adv = (ppa or {}).get(cid) or (usage or {}).get(cid)
+            row["advanced"] = {"season": season, "ppa": (ppa or {}).get(cid), "usage": (usage or {}).get(cid)} if has_adv else None
+        if game_weeks is not None:
+            row["game_log"] = merge_game_log(old.get("game_log"), season, [g[cid] for g in game_weeks.values() if cid in g])
+        if recruits is not None:
+            by_recruit, by_athlete = recruits
+            row["recruiting"] = by_athlete.get(cid) or next((by_recruit[r] for r in meta.get("recruit_ids") or [] if r in by_recruit), None)
+        rows.append(row)
+    return rows
+
+
+def fetch_stats_bundle(
+    key: str,
+    season: int,
+    wanted: set,
+    *,
+    today: _dt.date,
+    slow: bool,
+    have_game_log: bool,
+    getter: Callable[..., Any],
+    log: Callable[[str], None] = print,
+) -> Dict[str, Any]:
+    """The CFBD calls for the stats step (``getter`` is already budget-wrapped). Each piece fails
+    soft on its own: a failed piece is reported in ``errors`` and left unfetched (None)."""
+
+    out: Dict[str, Any] = {"ppa": None, "usage": None, "game_weeks": None, "prior_seasons": None, "recruits": None, "errors": []}
+
+    def attempt(name: str, fn: Callable[[], Any]) -> Any:
+        try:
+            return fn()
+        except BudgetExceeded:
+            out["errors"].append(f"{name}:budget")
+        except Exception as exc:
+            out["errors"].append(f"{name}:{type(exc).__name__}")
+            log(f"stats piece {name} failed: {type(exc).__name__}")
+        return None
+
+    live = in_season(today)
+    if live or slow:
+        out["ppa"] = attempt("ppa", lambda: parse_ppa(getter("/ppa/players/season", {"year": season}, key)))
+        out["usage"] = attempt("usage", lambda: parse_usage(getter("/player/usage", {"year": season}, key)))
+
+    def game_weeks() -> Dict[str, Dict[str, Any]]:
+        in_progress = season == college_season(today) and today.month >= 8
+        last = current_week(today, season) if in_progress else LAST_REGULAR_WEEK
+        first = max(0, last - GAME_LOG_RECENT_WEEKS + 1) if have_game_log else 0
+        weeks: Dict[str, Dict[str, Any]] = {}
+        for week in range(first, last + 1):
+            data = getter("/games/players", {"year": season, "week": week, "seasonType": "regular"}, key)
+            weeks[f"r{week}"] = parse_game_week(data, week, wanted)
+        if today.month in (12, 1) and (today.month == 1 or today.day >= 10):
+            data = getter("/games/players", {"year": season, "week": 1, "seasonType": "postseason"}, key)
+            weeks["post"] = parse_game_week(data, LAST_REGULAR_WEEK + 1, wanted)
+        return weeks
+
+    if live or slow:
+        weeks = attempt("game_log", game_weeks)
+        if weeks is not None:
+            out["game_weeks"] = weeks
+
+    if slow:
+        prior: Dict[int, Dict[str, Any]] = {}
+        for year in (season - 1, season - 2):
+            rows: List[Mapping[str, Any]] = []
+            ok = True
+            for category in MIN_SEASON_YARDS:
+                got = attempt(f"season{year}_{category}", lambda c=category, y=year: getter("/stats/player/season", {"year": y, "category": c}, key))
+                if got is None:
+                    ok = False
+                    break
+                rows.extend(got)
+            if ok:
+                prior[year] = parse_season_stats(rows)
+        out["prior_seasons"] = prior or None
+
+        def recruits() -> Tuple[Dict[str, Any], Dict[str, Any]]:
+            by_recruit: Dict[str, Any] = {}
+            by_athlete: Dict[str, Any] = {}
+            for year in range(season - 4, season + 1):
+                a, b = parse_recruits(getter("/recruiting/players", {"year": year, "classification": "HighSchool"}, key))
+                by_recruit.update(a)
+                by_athlete.update(b)
+            return by_recruit, by_athlete
+
+        out["recruits"] = attempt("recruiting", recruits)
+    return out
+
+
+def run_stats_step(
+    supa_url: str,
+    supa_key: str,
+    cfbd_key: str,
+    prospects: Sequence[Mapping[str, Any]],
+    sink: Mapping[str, Any],
+    *,
+    season: int,
+    today: _dt.date,
+    now_iso: str,
+    force: bool,
+    month_calls: int,
+    getter: Callable[..., Any] = _cfbd_get,
+    log: Callable[[str], None] = print,
+) -> Dict[str, Any]:
+    """Run the stats step and return its status block (never raises)."""
+
+    try:
+        existing = select_existing_stats(supa_url, supa_key)
+        if existing is None:
+            return {"status": "skipped_migration_pending", "calls": 0}
+        remaining = MONTHLY_CALL_CAP - month_calls
+        if remaining <= 0:
+            return {"status": "skipped_monthly_budget", "calls": 0}
+        budget = CallBudget(min(RUN_STATS_CALL_CAP, remaining))
+        slow = is_slow_refresh(today, have_rows=bool(existing), force=force)
+        have_game_log = any((r.get("game_log") or {}).get("season") == season for r in existing.values())
+        wanted = {str(p["cfbd_id"]) for p in prospects if p.get("cfbd_id")}
+        bundle = fetch_stats_bundle(
+            cfbd_key, season, wanted, today=today, slow=slow, have_game_log=have_game_log, getter=budget.wrap(getter), log=log
+        )
+        rows = build_stats_rows(
+            prospects,
+            season=season,
+            sink=sink,
+            existing=existing,
+            ppa=bundle["ppa"],
+            usage=bundle["usage"],
+            game_weeks=bundle["game_weeks"],
+            prior_seasons=bundle["prior_seasons"],
+            recruits=bundle["recruits"],
+            now_iso=now_iso,
+        )
+        sent = upsert_stats(supa_url, supa_key, rows) if rows else 0
+        return {"status": "ok", "rows": sent, "calls": budget.used, "slow": slow, "errors": bundle["errors"]}
+    except Exception as exc:
+        return {"status": "error", "error": type(exc).__name__, "calls": 0}
+
+
+# ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
 def run(
@@ -368,6 +864,7 @@ def run(
     today: Optional[_dt.date] = None,
     force_classes: bool = False,
     log: Callable[[str], None] = print,
+    previous_status: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     env = os.environ if environ is None else environ
     today = today or _dt.date.today()
@@ -376,7 +873,9 @@ def run(
     supa_key = env.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
     cfbd_key = env.get("CFBD_API_KEY", "").strip()
     season = college_season(today)
-    status: Dict[str, Any] = {"ran_at": now_iso, "season": season, "ok": True, "classes": {}, "retire": {}}
+    status: Dict[str, Any] = {"ran_at": now_iso, "season": season, "ok": True, "classes": {}, "stats": {}, "retire": {}}
+    month_before = month_calls_so_far(previous_status, today)
+    listing_calls = CallBudget(10**6)  # counts what step 1 really spends
     if not (supa_url and supa_key):
         status.update(ok=False, error="supabase_not_configured")
         return status
@@ -387,9 +886,12 @@ def run(
         status["classes"] = {"status": "skipped_no_key"}
     elif today.weekday() != 0 and not force_classes:
         status["classes"] = {"status": "skipped_not_monday"}
+    elif month_before + CLASS_LISTING_CALLS_ESTIMATE > MONTHLY_CALL_CAP:
+        status["classes"] = {"status": "skipped_monthly_budget", "month_calls": month_before}
     else:
         try:
-            candidates = fetch_candidates(cfbd_key, season, log=log)
+            sink: Dict[str, Any] = {}
+            candidates = fetch_candidates(cfbd_key, season, log=log, sink=sink, getter=listing_calls.wrap(_cfbd_get))
             if not candidates:
                 status["classes"] = {"status": "empty", "fetched": 0}
                 status["ok"] = False
@@ -398,9 +900,19 @@ def run(
                 rows = reconcile(candidates, existing, season=season, now_iso=now_iso)
                 sent, extended = upsert_with_fallback(supa_url, supa_key, rows)
                 status["classes"] = {"status": "ok", "fetched": len(candidates), "upserted": sent, "extended_columns": extended}
+                status["stats"] = run_stats_step(
+                    supa_url, supa_key, cfbd_key, rows, sink,
+                    season=season, today=today, now_iso=now_iso, force=force_classes,
+                    month_calls=month_before + listing_calls.used, log=log,
+                )
         except Exception as exc:
             status["classes"] = {"status": "error", "error": type(exc).__name__}
             status["ok"] = False
+
+    status["cfbd_usage"] = {
+        "month": month_key(today),
+        "calls": month_before + listing_calls.used + int((status.get("stats") or {}).get("calls") or 0),
+    }
 
     # Step 2: retirement (keyless nflverse), only once the draft data exists
     try:
