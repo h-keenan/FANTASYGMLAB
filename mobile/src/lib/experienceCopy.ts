@@ -45,11 +45,11 @@ export const EXPERIENCE_LEVEL_OPTIONS = {
   },
   beginner: {
     title: "New to dynasty",
-    body: "Explain the why behind every recommendation — trade logic, value, roster strategy.",
+    body: "Explain the why behind every recommendation: trade logic, value, roster strategy.",
   },
   advanced: {
     title: "Veteran dynasty manager",
-    body: "Skip the explanations — just the call, the value, and the confidence.",
+    body: "Skip the explanations. Just the call, the value, and the confidence.",
   },
 } as const;
 
