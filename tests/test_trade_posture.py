@@ -266,9 +266,10 @@ def test_calibration_grid_verdict_changes_are_few_directional_and_explained(monk
     # Most verdicts are untouched: only trades with a real lineup or direction effect move.
     win_now = {k for k in after if k[2] in {"contender", "fringe_contender", "retool"}}
     # Win-now side (where the owner's report lives): few verdicts move.
-    assert len(ui_changed & win_now) / len(win_now) <= 0.15
+    # (0.20: without the user-side consolidation premium the 1-for-2 / 2-for-1 probes sit nearer a cut)
+    assert len(ui_changed & win_now) / len(win_now) <= 0.20
     # Rebuild/tank move more by design: their lineup weight drops (PRESENT_ADJUST).
-    assert len(ui_changed) / len(after) <= 0.30  # share-based cuts are tighter on big deals
+    assert len(ui_changed) / len(after) <= 0.35  # share-based cuts are tighter on big deals (0.35: no user-side consolidation premium)
     # There is no separate label any more: the band IS the UI rung of the score.
     assert ui_changed <= label_changed
     assert len(label_changed) / len(after) <= 0.40

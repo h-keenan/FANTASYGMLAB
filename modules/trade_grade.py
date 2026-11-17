@@ -145,7 +145,37 @@ def _asset_value(asset: Mapping[str, Any], values: Mapping[int, float] | None = 
         return 0.0
 
 
+# Share of the consolidation premium the user's own verdict credits or debits. The premium is the
+# right price for what a *partner* demands (Trade Hub's partner-side check keeps the full rate), but as
+# a statement about the user's outcome it double counts: market values already price star
+# concentration (they are convex in player quality) and the lineup effect of consolidating is priced
+# separately (starter strength offseason, the lineup model in season). Backtest 2021-2025 (48,521
+# graded trades): conditional on the value delta, each +1000 of consolidation credit went with
+# -26 (offseason) / -14 (in season) lineup points, 2-for-1 deals the premium favoured won 47%, and
+# the 1-for-2 break-ups it penalised won 56-63%. Zero until a lineup-based premium is evidenced.
+USER_CONSOLIDATION_SHARE = 0.0
+
+
 def user_consolidation_adjustment(
+    send_assets: Sequence[Mapping[str, Any]],
+    receive_assets: Sequence[Mapping[str, Any]],
+    *,
+    values: Mapping[int, float] | None = None,
+) -> tuple[int, str]:
+    """The user's consolidation credit: ``USER_CONSOLIDATION_SHARE`` of the full premium.
+
+    ``(0, "")`` while the share is 0. ``full_consolidation_premium`` is the unscaled signed premium."""
+
+    premium, note = full_consolidation_premium(send_assets, receive_assets, values=values)
+    scaled = int(round(premium * USER_CONSOLIDATION_SHARE))
+    if scaled == 0:
+        return 0, ""
+    if scaled == premium:
+        return scaled, note
+    return scaled, f"{note.rsplit(' (', 1)[0]} ({scaled:+,})"
+
+
+def full_consolidation_premium(
     send_assets: Sequence[Mapping[str, Any]],
     receive_assets: Sequence[Mapping[str, Any]],
     *,

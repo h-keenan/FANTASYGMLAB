@@ -121,7 +121,7 @@ def test_stash_requires_real_injury_signal(pool):
 def test_pick_items_use_the_apps_pick_curve(pool):
     picks = [a for i in pool if i["type"] == E.TYPE_PICK for s in (i["send"], i["receive"]) for a in s["assets"] if a["kind"] == "pick"]
     for p in picks:
-        assert p["value"] in {7600, 6500, 5600, 3800, 3200, 2700}
+        assert p["value"] in {4200, 2900, 2300, 2000, 1850, 1700}
 
 
 def test_item_ids_are_stable_and_unique(ctx):

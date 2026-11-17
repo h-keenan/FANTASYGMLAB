@@ -60,7 +60,7 @@ def safe_pick_value(pick: dict) -> int:
             )
         )
     round_num = _safe_positive_int(pick.get("round"), 4)
-    default_values = {1: 6500, 2: 3200, 3: 1400, 4: 650}
+    default_values = {1: 2900, 2: 1850, 3: 1450, 4: 650}  # = trade_ideas.BASE_PICK_VALUES (mid tier)
     return default_values.get(round_num, max(150, 650 - ((round_num - 4) * 150)))
 
 

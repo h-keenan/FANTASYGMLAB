@@ -55,16 +55,23 @@ from modules import model_status, runtime_trace
 from modules import drop_candidates, trade_cautions, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 
+# Calibrated to what a pick turns into (docs/audits/2026-11-trade-advice-backtest.md, scripts/
+# trade_advice_backtest.py): the engine-scale dynasty score of the slot-th rookie of the 2021-2025 classes
+# at the Aug-20 rookie-draft snapshot, by round and early (slots 1-4) / mid (5-8) / late (9-12) tier. The
+# previous table (6500 / 3200 / 1400 for a mid pick) priced a mid 1st at 2.3x, a 2nd at 1.7x what the
+# same pick had become, and the realized rookies produced ~0 points over replacement (mid/late 1sts)
+# or less (2nds). The league-format, team-strength, future-discount and class-strength multipliers
+# below are unchanged (the Superflex 1st-round uplift matches the realized +10-12%).
 BASE_PICK_VALUES = {
-    1: 6500,
-    2: 3200,
-    3: 1400,
+    1: 2900,
+    2: 1850,
+    3: 1450,
     4: 650,
 }
 PICK_TIER_BASE_VALUES = {
-    1: {"early": 7600, "mid": 6500, "late": 5600},
-    2: {"early": 3800, "mid": 3200, "late": 2700},
-    3: {"early": 1750, "mid": 1400, "late": 1100},
+    1: {"early": 4200, "mid": 2900, "late": 2300},
+    2: {"early": 2000, "mid": 1850, "late": 1700},
+    3: {"early": 1600, "mid": 1450, "late": 1350},
     4: {"early": 850, "mid": 650, "late": 500},
 }
 PICK_TIER_MULTIPLIERS = {
