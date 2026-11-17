@@ -98,16 +98,16 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Matchup'>;
 
 const NOT_READY_MESSAGES: Record<string, string> = {
   no_sleeper_username_linked:
-    'Link your Sleeper username on the web app first — the matchup view needs to know which roster is yours.',
+    'Link your Sleeper username on the web app first. The matchup view needs to know which roster is yours.',
   sleeper_user_not_found: "Couldn't find that Sleeper account. Double-check the linked username on the web app.",
   not_a_member_of_league: "You don't appear to own a team in this league.",
   empty_roster: "This roster doesn't have any players yet.",
-  no_player_data: "Player data isn't available right now — try again in a bit.",
+  no_player_data: "Player data isn't available right now. Try again in a bit.",
   no_current_week: "This league hasn't started a week yet.",
   no_matchup_data: "Sleeper doesn't have matchups posted for this week yet.",
   roster_not_in_matchups: "Your roster isn't in this week's matchup list.",
-  bye_week: "You're not paired against anyone this week — enjoy the bye.",
-  opponent_roster_missing: "Couldn't load your opponent's roster right now — try again in a bit.",
+  bye_week: "You're not paired against anyone this week. Enjoy the bye.",
+  opponent_roster_missing: "Couldn't load your opponent's roster right now. Try again in a bit.",
 };
 
 const MOVES_PREVIEW_COUNT = 3;

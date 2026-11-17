@@ -136,7 +136,7 @@ function horizonCopy(yearsOut: number | null, futureDiscount: number | null): st
     return 'Pick projections widen the further a draft sits in the future.';
   }
   if (yearsOut <= 0) {
-    return "This class is already in view, so it takes no future discount — it's the most confidently projected pick horizon there is.";
+    return "This class is already in view, so it takes no future discount. It's the most confidently projected pick horizon there is.";
   }
   const discountPct = futureDiscount === null ? null : Math.round((1 - futureDiscount) * 100);
   const drafts = yearsOut === 1 ? '1 draft' : `${yearsOut} drafts`;
@@ -274,7 +274,7 @@ export default function PickDetailScreen({ route, navigation }: Props) {
                 multiplier={futureDiscount}
                 note={
                   yearsOut === null || yearsOut <= 0
-                    ? 'No horizon penalty — this class is already in view'
+                    ? 'No horizon penalty: this class is already in view'
                     : `Compounds 12% per draft beyond the next class (${yearsOut} out)`
                 }
               />

@@ -155,7 +155,7 @@ export const WHY_REGISTRY: Record<WhyMetricId, WhyEntry> = {
   },
   posture: {
     id: "posture",
-    title: "What posture means",
+    title: "What team stance means",
     sentences: [BEGINNER_HELP.tradeHubPosture],
   },
   buy_low: {

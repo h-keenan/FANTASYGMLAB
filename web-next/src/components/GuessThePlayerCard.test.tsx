@@ -120,7 +120,7 @@ describe("GuessThePlayerCard", () => {
     const option = await screen.findByRole("radio", { name: "Other Back" });
     fireEvent.click(option);
 
-    await waitFor(() => expect(screen.getByText("Not quite — it was Bench Runner.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Not quite: it was Bench Runner.")).toBeInTheDocument());
     expect(api.answerGuessThePlayer).toHaveBeenCalledWith("pick-1", "2");
   });
 

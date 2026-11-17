@@ -47,7 +47,7 @@ describe("FounderAnalyticsContent", () => {
     render(<FounderAnalyticsContent data={report()} windowKey="7d" onWindowChange={vi.fn()} />);
 
     expect(screen.getByText("Founder Analytics")).toBeInTheDocument();
-    expect(screen.getByText("Durable — Supabase")).toBeInTheDocument();
+    expect(screen.getByText("Durable: Supabase")).toBeInTheDocument();
     expect(screen.getByText("All app instances (Supabase-backed) — not host-local.")).toBeInTheDocument();
 
     expect(screen.getByText("128")).toBeInTheDocument(); // event_count tile

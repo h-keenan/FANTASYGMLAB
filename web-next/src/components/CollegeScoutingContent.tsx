@@ -123,7 +123,7 @@ function ProspectCard({
           className="px-2 py-1 text-xs font-bold"
           style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-border)" }}
         >
-          {hasReport ? `Edit your grade — ${prospect.name}` : `Scout ${prospect.name}`}
+          {hasReport ? `Edit your grade: ${prospect.name}` : `Scout ${prospect.name}`}
         </button>
       </div>
     </article>
@@ -205,7 +205,7 @@ export function CollegeScoutingContent({
                 : row,
             ),
           );
-          setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: "success", message: "Saved — thanks for scouting." } }));
+          setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: "success", message: "Saved: thanks for scouting." } }));
         } else {
           setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: "error", message: "Could not save your grade. Try again in a moment." } }));
         }
@@ -250,7 +250,7 @@ export function CollegeScoutingContent({
 
       {prospects.length === 0 ? (
         data.catalog_available ? (
-          <EmptyState title="No prospects yet" subtitle="Check back soon — the prospect pool is still growing." />
+          <EmptyState title="No prospects yet" subtitle="Check back soon: the prospect pool is still growing." />
         ) : (
           <EmptyState
             title="College Scouting isn't connected yet"

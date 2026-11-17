@@ -154,7 +154,7 @@ function playerScore(player: RankedPlayer): number {
 
 const NOT_READY_MESSAGES: Record<string, string> = {
   no_sleeper_username_linked:
-    "Link your Sleeper username on the web app first — the Trade Analyzer needs to know which roster is yours.",
+    "Link your Sleeper username on the web app first. The Trade Analyzer needs to know which roster is yours.",
   sleeper_user_not_found: "Couldn't find that Sleeper account. Double-check the linked username on the web app.",
   not_a_member_of_league: "You don't appear to own a team in this league.",
   assets_unresolved:
@@ -551,8 +551,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
             label={quickMode ? 'Quick Compare' : 'the Trade Analyzer'}
             lines={[
               quickMode
-                ? `Raw asset value only — ${leagueName}'s "Dynasty" valuations. Doesn't yet weigh roster fit or strategy, unlike the full Trade Analyzer.`
-                : `The real accept / decline / counter verdict for ${leagueName} — weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`,
+                ? `Raw asset value only: ${leagueName}'s "Dynasty" valuations. Doesn't yet weigh roster fit or strategy, unlike the full Trade Analyzer.`
+                : `The real accept / decline / counter verdict for ${leagueName}. Weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`,
             ]}
           />
         }

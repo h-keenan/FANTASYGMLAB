@@ -61,7 +61,7 @@ function toneColorMap(colors: ThemeColors): Record<string, string> {
 }
 
 const POSTURE_REASON_MESSAGE: Record<string, string> = {
-  no_sleeper_username_linked: "Link your Sleeper account and join this league from Home to see your own draft posture.",
+  no_sleeper_username_linked: "Link your Sleeper account and join this league from Home to see your own draft stance.",
   sleeper_user_not_found: "We couldn't find your linked Sleeper account in this league.",
   not_a_member_of_league: "You don't appear to have a roster in this league.",
   no_draft_capital_row: "Your roster's draft-capital data isn't available yet.",
@@ -208,7 +208,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
             title={locked.title || 'Know where you stand on draft capital'}
             description={
               locked.body ||
-              'Draft Center is a Pro feature: your draft posture, league-wide pick decision signals and the best trade partners for your picks. Start your free trial to unlock it.'
+              'Draft Center is a Pro feature: your draft stance, league-wide pick decision signals and the best trade partners for your picks. Start your free trial to unlock it.'
             }
           />
         </View>
@@ -241,7 +241,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
         </View>
         {tab === 'overview' ? (
           <>
-        <SectionHeading title="Your Draft Posture" topGap={16} />
+        <SectionHeading title="Your draft stance" topGap={16} />
         {posture ? (
           <AccentCard accent={toneColorMap(colors)[posture.tone] ?? colors.accent}>
             <View style={styles.postureHead}>
@@ -282,7 +282,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
         ) : (
           <EmptyState
             icon="information-circle-outline"
-            title={POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft posture isn't available right now."}
+            title={POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft stance isn't available right now."}
           />
         )}
 

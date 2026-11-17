@@ -61,11 +61,11 @@ export const FALLBACK_PUBLIC_PLANS: BillingPlan[] = [
     cadence: "per month",
     features: [
       "Your full Today briefing, not just the top 4",
-      "League Pulse leaders — your league's top contender, rebuilder, draft capital, and most active manager",
-      "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
+      "League Pulse leaders: your league's top contender, rebuilder, draft capital, and most active manager",
+      "The complete waiver board: stash candidates, watchlist depth, and a FAAB shortlist",
       "Every Trade Hub idea, not just the first 2",
       "Watchlist watchlist up to 50 players (Free is capped at 3)",
-      "Portfolio — your record, rank, and top need across every saved league, not just one",
+      "Portfolio: your record, rank, and top need across every saved league, not just one",
     ],
   },
   {
@@ -76,11 +76,11 @@ export const FALLBACK_PUBLIC_PLANS: BillingPlan[] = [
     cadence: "per year",
     features: [
       "Your full Today briefing, not just the top 4",
-      "League Pulse leaders — your league's top contender, rebuilder, draft capital, and most active manager",
-      "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
+      "League Pulse leaders: your league's top contender, rebuilder, draft capital, and most active manager",
+      "The complete waiver board: stash candidates, watchlist depth, and a FAAB shortlist",
       "Every Trade Hub idea, not just the first 2",
       "Watchlist watchlist up to 50 players (Free is capped at 3)",
-      "Portfolio — your record, rank, and top need across every saved league, not just one",
+      "Portfolio: your record, rank, and top need across every saved league, not just one",
     ],
   },
 ];

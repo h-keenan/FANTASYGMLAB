@@ -3,7 +3,7 @@ import { api, type ManagerTendenciesSummaryResponse, type ManagerTendencySummary
 /** Signal order + short titles for the manager profile (mirrors
  * modules.manager_tendencies.SIGNAL_ORDER). */
 export const TENDENCY_SIGNALS: Array<[string, string]> = [
-  ["posture", "Posture"],
+  ["posture", "Team stance"],
   ["position_preference", "Positions"],
   ["age_preference", "Age"],
   ["pick_behavior", "Picks"],

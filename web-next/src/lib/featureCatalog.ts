@@ -54,7 +54,7 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
   { id: "gm-plan", group: "lineup", name: "GM Plan", line: "Set rebuilding, competing or balanced and get a roadmap.", extra: "Pro adds focus areas.", segment: "gm-plan", leagueScoped: true, glyph: "gmPlan", color: accentVar("gm-plan") },
 
   { id: "waivers", group: "pickup", name: "Waivers", line: "Ranked pickups for your roster, with FAAB bid guidance.", extra: "Pro adds the FAAB shortlist and usage stats.", segment: "waivers", leagueScoped: true, glyph: "waivers", color: accentVar("waivers") },
-  { id: "draft-center", group: "pickup", name: "Draft Center", line: "Your picks, draft posture and college scouting in one place.", pro: true, segment: "draft-center", leagueScoped: true, glyph: "draftCenter", color: accentVar("draft-center") },
+  { id: "draft-center", group: "pickup", name: "Draft Center", line: "Your picks, draft stance and college scouting in one place.", pro: true, segment: "draft-center", leagueScoped: true, glyph: "draftCenter", color: accentVar("draft-center") },
   { id: "live-draft", group: "pickup", name: "Live Draft", line: "Pick recommendations while your Sleeper draft is running.", pro: true, segment: "live-draft", leagueScoped: true, glyph: "liveDraft", color: accentVar("live-draft") },
 
   { id: "players", group: "scout", name: "Players", line: "Search any player for value, stats, trends and news.", segment: "players", leagueScoped: true, glyph: "players", color: accentVar("players") },

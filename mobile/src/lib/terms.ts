@@ -33,6 +33,10 @@
  * - Your leagues  What "Home" is called outside a league (the league list).
  * - Depth Adds  The Waivers shortlist row of free agents who would add bench
  *              depth (it was "Bench Depth", which is also a team rank).
+ * - Team stance  How you are building the team (compete now, build for later,
+ *              in between). "Posture", "GM stance" and "Team posture" are retired
+ *              in user-visible copy; the API and code names keep posture. Defined in
+ *              lib/glossary.ts with every other jargon term (one source for the "?" sheets).
  * - Season Outlook is always named with its parent (GM Plan or Games); use
  *              seasonOutlookIn().
  *
@@ -55,6 +59,7 @@ export const TERMS = {
   gradeATradeShort: "Grade",
   yourLeagues: "Your leagues",
   depthAdds: "Depth Adds",
+  teamStance: "Team stance",
 } as const;
 
 /** "Season Outlook" is never shown alone: it always names the page it lives on ("GM Plan > Season Outlook"). */
@@ -82,6 +87,10 @@ export const RETIRED_TERMS: RetiredTerm[] = [
   { pattern: /^Watching$/, use: TERMS.watchlist },
   { pattern: /^Hub$/, use: TERMS.tradeIdeas },
   { pattern: /^Analyzer$/, use: TERMS.gradeATrade },
+  { pattern: /\bPosture\b/, use: TERMS.teamStance },
+  { pattern: /\bdraft posture\b/i, use: "draft stance" },
+  { pattern: /\bGM stance\b/, use: TERMS.teamStance },
+  { pattern: /\bWatching list\b/, use: TERMS.watchlist },
 ];
 
 /** Phrases that contain a retired word legitimately (league settings, etc.). */

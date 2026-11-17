@@ -382,7 +382,7 @@ function TargetRowView({
             <ValueStat value={formatWaiverScore(player.score)} />
           ) : null}
           {player?.position_rank ? (
-            <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league.`} />
+            <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s. Overall, not just this league.`} />
           ) : null}
           <OvrGauge rating={player?.overall_rating ?? null} size="sm" />
         </div>
@@ -607,7 +607,7 @@ export function GmPlanContent({
         leagueName={leagueName}
         upsell={data.upsell}
         fallbackTitle="Your season-arc roadmap"
-        fallbackBody="GM Plan is a Pro feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Pro to unlock it."
+        fallbackBody="GM Plan is a Pro feature: where you stand, your best trade paths, and your roster construction. Framed by your declared Team Situation. Upgrade to Pro to unlock it."
         bare
       />
       <section className="glass-surface flex flex-col gap-1 p-4 premium-glow-card" data-testid="gm-plan-pro-preview">
@@ -800,7 +800,7 @@ export function GmPlanContent({
             help={
               <InfoMark
                 label="Protected Core"
-                lines={["Mark players you don't want traded away. This is the same protection the Watching list uses — toggling it here or there shows up in both places."]}
+                lines={["Mark players you don't want traded away. This is the same protection the Watchlist uses. Toggling it here or there shows up in both places."]}
               />
             }
           >

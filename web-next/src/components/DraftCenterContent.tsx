@@ -45,7 +45,7 @@ const LiveDraftRoom = dynamic(() => import("@/components/LiveDraftRoom").then((m
 /**
  * Ports mobile's DraftCenterScreen.tsx (the GM_TOOLS "Draft Center" nav
  * destination) for Revision 14 — same two endpoints, same scope: your own
- * draft posture, pick values with a My Picks/League toggle, and the
+ * draft stance, pick values with a My Picks/League toggle, and the
  * league-wide decision/partner cards. The page is named "Draft" in the nav
  * (2026-11-16 consolidation): the live draft room is its "Live room" tab, which
  * exists only while a Sleeper draft is in progress or paused (the old Live Draft
@@ -138,7 +138,7 @@ export function DraftCenterContent({
       {tab === "overview" ? (
       <CompactModule
         id="draft.posture"
-        title="Your Draft Posture"
+        title="Your draft stance"
         persist={false}
         defaultOpen
         tone={posture ? "accent" : "muted"}
@@ -151,7 +151,7 @@ export function DraftCenterContent({
                 { key: "picks", text: `${posture.pick_count ?? 0} picks` },
                 posture.draft_capital_rank ? { key: "cap", text: `Capital ${formatRank(posture.draft_capital_rank, posture.draft_capital_rank_tied)}` } : null,
               ]
-            : [{ key: "none", text: POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft posture isn't available right now.", tone: "muted" }]
+            : [{ key: "none", text: POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft stance isn't available right now.", tone: "muted" }]
         }
       >
         {posture ? (
@@ -211,7 +211,7 @@ export function DraftCenterContent({
             </div>
           </AccentCard>
         ) : (
-          <EmptyState title={POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft posture isn't available right now."} />
+          <EmptyState title={POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft stance isn't available right now."} />
         )}
       </CompactModule>
       ) : null}

@@ -82,7 +82,7 @@ export interface ManagerTendenciesDetailResponse {
 
 /** Signal order + short titles (mirrors modules.manager_tendencies.SIGNAL_ORDER). */
 export const TENDENCY_SIGNALS: Array<[string, string]> = [
-  ['posture', 'Posture'],
+  ['posture', 'Team stance'],
   ['position_preference', 'Positions'],
   ['age_preference', 'Age'],
   ['pick_behavior', 'Picks'],

@@ -402,7 +402,7 @@ export function LiveDraftContent({
         leagueName={leagueName}
         upsell={discovery.upsell}
         fallbackTitle="Draft with real-time recommendations"
-        fallbackBody="Live Draft is a Pro feature — Best Available/Best Fit picks, a live roster-strength board, and positional-run alerts while your draft is actually happening. Upgrade to Pro to unlock it."
+        fallbackBody="Live Draft is a Pro feature. Best Available/Best Fit picks, a live roster-strength board, and positional-run alerts while your draft is actually happening. Upgrade to Pro to unlock it."
       />
     );
   }
@@ -428,7 +428,7 @@ export function LiveDraftContent({
         <span className="font-bold uppercase" style={{ color: "var(--color-warning)", letterSpacing: "var(--letter-spacing-badge)" }}>
           Coming soon
         </span>
-        <span>This page is still being tested end-to-end against a real live draft — treat recommendations as a preview.</span>
+        <span>This page is still being tested end-to-end against a real live draft. Treat recommendations as a preview.</span>
       </div>
 
       {liveOrPaused.length === 0 ? (

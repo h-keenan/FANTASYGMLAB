@@ -4,7 +4,7 @@
  * (modules.league_standings.build_league_standings_bundle); `standing_rank` is final, this only orders and words it.
  */
 
-export const STANDINGS_NOTE = "Actual results from league matchups — separate from Roster Power strength.";
+export const STANDINGS_NOTE = "Actual results from league matchups. Separate from Roster Power strength.";
 export const STANDINGS_KICKER = "Where you stand";
 export const STANDINGS_EMPTY = "Standings will populate once regular-season results are available.";
 

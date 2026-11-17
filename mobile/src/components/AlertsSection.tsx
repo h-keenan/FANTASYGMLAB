@@ -82,7 +82,7 @@ function rosterRelationshipColor(colors: ThemeColors): Record<Exclude<RosterRela
 
 export const NOT_READY_MESSAGES: Record<string, string> = {
   no_sleeper_username_linked:
-    "Link your Sleeper username on the web app first — Alerts needs to know which players are yours.",
+    "Link your Sleeper username on the web app first. Alerts needs to know which players are yours.",
   sleeper_user_not_found: "Couldn't find that Sleeper account. Double-check the linked username on the web app.",
   not_a_member_of_league: "You don't appear to own a team in this league.",
   empty_roster: 'Your roster in this league is empty.',

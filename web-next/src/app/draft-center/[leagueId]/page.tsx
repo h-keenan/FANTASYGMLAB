@@ -141,7 +141,7 @@ export default function DraftCenterPage() {
         leagueName={leagueName}
         upsell={draftCenter.upsell ?? null}
         fallbackTitle="Know where you stand on draft capital"
-        fallbackBody="Draft Center is a Pro feature: your draft posture, league-wide pick decision signals and the best trade partners for your picks. Start your free trial to unlock it."
+        fallbackBody="Draft Center is a Pro feature: your draft stance, league-wide pick decision signals and the best trade partners for your picks. Start your free trial to unlock it."
       />
     );
   }

@@ -37,7 +37,7 @@ export function tradeAnalyzerReasonMessage(reason: string): string | null {
  * league-link reasons tradeAnalyzerReasonMessage already covers — mirrors
  * mobile's TradeAnalyzerScreen.tsx NOT_READY_MESSAGES map. */
 const ANALYZE_FAILURE_MESSAGES: Record<string, string> = {
-  no_player_data: "Player data isn't available right now — try again in a bit.",
+  no_player_data: "Player data isn't available right now. Try again in a bit.",
   assets_not_found: "One of the selected assets could not be resolved. Remove it and try again.",
   assets_unresolved:
     "Some players or picks in this package could not be found, so no verdict was given (a verdict on part of a trade would be misleading). Remove them and try again. This did not use one of your free evaluations.",

@@ -114,7 +114,7 @@ export default function TradeHistoryScreen({ navigation }: Props) {
             info={
               <InfoMark
                 label="trade history"
-                lines={["Trades you've confirmed you made. Once a confirmed trade has had a few weeks to play out, we'll show a real before/after read here — using actual points scored and value trend, never a guess. Nothing here is pushed to you; it only shows up when you check this screen."]}
+                lines={["Trades you've confirmed you made. Once a confirmed trade has had a few weeks to play out, we'll show a real before/after read here. Using actual points scored and value trend, never a guess. Nothing here is pushed to you; it only shows up when you check this screen."]}
               />
             }
           />

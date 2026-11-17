@@ -362,7 +362,7 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
     <section id="playoff-odds" className="flex flex-col gap-3 scroll-mt-4">
       <SectionHeading
         kicker="What might happen next"
-        note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Roster Power, thousands of simulated outcomes."
+        note="A real Monte Carlo simulation of the rest of the season. Your real schedule, real Roster Power, thousands of simulated outcomes."
       >
         Playoff Odds
       </SectionHeading>

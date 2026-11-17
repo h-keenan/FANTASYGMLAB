@@ -21,7 +21,7 @@ import { spacing, type ThemeColors } from '../theme';
 export default function GuestCreateAccountModal({
   visible,
   onClose,
-  hint = 'Your connected league carries over automatically — nothing to re-enter.',
+  hint = 'Your connected league carries over automatically. Nothing to re-enter.',
 }: {
   visible: boolean;
   onClose: () => void;

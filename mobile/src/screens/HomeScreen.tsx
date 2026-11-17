@@ -328,7 +328,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       }
       setAddMessage(
         result.reason === 'league_not_found'
-          ? "That league isn't on Sleeper — check the league ID and try again."
+          ? "That league isn't on Sleeper. Check the league ID and try again."
           : 'Could not save that league right now. Please try again in a moment.',
       );
     } catch (error) {
@@ -558,10 +558,10 @@ export default function HomeScreen({ navigation, route }: Props) {
                     ]}
                   >
                     {me.profile_status === 'error'
-                      ? "Couldn't verify your plan — tap to retry"
+                      ? "Couldn't verify your plan: tap to retry"
                       : planOf(me) === 'pro'
                         ? 'Pro'
-                        : 'Free — Upgrade'}
+                        : 'Free: Upgrade'}
                   </AppText>
                 </PressableScale>
               ) : null}
@@ -959,7 +959,7 @@ export default function HomeScreen({ navigation, route }: Props) {
 
       <ModalFormCard visible={renamingLeague !== null} onClose={() => setRenamingLeague(null)}>
         <ModalFormTitle>Rename League</ModalFormTitle>
-        <ModalFormHint>Only changes what you see here — the real league name in Sleeper stays the same.</ModalFormHint>
+        <ModalFormHint>Only changes what you see here. The real league name in Sleeper stays the same.</ModalFormHint>
         <Input
           value={renameText}
           onChangeText={setRenameText}

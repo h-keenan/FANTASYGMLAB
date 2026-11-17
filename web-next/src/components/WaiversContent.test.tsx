@@ -145,7 +145,7 @@ describe("WaiversContent", () => {
     fireEvent.click(screen.getByRole("button", { name: /How Priority Adds rank/i }));
     expect(
       screen.getByText(
-        /FantasyDesk does not submit waiver claims for you — place the claim in your Sleeper league once you've decided\./,
+        /FantasyDesk does not submit waiver claims for you. Place the claim in your Sleeper league once you've decided\./,
       ),
     ).toBeInTheDocument();
   });

@@ -67,7 +67,7 @@ const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: IconName }> = [
 
 const DENSITY_OPTIONS: Array<{ value: UiDensity; label: string; description: string }> = [
   { value: 'guided', label: 'Guided', description: 'Show the reasoning behind every recommendation' },
-  { value: 'compact', label: 'Compact', description: 'Just the calls — hide the explanation text' },
+  { value: 'compact', label: 'Compact', description: 'Just the calls: hide the explanation text' },
 ];
 
 // Onboarding's "How much dynasty experience do you have?" answer, changeable
@@ -85,8 +85,8 @@ const EXPERIENCE_OPTIONS: Array<{ value: ExperienceLevel; label: string; descrip
 }));
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; description: string }> = [
-  { value: 'dark', label: 'Night', description: 'OLED black — always dark' },
-  { value: 'light', label: 'Day', description: 'Glacier ice white — always light' },
+  { value: 'dark', label: 'Night', description: 'OLED black: always dark' },
+  { value: 'light', label: 'Day', description: 'Glacier ice white: always light' },
   { value: 'auto', label: 'Auto', description: "Match this device's system setting" },
 ];
 
@@ -628,7 +628,7 @@ export default function MoreScreen({ navigation }: Props) {
                 icon="school-outline"
                 iconColor={colors.textSecondary}
                 label="Follow college football?"
-                description="You said this wasn't for you — tap to turn on prospect scouting"
+                description="You said this wasn't for you. Tap to turn on prospect scouting"
                 onPress={() => respondToCollegeInterest(true)}
                 showDivider={false}
               />
@@ -745,7 +745,7 @@ export default function MoreScreen({ navigation }: Props) {
               icon="person-add-outline"
               iconColor={colors.accent}
               label="Create account"
-              description="Keep this league connected — no need to re-enter your Sleeper info"
+              description="Keep this league connected: no need to re-enter your Sleeper info"
               onPress={() => setGuestUpgradeOpen(true)}
               showDivider
             />

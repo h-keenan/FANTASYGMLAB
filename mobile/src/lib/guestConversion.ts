@@ -111,9 +111,9 @@ export function classifyGuestLinkError(err: ErrorLike | null | undefined): Guest
 }
 
 export const GUEST_EMAIL_EXISTS_MESSAGE =
-  "That email already has an account. Sign in to it instead — note that what you set up as a guest won't carry over.";
+  "That email already has an account. Sign in to it instead. Note that what you set up as a guest won't carry over.";
 export const GUEST_IDENTITY_EXISTS_MESSAGE =
-  "That Apple/Google account is already in use. Sign in to it instead — note that what you set up as a guest won't carry over.";
+  "That Apple/Google account is already in use. Sign in to it instead. Note that what you set up as a guest won't carry over.";
 export const GUEST_LINK_UNAVAILABLE_MESSAGE =
   "We couldn't link this sign-in to your guest session right now. Try email instead, or try again later.";
 

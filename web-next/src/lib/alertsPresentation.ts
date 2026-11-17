@@ -3,7 +3,7 @@ import { notReadyReasonMessage } from "./notReadyMessages";
 
 export function alertsReasonMessage(reason: string): string | null {
   return notReadyReasonMessage(reason, {
-    linkAccount: "Link your Sleeper username on the web app first — Alerts needs to know which players are yours.",
+    linkAccount: "Link your Sleeper username on the web app first. Alerts needs to know which players are yours.",
     emptyRoster: "Your roster in this league is empty.",
   });
 }

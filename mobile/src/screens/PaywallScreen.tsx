@@ -534,7 +534,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
 
       {fromOnboarding ? (
         <PressableScale accessibilityRole="button" onPress={exit} style={styles.skipFree} hitSlop={LINK_HIT_SLOP}>
-          <AppText style={styles.skipFreeText}>Skip for now — continue free</AppText>
+          <AppText style={styles.skipFreeText}>Skip for now: continue free</AppText>
         </PressableScale>
       ) : null}
 

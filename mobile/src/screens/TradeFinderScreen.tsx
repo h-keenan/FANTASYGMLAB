@@ -564,7 +564,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
               info={
                 <InfoMark
                   label="the Trade Finder"
-                  lines={[`Pick the players and draft picks you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`]}
+                  lines={[`Pick the players and draft picks you'd actually consider moving. The engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`]}
                 />
               }
             />

@@ -79,7 +79,7 @@ describe("CollegeScoutingContent", () => {
     render(<CollegeScoutingContent data={response([])} />);
 
     expect(screen.getByText("No prospects yet")).toBeInTheDocument();
-    expect(screen.getByText("Check back soon — the prospect pool is still growing.")).toBeInTheDocument();
+    expect(screen.getByText("Check back soon: the prospect pool is still growing.")).toBeInTheDocument();
   });
 
   it("shows the unreachable-catalog state when catalog_available is false", () => {
@@ -122,7 +122,7 @@ describe("CollegeScoutingContent", () => {
       round_projection: null,
       note: "",
     });
-    expect(await screen.findByText("Saved — thanks for scouting.")).toBeInTheDocument();
+    expect(await screen.findByText("Saved: thanks for scouting.")).toBeInTheDocument();
   });
 
   it("warns instead of saving when Submit is pressed with no grade chosen", async () => {
@@ -142,7 +142,7 @@ describe("CollegeScoutingContent", () => {
     ]);
     render(<CollegeScoutingContent data={data} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit your grade — Remove Me" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit your grade: Remove Me" }));
     await screen.findByTestId("prospect-report-form");
     fireEvent.click(screen.getByRole("button", { name: "Remove my report" }));
     expect(api.deleteScoutingReport).not.toHaveBeenCalled();

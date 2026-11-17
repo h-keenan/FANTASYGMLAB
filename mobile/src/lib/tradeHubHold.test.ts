@@ -6,7 +6,7 @@ import { BEGINNER_HELP } from './experienceCopy.ts';
 
 test('holdFactorLabel names the known factors and passes unknown ones through', () => {
   assert.equal(holdFactorLabel('competition'), 'Competition');
-  assert.equal(holdFactorLabel('posture'), 'Posture');
+  assert.equal(holdFactorLabel('posture'), 'Team stance');
   assert.equal(holdFactorLabel('other'), 'other');
 });
 
@@ -18,6 +18,6 @@ test('holdIdeasNote only labels ideas optional when some are shown', () => {
 });
 
 test('beginner copy explains posture and hold', () => {
-  assert.match(BEGINNER_HELP.tradeHubPosture, /Posture is how you're building/);
+  assert.match(BEGINNER_HELP.tradeHubPosture, /Your team stance is how you're building/);
   assert.match(BEGINNER_HELP.tradeHubHold, /no trade/);
 });

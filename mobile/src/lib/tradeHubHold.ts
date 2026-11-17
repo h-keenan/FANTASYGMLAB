@@ -7,7 +7,7 @@ export const HOLD_FACTOR_LABELS: Record<string, string> = {
   context: 'Context',
   ideas: 'Ideas',
   competition: 'Competition',
-  posture: 'Posture',
+  posture: 'Team stance',
 };
 
 export function holdFactorLabel(factor: string): string {

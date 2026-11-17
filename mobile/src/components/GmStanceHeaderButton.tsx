@@ -54,8 +54,8 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
             <AppText style={styles.title}>Team Situation</AppText>
             <AppText style={styles.subtitle}>
               {isSet
-                ? "How should this league's advice be framed? Remembered for this league — it shapes Trade Hub, Trade Analyzer, and Today suggestions, plus trade and lineup value adjustments."
-                : "Not set yet — we're reading this league as Balanced until you pick one."}
+                ? "How should this league's advice be framed? Remembered for this league: it shapes Trade Hub, Trade Analyzer, and Today suggestions, plus trade and lineup value adjustments."
+                : "Not set yet: we're reading this league as Balanced until you pick one."}
             </AppText>
             {TEAM_STANCE_OPTIONS.map((option) => {
               const active = isSet && option.value === stance;

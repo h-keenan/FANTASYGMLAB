@@ -85,7 +85,7 @@ export const RANK_BOARD_CONFIG: Record<
   power: {
     title: "Roster Power Rankings",
     kicker: "Who is strongest",
-    note: "Who is best equipped to win games right now — not who has the best record.",
+    note: "Who is best equipped to win games right now. Not who has the best record.",
     scoreLabel: "Starter-Weighted Score",
     rankField: "power_rank",
     tiedField: "power_rank_tied",
@@ -94,7 +94,7 @@ export const RANK_BOARD_CONFIG: Record<
   franchise: {
     title: "Franchise Value",
     kicker: "Dynasty value",
-    note: "Total roster value plus owned draft capital — the long-term asset base.",
+    note: "Total roster value plus owned draft capital. The long-term asset base.",
     scoreLabel: "Roster Value + Draft Capital",
     rankField: "franchise_rank",
     tiedField: "franchise_rank_tied",
@@ -112,7 +112,7 @@ export const RANK_BOARD_CONFIG: Record<
   starter: {
     title: "Starter Quality",
     kicker: "Who starts best",
-    note: "Combined strength of each team's starting lineup only — bench excluded.",
+    note: "Combined strength of each team's starting lineup only. Bench excluded.",
     scoreLabel: "Starter Score",
     rankField: "starter_rank",
     tiedField: "starter_rank_tied",
@@ -121,7 +121,7 @@ export const RANK_BOARD_CONFIG: Record<
   bench: {
     title: "Bench Depth",
     kicker: "Who's deepest",
-    note: "Depth and value of each team's bench — usable reinforcements if a starter goes down.",
+    note: "Depth and value of each team's bench. Usable reinforcements if a starter goes down.",
     scoreLabel: "Bench Score",
     rankField: "bench_rank",
     tiedField: "bench_rank_tied",
@@ -166,7 +166,7 @@ export function sortByBoard(teams: TeamRanking[], board: RankBoardKey): TeamRank
  * other pages' reason-message convention. */
 export function teamRankingsReasonMessage(reason: string): string {
   if (reason === "no_player_data") {
-    return "Player data isn't available right now — try again in a bit.";
+    return "Player data isn't available right now. Try again in a bit.";
   }
   if (reason === "no_rankings_data") {
     return "We don't have enough roster data to build League Rankings for this league yet.";
@@ -180,7 +180,7 @@ export function teamRankingsReasonMessage(reason: string): string {
 export const PLAYOFF_ODDS_REASON_MESSAGES: Record<string, string> = {
   offseason: "Playoff odds will be available once the regular season begins.",
   no_playoff_format:
-    "This league's playoff format isn't set yet — odds need a real playoff-team count from league settings.",
+    "This league's playoff format isn't set yet. Odds need a real playoff-team count from league settings.",
   no_rankings_data: "We don't have enough roster data to compute Roster Power for this league yet.",
   unavailable: "Playoff odds aren't available for this league right now.",
 };
