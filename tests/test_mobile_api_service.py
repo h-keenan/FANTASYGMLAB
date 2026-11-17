@@ -25,23 +25,6 @@ def _open_free_league_gate(monkeypatch):
 
 
 @pytest.fixture
-def frozen_data_file_versions(monkeypatch):
-    """Pin the on-disk inputs the SWR cache keys fingerprint.
-
-    The idea-search / rankings-frame cache keys embed the (mtime, size) of data/ files (players.db, fantasycalc, season stats).
-    Under pytest-xdist every worker shares the repo's data/ directory, and other tests legitimately rewrite
-    data/sleeper_player_stats_*.json (conftest reverts them afterwards). When such a write lands between the Dashboard request
-    and the Hub request of a cache-sharing test, the fingerprint (correctly, for production) changes, the key misses and the
-    search recomputes: a cross-test race, not a cache bug. Freeze the file versions so the key depends only on the stubbed
-    league state."""
-
-    from modules import rankings
-
-    monkeypatch.setattr(rankings, "public_player_source_fingerprint", lambda db_path: (("frozen", str(db_path)),))
-    monkeypatch.setattr(rankings, "reconciled_valuation_cache_versions", lambda: (("frozen", None, None),))
-
-
-@pytest.fixture
 def offline_nfl_schedule(monkeypatch):
     """The Analyzer / Hub paths read nflverse's games.csv (bye weeks, kickoff).
     Without this the tests make a real GitHub request (and write
@@ -8713,7 +8696,7 @@ def test_dashboard_early_return_entitlement_reflects_a_real_premium_caller(monke
     assert body["entitlement"] == {"is_premium": True, "visible_count": 0, "hidden_count": 0, "free_limit": 4}
 
 
-def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch, offline_nfl_schedule, frozen_data_file_versions):
+def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch, offline_nfl_schedule):
     # Dashboard's trade tile and the Trade Hub endpoint ask the identical
     # (league, roster, strategy, lens) question: this pins that they hit ONE
     # cached search (trade_hub_engine.generate_trade_idea_records_cached)
@@ -8787,7 +8770,7 @@ def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch, offli
     assert fake_get.unrouted == []
 
 
-def test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame(monkeypatch, frozen_data_file_versions):
+def test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame(monkeypatch):
     # Dashboard's power/franchise rank lookup and the Team Rankings screen
     # ask the identical (league, lens) question — this pins that they hit
     # ONE cached frame (league_rankings.build_league_rankings_frame_cached)

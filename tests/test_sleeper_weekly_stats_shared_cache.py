@@ -77,6 +77,8 @@ def test_large_payloads_stay_out_of_long_lived_local_store(monkeypatch):
 @pytest.fixture
 def tmp_cwd(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    # Relative template, resolved under the tmp cwd (the suite-wide default points at a private copy).
+    monkeypatch.setattr(sleeper, "PLAYER_STATS_CACHE_TEMPLATE", "data/sleeper_player_stats_{season}.json")
     return tmp_path
 
 

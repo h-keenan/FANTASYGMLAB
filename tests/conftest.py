@@ -159,6 +159,98 @@ def _guard_real_data_json_files():
         )
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "live_data_fingerprints: opt out of the autouse freeze of real data/ file versions in SWR cache-key fingerprints",
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _private_player_stats_cache(tmp_path_factory):
+    """Point modules.sleeper's season-stats cache at a private per-worker copy of data/sleeper_player_stats_*.
+
+    ROOT CAUSE of the intermittent "2 == 1" failures in SWR cache tests: tests that reach the stats cache without
+    redirecting PLAYER_STATS_CACHE_TEMPLATE (e.g. test_trade_generation_pipeline) wrote data/sleeper_player_stats_2026*.json
+    in the shared repo dir. The SWR cache keys fingerprint those files' mtime/size, so a write by one xdist worker changed
+    the key between two requests of a cache test in another worker. Tests now get a private copy; tests that deliberately
+    patch the template to their own tmp_path keep doing so.
+    """
+    from modules import sleeper
+
+    work = tmp_path_factory.mktemp("player-stats-cache")
+    pristine = tmp_path_factory.mktemp("player-stats-pristine")
+    for src in _REPO_DATA_DIR.glob("sleeper_player_stats_*.json"):
+        shutil.copy2(src, work / src.name)
+        shutil.copy2(src, pristine / src.name)
+    original = sleeper.PLAYER_STATS_CACHE_TEMPLATE
+    private_template = str(work / "sleeper_player_stats_{season}.json")
+    sleeper.PLAYER_STATS_CACHE_TEMPLATE = private_template
+    try:
+        yield (work, pristine, private_template)
+    finally:
+        sleeper.PLAYER_STATS_CACHE_TEMPLATE = original
+
+
+@pytest.fixture(autouse=True)
+def _restore_private_player_stats_cache(_private_player_stats_cache):
+    """Undo any write a test made to the private stats copy so tests stay order independent."""
+    work, pristine, template = _private_player_stats_cache
+
+    def _snap(folder):
+        return {p.name: (p.stat().st_mtime_ns, p.stat().st_size) for p in folder.iterdir()}
+
+    before = _snap(work)
+    yield
+    if _snap(work) == before:
+        return
+    for p in work.iterdir():
+        if p.name not in before:
+            p.unlink(missing_ok=True)
+    for name in before:
+        if (work / name).exists() and (work / name).stat().st_size == before[name][1] and (work / name).stat().st_mtime_ns == before[name][0]:
+            continue
+        shutil.copy2(pristine / name, work / name)
+    from modules import sleeper
+
+    sleeper._season_stats_memo.clear()
+
+
+@pytest.fixture(autouse=True)
+def _freeze_real_data_file_versions(request, monkeypatch):
+    """Keep SWR cache-key fingerprints stable for files that live in the shared repo data/ dir.
+
+    modules.rankings fingerprints (mtime, size) of players.db / fantasycalc_values.csv / stats files. Under xdist every worker
+    shares data/, so a stray write by another test changes the key mid-test and a cache hit becomes a recompute. Paths under
+    the real data/ dir report their session-start stat; tmp paths (which invalidation tests write) stay live. Production is
+    unaffected (the seam is plain os.stat). Opt out with @pytest.mark.live_data_fingerprints."""
+    if request.node.get_closest_marker("live_data_fingerprints"):
+        yield
+        return
+    from modules import rankings
+
+    real_stat = rankings._fingerprint_stat
+    data_root = str(_REPO_DATA_DIR) + os.sep
+    frozen: dict[str, object] = {}
+
+    def _stat(path):
+        full = os.path.abspath(os.fspath(path))
+        if not full.startswith(data_root):
+            return real_stat(path)
+        if full not in frozen:
+            try:
+                frozen[full] = real_stat(path)
+            except OSError as exc:
+                frozen[full] = exc
+        value = frozen[full]
+        if isinstance(value, OSError):
+            raise value
+        return value
+
+    monkeypatch.setattr(rankings, "_fingerprint_stat", _stat)
+    yield
+
+
 _FAR_FUTURE_SECONDS = 30 * 24 * 3600
 
 

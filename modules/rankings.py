@@ -4399,6 +4399,11 @@ def _read_cached_json_mapping(path: str) -> dict[str, Any]:
         return {}
 
 
+def _fingerprint_stat(path: str):
+    """os.stat for cache-key fingerprints. A seam so the test suite can hold the shared repo data/ files steady."""
+    return os.stat(path)
+
+
 def reconciled_valuation_cache_versions() -> tuple:
     """(path, mtime_ns, size) for each disk cache
     hydrate_reconciled_valuations_from_cache reads, so a caller caching its
@@ -4413,7 +4418,7 @@ def reconciled_valuation_cache_versions() -> tuple:
     versions = []
     for path in paths:
         try:
-            stat = os.stat(path)
+            stat = _fingerprint_stat(path)
             versions.append((path, stat.st_mtime_ns, stat.st_size))
         except OSError:
             versions.append((path, None, None))
@@ -5485,7 +5490,7 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
 
 def _public_file_fingerprint(path: str) -> tuple[bool, int, int]:
     try:
-        stat = os.stat(path)
+        stat = _fingerprint_stat(path)
         return True, int(stat.st_size), int(stat.st_mtime_ns)
     except OSError:
         return False, 0, 0
