@@ -34,7 +34,6 @@ import PageFamilyTabs from '../components/PageFamilyTabs';
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from '../lib/filterSheet';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import GridBackground from '../components/GridBackground';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
@@ -397,7 +396,6 @@ export default function WaiversScreen({ route, navigation }: Props) {
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       {/* ONE compact header module (summary: available, FAAB, team need). The explainer, the ranking note, the stat
           tiles, the beginner intro, the needs sentence + position badges and the Sleeper link all sit in its body, one
           tap away; the Sleeper link is also the module's action. Nothing was removed (coridian_: "look how much space is

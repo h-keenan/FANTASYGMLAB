@@ -27,13 +27,34 @@ export const TAB_PAGE_SEGMENTS: readonly string[] = [
   "leagues",
 ];
 
+/**
+ * Immersive pages (header rewrite phase 6): the page is the whole screen, so the header is the minimal variant (`headerSlotsFor`):
+ * landing / sign-in, onboarding, the paywall, connecting a league, and the live draft room. (The Sim game is the `sim` template: its own
+ * one-row header; the live Sim game keeps that row and nothing else.)
+ */
+export const IMMERSIVE_SEGMENTS: readonly string[] = ["", "onboarding", "premium", "connect-league", "live-draft"];
+
+/** What each template renders. Immersive keeps only back + title (+ the page's "?"): no league identity, ribbon, search, bell or crest. */
+export type HeaderSlots = { identity: boolean; title: boolean; ribbon: boolean; actions: boolean; crest: boolean };
+export function headerSlotsFor(template: HeaderTemplate): HeaderSlots {
+  switch (template) {
+    case "root":
+    case "sim":
+      return { identity: true, title: false, ribbon: true, actions: true, crest: false };
+    case "immersive":
+      return { identity: false, title: true, ribbon: false, actions: false, crest: false };
+    default:
+      return { identity: false, title: true, ribbon: false, actions: true, crest: true };
+  }
+}
+
 const firstSegment = (pathname: string | null | undefined) => (pathname || "").split("/").filter(Boolean)[0] ?? "";
 
 /** Which header template a route uses. */
 export function headerTemplateFor(pathname: string | null | undefined): HeaderTemplate {
   const segment = firstSegment(pathname);
   if (segment === "gm-game") return "sim";
-  if (segment === "" || segment === "onboarding" || segment === "premium" || segment === "connect-league") return "immersive";
+  if (IMMERSIVE_SEGMENTS.includes(segment)) return "immersive";
   // `/players/<leagueId>/<playerId>` is a detail page of the Players tab.
   if (segment === "players" && (pathname || "").split("/").filter(Boolean).length > 2) return "detail";
   return TAB_PAGE_SEGMENTS.includes(segment) ? "root" : "detail";

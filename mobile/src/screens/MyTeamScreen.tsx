@@ -15,7 +15,6 @@ import ErrorState from '../components/ErrorState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import GridBackground from '../components/GridBackground';
 import CompactModule from '../components/CompactModule';
@@ -275,7 +274,6 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <PageFamilyTabs family="team" active="roster" leagueId={leagueId} leagueName={leagueName} padded={false} />
 
         <TeamHero

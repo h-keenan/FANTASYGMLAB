@@ -4,7 +4,6 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import ToneBadge from '../components/ToneBadge';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -245,7 +244,6 @@ export default function TeamsScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <View style={[styles.topSection, { paddingTop: headerHeight }]}>
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <PageFamilyTabs family="league" active="rankings" leagueId={leagueId} leagueName={leagueName} />
         {tabOptions.length > 1 ? (
           <View style={styles.viewRow}>

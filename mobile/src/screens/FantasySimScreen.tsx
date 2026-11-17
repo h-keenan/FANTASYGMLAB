@@ -5,7 +5,6 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
@@ -113,7 +112,6 @@ export default function FantasySimScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         {children}
       </ScrollView>
     </View>

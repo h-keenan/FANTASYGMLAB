@@ -66,3 +66,7 @@ Each phase is a small PR, web and app together, behind the shell flag until phas
 - Direction: V1, V2 (recommended) or V3. Sim: same direction or V3 for Sim only.
 - Rule confirmation: no page title on tab pages (the pill names them). This is the biggest visible change.
 - League crest source for leagues without an avatar.
+
+## 6. Status (2026-11-17)
+
+Phases 1 to 7 shipped: see docs/ui-patterns.md, "Header system", for what each delivered (4: SheetChrome, 5: Sim header, 6: immersive minimal chrome, 7: AppHeader + BrandHeaderBar retired, guard `scripts/check_legacy_header.mjs`). Open: the kill switch (`NEXT_PUBLIC_BOTTOM_NAV=off`) is kept for one more release; the sample-league banner to a one-line pill is not done.

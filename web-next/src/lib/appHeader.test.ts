@@ -2,8 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import { filterLeagues, headerShowsTitle, headerTemplateFor, normalizeHeaderChips, repeatsLabel, ribbonCollapsed } from "./appHeader";
 import { leagueCrestColors, leagueCrestHue, leagueInitials } from "./leagueCrest";
-import { headerTitleFor, TAB_PAGE_SEGMENTS, TAB_PAGE_TITLES } from "./appHeader";
+import { headerSlotsFor, headerTitleFor, TAB_PAGE_SEGMENTS, TAB_PAGE_TITLES } from "./appHeader";
 import { PAGE_TITLE_BY_SEGMENT } from "./navDestinations";
+
+describe("immersive template (header rewrite phase 6)", () => {
+  it("landing, onboarding, paywall, connect and the live draft room are immersive with the minimal slots", () => {
+    for (const p of ["/", "/onboarding", "/premium", "/connect-league", "/live-draft/L1"]) expect(headerTemplateFor(p), p).toBe("immersive");
+    const slots = headerSlotsFor("immersive");
+    expect(slots).toEqual({ identity: false, title: true, ribbon: false, actions: false, crest: false });
+    expect(headerSlotsFor("root").identity).toBe(true);
+    expect(headerSlotsFor("detail").crest).toBe(true);
+  });
+});
 
 describe("headerTitleFor (one title source, running-findings row 9)", () => {
   it("drops a title a pill / family tab already names, keeps detail titles", () => {

@@ -7,7 +7,6 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
 import { SkeletonPage } from '../components/Skeleton';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
@@ -91,7 +90,6 @@ export default function GuessThePlayerLeaderboardScreen({ route, navigation }: P
     <View style={styles.root}>
       <GridBackground />
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}>
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <SegmentedTabBar options={MODE_OPTIONS} active={mode} onChange={setMode} />
         <SectionHeading
           title="League Leaderboard"

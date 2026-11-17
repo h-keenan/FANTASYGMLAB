@@ -8,7 +8,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { LeagueCrest } from "@/components/LeagueCrest";
 import { SHELL_PAGE_INFO_SLOT_ID } from "@/components/PageTitle";
-import { headerShowsTitle, headerTemplateFor, ribbonCollapsed, type HeaderChip } from "@/lib/appHeader";
+import { headerShowsTitle, headerSlotsFor, headerTemplateFor, ribbonCollapsed, type HeaderChip } from "@/lib/appHeader";
 import { useHeaderChips } from "@/lib/headerContext";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
 import { shellLeagueContext, shellParent } from "@/lib/shellNav";
@@ -39,7 +39,7 @@ const CHIP_COLOR: Record<string, string> = {
  */
 // The switcher sheet (with its pill row) is only needed once the crest is tapped, so its code loads on first open instead of in
 // every route's first-load JS.
-const LeagueSwitcherSheet = dynamic(() => import("@/components/LeagueSwitcherSheet").then((m) => m.LeagueSwitcherSheet), { ssr: false });
+export const LeagueSwitcherSheet = dynamic(() => import("@/components/LeagueSwitcherSheet").then((m) => m.LeagueSwitcherSheet), { ssr: false });
 
 export function ShellHeader({ actions }: { actions: ReactNode }) {
   const { barVisible } = useShellNav();
@@ -74,12 +74,13 @@ export function ShellHeader({ actions }: { actions: ReactNode }) {
   const parent = shellParent(pathname, { leagueId, leagueName: paramName });
   const template = headerTemplateFor(pathname);
   const showTitle = headerShowsTitle(pathname);
+  const slots = headerSlotsFor(template);
   const resolvedName = (paramName && paramName !== UNNAMED_LEAGUE ? paramName : null) || saved.rows.find((r) => r.league_id === leagueId)?.league_name || null;
   const leagueName = resolvedName || "Your league";
   return (
     <header className="shell-header md:hidden" data-testid="shell-header" data-template={template} data-collapsed={collapsed ? "true" : "false"}>
       <div className="shell-header-row">
-        {template === "detail" && parent ? (
+        {template !== "root" && parent ? (
           <Link href={parent.href} className="shell-header-back" aria-label={`Back to ${parent.label}`}>
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="m15 18-6-6 6-6" />
@@ -105,7 +106,7 @@ export function ShellHeader({ actions }: { actions: ReactNode }) {
               <h1 className="min-w-0 shrink break-words text-sm font-extrabold leading-tight" data-testid="shell-title">{title}</h1>
               <span id={SHELL_PAGE_INFO_SLOT_ID} className="inline-flex" />
             </div>
-            {leagueId ? (
+            {leagueId && slots.crest ? (
               <button type="button" onClick={() => { setSwitcherSeen(true); setSwitcherOpen(true); }} aria-label={`${leagueName}. Switch league`} aria-haspopup="dialog" className="shell-header-crest">
                 <LeagueCrest leagueId={leagueId} name={leagueName} size={32} />
               </button>
@@ -119,7 +120,7 @@ export function ShellHeader({ actions }: { actions: ReactNode }) {
             {!showTitle && title ? <h1 className="sr-only" data-testid="shell-title">{title}</h1> : null}
           </>
         ) : null}
-        <div className="flex shrink-0 items-center">{actions}</div>
+        {slots.actions ? <div className="flex shrink-0 items-center">{actions}</div> : null}
       </div>
       {template === "root" && chips.length > 0 ? <Ribbon chips={chips} /> : null}
       {leagueId && (switcherOpen || switcherSeen) ? <LeagueSwitcherSheet open={switcherOpen} onClose={() => setSwitcherOpen(false)} leagueId={leagueId} leagueName={leagueName} leagues={saved.rows} status={saved.status} onRetry={saved.reload} /> : null}
@@ -127,7 +128,7 @@ export function ShellHeader({ actions }: { actions: ReactNode }) {
   );
 }
 
-function LeagueIdentity({ leagueId, name, onOpen }: { leagueId: string; name: string; onOpen: () => void }) {
+export function LeagueIdentity({ leagueId, name, onOpen }: { leagueId: string; name: string; onOpen: () => void }) {
   const { lens } = useValuationLens(leagueId);
   const lensLabel = VALUATION_LENS_OPTIONS.find((o) => o.value === lens)?.label ?? "Dynasty";
   return (

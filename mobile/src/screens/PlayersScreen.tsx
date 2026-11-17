@@ -5,7 +5,6 @@ import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import PageControlRow, { ViewSelect } from '../components/PageControlRow';
 import CollegeScoutingPanel from '../components/CollegeScoutingPanel';
@@ -439,7 +438,6 @@ export default function PlayersScreen({ route, navigation }: Props) {
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <PageFamilyTabs family="team" active="players" leagueId={leagueId} leagueName={leagueName} />
       {tab === 'prospects' ? (
         <ScrollView contentContainerStyle={[styles.prospectsContent, { paddingBottom: orbClearance }]}>
