@@ -1397,3 +1397,7 @@ Updating fixtures:
 - `/v1/me` (`me(entitlement)`) must keep `profile_status: "ok"`, or `planOf()` reports "unknown" and the page shows "Unavailable".
 - The mocked API answers unknown paths with `{}`; the smoke logs them as `unmocked API paths`. If a new Today module crashes on `{}`, add its endpoint to the fixtures (or the handler in `new_user_smoke.mjs`) rather than loosening a check.
 - Changed onboarding copy or test ids: update the selectors at the top of each scenario, not the assertions.
+
+## Tabs, not dropdowns (2026-11-17)
+
+A view switch with **four or fewer** options is the shared compact segmented tabs: web `ui/ViewTabs` (`PillRow variant="compact"`, about 40px, the height of the select it replaced), app `ViewTabs` in `components/PageControlRow.tsx` (`SegmentedTabBar`). Games (Season Outlook / Pick'em), Players (Players / Prospects), News (NFL / My League), Waivers, League Recaps and the Prospects Show / Scouting view are tabs. A dropdown (`ViewSelect`) is only for **five or more** options (seasons, weeks, long lists) and must say so with `// view-select-ok: reason` when its options are computed. `scripts/check_view_select.mjs` (CI) fails a `ViewSelect` with four or fewer options. "One tab row per page" still holds: the page's own view tabs are the single in-page row; the footer pill's page tabs do not count as an in-page row. The control row keeps the 110px top budget at 390px (`module_scan.mjs`).

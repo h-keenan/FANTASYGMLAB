@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/EmptyState";
-import { ViewSelect } from "@/components/ui/ViewSelect";
+import { ViewTabs } from "@/components/ui/ViewTabs";
 import { PageControlsRow } from "@/components/ui/PageControls";
 import { parseNewsTab, type NewsTab } from "@/lib/newsLinks";
 import { PageTitle } from "@/components/PageTitle";
@@ -298,7 +298,7 @@ export function NewsContent({
           the NFL / My League view select, plus the tab body's own controls (News type filter, recap view and week) in the same row. */}
       {playerName ? null : (
         <PageControlsRow testId="news-controls">
-          <ViewSelect
+          <ViewTabs
             label="News section"
             className="shrink-0"
             value={tab}

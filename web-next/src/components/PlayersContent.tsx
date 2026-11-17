@@ -24,7 +24,7 @@ import {
   playersPositionOptions,
 } from "@/lib/idpPresentation";
 import { PickRow, draftPickRowProps } from "@/components/PickRow";
-import { ViewSelect } from "@/components/ui/ViewSelect";
+import { ViewTabs } from "@/components/ui/ViewTabs";
 import { PageControlsRow } from "@/components/ui/PageControls";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { picksSummaryParts } from "@/lib/playersModules";
@@ -339,7 +339,7 @@ export function PlayersContent({
           the one Filters button (position, age, status, health, roster, sort). The first player row starts <= 110px under the nav. */}
       <PageControlsRow testId="players-controls">
         {showProspectsTab ? (
-          <ViewSelect
+          <ViewTabs
             label="Players section"
             className="shrink-0"
             value={tab}

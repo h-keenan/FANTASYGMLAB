@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import FilterDropdownButton from './FilterDropdownButton';
+import SegmentedTabBar from './SegmentedTabBar';
 import { PAGE_TOP_GAP, spacing } from '../theme';
 
 /**
@@ -19,7 +20,31 @@ export default function PageControlRow({ children, testID = 'page-controls' }: {
   );
 }
 
-/** A view / section select for a PageControlRow: reads its current value, opens the shared option sheet. */
+/**
+ * A view / section switch for a PageControlRow with FOUR OR FEWER options: the shared compact segmented tabs (never a dropdown;
+ * docs/ui-patterns.md, "Tabs, not dropdowns"). Same props as `ViewSelect`. Web twin: ui/ViewTabs.tsx.
+ */
+export function ViewTabs<T extends string>({
+  label = 'View',
+  options,
+  value,
+  onChange,
+  testID,
+}: {
+  label?: string;
+  options: readonly T[];
+  value: T;
+  onChange: (next: T) => void;
+  testID?: string;
+}) {
+  return (
+    <View style={styles.tabs} testID={testID} accessibilityLabel={label}>
+      <SegmentedTabBar<T> options={options.map((o) => ({ key: o, label: o }))} active={value} onChange={onChange} />
+    </View>
+  );
+}
+
+/** A view / section SELECT for a PageControlRow, for FIVE OR MORE options only (seasons, long lists); fewer use `ViewTabs`.: reads its current value, opens the shared option sheet. */
 export function ViewSelect<T extends string>({
   label = 'View',
   options,
@@ -53,5 +78,6 @@ export function WeekSelect({ weeks, value, onChange }: { weeks: readonly number[
 }
 
 const styles = StyleSheet.create({
+  tabs: { flex: 1, minWidth: 140 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, marginBottom: PAGE_TOP_GAP },
 });

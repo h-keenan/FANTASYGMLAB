@@ -494,6 +494,7 @@ export function RecapWeekView({ leagueId, leagueName, initial, onOpenHistory }: 
     <div className="flex flex-col gap-3" data-testid="recap-week-view">
       {chips.length > 1 ? (
         <PageControl>
+          {/* view-select-ok: weeks (5+ and growing) */}
           <ViewSelect label="Recap week" className="min-w-0 flex-1" value={String(selectedWeek)} options={chips} onChange={(value) => loadWeek(Number(value))} />
         </PageControl>
       ) : null}

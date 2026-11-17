@@ -90,7 +90,7 @@ describe("CollegeScoutingContent", () => {
     const data = response([prospect({ name: "Not Followed", on_watchlist: false })]);
     render(<CollegeScoutingContent data={data} />);
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Show" }), { target: { value: "watchlist" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Watchlist" }));
 
     expect(screen.queryByText("Not Followed")).not.toBeInTheDocument();
     expect(screen.getByText("No prospects followed yet")).toBeInTheDocument();

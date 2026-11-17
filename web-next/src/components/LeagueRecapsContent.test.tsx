@@ -269,7 +269,7 @@ describe("LeagueRecapsContent", () => {
 
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
 
-    fireEvent.change(screen.getByRole("combobox", { name: "League memory view" }), { target: { value: "Storylines" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Storylines" }));
 
     // The tab bodies are lazy chunks, so the fetch starts once the chunk resolves.
     await waitFor(() => expect(api.getLeagueStorylines).toHaveBeenCalledWith("league-1"));

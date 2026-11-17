@@ -502,16 +502,15 @@ describe("WaiversContent", () => {
 
   it("has one control row (view selector + filters) and no second tab row", () => {
     renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
-    expect(screen.queryAllByRole("tablist").length).toBeLessThanOrEqual(1);
-    expect(screen.queryByRole("tab", { name: "Explore" })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("tablist")).toHaveLength(1); // the page's own view tabs are the one tab row
     const row = screen.getByTestId("waiver-controls");
-    expect(within(row).getByLabelText("View")).toBeInTheDocument();
+    expect(within(row).getByRole("tablist", { name: "View" })).toBeInTheDocument();
   });
 
   it("Explore tab shows the searchable free-agent list", () => {
     renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
     expect(screen.queryByPlaceholderText("Search free agents")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("View"), { target: { value: "explore" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Explore" }));
     expect(screen.getByPlaceholderText("Search free agents")).toBeInTheDocument();
   });
 
@@ -525,7 +524,7 @@ describe("WaiversContent", () => {
       players: [player({ player_id: "fa1", name: "Target Guy" }), player({ player_id: "fa2", name: "Other Guy" })],
     };
     renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={data} leagueId="L1" />);
-    fireEvent.change(screen.getByLabelText("View"), { target: { value: "watchlist" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Watchlist" }));
     expect(await screen.findByText("Target Guy")).toBeInTheDocument();
     expect(screen.queryByText("Other Guy")).not.toBeInTheDocument();
     spy.mockRestore();
@@ -534,7 +533,7 @@ describe("WaiversContent", () => {
   it("Explore lists free-agent defenders under DL/LB/DB only in IDP leagues", () => {
     const idp = [player({ player_id: "dl9", name: "Free Edge", position: "DL", score: 640, overall_rating: null })];
     const { unmount } = renderOpen(<WaiversContent leagueName="IDP" data={{ ...BASE_RESPONSE, idp_players: idp }} />);
-    fireEvent.change(screen.getByLabelText("View"), { target: { value: "explore" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Explore" }));
     expect(screen.queryByText("Free Edge")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
     fireEvent.click(screen.getByRole("radio", { name: "DL" }));
@@ -543,7 +542,7 @@ describe("WaiversContent", () => {
     unmount();
 
     renderOpen(<WaiversContent leagueName="Std" data={BASE_RESPONSE} />);
-    fireEvent.change(screen.getByLabelText("View"), { target: { value: "explore" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Explore" }));
     expect(screen.queryByRole("option", { name: "DL" })).not.toBeInTheDocument();
   });
 });

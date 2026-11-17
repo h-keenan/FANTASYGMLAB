@@ -6,7 +6,7 @@ import AppText from '../components/AppText';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import PageFamilyTabs from '../components/PageFamilyTabs';
-import PageControlRow, { ViewSelect } from '../components/PageControlRow';
+import PageControlRow, { ViewTabs } from '../components/PageControlRow';
 import CollegeScoutingPanel from '../components/CollegeScoutingPanel';
 import { needPositionsFrom, type ScoutingLens } from '../lib/scoutingLens';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -427,7 +427,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   };
 
   const viewSelect = (
-    <ViewSelect<(typeof PLAYERS_VIEWS)[number]>
+    <ViewTabs<(typeof PLAYERS_VIEWS)[number]>
       options={PLAYERS_VIEWS}
       value={tab === 'prospects' ? 'Prospects' : 'Players'}
       onChange={(label) => setTab(label === 'Prospects' ? 'prospects' : 'players')}
