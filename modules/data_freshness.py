@@ -162,6 +162,38 @@ def college_prospects_row(now: float, data_dir: str, in_season: bool) -> dict[st
     return base
 
 
+ADP_MAX_AGE_HOURS = 24 * 3
+
+
+def adp_snapshot_row(now: float) -> dict[str, Any]:
+    """Rookie/dynasty ADP feed (Supabase ``adp_snapshots``, GitHub Actions job).
+
+    Never ``fail``: FFC only publishes ADP inside draft windows (rookie ADP is empty most of
+    the year), so an old or empty feed is ``warn``; unreachable Supabase is ``warn``
+    (unverifiable). One short query, fail-soft."""
+
+    from datetime import datetime, timezone
+
+    from modules import rookie_adp
+
+    base = {"name": "adp_rookie_dynasty", "cadence": "daily 08:00 UTC; data only in FFC draft windows", "max_age_hours": ADP_MAX_AGE_HOURS, "producer": "rookie-adp-snapshot.yml / modules.rookie_adp"}
+    try:
+        newest = rookie_adp.newest_snapshot_date()
+    except Exception:
+        newest = None
+    if not rookie_adp.load_config().configured:
+        return {**base, "status": "warn", "as_of": None, "age_hours": None, "detail": "Supabase not configured here; unverifiable"}
+    if not newest:
+        return {**base, "status": "warn", "as_of": None, "age_hours": None, "detail": "no ADP snapshot stored (FFC window empty, or table not created)"}
+    try:
+        as_of = datetime.fromisoformat(newest).replace(tzinfo=timezone.utc).timestamp()
+    except ValueError:
+        return {**base, "status": "warn", "as_of": None, "age_hours": None, "detail": f"unreadable snapshot date {newest!r}"}
+    age = max(0.0, (now - as_of) / 3600.0)
+    status = "ok" if age <= ADP_MAX_AGE_HOURS + 24 else "warn"
+    return {**base, "status": status, "as_of": as_of, "age_hours": round(age, 1), "detail": f"newest snapshot {newest} ({age:.0f}h old)"}
+
+
 def build_report(now: float | None = None, data_dir: str = "data") -> dict[str, Any]:
     now = time.time() if now is None else now
     in_season = _in_season()
@@ -174,6 +206,10 @@ def build_report(now: float | None = None, data_dir: str = "data") -> dict[str, 
         rows.append(college_prospects_row(now, data_dir, in_season))
     except Exception as exc:
         rows.append({"name": "college_prospects", "status": "fail", "detail": f"check errored: {type(exc).__name__}"})
+    try:
+        rows.append(adp_snapshot_row(now))
+    except Exception as exc:
+        rows.append({"name": "adp_rookie_dynasty", "status": "warn", "detail": f"check errored: {type(exc).__name__}"})
     return {
         "checked_at": now,
         "in_season": in_season,

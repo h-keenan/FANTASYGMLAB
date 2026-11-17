@@ -2779,6 +2779,7 @@ export interface QuickViewBio {
 
 export interface QuickViewResponse {
   ok: boolean;
+  adp?: QuickViewAdp | null;
   stats: QuickViewStats | null;
   bio: QuickViewBio | null;
   model: QuickViewModel | null;
@@ -3394,9 +3395,53 @@ export interface DraftCard {
   schema?: number;
 }
 
+export interface AdpSource {
+  source: string;
+  url: string;
+  format: string;
+  qb_format: string;
+  as_of: string | null;
+  total_drafts: number | null;
+}
+
+export interface RookieAdpBoardRow {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  our_rank: number;
+  adp: number | null;
+  adp_label?: string | null;
+  delta: number | null;
+  verdict: "value" | "aligned" | "reach" | null;
+  read: string | null;
+  drafts: number | null;
+  adp_est_sf?: number | null;
+  adp_est_sf_label?: string | null;
+  adp_est_sf_delta?: number | null;
+}
+
+export interface RookieAdpBoard {
+  rows: RookieAdpBoardRow[];
+  source: AdpSource | null;
+  est_sf_note?: string | null;
+}
+
+export interface QuickViewAdp {
+  adp: number | null;
+  label: string;
+  our_rank: number | null;
+  delta: number | null;
+  verdict: string | null;
+  read: string | null;
+  format: string;
+  source: AdpSource | null;
+}
+
 export interface DraftCenterResponse {
   ok: true;
   reason: string;
+  rookie_adp_board?: RookieAdpBoard;
   posture: DraftPosture | null;
   posture_reason: string;
   decision_cards: DraftCard[];
@@ -4194,6 +4239,15 @@ export interface LiveDraftRecommendation {
   immediate_roster_impact: string;
   confidence: string;
   adp_delta: number | null;
+  adp?: number | null;
+  adp_label?: string | null;
+  adp_verdict?: string | null;
+  adp_read?: string | null;
+  adp_trend?: number | null;
+  adp_drafts?: number | null;
+  adp_est_sf?: number | null;
+  adp_est_sf_delta?: number | null;
+  adp_est_sf_label?: string | null;
 }
 
 export interface LiveDraftRankingRow {
@@ -4204,6 +4258,16 @@ export interface LiveDraftRankingRow {
   age: number | null;
   tier: string;
   is_rookie: boolean;
+  adp_delta?: number | null;
+  adp?: number | null;
+  adp_label?: string | null;
+  adp_verdict?: string | null;
+  adp_read?: string | null;
+  adp_trend?: number | null;
+  adp_drafts?: number | null;
+  adp_est_sf?: number | null;
+  adp_est_sf_delta?: number | null;
+  adp_est_sf_label?: string | null;
   overall_rank: number | null;
   position_rank: number | null;
   canonical_overall_rank: number | null;
@@ -4249,6 +4313,8 @@ export interface LiveDraftTeamRow {
 
 export interface LiveDraftStateResponse {
   ok: boolean;
+  adp_source?: AdpSource | null;
+  adp_est_sf_note?: string | null;
   reason: string;
   is_premium: boolean;
   upsell: PremiumUpsell | null;

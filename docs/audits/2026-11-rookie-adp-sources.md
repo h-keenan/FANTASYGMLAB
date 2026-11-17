@@ -22,3 +22,8 @@ Probed live on 2026-11-17 with a generic client User-Agent. Nothing was scraped;
 ## Attribution shown on screen
 
 "ADP: Fantasy Football Calculator (fantasyfootballcalculator.com)". FFC states it is not affiliated with the NFL; we claim no endorsement.
+
+## Owner decision: superflex (2026-11-17)
+
+- (a) In superflex leagues the real FFC ADP is shown labelled "1QB ADP".
+- (b) "Est. SF" is a modeled estimate: FFC 1QB ADP slots re-ordered by `adp / (FantasyCalc superflex value / 1QB value)` (modules/rookie_adp.py `estimate_sf_adp`). QBs move up; the ADP scale is unchanged; with no ratios it equals 1QB ADP. Computed at read time, never stored (`adp_snapshots` is real ADP only, constrained to `1qb`), always labelled "Est. SF" with a "?" note on every surface.

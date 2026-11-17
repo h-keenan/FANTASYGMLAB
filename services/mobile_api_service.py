@@ -178,6 +178,7 @@ from modules import (
     draft_assistant,
     draft_capital,
     draft_center_cards,
+    rookie_adp,
     espn_leagues,
     external_leagues,
     games,
@@ -4094,6 +4095,46 @@ def post_games_pickem_pick(
     return {"ok": True, "available": True, "reason": ""}
 
 
+def _rookie_adp_board_payload(players_df: Any, lens: str, qb_format: Any = None) -> dict[str, Any]:
+    """Rookie board: our rookie rank next to Fantasy Football Calculator rookie ADP with
+    value-vs-ADP. Fail-soft: any problem returns an empty board, never an error."""
+
+    empty: dict[str, Any] = {"rows": [], "source": None}
+    try:
+        score_field = league_value_settings.valuation_score_field(lens)
+        if players_df is None or players_df.empty or score_field not in players_df.columns or "years_exp" not in players_df.columns:
+            return empty
+        exp = pd.to_numeric(players_df["years_exp"], errors="coerce")
+        rookies_df = players_df[exp == 0]
+        rookies = [
+            {
+                "player_id": str(row.get("player_id")),
+                "name": row.get("name"),
+                "position": row.get("position"),
+                "team": row.get("team"),
+                "score": row.get(score_field),
+            }
+            for row in rookies_df.to_dict("records")
+            if row.get("player_id")
+        ]
+        snapshot = rookie_adp.latest_cached("rookie_1qb")
+        rows = rookie_adp.build_rookie_board(rookies, snapshot, limit=30)
+        est_sf = _est_sf_map(qb_format, snapshot)
+        for row in rows:
+            row["adp_label"] = rookie_adp.ONE_QB_LABEL if row.get("adp") is not None else None
+            est = est_sf.get(str(row.get("player_id")))
+            row["adp_est_sf"] = est
+            row["adp_est_sf_label"] = rookie_adp.EST_SF_LABEL if est is not None else None
+            row["adp_est_sf_delta"] = round(est - row["our_rank"], 1) if est is not None else None
+        return {
+            "rows": [_clean_json_value(row) for row in rows],
+            "source": rookie_adp.attribution("rookie_1qb", snapshot),
+            "est_sf_note": rookie_adp.EST_SF_NOTE if est_sf else None,
+        }
+    except Exception:
+        return empty
+
+
 @app.get("/v1/leagues/{league_id}/draft-center")
 def get_league_draft_center(
     league_id: str = Depends(require_league_access),
@@ -4251,6 +4292,9 @@ def get_league_draft_center(
         "posture_reason": posture_reason,
         "decision_cards": decision_cards,
         "partner_cards": partner_cards,
+        "rookie_adp_board": _rookie_adp_board_payload(
+            players_df, lens, league_value_settings.detect_league_value_settings_from_payload(league).get("qb_format")
+        ),
         "is_premium": True,
         "upsell": None,
     }
@@ -4771,10 +4815,67 @@ def _project_live_draft_pick_row(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _est_sf_map(qb_format: Any, snapshot: dict[str, Any] | None) -> dict[str, float]:
+    """Modeled Est. SF ADP, only for superflex leagues and only with real 1QB ADP + ratios."""
+
+    players = (snapshot or {}).get("players") or {}
+    if not players or not rookie_adp.is_superflex(qb_format):
+        return {}
+    try:
+        ratios = rookie_adp.sf_value_ratios()
+        return rookie_adp.estimate_sf_adp(players, ratios) if ratios else {}
+    except Exception:
+        return {}
+
+
+def _adp_fields(
+    player_id: Any,
+    our_rank: Any,
+    adp_players: dict[str, Any] | None,
+    est_sf: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    """Real FFC 1QB ADP (modules.rookie_adp) next to our rank, plus the clearly separate
+    modeled Est. SF ADP in superflex leagues. All-None when the feed has no entry for this
+    player. Never an invented number; always with its multi-factor read."""
+
+    sid = str(player_id or "")
+    entry = (adp_players or {}).get(sid)
+    none = {
+        "adp": None, "adp_delta": None, "adp_verdict": None, "adp_read": None, "adp_trend": None,
+        "adp_drafts": None, "adp_label": None, "adp_est_sf": None, "adp_est_sf_delta": None,
+        "adp_est_sf_label": None,
+    }
+    if not entry:
+        return none
+    try:
+        rank = float(our_rank) if our_rank is not None else None
+    except (TypeError, ValueError):
+        rank = None
+    read = rookie_adp.value_vs_adp(rank, entry)
+    est = (est_sf or {}).get(sid)
+    return {
+        "adp": read["adp"],
+        "adp_delta": read["delta"],
+        "adp_verdict": read["verdict"],
+        "adp_read": read["read"],
+        "adp_trend": read["trend"],
+        "adp_drafts": entry.get("drafts"),
+        "adp_label": rookie_adp.ONE_QB_LABEL,
+        "adp_est_sf": est,
+        "adp_est_sf_delta": round(est - rank, 1) if est is not None and rank else None,
+        "adp_est_sf_label": rookie_adp.EST_SF_LABEL if est is not None else None,
+    }
+
+
 def _project_live_draft_recommendation(
-    rec: dict[str, Any], rating_by_player_id: dict[str, Any] | None = None
+    rec: dict[str, Any],
+    rating_by_player_id: dict[str, Any] | None = None,
+    adp_players: dict[str, Any] | None = None,
+    rank_by_player_id: dict[str, Any] | None = None,
+    est_sf: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     player_id = _clean_json_value(rec.get("player_id"))
+    adp = _adp_fields(player_id, (rank_by_player_id or {}).get(str(player_id or "")), adp_players, est_sf)
     return {
         "player_id": player_id,
         "name": _clean_json_value(rec.get("name")),
@@ -4789,12 +4890,15 @@ def _project_live_draft_recommendation(
         "position_need_impact": _clean_json_value(rec.get("position_need_impact")),
         "immediate_roster_impact": _clean_json_value(rec.get("immediate_roster_impact")),
         "confidence": _clean_json_value(rec.get("confidence")),
-        "adp_delta": _clean_json_value(rec.get("adp_delta")),
+        **({**adp} if adp["adp"] is not None else {**adp, "adp_delta": _clean_json_value(rec.get("adp_delta"))}),
     }
 
 
-def _project_live_draft_ranking_row(row: dict[str, Any]) -> dict[str, Any]:
+def _project_live_draft_ranking_row(
+    row: dict[str, Any], adp_players: dict[str, Any] | None = None, est_sf: dict[str, float] | None = None
+) -> dict[str, Any]:
     return {
+        **_adp_fields(row.get("player_id"), row.get("overall_rank"), adp_players, est_sf),
         "player_id": _clean_json_value(row.get("player_id")),
         "name": _clean_json_value(row.get("name")),
         "position": _clean_json_value(row.get("position")),
@@ -4989,11 +5093,27 @@ def get_league_live_draft_state(
             if row.get("player_id")
         }
 
+    adp_format = rookie_adp.format_for_draft_kind(live_draft._draft_kind(draft))
+    adp_snapshot = rookie_adp.latest_cached(adp_format)
+    adp_players = adp_snapshot.get("players") or {}
+    est_sf = _est_sf_map(settings.get("qb_format"), adp_snapshot)
+    rank_by_player_id = (
+        {
+            str(row.get("player_id")): row.get("overall_rank")
+            for row in rankings_df.to_dict("records")
+            if row.get("player_id")
+        }
+        if rankings_df is not None and not rankings_df.empty
+        else {}
+    )
+
     return {
         "ok": True,
         "reason": "",
         "is_premium": True,
         "upsell": None,
+        "adp_source": rookie_adp.attribution(adp_format, adp_snapshot),
+        "adp_est_sf_note": rookie_adp.EST_SF_NOTE if est_sf else None,
         "pick_data_stale": bool(pick_error),
         "status": state.get("status"),
         "rounds": _clean_json_value(state.get("rounds")),
@@ -5016,13 +5136,13 @@ def get_league_live_draft_state(
             "league_format": settings.get("league_format"),
         },
         "recommendations": [
-            _project_live_draft_recommendation(rec, rating_by_player_id)
+            _project_live_draft_recommendation(rec, rating_by_player_id, adp_players, rank_by_player_id, est_sf)
             for rec in (state.get("recommendations") or [])
         ],
         "pick_rows": [_project_live_draft_pick_row(row) for row in pick_rows[-LIVE_DRAFT_MAX_PICK_ROWS:]],
         "rankings": (
             [
-                _project_live_draft_ranking_row(row)
+                _project_live_draft_ranking_row(row, adp_players, est_sf)
                 for row in rankings_df.head(LIVE_DRAFT_MAX_RANKING_ROWS).to_dict("records")
             ]
             if rankings_df is not None and not rankings_df.empty
@@ -9623,10 +9743,39 @@ def get_player_quick_view(
         "ok": True,
         "stats": _quick_view_stats_dict(stats),
         "bio": dataclasses.asdict(bio),
+        "adp": _quick_view_adp(row, players_df, is_rookie=bool(bio.is_rookie)),
         "model": _project_player_model(row, players_df, pro=_is_pro_caller(user)),
         "identity": _quick_view_identity(player_id, row),
         "reason": "",
     }
+
+
+def _quick_view_adp(row: Any, players_df: Any, *, is_rookie: bool) -> dict[str, Any] | None:
+    """Market ADP (Fantasy Football Calculator) beside our rank for one player: rookie
+    ADP for rookies, dynasty/startup ADP otherwise. None when the feed has no real entry."""
+
+    try:
+        fmt = "rookie_1qb" if is_rookie else "dynasty_1qb"
+        snapshot = rookie_adp.latest_cached(fmt)
+        entry = (snapshot.get("players") or {}).get(str(row.get("player_id")))
+        if not entry:
+            return None
+        score_field = "dynasty_score"
+        our_rank = None
+        if score_field in players_df.columns:
+            pool = players_df
+            if is_rookie and "years_exp" in players_df.columns:
+                pool = players_df[pd.to_numeric(players_df["years_exp"], errors="coerce") == 0]
+            mine = pd.to_numeric(pd.Series([row.get(score_field)]), errors="coerce").iloc[0]
+            scores = pd.to_numeric(pool[score_field], errors="coerce")
+            if pd.notna(mine):
+                our_rank = int((scores > mine).sum()) + 1
+        read = rookie_adp.value_vs_adp(our_rank, entry)
+        return _clean_json_value(
+            {**read, "label": rookie_adp.ONE_QB_LABEL, "our_rank": our_rank, "format": fmt, "drafts": entry.get("drafts"), "source": rookie_adp.attribution(fmt, snapshot)}
+        )
+    except Exception:
+        return None
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]

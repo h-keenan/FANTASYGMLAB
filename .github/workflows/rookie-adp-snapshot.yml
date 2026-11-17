@@ -1,0 +1,42 @@
+name: Rookie ADP Snapshot
+
+# Daily snapshot of Fantasy Football Calculator's rookie and dynasty ADP into
+# Supabase (docs/supabase_adp_snapshots.sql) so trends can be shown. Same
+# standalone "own Supabase service-role access" shape as player-rating-snapshot.yml.
+# Source decision: docs/audits/2026-11-rookie-adp-sources.md. FFC rookie ADP only has
+# data during the rookie-draft season; an empty window is logged, not a failure.
+#
+# 08:00 UTC: clear of the 07:00 rating snapshot and the 13:00 trade-outcome sweep.
+#
+# Required secrets (already used by the other Supabase jobs):
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rookie-adp-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run rookie ADP snapshot
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/run_rookie_adp_snapshot.py

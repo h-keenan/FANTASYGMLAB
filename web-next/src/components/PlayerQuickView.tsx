@@ -1,5 +1,6 @@
 "use client";
 
+import { AdpCredit } from "@/components/AdpInline";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ExplorerLeagueProvider } from "@/context/ExplorerLeagueContext";
 import dynamic from "next/dynamic";
@@ -424,6 +425,15 @@ export function PlayerQuickView({
           depthChartNote={realWorld.showDepthChartNote ? model?.depth_chart_note : null}
           rookie={rookieBadge(bio)}
         />
+
+        {detail?.adp && detail.adp.adp != null ? (
+          <div className="text-xs px-1" style={{ color: "var(--color-text-secondary)" }} data-testid="pqv-adp">
+            {detail.adp.label} {detail.adp.adp.toFixed(1)}
+            {detail.adp.our_rank != null ? ` · our rank ${detail.adp.our_rank}` : ""}
+            {detail.adp.verdict ? ` · ${detail.adp.read}` : ""}
+            {detail.adp.source ? <AdpCredit asOf={detail.adp.source.as_of} /> : null}
+          </div>
+        ) : null}
 
         <div className="pqv-signal-row">
           {identity.opportunity_label ? <ToneBadge label={identity.opportunity_label} color={TAG_TONE_COLOR[opportunityLabelTone(identity.opportunity_label)]} size="xs" testId="pqv-opportunity-chip" /> : null}
