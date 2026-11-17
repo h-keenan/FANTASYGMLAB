@@ -1161,43 +1161,132 @@ def _games_ahead(schedule: List[Dict[str, Any]], week: int) -> int:
 BACKUP_QB_PLAY_SHARE = 0.2
 
 
+# Share of a hurt starter's production a depth-chart backup inherits when the
+# starter misses the game. Uncalibrated priors (no backtest yet), like the
+# backup-QB share above: a lead back's carries and receiving work split with
+# the rest of the backfield, a tight end's routes go mostly to the next TE,
+# and a receiver's targets spread across the whole group.
+HANDCUFF_INHERIT_SHARE = {"RB": 0.65, "TE": 0.6, "WR": 0.4}
+
+
+def _depth_order(player: Dict[str, Any]) -> Optional[int]:
+    try:
+        return int(float(player.get("depth_chart_order")))
+    except (TypeError, ValueError):
+        return None
+
+
 def _role_adjustment(player: Dict[str, Any], players: Dict[str, Any]) -> Dict[str, Any]:
-    """Role layer: a QB behind a healthy depth-chart starter -> multiplier."""
+    """Role layer, from the depth chart and the teammate ahead of him.
+
+    * QB behind a depth-chart starter: a multiplier (his usage baseline
+      reflects past starts, not the role he has now).
+    * RB / WR / TE behind a teammate at the same position who is Out or
+      Doubtful: a handcuff. The starter's absence is a share of production
+      the backup inherits, so the role is returned as ``handcuff_starter_out``
+      with the starter's play probability and the inherited share; the
+      projection mixes the backup's usual output with that inheritance by the
+      probability the starter misses (``project_player_week``).
+    """
 
     none = {"multiplier": 1.0, "reason": None, "applied": False, "starter_player_id": None}
-    if str(player.get("position") or "").upper() != "QB":
+    position = str(player.get("position") or "").upper()
+    if position not in ("QB", "RB", "WR", "TE"):
         return none
-    try:
-        order = int(float(player.get("depth_chart_order")))
-    except (TypeError, ValueError):
-        return none
+    order = _depth_order(player)
     team = player.get("team")
-    if order < 2 or not team:
+    if order is None or order < 2 or not team:
         return none
+    ahead: List[tuple] = []
     for pid, other in players.items():
         if other is player or str(other.get("team") or "") != str(team):
             continue
-        if str(other.get("position") or "").upper() != "QB":
+        if str(other.get("position") or "").upper() != position:
             continue
-        try:
-            other_order = int(float(other.get("depth_chart_order")))
-        except (TypeError, ValueError):
+        other_order = _depth_order(other)
+        if other_order is None or other_order >= order:
             continue
-        if other_order >= order:
-            continue
-        cls = injury_status.classify(str(other.get("status") or ""), str(other.get("injury_status") or ""))
-        if cls.ruled_out:
-            continue  # the starter is out, so this QB is the one playing
-        # The backup plays in the games the starter does not: a Doubtful starter (p_play 0.15) leaves his backup about 85 percent of the snaps, not the
-        # 20 percent a healthy starter's backup sees. Never below the garbage-time floor.
-        share = max(BACKUP_QB_PLAY_SHARE, 1.0 - float(cls.p_play))
+        ahead.append((other_order, str(pid), other))
+    if not ahead:
+        return none
+    # The teammate directly ahead of him on the depth chart.
+    _other_order, pid, other = max(ahead, key=lambda item: item[0])
+    cls = injury_status.classify(str(other.get("status") or ""), str(other.get("injury_status") or ""))
+    if position != "QB":
+        if cls.p_play >= 1.0 and not cls.ruled_out:
+            return none  # a healthy starter keeps his workload
+        miss = 1.0 if cls.ruled_out else 1.0 - float(cls.p_play)
         return {
-            "multiplier": round(min(1.0, share), 3),
-            "reason": "backup_qb",
+            "multiplier": 1.0,
+            "reason": "handcuff_starter_out",
             "applied": True,
-            "starter_player_id": str(pid),
+            "starter_player_id": pid,
+            "starter_p_miss": round(miss, 3),
+            "inherit_share": HANDCUFF_INHERIT_SHARE[position],
+            "uncalibrated": True,
         }
-    return none
+    if cls.ruled_out:
+        return none  # the starter is out, so this QB is the one playing
+    # The backup plays in the games the starter does not: a Doubtful starter (p_play 0.15) leaves his backup about 85 percent of the snaps, not the
+    # 20 percent a healthy starter's backup sees. Never below the garbage-time floor.
+    share = max(BACKUP_QB_PLAY_SHARE, 1.0 - float(cls.p_play))
+    return {
+        "multiplier": round(min(1.0, share), 3),
+        "reason": "backup_qb",
+        "applied": True,
+        "starter_player_id": pid,
+    }
+
+
+def _handcuff_estimate(
+    own_scored: float,
+    role: Dict[str, Any],
+    players: Dict[str, Any],
+    *,
+    season: int,
+    week: int,
+    weekly_stats: Optional[Dict[str, Any]],
+    scoring_settings: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """The handcuff's expected points with the starter's absence priced in.
+
+    ``own_scored`` is his usual (league-scored) baseline. If the starter misses
+    (probability ``starter_p_miss``) he inherits ``inherit_share`` of the
+    starter's own baseline, never less than his usual output:
+
+        expected = (1 - p_miss) * own + p_miss * max(own, share * starter)
+
+    When the starter's history cannot be read there is nothing to inherit
+    from, so the estimate stays at his usual baseline and says so."""
+
+    out = {"estimate": own_scored, "starter_baseline_ppr": None, "inherited_ppr": None}
+    starter_id = str(role.get("starter_player_id") or "")
+    starter = players.get(starter_id) or {}
+    position = str(starter.get("position") or "").upper()
+    if not starter_id or position not in HANDCUFF_INHERIT_SHARE:
+        return out
+    rows = None
+    if weekly_stats is not None:
+        entry = weekly_stats.get(starter_id)
+        if isinstance(entry, dict):
+            rows = entry.get("weekly")
+    if rows is None:
+        rows = sleeper.cached_season_player_weekly(starter_id, season)
+    if not rows:
+        return out
+    as_of = _most_recent_played_week(rows, before_week=week)
+    trend = _player_usage_trend(rows, position=position, upto_week=as_of)
+    if trend is None:
+        return out
+    raw = _calibrated_baseline(trend["baseline_ppr"], position)
+    adjustment = _scoring_adjustment(rows, position, scoring_settings, as_of)
+    starter_scored, _lo, _hi = projection_calibration.apply_scoring_to_projection(max(0.0, raw), 0.0, 0.0, adjustment)
+    inherited = float(role["inherit_share"]) * starter_scored
+    miss = float(role["starter_p_miss"])
+    out["estimate"] = (1.0 - miss) * own_scored + miss * max(own_scored, inherited)
+    out["starter_baseline_ppr"] = round(starter_scored, 2)
+    out["inherited_ppr"] = round(inherited, 2)
+    return out
 
 
 def _availability_adjustment(player: Dict[str, Any], games_ahead: int) -> Dict[str, Any]:
@@ -1567,6 +1656,16 @@ def project_player_week(
     scored_estimate, _scored_low, _scored_high = projection_calibration.apply_scoring_to_projection(
         max(0.0, raw_point_estimate), 0.0, 0.0, scoring_adjustment
     )
+    handcuff_lift = 1.0
+    if role.get("reason") == "handcuff_starter_out":
+        handcuff = _handcuff_estimate(
+            scored_estimate, role, players, season=season, week=week,
+            weekly_stats=weekly_stats, scoring_settings=scoring_settings,
+        )
+        role = {**role, "starter_baseline_ppr": handcuff["starter_baseline_ppr"], "inherited_ppr": handcuff["inherited_ppr"]}
+        if scored_estimate > 0:
+            handcuff_lift = handcuff["estimate"] / scored_estimate
+        scored_estimate = handcuff["estimate"]
     point_estimate = scored_estimate * availability["multiplier"] * role["multiplier"] * plays["multiplier"]
     confidence = _v2_confidence(trend["games_played"])
     if prior_seeded and current_season_games < 2 and confidence == "high":
@@ -1581,6 +1680,8 @@ def project_player_week(
         low = high = 0.0
         confidence = "high"
     elif availability["applied"] or role["applied"]:
+        # A handcuff whose starter may miss can also hit the starter's workload.
+        high = high * max(1.0, handcuff_lift)
         # Doubtful/Questionable: he may sit (0) or play a full game (the
         # unadjusted high), and the play probability itself is an uncalibrated
         # prior, so the label drops to "low".

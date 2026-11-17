@@ -274,6 +274,15 @@ Tests: `tests/test_sim_rookie_v.py` (gate, serialization and the stability depen
 Contradictions between surfaces: Today top add vs Waivers #1 add vs the trade card's waiver alternative; FAAB "would start" vs the card's Add / Stash label; push and team
 sheet vs the in-app feed on IR (fixed); GM Plan "Roster Age weak spot" vs the declared stance; planner headline vs lean on one card.
 
+### Desk P1 delivery: handcuffs and the trade window
+
+| Item | Before | After |
+| --- | --- | --- |
+| Handcuff role | `_role_adjustment` was QB-only: a handcuff next to an Out RB1 was projected at his old, low usage | generalized from the backup-QB layer: an RB / WR / TE directly behind a same-position teammate who is Out, IR or Doubtful gets role `handcuff_starter_out` with the starter's miss probability. The projection mixes his usual output with what he inherits if the starter misses: `(1 - p_miss) * own + p_miss * max(own, share * starter baseline)`, share RB 0.65 / TE 0.6 / WR 0.4 (`HANDCUFF_INHERIT_SHARE`, uncalibrated like the backup-QB share, so confidence is low and the range widens). A healthy starter, or no starter history, leaves the projection unchanged |
+| Trade window | `season_window` was 17 equal weeks, playoffs and elimination ignored | `SeasonWindow` carries the league's playoff start, last scored week (bracket size: log2 of the teams, so a 4-team bracket ends a week before a 6-team one), the team's chance to be alive and the trade deadline (`league_value_settings` now reads `playoff_week_start`, `playoff_teams`, `trade_deadline_week` when Sleeper reports them). Playoff weeks are weighted by the chance the team is alive, `reach * 0.6 ** rounds already played` (reach is the base rate `playoff_teams / league_size`, or `playoff_odds` when supplied); weeks past the last scored week and weeks an eliminated team cannot play count for zero. The lineup model weights every week by it (byes in playoff weeks are already handled per week), the injury availability cost uses the effective weeks, and the analyzer's risk text and `season_week` say it ("4 regular-season weeks left, then the playoffs (weeks 12-13) counted at about 50% to be alive; trade deadline is week 12"). A league with no playoff settings keeps the old flat window |
+
+Gaps: the handcuff lift is a prior, not a calibrated model, and the projection role reason is not shown in a client (no client renders `basis.role` today, so web and mobile stay consistent by showing nothing new). `playoff_odds` is supported by `season_window` but no production caller supplies it yet (the Hub and the Analyzer must read the same number, and the shared playoff-odds build is too heavy to add to every trade surface in this change), so an eliminated team is still weighted at the base rate until that is wired once for all of them.
+
 ## Fantasy Sim findings (8 instrumented 10-season dynasties, 12 teams, seeds 1-8, about 15,000 AI team-weeks, 280 AI-AI trades, 4,700 AI waiver claims; user passive)
 
 Checked and fine: AI lineups are exactly optimal (compared with an exact DP over 6,000 random rosters across standard, superflex and flex layouts) and no AI starter was ever
