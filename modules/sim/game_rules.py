@@ -46,6 +46,7 @@ from modules.sim.game_types import (
     POS_VERSION,
     INJURY_VERSION,
     ROOKIE_VERSION,
+    POSTURE_VERSION,
     CAP_VERSION,
     NEED_VERSION,
     WIRE_VERSION,
@@ -76,6 +77,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "pos_v": (POS_VERSION, NOW),
     "injury_v": (INJURY_VERSION, WEEK),
     "rookie_v": (ROOKIE_VERSION, SEASON),
+    "posture_v": (POSTURE_VERSION, WEEK),
     "cap_v": (CAP_VERSION, NOW),
     "need_v": (NEED_VERSION, NOW),
     "wire_v": (WIRE_VERSION, WEEK),
@@ -166,6 +168,11 @@ FLAGS: dict[str, dict[str, Any]] = {
     "cap_v": {
         "label": 'One roster limit per position',
         "body": "Auto-draft, draft hints, the AI draft and the AI's waiver moves all use one position limit (starting slots plus flex plus the backups byes and injuries call for), so a team no longer ends up with three quarterbacks in a one-QB league.",
+        "dynasty_only": False,
+    },
+    "posture_v": {
+        "label": 'AI managers that react to the standings',
+        "body": 'Contenders and rebuilders re-read their playoff odds every week: a team on the rise starts buying (win-now value in trades and waivers), a team falling out of the race starts selling for the future, with a buffer so they do not flip-flop week to week.',
         "dynasty_only": False,
     },
     "names_v": {

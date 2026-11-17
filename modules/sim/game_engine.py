@@ -34,6 +34,7 @@ from modules.sim.game_ai import (
 from modules.sim.game_ai_depth import ai_waiver_claims, depth_adds
 from modules.sim.game_draft import draft_recap
 from modules.sim.game_eval import Evaluator, team_params
+from modules.sim.game_posture import update_posture
 from modules.sim.game_scoring import PlayerWeek, ScoringModel, get_model
 from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_usage import group_factors
@@ -379,7 +380,7 @@ def _ai_trade_phase(em: Emitter, snap: GameSnapshot, state: GameState, seed: int
         tid = snap.tids[int(ti)]
         if tid == user or tid in done:
             continue
-        params = team_params(snap, tid)
+        params = team_params(snap, tid, state)
         if params.activity <= 0 or state.trades_made[tid] >= params.max_trades:
             continue
         r = rng.stream(week, "gtrade", 1 + int(ti))
@@ -426,7 +427,7 @@ def generate_offers(em: Emitter, snap: GameSnapshot, state: GameState, seed: int
         tid = snap.tids[int(ti)]
         if tid == user:
             continue
-        params = team_params(snap, tid)
+        params = team_params(snap, tid, state)
         if params.activity <= 0 or state.trades_made[tid] >= params.max_trades:
             continue
         if rng.stream(week, "goffer", 1 + int(ti)).random() > 0.8 * params.activity:
@@ -680,6 +681,9 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
         ev0 = Evaluator(snap, state)
         slots, _ = ev0.best_lineup(state.rosters[user], W)
         em.emit(W, "engine", "lineup_set", team=user, slots=slots, auto=True)
+
+    # 1b. posture_v 1: every AI team re-reads its standing and playoff odds (buy / sell / hold, with hysteresis) before it shops
+    update_posture(em, snap, state, W)
 
     # 2. waivers, worst record first
     waiver_rows = _resolve_waivers(em, snap, state, seed, W)

@@ -566,9 +566,10 @@ def _plan_order(plan: SlotPlan, order: Assignment) -> Assignment:
     return out
 
 
-def team_params(snapshot: GameSnapshot, tid: str) -> TeamParams:
+def team_params(snapshot: GameSnapshot, tid: str, state: GameState | None = None) -> TeamParams:
     """The AI manager's parameters: persona base, this team's own horizon and
-    position bias, then the game's difficulty (never hidden dice on the user)."""
+    position bias, then the game's difficulty (never hidden dice on the user), then (posture_v 1+, when the caller passes the
+    game ``state``) the team's current buy / sell posture."""
 
     team = snapshot.team(tid)
     persona = PERSONAS.get(team.persona_id)
@@ -586,6 +587,12 @@ def team_params(snapshot: GameSnapshot, tid: str) -> TeamParams:
             params, accept_threshold=params.accept_threshold * 1.3 + 2.0,
             noise_sd=params.noise_sd * 0.8, waiver_aggr=min(0.95, params.waiver_aggr * 1.3),
         )
+    if state is not None and snapshot.settings.posture_v >= 1 and state.posture:
+        stance = (state.posture.get(tid) or {}).get("stance", "")
+        if stance:
+            from modules.sim.game_posture import apply_posture  # lazy: game_posture imports this module
+
+            params = apply_posture(params, stance)
     return params
 
 

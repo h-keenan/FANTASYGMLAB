@@ -87,6 +87,8 @@ class GameState:
         self.block: dict[str, dict[str, Any]] = {}
         # The game's settings history: one row per Realism update (``realism_upgrade`` event), see game_rules. Inert (and out of the digest) while empty.
         self.rules: list[dict[str, Any]] = []
+        # posture_v 1+: each AI team's buy / sell posture, {tid: {"stance": "buy" | "sell" | "", "week": n, "odds": p}}. Inert (and out of the digest) while empty; cleared each season.
+        self.posture: dict[str, dict[str, Any]] = {}
 
     # --------------------------------------------------------------- views
 
@@ -170,7 +172,7 @@ class GameState:
         for key in ("ir", "taxi"):
             if not any(raw[key].values()):
                 del raw[key]
-        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block", "rules", "out_kind"):
+        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block", "rules", "out_kind", "posture"):
             if not raw[key]:
                 del raw[key]
         if raw["season_no"] == 1:
@@ -586,6 +588,7 @@ def _season_started(state, snap, week, p):
     state.points = {}
     state.role_hist = {}
     state.claims = []
+    state.posture = {}
     state.offers = []
     state.offer_keys = []
     state.trades_made = {t.tid: 0 for t in snap.teams}
@@ -628,6 +631,13 @@ def _advance_requested(state, snap, week, p):
     """Marker only: the user tapped Advance (lets a replay re-issue it)."""
 
 
+def _posture(state, snap, week, p):
+    """posture_v 1+: the AI teams whose buy / sell posture changed this week (the event carries only the changes)."""
+
+    for tid, row in p["teams"].items():
+        state.posture[str(tid)] = dict(row)
+
+
 def _week_advanced(state, snap, week, p):
     state.recaps[str(p["week"])] = p["recap"]
     state.week = int(p["next_week"])
@@ -649,7 +659,7 @@ _HANDLERS = {
     "inbox_response": _inbox_response, "injury": _injury, "week_scored": _week_scored,
     "playoff_seeded": _playoff_seeded, "season_complete": _season_complete,
     "week_advanced": _week_advanced, "advance": _advance_requested,
-    "slot_move": _slot_move, "block_set": _block_set, "realism_upgrade": _realism_upgrade, "rookie_draft_started": _rookie_draft_started, "rookie_pick": _rookie_pick,
+    "slot_move": _slot_move, "block_set": _block_set, "realism_upgrade": _realism_upgrade, "posture": _posture, "rookie_draft_started": _rookie_draft_started, "rookie_pick": _rookie_pick,
     "rookie_draft_complete": _rookie_draft_complete, "season_started": _season_started, "depth_chart": _depth_chart,
 }
 
