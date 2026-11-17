@@ -329,7 +329,8 @@ class TradeDesk:
             entries = self.position_levels()[tid]
             needy = [e for e in entries if e["level"] == "need"]
             if needy:
-                worst = max(needy, key=lambda e: (e["rank"], -e["strength"]))
+                worst = (min(needy, key=lambda e: (e["ratio"], e["pos"])) if snap.settings.need_v >= 1  # need_v 1: the deepest shortfall, not the lowest rank
+                         else max(needy, key=lambda e: (e["rank"], -e["strength"])))
                 return worst["pos"], 0.0
             return (min(entries, key=lambda e: (-e["rank"], e["pos"]))["pos"] if entries else "RB"), 1.0
         slots = snap.settings.slots
@@ -393,6 +394,8 @@ class TradeDesk:
 
         sent = {self.snap.players[p].pos for p in user_gives if not is_pick_id(p)}
         needy = [e for e in self.position_levels()[ai] if e["level"] == "need" and e["pos"] in sent]
+        if self.snap.settings.need_v >= 1:
+            return [e["pos"] for e in sorted(needy, key=lambda e: (e["ratio"], e["pos"]))]
         return [e["pos"] for e in sorted(needy, key=lambda e: (-e["rank"], e["strength"], e["pos"]))]
 
     def verdict(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str]) -> Verdict:

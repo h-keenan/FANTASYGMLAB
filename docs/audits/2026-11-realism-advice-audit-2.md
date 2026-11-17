@@ -361,6 +361,33 @@ User queues the three most valuable free agents every week (312 claims over 8 se
 | ... when the user has a bottom-half priority | 100% | 51.4% |
 | AI claims placed per game (won or lost) | 56.6 | 71.6 |
 
+### `need_v 1`: Needs / Strength tags from real holes (delivered, upgradable, immediate)
+
+`game_need.position_report` ranked the 12 teams per position and tagged the bottom third "need" and the top third "strength", so exactly 4 teams were tagged at every position in every league and
+week, whatever the gaps. It also rounded flex shares into the starter count (a TE counted 2, a superflex QB 1). `need_v 1` (`position_report_v1`, one report for the Team sheet, the trade AI's `need_position` /
+`filled_needs` and the #2021 reason text):
+
+* starters = strict slots only, a SUPER_FLEX counts as one more QB, flex slots are never a need (`starter_slots`);
+* a team is "need" when its best-`k` strength is under 0.88 of the league median, or it cannot field `k` usable starters, in both cases after the wire's best free agent replaces its weakest starter (so a
+  kicker gap the wire fixes is not a need); "strength" needs 1.12 of the median and a top-third rank; else "ok";
+* the AI names its deepest shortfall (lowest ratio) rather than the lowest rank.
+
+Per league-week, 8 seeds x 12 teams, AI team realized points from that position's strict starters against the league mean for the week (a real need should score under 1.0; a strength over):
+
+| One-QB league | Teams tagged Need, `need_v 0` | Teams tagged Need, `need_v 1` (mean, min-max) | Realized pts of Need teams, 0 -> 1 | Strength teams, 0 -> 1 |
+| --- | --- | --- | --- | --- |
+| QB | 4 always | 1.4 (0-4) | 0.94 -> 0.88 | 1.10 -> 1.08 |
+| RB | 4 always | 2.6 (0-5) | 0.85 -> 0.78 | 1.17 -> 1.26 |
+| WR | 4 always | 1.7 (0-4) | 0.88 -> 0.89 | 1.11 -> 1.16 |
+| TE | 4 always | 3.4 (0-5) | 0.72 -> 0.69 | 1.25 -> 1.24 |
+| K | 4 always | 0.6 (0-4) | 0.96 -> 0.89 | 1.09 -> 1.17 |
+
+Superflex: QB Need teams 4 always -> 2.3 (0-5) and their QB-slot output 0.89 -> 0.81 of the league mean (the superflex starter is now counted, so a one-QB team is a hole). Empty starting slot at a Need-tagged position, one QB / superflex: 0.97% -> 0.97% and 1.8% -> 2.9%
+(against 0.5% / 0.7% for "ok").
+
+Tests: `tests/test_sim_need_v.py` (gate, slots, the old tercile and a digest pin for `need_v 0`, tags that are not a fixed count, a QB hole the wire cannot fill, the trade AI reading the same tags);
+`tests/test_sim_pos_v.py` pins `need_v 0` for its tercile-based scenarios.
+
 ## Decisions needed (product)
 1. Ship the late-career age curve and a lower `REVERSION` (`stability_v 2`)? Done as an upgradable offseason change (it changes dynasty values for 27+ players, so it is not silent); the owner may still veto the Realism update copy.
 2. Cap rookie class strength (`rookie_v 1`)? Done as an upgradable offseason change (it lowers rookie pick values and the top of the draft board; real classes are far less top-heavy); the owner may still veto the Realism update copy.

@@ -46,6 +46,7 @@ from modules.sim.game_types import (
     POS_VERSION,
     INJURY_VERSION,
     ROOKIE_VERSION,
+    NEED_VERSION,
     WIRE_VERSION,
     HINT_VERSION,
     KD_VERSION,
@@ -74,6 +75,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "pos_v": (POS_VERSION, NOW),
     "injury_v": (INJURY_VERSION, WEEK),
     "rookie_v": (ROOKIE_VERSION, SEASON),
+    "need_v": (NEED_VERSION, NOW),
     "wire_v": (WIRE_VERSION, WEEK),
 }
 
@@ -152,6 +154,11 @@ FLAGS: dict[str, dict[str, Any]] = {
     "wire_v": {
         "label": 'A waiver wire that is contested',
         "body": 'AI managers now put in their own claims on the free agents they want, even ones you also claimed, and every claim is settled in waiver-priority order (worst record first), so a team with a better priority can beat you to a player.',
+        "dynasty_only": False,
+    },
+    "need_v": {
+        "label": 'Needs tags from real roster holes',
+        "body": 'A team is tagged Needs only where its starters really fall short of the league (or a starting slot cannot be filled and the free-agent pool cannot fix it), a superflex counts as a second starting quarterback, flex slots are never a need, and the trade AI and its reasons read the same tags.',
         "dynasty_only": False,
     },
     "names_v": {
