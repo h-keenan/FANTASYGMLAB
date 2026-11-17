@@ -161,18 +161,6 @@ export function sortByBoard(teams: TeamRanking[], board: RankBoardKey): TeamRank
   });
 }
 
-/** Sort a copy of `teams` by the already-computed Standings rank — a pure
- * presentation sort (the tie-break math itself lives server-side in
- * modules.league_standings.build_league_standings_bundle; `standing_rank`
- * is already final). */
-export function sortByStanding(teams: TeamRanking[]): TeamRanking[] {
-  return [...teams].sort((a, b) => {
-    const rankA = a.standing_rank ?? Number.MAX_SAFE_INTEGER;
-    const rankB = b.standing_rank ?? Number.MAX_SAFE_INTEGER;
-    return rankA - rankB;
-  });
-}
-
 /** Honest, not-ready-yet copy per real `reason` code from GET
  * .../team-rankings (modules.rankings' own gate), matching this app's
  * other pages' reason-message convention. */
