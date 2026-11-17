@@ -324,7 +324,7 @@ def test_balanced_pick_for_pick_trades_are_not_flagged():
 
 def test_same_picks_moved_back_and_forth_three_times_is_worth_a_look():
     # Real pattern (league 1312122984617476096, rosters 3 and 9): same picks A->B->A->B in week 1.
-    picks = [("pick", 2026, 2, 9), ("pick", 2027, 2, 9)]  # ~6400 priced vs 6000 of players: not lopsided
+    picks = [("pick", 2026, 1, 9), ("pick", 2027, 1, 9)]  # ~5800 priced (mid 1sts) vs 6000 of players: not lopsided
     txs = [_swap(1, "a", 3, 4, picks, [("player", "v0"), ("player", "v1")], ts=1),
            _swap(1, "b", 4, 3, picks, [("player", "v2"), ("player", "v3")], ts=2),
            _swap(1, "c", 3, 4, picks, [("player", "v4"), ("player", "v5")], ts=3)]
