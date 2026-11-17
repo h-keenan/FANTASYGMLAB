@@ -117,13 +117,19 @@ export interface SimPqvSections {
   stats?: React.ReactNode;
 }
 
+/** A header tag as a badge glyph; the owner is the exception ("Your team" would draw a lone star on its own row, UI audit B10): it always reads as the labelled "Owner" cue. */
+function headerBadge(tag: { key?: string; label?: string }) {
+  const badge = badgeFromTag(tag);
+  return tag.key === 'owner' && badge?.kind === 'yours' ? null : badge;
+}
+
 export default function PlayerQuickViewSheet({
   request,
   onClose,
   simOverlay,
   asOfSeason,
   simSections,
-  remote = true,
+  remote: remoteProp = true,
 }: {
   request: QuickViewRequest;
   onClose: () => void;
@@ -144,6 +150,8 @@ export default function PlayerQuickViewSheet({
   const isSim = sim != null;
   const realWorld = pqvRealWorld(isSim);
   const { player } = request;
+  // The sim's own ids (generated rookies, DEF-<TEAM>, fixtures) are not Sleeper ids: they never hit the real endpoints.
+  const remote = remoteProp && (!isSim || /^\d+$/.test(player.player_id));
   const [explorer, setExplorer] = useState<ExplorerTarget | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const scoped = leagueScopedIdentity(request);
@@ -266,7 +274,7 @@ export default function PlayerQuickViewSheet({
       <SkeletonBlock height={90} />
       <SkeletonBlock height={90} />
     </View>
-  ) : !remote ? null : detailQuery.isError || !detail ? (
+  ) : !remote || (isSim && (detailQuery.isError || !detail)) ? null : detailQuery.isError || !detail ? ( // a sim player's own tabs stand alone: the real record is a bonus there
     <AppText style={styles.muted}>Couldn&apos;t load this player&apos;s detail right now.</AppText>
   ) : null;
 
@@ -540,8 +548,8 @@ export default function PlayerQuickViewSheet({
                   ) : null}
                   {headerTags.length > 0 ? (
                     <>
-                      <PlayerBadges badges={headerTags.map((tag) => badgeFromTag(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} />
-                      {headerTags.filter((tag) => !badgeFromTag(tag)).map((tag) =>
+                      <PlayerBadges badges={headerTags.map((tag) => headerBadge(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} />
+                      {headerTags.filter((tag) => !headerBadge(tag)).map((tag) =>
                         tag.key === 'owner' ? (
                           <View key={tag.key} style={styles.ownerTag} accessibilityLabel={`Owner: ${tag.label}`}>
                             <AppText style={styles.ownerLabel}>OWNER</AppText>

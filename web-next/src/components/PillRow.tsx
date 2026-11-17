@@ -4,6 +4,7 @@ import { PulseOnIncrease } from "@/components/Motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import { slimTabInset } from "@/lib/sheetTabs";
 import type { TabIconName } from "@/lib/tabIcons";
 
 import { TabGlyph } from "./TabGlyph";
@@ -125,13 +126,16 @@ export function PillRow({
 
   useEffect(() => {
     measure();
+    // Web fonts swap after the first measure and widen the labels without resizing the scroller: measure again so the edge fade shows.
+    let live = true;
+    document.fonts?.ready.then(() => { if (live) { measure(); placeIndicator(); } });
     if (typeof ResizeObserver === "undefined" || !scrollerRef.current) return;
     const observer = new ResizeObserver(() => {
       measure();
       placeIndicator();
     });
     observer.observe(scrollerRef.current);
-    return () => observer.disconnect();
+    return () => { live = false; observer.disconnect(); };
   }, [measure, placeIndicator]);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -212,7 +216,7 @@ export function PillRow({
           const style = {
             // Icon tabs keep the full 44px touch target even in the sticky bar.
             minHeight: (sticky || slim) && !anyIcon ? "var(--segmented-height-compact)" : "var(--segmented-height)",
-            padding: slim ? "0 var(--space-sm)" : equalFit ? "0 var(--space-xs)" : mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
+            padding: slim ? `0 ${slimTabInset(options.length)}px` : equalFit ? "0 var(--space-xs)" : mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
             background: track ? (isActive ? "color-mix(in srgb, var(--color-accent) 16%, transparent)" : "transparent") : isActive && !slim && !glass ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
             color: glass ? undefined : track ? (isActive ? "var(--color-accent)" : "var(--color-text-secondary)") : isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",

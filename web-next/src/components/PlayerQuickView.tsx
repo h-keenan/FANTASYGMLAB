@@ -106,6 +106,15 @@ export interface SimPqvSections {
   stats?: ReactNode;
 }
 
+/**
+ * A header tag as a badge glyph. The owner "Your team" is the exception: it would draw the lone "★" glyph on a row of its own
+ * (UI audit B10), so it reads as the labelled "Owner  <team>" cue, the same for you and for an AI team.
+ */
+function headerBadge(tag: { key?: string; label?: string }) {
+  const badge = badgeFromTag(tag);
+  return tag.key === "owner" && badge?.kind === "yours" ? null : badge;
+}
+
 const TAG_TONE_COLOR = {
   success: "var(--color-success)",
   accent: "var(--color-accent)",
@@ -120,7 +129,7 @@ export function PlayerQuickView({
   simOverlay,
   asOfSeason,
   simSections,
-  remote = true,
+  remote: remoteProp = true,
 }: {
   identity: PlayerQuickViewIdentity;
   onClose: () => void;
@@ -148,6 +157,8 @@ export function PlayerQuickView({
   // the real bye never show here; the sim's own status, news and outlook (simOverlay) are the only source.
   const sim: SimPqvSections | null = simSections ?? (simOverlay != null ? { overview: simOverlay } : null);
   const isSim = sim != null;
+  // The sim's own ids (generated rookies, DEF-<TEAM>, fixtures) are not Sleeper ids: they never hit the real endpoints.
+  const remote = remoteProp && (!isSim || /^\d+$/.test(identity.player_id));
   const realWorld = pqvRealWorld(isSim);
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -230,11 +241,18 @@ export function PlayerQuickView({
     if (!remote) return;
     let cancelled = false;
 
-    Promise.all([api.getPlayerQuickView(identity.player_id), api.getPlayerAwards(identity.player_id)])
-      .then(([quickView, awardsResponse]) => {
+    // Awards are a best-effort extra: a failed / slow awards request is an empty strip, never the sheet's error state.
+    api
+      .getPlayerAwards(identity.player_id)
+      .then((awardsResponse) => {
+        if (!cancelled) setAwards(awardsResponse.ok ? awardsResponse.awards : []);
+      })
+      .catch(() => {});
+    api
+      .getPlayerQuickView(identity.player_id)
+      .then((quickView) => {
         if (cancelled) return;
         setDetail(quickView);
-        setAwards(awardsResponse.ok ? awardsResponse.awards : []);
       })
       .catch(() => {
         if (cancelled) return;
@@ -338,7 +356,7 @@ export function PlayerQuickView({
   // What a remote tab shows instead of its content while the detail loads or when it failed (null = show the content).
   const bodyGate: ReactNode | null = loading ? (
     <PqvBodySkeleton />
-  ) : !remote ? null : loadError ? (
+  ) : !remote || (loadError && isSim) ? null : loadError ? ( // a sim player's own tabs stand alone: the real record is a bonus there
     <p className="pqv-status-text">Couldn&apos;t load this player&apos;s detail right now.</p>
   ) : null;
 
@@ -418,8 +436,8 @@ export function PlayerQuickView({
           {identity.opportunity_label ? <ToneBadge label={identity.opportunity_label} color={TAG_TONE_COLOR[opportunityLabelTone(identity.opportunity_label)]} size="xs" testId="pqv-opportunity-chip" /> : null}
           {identity.tags?.length ? (
             <>
-              <PlayerBadges badges={identity.tags.map((tag) => badgeFromTag(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
-              {identity.tags.filter((tag) => !badgeFromTag(tag)).map((tag) =>
+              <PlayerBadges badges={identity.tags.map((tag) => headerBadge(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
+              {identity.tags.filter((tag) => !headerBadge(tag)).map((tag) =>
                 tag.key === "owner" ? (
                   // The owning fantasy team: a small "Owner" cue ahead of the (unaltered) team name so it never reads as a stray tag.
                   <span key={tag.key} className="pqv-owner-tag" role="group" aria-label={`Owner: ${tag.label}`} data-testid="pqv-owner-tag">

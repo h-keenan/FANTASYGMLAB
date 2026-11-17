@@ -43,7 +43,7 @@ const cast = [["vet", "Jaxon Moore"], ["ir", "Dalton Reyes"], ["rookie", "Brock 
 for (const theme of ["dark"]) for (const [kind, name] of cast) {
   if (only && kind !== only) continue;
   const w = 390;
-  const mock = createMock({ status: "in_season", week: 3, sheetDemo: true, ...(globalThis.__mockOpts || {}) });
+  const mock = createMock({ status: "in_season", week: 3, sheetDemo: true, playerStubs: false, ...(globalThis.__mockOpts || {}) });
   const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, deviceScaleFactor: 1 });
   await ctx.addInitScript(([t, s]) => { try { localStorage.setItem("fgl:theme-mode", t); localStorage.setItem("sb-dummy-auth-token", JSON.stringify(s)); localStorage.setItem("fgl:onboarding-complete", "1"); } catch (e) {} }, [theme, session]);
   await ctx.route("**/*", async (route) => {

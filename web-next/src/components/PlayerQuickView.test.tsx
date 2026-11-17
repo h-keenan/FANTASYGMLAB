@@ -384,6 +384,49 @@ describe("PlayerQuickView", () => {
     expect(screen.getByRole("heading", { name: "Player One" })).toBeInTheDocument();
   });
 
+  it("a failed awards request never takes down the quick view (awards are best-effort)", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+    vi.mocked(api.getPlayerAwards).mockRejectedValue(new Error("boom"));
+
+    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
+
+    expect(screen.queryByText(/Couldn.t load this player/)).not.toBeInTheDocument();
+  });
+
+  it("a failed quick view still shows the error for a real player but never inside a sim player's own tabs", async () => {
+    vi.mocked(api.getPlayerQuickView).mockRejectedValue(new Error("boom"));
+    vi.mocked(api.getPlayerAwards).mockResolvedValue({ ok: true, awards: [], reason: "" });
+
+    const real = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Stats" }));
+    expect(await screen.findByText(/Couldn.t load this player/)).toBeInTheDocument();
+    real.unmount();
+
+    window.sessionStorage.clear();
+    render(<PlayerQuickView identity={identity({ player_id: "4046" })} onClose={vi.fn()} simSections={{ overview: <p>sim overview</p>, stats: <p>sim stats</p> }} />);
+    await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalledWith("4046"));
+    fireEvent.click(await screen.findByRole("tab", { name: "Stats" }));
+    expect(await screen.findByText("sim stats")).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn.t load this player/)).not.toBeInTheDocument();
+  });
+
+  it("never calls the real endpoints for a sim player whose id is not a Sleeper id", async () => {
+    render(<PlayerQuickView identity={identity({ player_id: "DEF-SEA" })} onClose={vi.fn()} simSections={{ overview: <p>sim overview</p> }} />);
+    expect(await screen.findByText("sim overview")).toBeInTheDocument();
+    expect(api.getPlayerQuickView).not.toHaveBeenCalled();
+    expect(api.getPlayerAwards).not.toHaveBeenCalled();
+  });
+
+  it("shows the owner as the labelled Owner cue, never as a lone star badge on its own row", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+    vi.mocked(api.getPlayerAwards).mockResolvedValue({ ok: true, awards: [], reason: "" });
+    render(<PlayerQuickView identity={identity({ tags: [{ key: "owner", label: "Your team", tone: "accent" }] })} onClose={vi.fn()} />);
+    expect(await screen.findByTestId("pqv-owner-tag")).toHaveTextContent("Your team");
+    expect(screen.queryByLabelText("Your player")).not.toBeInTheDocument();
+  });
+
   it("renders a Compare link only when leagueId is provided", async () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
@@ -451,7 +494,7 @@ describe("PlayerQuickView", () => {
       vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
       vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items: [realItem], injury_item: realItem });
 
-      render(<PlayerQuickView identity={identity({ injury_status: "Out" })} onClose={vi.fn()} simOverlay={<p>Sim overlay: Out 2 weeks (sim world)</p>} />);
+      render(<PlayerQuickView identity={identity({ player_id: "4046", injury_status: "Out" })} onClose={vi.fn()} simOverlay={<p>Sim overlay: Out 2 weeks (sim world)</p>} />);
 
       await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
       await screen.findByText("Sim overlay: Out 2 weeks (sim world)");
@@ -506,7 +549,7 @@ describe("PlayerQuickView", () => {
       vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult({ awards: [award("a1", 2025, "AWARD-2025"), award("a2", 2026, "AWARD-2026-CURRENT"), award("a3", null, "AWARD-UNDATED")] }));
       vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({ ok: true, season: 2026, weeks: [{ week: 1, fantasy_points_ppr: 99, snap_share: 0.9 }] });
 
-      render(<PlayerQuickView identity={identity()} onClose={vi.fn()} asOfSeason={2025} simOverlay={<p>Sim overlay</p>} />);
+      render(<PlayerQuickView identity={identity({ player_id: "4046" })} onClose={vi.fn()} asOfSeason={2025} simOverlay={<p>Sim overlay</p>} />);
 
       await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
       fireEvent.click(screen.getByRole("tab", { name: "Stats" }));

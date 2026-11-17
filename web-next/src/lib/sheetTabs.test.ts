@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { chromeDock, managerProfileTabs, nextPanelMinHeight, percentileTabs, stickyTabsOffset } from "./sheetTabs";
+import { chromeDock, managerProfileTabs, nextPanelMinHeight, percentileTabs, slimTabInset, stickyTabsOffset } from "./sheetTabs";
 
 describe("sheetTabs", () => {
+  it("five or more slim tabs take the tight inset so the player sheet strip fits 390px (PROFILE was cut)", () => {
+    expect(slimTabInset(5)).toBe(4);
+    expect(slimTabInset(6)).toBe(4);
+    expect(slimTabInset(3)).toBe(8);
+  });
+
   it("manager profile always has Overview and drops empty tabs", () => {
     expect(managerProfileTabs({ hasProfile: false, tendencyCount: 0, tradeCount: 0 }).map((t) => t.key)).toEqual(["overview"]);
     expect(managerProfileTabs({ hasProfile: true, tendencyCount: 4, tradeCount: 0 }).map((t) => t.key)).toEqual(["overview", "tendencies"]);

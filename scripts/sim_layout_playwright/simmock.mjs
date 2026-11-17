@@ -189,6 +189,12 @@ export function createMock(opts = {}) {
 
   // returns {status, body} or null if not a sim route
   return function handle(method, path, query, body) {
+    // The real PQV endpoints a sim sheet calls for a player with a real (Sleeper) id: a small valid payload so no audit shows
+    // "Couldn't load this player's detail". opts.playerStubs === false lets a script (pqv_sheet.mjs) serve its own richer fixture.
+    if (opts.playerStubs !== false && method === "GET") {
+      const real = path.match(/^\/v1\/players\/[^/]+\/(quick-view|awards)$/);
+      if (real) return { status: 200, body: real[1] === "awards" ? { ok: true, awards: [], reason: "" } : { ok: true, stats: null, bio: null, model: null, identity: null, reason: "not_found" } };
+    }
     if (!state.enabled) return { status: 404, body: { detail: "Not Found" } };
     const m = path.match(/^\/v1\/sim\/games(?:\/([^/]+))?(\/.*)?$/);
     if (!m) return null;
