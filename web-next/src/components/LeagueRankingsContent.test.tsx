@@ -110,7 +110,7 @@ describe("LeagueRankingsContent", () => {
       team({ roster_id: String(i + 1), team_name: `Team ${i + 1}`, power_rank: i + 1, franchise_rank: i + 1, draft_capital_rank: i + 1, starter_rank: i + 1, bench_rank: i + 1, age_rank: i + 1, average_age: 24 + i, standing_rank: i + 1 }),
     );
     render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={{ ...BASE_RESPONSE, teams }} />);
-    // Boards are compact modules: Roster Power opens by default, the rest read "1. Team 1 · 8 teams" until tapped.
+    // Boards are compact modules: Roster Power opens by default, the rest summarise the leader and score gap (their own rank lives in the hero) until tapped.
     expect(collapsedModuleProblems(document.body)).toEqual([]);
     for (const header of screen.getAllByRole("button", { expanded: false }).filter((b) => /\. Expand$/.test(b.getAttribute("aria-label") ?? ""))) fireEvent.click(header);
     const buttons = screen.getAllByRole("button", { name: "Show all 8 teams" });
@@ -127,7 +127,7 @@ describe("LeagueRankingsContent", () => {
     const board = screen.getByTestId("rank-board-age");
     expect(board).toHaveAttribute("id", "board-age");
     expect(board).toHaveTextContent("Roster Age");
-    expect(within(board).getByTestId("compact-summary")).toHaveTextContent("1. Team 1 · You");
+    expect(within(board).getByTestId("compact-summary")).toHaveTextContent("You lead · 24.3");
     fireEvent.click(within(board).getByRole("button", { name: /^Roster Age:/ }));
     expect(board).toHaveTextContent("24.3");
     expect(document.getElementById("your-standing")).not.toBeNull();

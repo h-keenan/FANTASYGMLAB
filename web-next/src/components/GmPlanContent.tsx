@@ -715,7 +715,7 @@ export function GmPlanContent({
                     {data.season_phase_label}
                   </span>
                 ) : null}
-                {data.team_stance_label ? (
+                {data.team_stance_label && !teamStance ? (
                   <span
                     className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
                     style={{

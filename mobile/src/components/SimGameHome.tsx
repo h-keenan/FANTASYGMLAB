@@ -10,7 +10,7 @@ import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
 import StatusHeader from './StatusHeader';
 import { MatchupHeroCard } from './MatchupModule';
-import { simMatchupCardModel } from '../lib/matchupModules';
+import { matchupTickerParts, simMatchupCardModel } from '../lib/matchupModules';
 import { buildSimStatusHeader, simHomeAttentionItems } from '../lib/statusHeader';
 import CompactModule from './CompactModule';
 import { simLeagueParts } from '../lib/simSummaries';
@@ -166,7 +166,6 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const you = ctx.game.you;
   const opp = matchup.opponent;
   const [showLineups, setShowLineups] = useState(false);
   if (matchup.bye || !opp) {
@@ -195,8 +194,10 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
     rows: matchup.rows,
   });
   return (
+    <CompactModule id="home.matchup" testID="sim-matchup-module" title="This week's matchup" parts={matchupTickerParts(cardModel, matchup.week)}>
     <MatchupHeroCard
       model={cardModel}
+      bare
       testID="sim-matchup-hero"
       onOpenPlayer={(p) => {
         const hit = matchup.rows.flatMap((r) => [r.you, r.opp]).find((pl) => pl && pl.name === p.name);
@@ -204,29 +205,12 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
       }}
       action={<Button label="Set lineup" onPress={() => onTab('team')} />}
     >
-      <View style={styles.versus}>
-        <View style={styles.versusSide}>
-          <SimTeamLink teamId={you?.team_id} name={you?.name ?? 'You'} isYou size='row' stacked />
-          <AppText style={common.muted}>{matchup.you_record ? simFmtRecord(matchup.you_record) : ''}</AppText>
-        </View>
-        <AppText style={styles.vs}>VS</AppText>
-        <View style={styles.versusSide}>
-          <SimTeamLink teamId={opp.team_id} name={opp.name} size='row' stacked />
-          <AppText style={[common.muted, common.center]}>
-            {opp.record ? simFmtRecord(opp.record) : ''} · {opp.persona.label}
-          </AppText>
-        </View>
+      <View testID="sim-matchup-records" style={{ gap: 2 }}>
+        <SimTeamLink teamId={opp.team_id} name={opp.name} size="row" />
+        <AppText style={common.muted}>
+          {[matchup.you_record ? `You ${simFmtRecord(matchup.you_record)}` : null, opp.record ? `They ${simFmtRecord(opp.record)}` : null, opp.persona.label].filter(Boolean).join(' · ')}
+        </AppText>
       </View>
-
-      {flagged > 0 ? (
-        <View style={common.row} accessibilityLiveRegion="polite">
-          <SimGlyph name="alert" color={colors.warning} size={14} />
-          <AppText style={[common.small, { color: colors.warning, flex: 1 }]}>
-            {(matchup.you_flagged ?? 0) > 0 ? `${matchup.you_flagged} of your starters are out or on bye. ` : ''}
-            {(matchup.opp_flagged ?? 0) > 0 ? `${matchup.opp_flagged} of theirs ${matchup.opp_flagged === 1 ? 'is' : 'are'} too.` : ''}
-          </AppText>
-        </View>
-      ) : null}
 
       <Pressable
         accessibilityRole="button"
@@ -234,7 +218,7 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
         onPress={() => setShowLineups(!lineupsOpen)}
         style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}
       >
-        <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.accent }}>{lineupsOpen ? 'Hide lineups' : `Show lineups (${matchup.rows.length} slots)`}</AppText>
+        <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.accent }}>{lineupsOpen ? 'Hide lineups' : `Show lineups (${matchup.rows.length} slots${flagged > 0 ? `, ${flagged} out or on bye` : ''})`}</AppText>
       </Pressable>
       {lineupsOpen ? (
         <View style={common.tight}>
@@ -256,6 +240,7 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
         </View>
       ) : null}
     </MatchupHeroCard>
+    </CompactModule>
   );
 }
 
@@ -375,9 +360,6 @@ function AccentTap({ onPress, label, children }: { onPress: () => void; label: s
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    versus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    versusSide: { flex: 1, alignItems: 'center', gap: 2, minWidth: 0 },
-    vs: { fontSize: 12.5, fontWeight: '800', color: colors.textTertiary },
     chanceRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
     chance: { fontSize: 28, fontWeight: '800' },
     track: { height: 8, borderRadius: radii.pill, overflow: 'hidden', backgroundColor: colors.dangerMuted },

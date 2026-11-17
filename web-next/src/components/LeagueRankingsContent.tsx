@@ -2,7 +2,6 @@
 
 import { percentColorVar } from "@/lib/verdictToneCss";
 import { TERMS } from "@/lib/terms";
-import { useHeaderContext } from "@/lib/headerContext";
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { useRef, useState, useSyncExternalStore } from "react";
@@ -439,11 +438,14 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
   useFlipList(listRef, visible.map((team) => team.roster_id).join(","));
   const leader = ordered[0];
   const mine = ordered.find((team) => team.roster_id === myRosterId);
-  const mineRank = mine ? (mine[config.rankField] as number | null) : null;
+  // The collapsed summary carries what the hero does NOT: the leader and the score gap. Your own RANK lives in the
+  // "Your standing" hero (one owner per fact), so it is not repeated here.
+  const leaderScore = leader ? boardScoreText(board, leader[config.scoreField] as number | null) : "";
+  const mineScore = mine ? boardScoreText(board, mine[config.scoreField] as number | null) : "";
+  const iLead = Boolean(leader && mine && leader.roster_id === mine.roster_id);
   const parts = [
-    leader ? { key: "leader", text: `1. ${leader.team_name || "Team"}`, strong: true } : null,
-    mine && mineRank != null ? { key: "you", text: `You ${formatRank(mineRank, Boolean(mine[config.tiedField]))}`, tone: "accent" as const } : null,
-    { key: "count", text: `${ordered.length} teams` },
+    leader ? { key: "leader", text: `${iLead ? "You lead" : `1. ${leader.team_name || "Team"}`} · ${leaderScore}`, strong: true } : null,
+    mine && !iLead ? { key: "you", text: `You ${mineScore}`, tone: "accent" as const } : null,
   ];
   return (
     <section id={anchor} className="scroll-mt-4" data-testid={`rank-board-${board}`}>
@@ -515,17 +517,7 @@ export function LeagueRankingsContent({
 }) {
   const pageHelp = usePageHelp([BEGINNER_HELP.playoffOddsIntro, BEGINNER_HELP.playoffOddsTerms]);
   const notReady = !data.ok || data.teams.length === 0;
-  const mine = myRosterId ? data.teams.find((team) => team.roster_id === myRosterId) : undefined;
-  // The header ribbon (UI pass 7): where you stand, glanceable from any scroll position.
-  useHeaderContext(
-    notReady || !mine
-      ? []
-      : [
-          { key: "power", text: `Power ${formatRank(mine.power_rank, mine.power_rank_tied)} of ${data.teams.length}` },
-          { key: "record", text: mine.record_label ? `Record ${mine.record_label}` : "" },
-          { key: "standing", text: mine.standing_rank != null ? `Standings ${formatRank(mine.standing_rank)}` : "" },
-        ],
-  );
+  // Power rank, record and standings live in the "Your standing" hero (one owner per fact), not also in the header ribbon.
   const [profile, setProfile] = useState<{ rosterId: string; teamName: string; ownerName: string | null; avatarUrl: string | null } | null>(null);
   const openManager: OpenManager = (rosterId, teamName, ownerName, avatarUrl) => setProfile({ rosterId, teamName, ownerName, avatarUrl });
 

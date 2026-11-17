@@ -21,7 +21,7 @@ import { SimMiniPlayer, SimSectionTitle, SimTeamLink, SimToneBadge, simToneColor
 import { CompactModule } from "@/components/ui/CompactModule";
 import { StatusHeader } from "@/components/ui/StatusHeader";
 import { MatchupHeroCard } from "@/components/ui/MatchupModule";
-import { simMatchupCardModel } from "@/lib/matchupModules";
+import { matchupTickerParts, simMatchupCardModel } from "@/lib/matchupModules";
 import { buildSimStatusHeader, simHomeAttentionItems } from "@/lib/statusHeader";
 import { simLeagueParts } from "@/lib/simSummaries";
 import { useSimAutoSet } from "@/components/useSimAutoSet";
@@ -234,7 +234,6 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
 }
 
 function MatchupBody({ ctx, matchup, onTab, prob, youProj, oppProj, labels, flagged }: { ctx: SimCtx; matchup: SimHomeMatchup; onTab: (tab: SimTab) => void; prob: number; youProj: number; oppProj: number; labels: string[]; flagged: number }) {
-  const you = ctx.game.you;
   const opp = matchup.opponent!;
   const wide = useSimWide();
   const [showLineups, setShowLineups] = useState<boolean | null>(null);
@@ -250,8 +249,10 @@ function MatchupBody({ ctx, matchup, onTab, prob, youProj, oppProj, labels, flag
     rows: matchup.rows,
   });
   return (
+    <CompactModule id="home.matchup" testId="sim-matchup-module" title="This week's matchup" label="This week's matchup" parts={matchupTickerParts(cardModel, matchup.week)} defaultOpen={wide}>
     <MatchupHeroCard
       model={cardModel}
+      bare
       testId="sim-matchup-hero"
       onOpenPlayer={(p) => {
         const hit = matchup.rows.flatMap((r) => [r.you, r.opp]).find((pl) => pl && pl.name === p.name);
@@ -259,25 +260,10 @@ function MatchupBody({ ctx, matchup, onTab, prob, youProj, oppProj, labels, flag
       }}
       action={<Button fullWidth onClick={() => onTab("team")}>Set lineup</Button>}
     >
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
-        <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-          <SimTeamLink teamId={you?.team_id} name={you?.name ?? "You"} isYou size="row" stacked />
-          <span>{matchup.you_record ? simFmtRecord(matchup.you_record) : ""}</span>
-        </div>
-        <span className="font-extrabold">VS</span>
-        <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-          <SimTeamLink teamId={opp.team_id} name={opp.name} size="row" stacked />
-          <span>{opp.record ? simFmtRecord(opp.record) : ""} · {opp.persona.label}</span>
-        </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="sim-matchup-records">
+        <SimTeamLink teamId={opp.team_id} name={opp.name} size="row" />
+        <span>{[matchup.you_record ? `You ${simFmtRecord(matchup.you_record)}` : null, opp.record ? `They ${simFmtRecord(opp.record)}` : null, opp.persona.label].filter(Boolean).join(" · ")}</span>
       </div>
-
-      {flagged > 0 ? (
-        <p className="flex items-center gap-2 text-xs" style={{ color: "var(--color-warning)" }} role="status">
-          <SimGlyph name="alert" size={14} />
-          {(matchup.you_flagged ?? 0) > 0 ? `${matchup.you_flagged} of your starters are out or on bye. ` : ""}
-          {(matchup.opp_flagged ?? 0) > 0 ? `${matchup.opp_flagged} of theirs ${matchup.opp_flagged === 1 ? "is" : "are"} too.` : ""}
-        </p>
-      ) : null}
 
       <button
         type="button"
@@ -287,7 +273,7 @@ function MatchupBody({ ctx, matchup, onTab, prob, youProj, oppProj, labels, flag
         aria-controls="sim-matchup-lineups"
         onClick={() => setShowLineups(!lineupsOpen)}
       >
-        {lineupsOpen ? "Hide lineups" : `Show lineups (${matchup.rows.length} slots)`}
+        {lineupsOpen ? "Hide lineups" : `Show lineups (${matchup.rows.length} slots${flagged > 0 ? `, ${flagged} out or on bye` : ""})`}
       </button>
       {lineupsOpen ? (
         <div id="sim-matchup-lineups" className="flex flex-col gap-2">
@@ -311,6 +297,7 @@ function MatchupBody({ ctx, matchup, onTab, prob, youProj, oppProj, labels, flag
         </div>
       ) : null}
     </MatchupHeroCard>
+    </CompactModule>
   );
 }
 

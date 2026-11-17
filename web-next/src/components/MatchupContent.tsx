@@ -33,7 +33,7 @@ import { StatStrip } from "@/components/StatStrip";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { MatchupHeroCard } from "@/components/ui/MatchupModule";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
-import { bandColorVar, probabilityColorVar } from "@/lib/verdictToneCss";
+import { bandColorVar } from "@/lib/verdictToneCss";
 import { deltaBand } from "@/lib/verdictTone";
 import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, swingInputsFromMatchup, teamsValuesParts } from "@/lib/matchupModules";
 import { TeamAvatar } from "@/components/TeamAvatar";
@@ -253,7 +253,7 @@ function TeamsValues({ matchup, leagueId, leagueName = "" }: { matchup: MatchupR
   const mine = matchup.my_team!;
   const opponent = matchup.opponent!;
   const comparison = matchup.comparison!;
-  const { hasOdds, myPct, myProjected, opponentProjected, projectedMargin } = scoreboardFacts(matchup);
+  const { myProjected, opponentProjected, projectedMargin } = scoreboardFacts(matchup);
   const kickedOff = hasKickedOff(matchup);
   const valueMargin =
     comparison.margin === 0 ? "0" : `${comparison.margin > 0 ? "+" : "-"}${formatSeasonValue(Math.abs(comparison.margin))}`;
@@ -307,35 +307,7 @@ function TeamsValues({ matchup, leagueId, leagueName = "" }: { matchup: MatchupR
           ) : null}
         </div>
 
-        {hasOdds ? (
-          <div className="flex flex-col gap-1.5">
-            <div
-              className="winprob-bar-track"
-              role="img"
-              aria-label={`Win probability: you ${myPct}%, opponent ${100 - myPct!}%.`}
-            >
-              <span className="winprob-bar-fill" style={{ transform: `scaleX(${(myPct ?? 0) / 100})` }} aria-hidden="true" />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-base font-extrabold" style={{ color: probabilityColorVar((myPct ?? 0) / 100) }} data-testid="matchup-my-pct">
-                {myPct}%
-              </span>
-              <span
-                className="uppercase"
-                style={{
-                  font: "var(--type-supporting-metadata)",
-                  color: "var(--color-text-muted)",
-                  letterSpacing: "var(--letter-spacing-badge)",
-                }}
-              >
-                Win probability
-              </span>
-              <span className="text-base font-extrabold" style={{ color: "var(--color-text-secondary)" }}>
-                {100 - myPct!}%
-              </span>
-            </div>
-          </div>
-        ) : null}
+        {/* Win chance, its bar and its label live in the hero (one owner per fact). */}
 
         {/* Symmetric: each team's season value on the outside, the two matchup-level margins inside. */}
         <StatStrip

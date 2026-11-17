@@ -138,6 +138,7 @@ export function MatchupHeroCard({
   action,
   bigPlays,
   testId = "matchup-hero",
+  bare = false,
   children,
 }: {
   model: MatchupCardModel;
@@ -148,11 +149,23 @@ export function MatchupHeroCard({
   /** Live big plays (Matchup page only); the line is hidden when empty. */
   bigPlays?: MatchupBigPlay[];
   testId?: string;
+  /** Render the body without its own card, for placing inside a CompactModule (no card inside a card). */
+  bare?: boolean;
   children?: ReactNode;
 }) {
   const winTone = model.win ? TONE[model.win.tone] : "var(--color-accent)";
-  return (
-    <AccentCard accent="var(--color-accent-strong)" as="section" data-testid={testId}>
+  const wrap = (inner: ReactNode) =>
+    bare ? (
+      <div className="flex flex-col gap-3" data-testid={testId}>
+        {inner}
+      </div>
+    ) : (
+      <AccentCard accent="var(--color-accent-strong)" as="section" data-testid={testId}>
+        {inner}
+      </AccentCard>
+    );
+  return wrap(
+    <>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }} data-testid="matchup-kicker">
           {model.kicker}
@@ -197,7 +210,7 @@ export function MatchupHeroCard({
       {bigPlays && bigPlays.length > 0 ? <LatestBigPlay plays={bigPlays} mineName={model.mine.name} opponentName={model.opponent.name} /> : null}
       {action}
       {children}
-    </AccentCard>
+    </>,
   );
 }
 

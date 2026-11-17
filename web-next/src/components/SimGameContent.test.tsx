@@ -116,7 +116,9 @@ describe("SimGameContent", () => {
     await openFirstGame();
     expect(await screen.findByTestId("sim-home")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Home" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("matchup-win-chip")).toHaveTextContent("62% win");
+    // One compact matchup module: collapsed it is a one-line ticker; the card (chip, scores, swing players) opens on tap.
+    fireEvent.click(screen.getByRole("button", { name: /^This week's matchup/ }));
+    expect(screen.getByTestId("matchup-win-chip")).toHaveTextContent("62% win · Favored");
     expect(screen.getByTestId("sim-matchup-hero")).toHaveTextContent("Projected points");
     // Phone layout: lineups and the secondary cards start collapsed, summary first.
     expect(screen.queryByRole("list", { name: "Lineups head to head" })).toBeNull();
@@ -193,6 +195,7 @@ describe("SimGameContent", () => {
     mocked.getSimGameTeam.mockResolvedValue(detail);
     render(<SimGameContent />);
     await openFirstGame();
+    fireEvent.click(await screen.findByRole("button", { name: /^This week's matchup/ }));
     fireEvent.click((await screen.findAllByRole("button", { name: "Rivals. Open team" }))[0]);
     const sheet = await screen.findByTestId("team-sheet-name");
     expect(sheet).toHaveTextContent("Rivals");
@@ -220,6 +223,7 @@ describe("SimGameContent", () => {
     });
     render(<SimGameContent />);
     await openFirstGame();
+    fireEvent.click(await screen.findByRole("button", { name: /^This week's matchup/ }));
     fireEvent.click((await screen.findAllByRole("button", { name: "Rivals. Open team" }))[0]);
     await screen.findByTestId("team-sheet-name");
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");

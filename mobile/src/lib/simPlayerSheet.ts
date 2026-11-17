@@ -5,7 +5,7 @@
 
 import { simDraftRowChips } from "./simDraft";
 import { simPlayerTags, type SimGameTone, type SimGamePlayer, type SimPlayerDetailResponse, type SimRosSummary } from "./simGame";
-import { simGradeOf, simGradeText, type SimGradeInput } from "./simGrade";
+import { simGradeOf, type SimGradeInput } from "./simGrade";
 import { isFlatProjection, type WeeklyActualPoint, type WeeklyProjectionPoint } from "./weeklyProjection";
 
 /**
@@ -162,11 +162,10 @@ export function simProfileRead(player: Pick<SimGamePlayer, "pos" | "age" | "grad
   const spread = base > 0 ? (player.ceiling - player.floor) / base : 0;
   const steady = spread > 1.6 ? { label: "Boom or bust", line: "A wide week-to-week range: he wins or loses weeks on his own." } : spread < 1 ? { label: "Steady", line: "A tight range: you know roughly what you get each week." } : { label: "Balanced", line: "A normal range between his floor and ceiling." };
   const chips = [{ key: "steady", label: steady.label }, ...(player.team ? [{ key: "team", label: player.team }] : [])];
+  // The sheet header owns grade, ADP and this week's projection; a tile here would repeat it (or sit empty as "—").
   const tiles: SimTile[] = [
     { label: "Age", value: player.age != null ? String(player.age) : "—", note: age ? age.label : "Unknown", percentile: null },
-    { label: "Grade", value: simGradeText(player), note: `${player.pos} grade`, percentile: null },
     { label: "Range", value: `${pts(player.floor)}-${pts(player.ceiling)}`, note: steady.label.toLowerCase(), percentile: null },
-    { label: "ADP", value: player.adp != null ? String(Math.round(player.adp)) : "—", note: player.adp == null ? "No ADP" : "Market pick", percentile: null },
   ];
   const lines = [age?.line, steady.line, (player.games ?? 0) > 0 ? `${pts(player.season_points ?? 0)} points in ${player.games} ${player.games === 1 ? "game" : "games"}${player.ppg != null ? ` (${pts(player.ppg)} ppg)` : ""}.` : null].filter((l): l is string => Boolean(l));
   return { phase: age ? { label: age.label, tone: age.tone } : null, chips, tiles, lines };

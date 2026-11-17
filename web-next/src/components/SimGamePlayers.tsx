@@ -22,7 +22,6 @@ import { api } from "@/lib/api";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import { simSuppressedBadges } from "@/lib/simDraft";
 import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroGrade, simHeroTiles, simOutlookBand, simOutlookTiles, simProfileRead, simRosLine } from "@/lib/simPlayerSheet";
-import { simGradeText } from "@/lib/simGrade";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import {
   SIM_PAGE_SIZE,
@@ -33,8 +32,6 @@ import {
   simFilterQuery,
   simFilterReducer,
   simFmtPts,
-  simProjText,
-  simFmtValue,
   simHeadshotId,
   simIfStartsHint,
   simPlayerTags,
@@ -309,17 +306,11 @@ function SimOverviewSection({ player, detail, actions, seasonLabel }: { player: 
   const status = simPlayerStatusLabel(player);
   const ros = body?.ros ?? null;
   const tiles = [
-    { label: "This week", value: simProjText(player), note: status ? status.label : `${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)}`, percentile: null },
+    // "This week", ADP and the grade live in the sheet header (hero tiles + grade tile); not repeated or left empty here.
     ros
       ? { label: "Rest of season", value: `${simFmtPts(ros.mean)} ppg`, note: `${simFmtPts(ros.floor)}-${simFmtPts(ros.ceiling)}`, percentile: null }
       : null,
     { label: seasonLabel || "This season", value: simFmtPts(player.season_points ?? 0), note: `${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ""}`, percentile: null },
-    {
-      label: "Grade",
-      value: simGradeText(player),
-      note: player.adp != null ? `ADP ${simFmtValue(player.adp)}` : "No ADP",
-      percentile: null,
-    },
   ].filter((t): t is { label: string; value: string; note: string; percentile: null } => t != null);
 
   return (

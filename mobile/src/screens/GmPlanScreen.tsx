@@ -433,7 +433,6 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                 TEAM_STANCE_OPTIONS.find((o) => o.value === stance)
                   ? { key: 'stance', text: TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.label, strong: true, tone: 'action' }
                   : { key: 'stance', text: 'Not set yet', tone: 'warning' },
-                stance ? { key: 'tag', text: stanceLook(stance as TeamStance, colors).tagline } : { key: 'tag', text: 'Pick the stance that fits your team' },
                 weekAhead !== null ? { key: 'deadline', text: `Trade deadline Wk ${weekAhead}` } : pastDeadline ? { key: 'deadline', text: 'Past the trade deadline', tone: 'muted' } : null,
               ]}
             >
@@ -473,7 +472,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                   <ToneBadge label={`Week ${weekAhead}`} color={colors.accent} />
                   <View style={styles.bannerText}>
                     <AppText style={styles.bannerTitle}>Trade deadline: Week {weekAhead}</AppText>
-                    <AppText style={styles.caption}>Declaring a stance sharpens your recommendations.</AppText>
+                    <AppText style={styles.caption}>{stance ? 'Your stance shapes the trade ideas below.' : 'Declaring a stance sharpens your recommendations.'}</AppText>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.accent} />
                 </PressableScale>

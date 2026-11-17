@@ -24,6 +24,8 @@ import type { MatchupSide, MatchupWinProbability } from "@/lib/api";
 import { changedPlayerIds, slotTotals, sortSlots, type SlotComparison, type SlotSortMode } from "@/lib/lineupSlots";
 import { freshnessLabel } from "@/lib/liveScores";
 import { formatSigned } from "@/lib/matchupPresentation";
+import { marginNowLabel } from "@/lib/matchupModules";
+import { percentWord } from "@/lib/verdictTone";
 import { Collapse } from "@/components/ui/Presence";
 
 /**
@@ -97,13 +99,13 @@ export function ComparisonHeader({
         <div className="flex flex-col items-center gap-1">
           {pct != null ? (
             <span className="text-xs font-extrabold tabular-nums" style={{ color: probabilityColorVar(pct / 100) }} data-testid="header-winprob">
-              {pct}% win
+              {pct}% win · {percentWord(pct)}
             </span>
           ) : null}
           <ToneBadge
-            label={Math.abs(totals.marginNow) < 0.05 ? "Even" : formatSigned(totals.marginNow)}
+            label={marginNowLabel(totals.marginNow, formatSigned(totals.marginNow))}
             color={leadTone(totals.marginNow)}
-            title="Your margin on the lineups' current totals"
+            title="Your margin on the lineups' current totals (the win chance projects the whole week)"
           />
         </div>
         <div className="flex flex-col items-end min-w-0 text-right">

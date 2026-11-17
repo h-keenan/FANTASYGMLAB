@@ -188,7 +188,7 @@ export function simHeadline(forecast: SimForecast): string {
   const pct = simFormatPercent(p);
   if (p >= 0.9) return `You are a near lock for the playoffs (${pct}).`;
   if (p >= 0.6) return `You are in good shape: you make the playoffs in ${pct} of simulated seasons.`;
-  if (p >= 0.35) return `It is a coin flip: you make the playoffs in ${pct} of simulated seasons.`;
+  if (p >= 0.4) return `It is a coin flip: you make the playoffs in ${pct} of simulated seasons.`;
   if (p >= 0.1) return `You are on the outside looking in: ${pct} playoff odds.`;
   return `The playoffs are a long shot: ${pct} odds.`;
 }

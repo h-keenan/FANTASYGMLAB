@@ -403,7 +403,7 @@ export function buildSimStatusHeader(input: SimStatusInput): StatusHeaderModel {
   return statusHeaderModel({
     kicker,
     headline: input.record ? `You are ${input.record}` : "Your week",
-    context: input.bye ? "Bye week: work the wire and your trades" : input.opponentName ? `Next: vs ${input.opponentName}${pct != null ? `, ${pct}% to win` : ""}` : null,
+    context: input.bye ? "Bye week: work the wire and your trades" : input.opponentName ? `Next: vs ${input.opponentName}` : null,
     ring,
     stats,
     attention: input.attention,

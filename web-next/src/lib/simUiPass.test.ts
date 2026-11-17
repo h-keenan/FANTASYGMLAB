@@ -60,7 +60,7 @@ describe("sim player sheet presentation", () => {
   it("a veteran gets a profile read built only from game fields, no value", () => {
     const read = simProfileRead({ pos: "WR", age: 27, grade: "A-" as const, adp: 20, projection: 15, ros_mean: 15, floor: 6, ceiling: 31, games: 3, ppg: 14.2, season_points: 42.6, last_week: 12, team: "BUF" });
     expect(read.phase?.label).toBe("Prime");
-    expect(read.tiles.map((t) => t.label)).toEqual(["Age", "Grade", "Range", "ADP"]);
+    expect(read.tiles.map((t) => t.label)).toEqual(["Age", "Range"]);
     expect(read.lines.join(" ")).not.toMatch(/sim has him|sim does/); // no market-vs-model line: that compares ADP with the hidden rating
     expect([...read.tiles.flatMap((t) => [t.label, t.note]), ...read.lines, ...read.chips.map((c) => c.label)].join(" ")).not.toMatch(/value/i);
   });

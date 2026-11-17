@@ -123,6 +123,7 @@ export function MatchupHeroCard({
   action,
   bigPlays,
   testID = 'matchup-hero',
+  bare = false,
   children,
 }: {
   model: MatchupCardModel;
@@ -133,13 +134,16 @@ export function MatchupHeroCard({
   /** Live big plays (Matchup screen only); the line is hidden when empty. */
   bigPlays?: MatchupBigPlay[];
   testID?: string;
+  /** Render the body without its own card, for placing inside a CompactModule (no card inside a card). */
+  bare?: boolean;
   children?: ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const winTone = model.win ? toneColor(model.win.tone, colors) : colors.accent;
-  return (
-    <AccentCard accent={colors.accent}>
+  const wrap = (inner: ReactNode) => (bare ? <>{inner}</> : <AccentCard accent={colors.accent}>{inner}</AccentCard>);
+  return wrap(
+    <>
       <View testID={testID} style={styles.stack}>
         <View style={styles.kickerRow}>
           <AppText style={styles.kicker} testID="matchup-kicker">{model.kicker}</AppText>
@@ -171,7 +175,7 @@ export function MatchupHeroCard({
         {action}
         {children}
       </View>
-    </AccentCard>
+    </>,
   );
 }
 
