@@ -164,3 +164,32 @@ def test_unfingerprintable_league_falls_back_to_the_clock_bucket(monkeypatch):
     monkeypatch.setattr(league_value_settings.rankings, "reconciled_valuation_cache_versions", lambda: ())
     assert league_value_settings._valued_players_inputs_fingerprint("L1", "x.db").startswith("bucket:")
     assert derived_cache.Unfingerprintable
+
+
+def test_miss_that_predates_another_callers_store_does_not_recompute():
+    """Deterministic replay of the flaky single-flight interleaving: B reads (miss), A stores and releases its
+    lock, B then wins the free lock. B must re-read under the lock instead of computing again."""
+
+    real = redis_cache.get_redis_client()
+
+    class StaleFirstRead:
+        reads = 0
+
+        def __getattr__(self, name):
+            return getattr(real, name)
+
+        def get(self, key):
+            self.reads += 1
+            if self.reads == 1:
+                swr_cache._store(real, key, {"from": "A"}, 60, 1000.0)
+                return None
+            return real.get(key)
+
+    redis_cache.set_redis_client_for_testing(StaleFirstRead())
+    calls = []
+    out = swr_cache.redis_swr_cache(
+        cache_key="swr-stale-read", fresh_ttl_seconds=30, stale_ttl_seconds=60,
+        compute=lambda: calls.append(1) or {"from": "B"}, clock=lambda: 1001.0,
+    )
+    assert calls == []
+    assert out == {"from": "A"}
