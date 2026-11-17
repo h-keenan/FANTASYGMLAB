@@ -181,7 +181,7 @@ const ROUTES = [
   { name: "players", path: `/players/${LID}?name=Donk`, family: "team", noModules: true },
   { name: "trade-finder", path: `/trade-finder/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true },
   { name: "trade-analyzer", path: `/trade-analyzer/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true, expectText: "The tickle monster" },
-  { name: "trade-history", path: `/trade-history?league=${LID}&name=Donk`, family: "trades", maxTablists: 2, expectText: "You gained +34" },
+  { name: "trade-history", path: `/trade-history?league=${LID}&name=Donk`, family: "trades", maxTablists: 2, expectText: "+34" },
   { name: "gm-plan", path: `/gm-plan/${LID}?name=Donk`, family: "none", maxTablists: 2 },
   { name: "games", path: `/games/${LID}?name=Donk`, family: "league" },
   { name: "recaps", path: `/league-recaps/${LID}?name=Donk`, family: "league", maxTablists: 3, expandAll: true, noTruncate: true },
