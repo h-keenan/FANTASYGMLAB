@@ -9,6 +9,7 @@ import { SAMPLE_ACTIVE_EVENT, SAMPLE_SELECT_EVENT, demoUsableDestinations, isSam
 import { SAMPLE_CONNECT_ROUTE, SAMPLE_CTA_LABEL, SAMPLE_LEAGUE_NAME, SAMPLE_TABS, type SampleTab } from "@/lib/sampleLeague";
 
 import { useAuth } from "@/context/AuthContext";
+import { useHydrated } from "@/lib/useHydrated";
 import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { NavProMarker } from "@/components/NavProMarker";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
@@ -29,6 +30,7 @@ import { UNNAMED_LEAGUE } from "@/lib/leagueName";
  */
 export function DesktopSidebar() {
   const { session } = useAuth();
+  const hydrated = useHydrated();
   const { collegeInterest } = useDisplayPreferences();
   const pathname = usePathname();
   const params = useParams<{ leagueId?: string }>();
@@ -46,7 +48,8 @@ export function DesktopSidebar() {
     return () => window.removeEventListener(SAMPLE_ACTIVE_EVENT, onActive);
   }, [sample]);
 
-  if (!session) return null;
+  // Gate on hydration: the session resolves client-side and can land before this Suspense boundary hydrates (React #418).
+  if (!hydrated || !session) return null;
   // Founder-only (app_metadata.founder_ops); session is already resolved
   // here so non-founders never see a flash.
   const founderCapable = isFounderSession(session);

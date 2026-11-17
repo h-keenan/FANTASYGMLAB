@@ -23,6 +23,7 @@ const BASE = process.env.BASE || "http://localhost:3232";
 const OUT = process.env.OUT || "/tmp/new-user-smoke";
 const TOP_BUDGET = 110;
 const WIDTH = 390;
+const HYDRATION = /Hydration failed|hydrat(ed|ion) (but|error)|React error #(418|423|425)|did not match|#418|#423|#425/i;
 const T = 30000; // generous selector timeout: waits return the moment the selector appears, so it costs nothing when healthy
 const TODAY_HEADLINE = FIX.dashboard.items[0].headline;
 fs.mkdirSync(OUT, { recursive: true });
@@ -36,8 +37,8 @@ function world(opts) {
   return w;
 }
 
-async function newPage(browser, w) {
-  const ctx = await browser.newContext({ viewport: { width: WIDTH, height: 844 }, hasTouch: true, isMobile: true });
+async function newPage(browser, w, width = WIDTH) {
+  const ctx = await browser.newContext(width === WIDTH ? { viewport: { width, height: 844 }, hasTouch: true, isMobile: true } : { viewport: { width, height: 900 } });
   // Fresh storage; the dashboard/onboarding state is whatever the scenario sets. Theme pinned so the run is deterministic.
   await ctx.addInitScript(([s, theme]) => {
     try {
@@ -96,7 +97,9 @@ async function newPage(browser, w) {
   const external = (url) => { try { const h = new URL(url).hostname; return h !== "localhost" && h !== "dummy.supabase.co"; } catch { return false; } };
   page.on("console", (msg) => { if (msg.type() === "error" && !external(msg.location().url || "")) problems.push(`console.error: ${msg.text().slice(0, 200)}`); });
   page.on("response", (res) => { if (res.status() >= 400 && !external(res.url())) problems.push(`HTTP ${res.status()} ${res.request().method()} ${res.url().replace(BASE, "")}`); });
-  page.on("pageerror", (err) => problems.push(`pageerror: ${String(err).slice(0, 200)}`));
+  page.on("pageerror", (err) => problems.push(`pageerror: ${String(err).slice(0, Number(process.env.HYD_LEN || 200))}`));
+  // Hydration guard: server HTML and first client render must match (React #418 text, #423 recoverable, #425 text content; dev: "Hydration failed").
+  page.on("console", (msg) => { if (HYDRATION.test(msg.text())) problems.push(`HYDRATION MISMATCH: ${msg.text().slice(0, Number(process.env.HYD_LEN || 400))}`); });
   return { ctx, page, problems, w };
 }
 
@@ -276,6 +279,23 @@ const EXPECTED_HTTP = /HTTP (401|404|500)|Failed to load resource/;
   await env.page.evaluate(() => window.dispatchEvent(new Event("online")));
   await env.page.getByText("Back online").first().waitFor({ state: "visible", timeout: T });
   await env.ctx.close();
+}
+
+// 8. Hydration guard: DIRECT visits (server render + hydrate, no client redirect) of the main routes, at 390px and desktop, signed in and out.
+// Any "Hydration failed" / React #418 / #423 / #425 console line fails the step (see HYDRATION; also folded into every scenario above).
+for (const width of [WIDTH, 1280]) {
+  for (const signedIn of [true, false]) {
+    const saved = [{ league_id: LID, league_name: LEAGUE_NAME }];
+    const routes = [`/dashboard/${LID}`, `/trades/${LID}`, `/leagues`, `/account`, `/`];
+    for (const path of routes) {
+      if (!signedIn && path !== `/` && path !== `/dashboard/${LID}`) continue;
+      const env = await newPage(browser, world({ signedIn, saved: signedIn ? saved : [] }), width);
+      await goto(env, path);
+      await env.page.waitForLoadState("networkidle", { timeout: T }).catch(() => {});
+      await check(env, `8 hydration ${width}px ${signedIn ? "in" : "out"} ${path.replace(LID, "<id>")}`, { allow: /HTTP (401|404)|Failed to load resource/ });
+      await env.ctx.close();
+    }
+  }
 }
 
 await browser.close();

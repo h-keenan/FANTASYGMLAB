@@ -8,6 +8,7 @@ import { usePathname, useParams } from "next/navigation";
 import { useSearchParams } from "@/lib/useSearchParams";
 
 import { useAuth } from "@/context/AuthContext";
+import { useHydrated } from "@/lib/useHydrated";
 import { trackFeatureUse } from "@/lib/analytics";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
@@ -33,6 +34,7 @@ export function GmOrb() {
     return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpenSearch);
   }, []);
   const { session } = useAuth();
+  const hydrated = useHydrated();
   const pathname = usePathname();
   const { barVisible: shellBar } = useShellNav();
   const params = useParams<{ leagueId?: string }>();
@@ -40,7 +42,7 @@ export function GmOrb() {
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
   const leagueName = searchParams.get("name") || (leagueId ? UNNAMED_LEAGUE : "");
 
-  if (!session) return null;
+  if (!hydrated || !session) return null; // hydrated: session can resolve before this Suspense boundary hydrates (React #418)
   // Zach, 2026-10-19: "fix the bottom orb on onboard its covering" — "/"
   // is exclusively the signup/Sleeper-import/paywall flow (an already-
   // onboarded signed-in user is always router.replace'd away from it to
