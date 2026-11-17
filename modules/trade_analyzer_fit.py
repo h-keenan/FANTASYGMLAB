@@ -92,6 +92,9 @@ def _model_risk_summary(lineup_model: dict, injury_lines, window) -> str:
         slot, weeks = max(opened.items(), key=lambda kv: kv[1])
         parts.append(f"Leaves a {slot} slot open ~{weeks:.0f} week{'s' if round(weeks) != 1 else ''} unless filled from waivers.")
     unc = lineup_model["uncertainty"]
+    if window is not None and getattr(window, "playoff_start_week", None) is not None:
+        # The league's own calendar: the weeks the points are summed over.
+        parts.append(f"Counted over {window.describe()}.")
     parts.append(
         f"Outcome range: about +/-{unc['sigma_points']:.0f} lineup points over the rest of the season "
         f"(injury timing and projection spread); {lineup_model['confidence_pct']:.0f}% sure of the direction."
@@ -1221,8 +1224,12 @@ def evaluate_trade_analyzer_fit(
         "season_week": {
             "current_week": window.current_week,
             "remaining_weeks": window.remaining_weeks,
+            "effective_weeks": round(window.effective_weeks, 2),
             "in_season": window.in_season,
             "source": window.source,
+            "last_week": window.last_week,
+            "playoff_start_week": window.playoff_start_week,
+            "note": window.describe(),
         },
         "value_verdict": trade_value_verdict(value_delta, trade_value_bands.deal_size_for(
             sum(score_asset_value(a) for a in send_assets), sum(score_asset_value(a) for a in receive_assets)

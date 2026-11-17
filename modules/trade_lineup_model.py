@@ -266,7 +266,7 @@ class ModelContext:
     @property
     def weeks(self) -> list[int]:
         start = max(1, self.window.current_week)
-        return list(range(start, self.params.horizon_end_week + 1))
+        return [w for w in range(start, self.params.horizon_end_week + 1) if self.window.weight(w) > 0.0]
 
 
 def _active_rows(frame: pd.DataFrame, score_column: str, scoring: Mapping[str, float]) -> dict[str, list[tuple[float, float]]]:
@@ -440,7 +440,8 @@ def get_context(
 
     settings_key = repr(sorted((str(k), repr(v)) for k, v in (lineup_settings or {}).items()))
     key = (id(all_players_df), id(waiver_df), score_column, normalize_team_strategy(strategy),
-           window.current_week, window.in_season, settings_key, params)
+           window.current_week, window.in_season, window.last_week, window.playoff_start_week,
+           window.playoff_reach, settings_key, params)
     for entry_key, _a, _w, ctx in _CONTEXT_CACHE:
         if entry_key == key:
             return ctx
@@ -669,6 +670,11 @@ def run_weeks(
         return rows
 
     for week in weeks:
+        # A playoff week only counts if the team is alive for it; a week past the
+        # league's last scored week, or one the team is out of, counts for nothing.
+        w_week = ctx.window.weight(week)
+        if w_week <= 0.0:
+            continue
         cb = cands(before, week)
         ca = cands(after, week)
         ce = []
@@ -738,21 +744,21 @@ def run_weeks(
                 best_prob, modal_b, modal_a = prob, sb, sa
         res_b.weekly.append(wb)
         res_a.weekly.append(wa)
-        res_b.expected += wb
-        res_a.expected += wa
-        var_delta += max(0.0, e_delta2 - e_delta * e_delta)
+        res_b.expected += w_week * wb
+        res_a.expected += w_week * wa
+        var_delta += w_week * w_week * max(0.0, e_delta2 - e_delta * e_delta)
         if enumerated:
             scen_weeks += 1
         for pos, v in bypos_b.items():
-            res_b.by_position[pos] = res_b.by_position.get(pos, 0.0) + v
+            res_b.by_position[pos] = res_b.by_position.get(pos, 0.0) + w_week * v
         for pos, v in bypos_a.items():
-            res_a.by_position[pos] = res_a.by_position.get(pos, 0.0) + v
+            res_a.by_position[pos] = res_a.by_position.get(pos, 0.0) + w_week * v
         for pid, v in pick_use.items():
-            res_a.pickups[pid] = res_a.pickups.get(pid, 0.0) + v
+            res_a.pickups[pid] = res_a.pickups.get(pid, 0.0) + w_week * v
         for slot, v in open_b.items():
-            res_b.open_slot_weeks[slot] = res_b.open_slot_weeks.get(slot, 0.0) + v
+            res_b.open_slot_weeks[slot] = res_b.open_slot_weeks.get(slot, 0.0) + w_week * v
         for slot, v in open_a.items():
-            res_a.open_slot_weeks[slot] = res_a.open_slot_weeks.get(slot, 0.0) + v
+            res_a.open_slot_weeks[slot] = res_a.open_slot_weeks.get(slot, 0.0) + w_week * v
         for pos in SCORED_POSITIONS:
             pos_delta_weeks.setdefault(pos, []).append(bypos_a.get(pos, 0.0) - bypos_b.get(pos, 0.0))
         if modal_b is not None:
@@ -762,7 +768,7 @@ def run_weeks(
             ids_b = {s[0] for s in modal_b}
             ids_a = {s[0] for s in modal_a}
             for pid in ids_a ^ ids_b:
-                symdiff_weeks[pid] = symdiff_weeks.get(pid, 0) + 1
+                symdiff_weeks[pid] = symdiff_weeks.get(pid, 0) + w_week
     sd_by_id = {p.player_id: p.sd for p in list(before) + list(after) + extra}
     # Projection spread, only for players whose presence differs between the
     # two lineups (shared starters cancel): independent game-to-game noise
@@ -948,7 +954,8 @@ def evaluate_trade(
     params = ctx.params
     w_now, w_fut = POSTURE_WEIGHTS.get(ctx.strategy, POSTURE_WEIGHTS["retool"])
     weeks = ctx.weeks
-    rem = len(weeks)
+    # Weeks that count, each weighted by the chance the team is still playing in it.
+    rem = sum(ctx.window.weight(w) for w in weeks)
     k = ctx.value_per_point
 
     before, before_aged = _before_side(before_df, ctx)
@@ -1062,7 +1069,13 @@ def evaluate_trade(
         "model_version": MODEL_VERSION,
         "posture": ctx.strategy,
         "weights": {"now": w_now, "future": w_fut},
-        "weeks": {"first": weeks[0] if weeks else 0, "last": weeks[-1] if weeks else 0, "count": rem},
+        "weeks": {
+            "first": weeks[0] if weeks else 0,
+            "last": weeks[-1] if weeks else 0,
+            "count": len(weeks),
+            "effective": round(rem, 2),
+            "note": ctx.window.describe(),
+        },
         "value_per_point": round(k, 2),
         "points": {
             "team_weekly_sd": round(math.sqrt(meta["team_weekly_var"]), 2),

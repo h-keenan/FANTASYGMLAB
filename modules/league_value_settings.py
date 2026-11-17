@@ -341,6 +341,21 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
     )
     if league.get("total_rosters") or league_settings.get("num_teams"):
         settings["_sources"]["league_size"] = "Sleeper"
+    # The league's own playoff calendar (only when Sleeper reports it, so a
+    # league without it is unchanged): when the bracket starts, how many teams
+    # make it, and the last trade week. Read by trade_grade.season_window.
+    for key, sleeper_key in (
+        ("playoff_week_start", "playoff_week_start"),
+        ("playoff_teams", "playoff_teams"),
+    ):
+        value = _safe_nonnegative_int(league_settings.get(sleeper_key), 0)
+        if value:
+            settings[key] = value
+            settings["_sources"][key] = "Sleeper"
+    deadline = _safe_nonnegative_int(league_settings.get("trade_deadline"), 0)
+    if 0 < deadline < 18:
+        settings["trade_deadline_week"] = deadline
+        settings["_sources"]["trade_deadline_week"] = "Sleeper"
     return settings
 
 

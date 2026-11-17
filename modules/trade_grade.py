@@ -78,6 +78,7 @@ The three adjustments, all in the same value units as the scores:
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Sequence
@@ -214,12 +215,71 @@ FANTASY_SEASON_WEEKS = 17
 OFFSEASON_INJURY_FACTOR = 0.10
 
 
+# Chance a playoff team wins a round and plays the next one (single-elimination
+# rounds, byes ignored). An uncalibrated prior, stated rather than hidden.
+PLAYOFF_ADVANCE_PROB = 0.6
+DEFAULT_PLAYOFF_REACH = 0.5
+
+
 @dataclass(frozen=True)
 class SeasonWindow:
+    """Where the league is in its own schedule, and what each remaining week
+    is worth to a trade decision.
+
+    Regular-season weeks count in full. A playoff week only matters if the
+    team is still alive, so it is weighted by the chance of reaching the
+    playoffs and surviving the rounds before it (``weight``); a team already
+    eliminated gets zero for them, and no week after the league's last scored
+    week counts at all. With no playoff settings known (``playoff_start_week``
+    None) every week up to ``last_week`` counts in full, as before."""
+
     current_week: int
     remaining_weeks: int
     in_season: bool
     source: str  # "league" | "calendar"
+    last_week: int = 17
+    playoff_start_week: int | None = None
+    playoff_reach: float | None = None
+    deadline_week: int | None = None
+
+    def weight(self, week: int) -> float:
+        if week > self.last_week:
+            return 0.0
+        if self.playoff_start_week is None or week < self.playoff_start_week:
+            return 1.0
+        reach = DEFAULT_PLAYOFF_REACH if self.playoff_reach is None else float(self.playoff_reach)
+        return max(0.0, min(1.0, reach)) * (PLAYOFF_ADVANCE_PROB ** (week - self.playoff_start_week))
+
+    @property
+    def effective_weeks(self) -> float:
+        if not self.in_season:
+            return float(self.remaining_weeks)
+        return sum(self.weight(w) for w in range(max(1, self.current_week), self.last_week + 1))
+
+    def describe(self) -> str:
+        """The weeks-left sentence, naming the playoff schedule when it is known."""
+
+        if not self.in_season:
+            return "offseason, so it barely touches this season"
+        if self.playoff_start_week is None:
+            return f"{self.remaining_weeks} fantasy weeks left"
+        regular = max(0, self.playoff_start_week - max(1, self.current_week))
+        playoff_weeks = [w for w in range(max(self.playoff_start_week, self.current_week), self.last_week + 1)]
+        text = f"{regular} regular-season week{'s' if regular != 1 else ''} left"
+        if playoff_weeks:
+            span = (
+                f"week {playoff_weeks[0]}"
+                if len(playoff_weeks) == 1
+                else f"weeks {playoff_weeks[0]}-{playoff_weeks[-1]}"
+            )
+            first = self.weight(playoff_weeks[0])
+            if first <= 0:
+                text += f", and the playoffs ({span}) do not count because the team is out of contention"
+            else:
+                text += f", then the playoffs ({span}) counted at about {round(first * 100)}% to be alive"
+        if self.deadline_week is not None and self.deadline_week >= self.current_week:
+            text += f"; trade deadline is week {self.deadline_week}"
+        return text
 
 
 def season_window(
@@ -237,9 +297,53 @@ def season_window(
     if week is None:
         week = season_clock.nfl_week(today)
         source = "calendar"
-    if week <= 0 or week > FANTASY_SEASON_WEEKS:
-        return SeasonWindow(0, FANTASY_SEASON_WEEKS, False, source)
-    return SeasonWindow(week, FANTASY_SEASON_WEEKS - week + 1, True, source)
+    playoff_start, last_week, reach, deadline = _playoff_schedule(settings)
+    if week <= 0 or week > last_week:
+        return SeasonWindow(0, last_week, False, source, last_week, playoff_start, reach, deadline)
+    return SeasonWindow(week, last_week - week + 1, True, source, last_week, playoff_start, reach, deadline)
+
+
+def _settings_int(settings: Mapping[str, Any], key: str) -> int | None:
+    try:
+        value = int(settings.get(key))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def _playoff_schedule(settings: Mapping[str, Any]) -> tuple[int | None, int, float | None, int | None]:
+    """(playoff start week, last scored week, chance of reaching the playoffs,
+    trade deadline week) from the league settings, each None / the 17-week
+    default when the league does not say.
+
+    ``playoff_week_start`` and ``playoff_teams`` come from the Sleeper league;
+    the number of rounds is log2 of the field, so a 4-team bracket ends a week
+    before a 6-team one. ``playoff_odds`` (0-1, optional, set by a caller that
+    has the team's real playoff odds) makes the reach chance the team's own;
+    without it the base rate playoff_teams / league_size is used."""
+
+    if not isinstance(settings, Mapping):
+        return None, FANTASY_SEASON_WEEKS, None, None
+    start = _settings_int(settings, "playoff_week_start")
+    teams = _settings_int(settings, "playoff_teams")
+    size = _settings_int(settings, "league_size")
+    last = FANTASY_SEASON_WEEKS
+    if start is not None and teams is not None:
+        rounds = max(1, math.ceil(math.log2(teams))) if teams > 1 else 1
+        last = max(start, min(FANTASY_SEASON_WEEKS, start + rounds - 1))
+    reach = None
+    raw_odds = settings.get("playoff_odds")
+    try:
+        if raw_odds is not None and str(raw_odds).strip() != "":
+            reach = max(0.0, min(1.0, float(raw_odds)))
+    except (TypeError, ValueError):
+        reach = None
+    if reach is None and teams is not None and size:
+        reach = max(0.05, min(0.95, teams / float(size)))
+    deadline = _settings_int(settings, "trade_deadline_week")
+    if start is not None and start > last:
+        start = None
+    return start, last, reach, deadline
 
 
 # --- injury availability -----------------------------------------------------
@@ -429,7 +533,7 @@ def injury_availability_cost(
 ) -> int:
     if absence is None or healthy_value <= 0:
         return 0
-    weeks_missed = min(float(absence.weeks), float(window.remaining_weeks))
+    weeks_missed = min(float(absence.weeks), float(window.effective_weeks))
     weekly_value = float(healthy_value) * CURRENT_SEASON_VALUE_SHARE / FANTASY_SEASON_WEEKS
     cost = weekly_value * weeks_missed * injury_posture_weight(strategy)
     cost *= 1.0 if starts else NON_STARTER_AVAILABILITY_WEIGHT
@@ -469,11 +573,7 @@ class InjuryLine:
             )
         else:
             timing = f"{_weeks_text(self.absence.weeks)} estimated"
-        when = (
-            f"{window.remaining_weeks} fantasy weeks left"
-            if window.in_season
-            else "offseason, so it barely touches this season"
-        )
+        when = window.describe()
         return (
             f"{self.name} ({self.absence.status_label}): {timing} "
             f"({self.absence.basis}; no return date in the data), {when}. "
