@@ -438,7 +438,6 @@ function TeamHero({
     valuePercentile,
     leagueSize: leagueSize > 0 ? leagueSize : null,
     context: context || null,
-    record: team ? `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}` : null,
     openSlots: openSlotCount,
     flaggedStarters: bestBall ? 0 : starters.filter((p) => p.ruled_out || p.start_ineligible_reason).length,
     injuredStarters: bestBall ? 0 : starters.filter((p) => p.injury_label && p.injury_label.trim()).length,

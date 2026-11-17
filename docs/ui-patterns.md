@@ -1350,3 +1350,21 @@ One shared map, `lib/verdictTone.ts` (byte-identical web/app twin; web wraps it 
 - Semantic colour appears only on small chips, badges, pills and numbers (a "3% WIN" chip, ACCEPT / DECLINE).
 - Negative deltas are muted with a down arrow, never red. Green only for positive.
 - `node scripts/check_verdict_colors.mjs` (CI, lib-twins job) fails on a hard-coded semantic colour or threshold ladder on a win / odds / probability / verdict line. Use the map instead.
+
+## One owner per fact (2026-11, UI audit B4)
+
+A fact is stated by exactly one module on a page. Every other module drops it, or links to the owner. The map lives in code as
+`PAGE_FACT_OWNERS` in `lib/statusHeader.ts` (web + app twin); `duplicatedFacts` plus `lib/pageFactOwnership.test.ts` fail when two
+modules of one page emit the same fact.
+
+| Page | Fact | Owner module | Everywhere else |
+|---|---|---|---|
+| My Team | Record (7-1) | Team Snapshot ("Record" tile, links to League) | removed from the hero stats |
+| My Team | Holes, Injured | Status hero (mini stats, "Fix lineup") | not repeated in Snapshot or Analysis |
+| My Team | Power / Long term / Starters / Bench / Avg age | Team Snapshot | not in the hero |
+| My Team | Biggest need, room status | Team Analysis | hero only shows lineup holes |
+| Today | Week, opponent, score, win chance | Matchup card (`TodayMatchupCard`) | the old "Today's strip" is gone; nothing else restates it |
+| Today | Standing, playoff odds, trade ideas | Tiles row | not in the Matchup card |
+| Today | This season / Long term / Starters / Bench / Age | "My Team" module | tiles carry standing (record rank), not power rank |
+
+To add a fact, add it to `PAGE_FACT_OWNERS` under its owner; a second owner makes the test fail.
