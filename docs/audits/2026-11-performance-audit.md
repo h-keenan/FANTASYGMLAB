@@ -278,8 +278,10 @@ future-year lineups, the confidence model, the per-position story and the waiver
 only. A candidate-count bound was not used: `trade_score` is not monotone in the dropped asset's value under every posture (`(w_now-1)*k*dPts + k*F`, `w_future`), so a bound
 cannot prove "no change in chosen results"; this one is exact by construction. Proof: `tests/test_overflow_score_only.py` compares the chosen cuts and the plan effect against
 the pre-change selection (a full `evaluate_swap` per candidate) for 3 postures x 4 roster sizes (1-4 cuts), and asserts `swap_score == evaluate_swap(...)["trade_score"]`
-bit for bit. `drops_for_overflow` for a 3-cut plan on the fixture: 80 ms -> 66 ms (-17%, median of 5). It is a modest win: the remaining time is the two weekly lineup
-solves per candidate, which a later pass could share across candidates (the before-side lineup is identical for every candidate).
+bit for bit. `drops_for_overflow` for a 3-cut plan on the fixture: 37.7 -> 35.7 ms (-5%, median of 5, quiet box; an earlier run on a loaded box read 80 -> 66 ms,
+the ratio is what to trust). That is a small win and the 3 s in leagues-glance cold is NOT fixed by it: profiling shows the time is the weekly lineup solves (`run_weeks`,
+two scenario enumerations per candidate), not the informational work this skips. An exact candidate bound was not found, so none was shipped. Next step: share the
+before-side lineup solve across the candidates of one cut (it is identical for all of them unless the dropped player is one of the uncertain-availability enumerated ones).
 
 ### 3. Today first-load JS (web)
 
@@ -331,6 +333,6 @@ Sim Home carries 423 KB of JS (the sim game bundle), the heaviest route measured
 - First visit of a league nobody has opened (no prewarm, no stale entry): dashboard 4.5 s, leagues-glance 3.6 s, trade hub 2.5 s: the compute itself. Prewarm covers leagues that were
   opened before; a brand-new league still pays once. Trade ideas are not prewarmed (they depend on the user's roster, posture and GM targets).
 - Waivers (about 100 ms warm, 0.95 s cold) and my-team/matchup were not behind these caches and did not move.
-- `plan_trade_overflow`: still two lineup solves per candidate; share the before-side solve across candidates next.
+- `plan_trade_overflow` (about 3 s of leagues-glance cold): only -5% here; the weekly lineup solves dominate (see section 2). Needs the shared before-side solve, not a cache.
 - Sim Home 423 KB JS; Today's critical path is still the framework + shell (about 250 KB gzip before any Today code).
 - fast3g Today is download-bound (about 2.5 s to the first API request).
