@@ -4064,6 +4064,20 @@ main > header:has(> h1.sr-only:only-child) {
   min-height: 32px;
   margin-bottom: calc(var(--page-top-gap) - var(--page-gap));
 }
+/* The one page control row (ui/PageControls.tsx): view switch + filters on a single line, then --page-top-gap to the first module. */
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: calc(var(--page-top-gap) - var(--page-gap));
+}
+.page-controls > *,
+.page-controls > .contents > * {
+  min-width: 0;
+}
+.page-controls .ui-fs {
+  flex: 0 0 auto;
+}
 .page-status-refresh {
   display: inline-flex;
   align-items: center;

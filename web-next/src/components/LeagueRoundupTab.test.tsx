@@ -106,7 +106,7 @@ describe("LeagueRoundupTab", () => {
     render(<LeagueRoundupTab leagueId="L1" />);
     await screen.findByText("Week 3");
     mock.mockResolvedValue(response({ week: 2 }));
-    fireEvent.click(screen.getByRole("tab", { name: "Wk 2" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Roundup week" }), { target: { value: "2" } });
     await waitFor(() => expect(mock).toHaveBeenLastCalledWith("L1", 2));
   });
 

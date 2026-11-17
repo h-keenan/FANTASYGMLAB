@@ -8,6 +8,8 @@ import { useMemo, useState, type ReactNode } from "react";
 import { api, type CollegeProspect, type CollegeProspectsResponse, MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION } from "@/lib/api";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { PillRow } from "@/components/PillRow";
+import { ViewSelect } from "@/components/ui/ViewSelect";
+import { PageControl } from "@/components/ui/PageControls";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { ToneBadge } from "@/components/ToneBadge";
 import { prospectFit, rankByFit, type ScoutingLens } from "@/lib/scoutingLens";
@@ -377,33 +379,38 @@ export function CollegeScoutingContent({
         )
       ) : (
         <div className="flex flex-col gap-4">
-          <PillRow
-            options={[
-              { label: "All Prospects", value: "all", glyph: "prospects" },
-              { label: "My Watchlist", value: "watchlist", glyph: "watchlist" },
-            ]}
-            active={filter}
-            onSelect={(value) => setFilter(value as FilterKey)}
-          />
-
-          {lens ? (
-            <div className="flex flex-col gap-1">
-              <PillRow
-                ariaLabel="Scouting view"
+          {/* One control row (UI audit batch H): both views are compact selects side by side, not two stacked pill rows plus a paragraph. */}
+          <>
+            <PageControl>
+              <ViewSelect
+                label="Show"
+                className="min-w-0 flex-1"
+                value={filter}
                 options={[
-                  { label: "Best available", value: "base" },
-                  { label: "For my league", value: "league" },
+                  { value: "all", label: "All prospects" },
+                  { value: "watchlist", label: "My watchlist" },
                 ]}
-                active={view}
-                onSelect={(value) => setView(value === "league" ? "league" : "base")}
+                onChange={(value) => setFilter(value as FilterKey)}
               />
+              {lens ? (
+                <ViewSelect
+                  label="Scouting view"
+                  className="min-w-0 flex-1"
+                  value={view}
+                  options={[
+                    { value: "base", label: "Best available" },
+                    { value: "league", label: "For my league" },
+                  ]}
+                  onChange={(value) => setView(value === "league" ? "league" : "base")}
+                />
+              ) : null}
+            </PageControl>
+            {lens && view === "league" ? (
               <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                {view === "league"
-                  ? "Prospects that fit a position you need or a round you hold are listed first and tagged. Same prospects and grades as Best available."
-                  : "The shared board, no league applied. Switch to For my league to see fits to your needs and picks."}
+                Prospects that fit a position you need or a round you hold are listed first and tagged. Same prospects and grades as Best available.
               </p>
-            </div>
-          ) : null}
+            ) : null}
+          </>
 
           {visible.length === 0 ? (
             <EmptyState

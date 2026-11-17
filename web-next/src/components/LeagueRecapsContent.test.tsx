@@ -219,9 +219,9 @@ describe("LeagueRecapsContent", () => {
     expect(screen.getByTestId("status-headline")).toHaveTextContent("Dynasty Overlords led the week with 142.6");
     expect(screen.queryByText("League Memory")).not.toBeInTheDocument();
     expect(screen.getByText("Week 5 recap")).toBeInTheDocument();
-    // The week strip is the single week control: every week is a chip, no "More weeks" select.
-    const weeks = screen.getByRole("tablist", { name: "Recap week" });
-    expect(weeks.querySelectorAll('[role="tab"]')).toHaveLength(5);
+    // The week select is the single week control (one control row): every week is an option, no "More weeks" select.
+    const weeks = screen.getByRole("combobox", { name: "Recap week" });
+    expect(weeks.querySelectorAll("option")).toHaveLength(5);
     expect(screen.queryByLabelText("More weeks")).not.toBeInTheDocument();
     // One compact module per kind of story.
     for (const key of ["scoring", "matchups", "waivers", "trades"]) expect(screen.getByTestId(`recap-section-${key}`)).toBeInTheDocument();
@@ -235,7 +235,7 @@ describe("LeagueRecapsContent", () => {
   it("opens a past week from the week strip", async () => {
     (api.getLeagueRecap as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ ...BASE_RECAP, recap: { ...BASE_RECAP.recap!, week: 3, stories: [story({ story_type: "performance", title: "Week 3 high score", metric_value: "130.0" })] } });
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
-    fireEvent.click(screen.getByRole("tab", { name: "Wk 3" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Recap week" }), { target: { value: "3" } });
     await waitFor(() => expect(api.getLeagueRecap).toHaveBeenCalledWith("league-1", 3, true));
     await waitFor(() => expect(screen.getByText("Week 3 recap")).toBeInTheDocument());
   });
@@ -269,7 +269,7 @@ describe("LeagueRecapsContent", () => {
 
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
 
-    fireEvent.click(within(screen.getByRole("tablist", { name: "League memory view" })).getByRole("tab", { name: "Storylines" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "League memory view" }), { target: { value: "Storylines" } });
 
     // The tab bodies are lazy chunks, so the fetch starts once the chunk resolves.
     await waitFor(() => expect(api.getLeagueStorylines).toHaveBeenCalledWith("league-1"));

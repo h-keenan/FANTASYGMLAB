@@ -6,7 +6,8 @@ import { api } from "@/lib/api";
 import type { RecapResponse, RecapStory, RecapTradeAsset } from "@/lib/api";
 import { EmptyState } from "@/components/EmptyState";
 import { Money } from "@/components/Money";
-import { PillRow } from "@/components/PillRow";
+import { ViewSelect } from "@/components/ui/ViewSelect";
+import { PageControl } from "@/components/ui/PageControls";
 import { SkeletonModule, SkeletonRegion, SkeletonStatusHeader } from "@/components/Skeleton";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -492,7 +493,9 @@ export function RecapWeekView({ leagueId, leagueName, initial, onOpenHistory }: 
   return (
     <div className="flex flex-col gap-3" data-testid="recap-week-view">
       {chips.length > 1 ? (
-        <PillRow ariaLabel="Recap week" variant="scroll" snap options={chips} active={String(selectedWeek)} onSelect={(value) => loadWeek(Number(value))} />
+        <PageControl>
+          <ViewSelect label="Recap week" className="min-w-0 flex-1" value={String(selectedWeek)} options={chips} onChange={(value) => loadWeek(Number(value))} />
+        </PageControl>
       ) : null}
       {loading ? <RecapSkeleton /> : <PresenceSwap swapKey={`week-${recap.week}`}>{header}</PresenceSwap>}
       {profile ? <ManagerProfileSheet leagueId={leagueId} leagueName={leagueName} rosterId={profile.rosterId} teamName={profile.teamName} ownerName={identities[profile.rosterId]?.ownerName ?? null} avatarUrl={identities[profile.rosterId]?.avatarUrl ?? null} onClose={() => setProfile(null)} /> : null}

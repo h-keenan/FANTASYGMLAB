@@ -13,6 +13,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Input } from "@/components/Input";
 import { RankingRow } from "@/components/LeagueRankingsContent";
 import { ViewSelect } from "@/components/ui/ViewSelect";
+import { PageControlsRow } from "@/components/ui/PageControls";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { PlayerRow } from "@/components/PlayerRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -68,10 +69,8 @@ export function GamesContent({ leagueId, leagueName, initialTab }: { leagueId: s
   return (
     <main className="page-shell">
       {leagueId ? <PageTabBar family="league" active="games" leagueId={leagueId} leagueName={leagueName} /> : null}
-      <header className="flex flex-col gap-1">
-        <PageTitle page="Games" leagueName={leagueName} />
-      </header>
-      <div className="flex flex-wrap items-center gap-2" data-testid="games-controls">
+      <PageTitle page="Games" leagueName={leagueName} />
+      <PageControlsRow testId="games-controls">
         <ViewSelect
           value={tab}
           options={[
@@ -80,7 +79,7 @@ export function GamesContent({ leagueId, leagueName, initialTab }: { leagueId: s
           ]}
           onChange={(value) => setTab(value as Tab)}
         />
-      </div>
+      </PageControlsRow>
       {tab === "sim" ? <SeasonSimPanel leagueId={leagueId} /> : <PickemPanel leagueId={leagueId} />}
     </main>
   );
@@ -141,16 +140,6 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
-        <SectionHeading
-          kicker="Rest of season"
-          note={
-            data.weeks_remaining === 0
-              ? "No games left. These are final results."
-              : `${data.weeks_remaining ?? ""} weeks left, your real schedule and Roster Power.`
-          }
-        >
-          Your odds
-        </SectionHeading>
         <div className="glass-surface flex items-center justify-between gap-4 p-4">
           <div className="flex flex-col">
             <span className="text-4xl font-extrabold" style={{ color: percentColorVar(mine.playoff_probability) }}>
@@ -178,6 +167,11 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
             {status ? <ToneBadge label={status} color={mine.clinched ? "var(--color-success)" : "var(--color-danger)"} /> : null}
           </div>
         </div>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="games-odds-note">
+          {data.weeks_remaining === 0
+            ? "Rest of season: no games left. These are final results."
+            : `Rest of season: ${data.weeks_remaining ?? ""} weeks left, your real schedule and Roster Power.`}
+        </p>
         {!titleAvailable ? (
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="title-odds-unavailable">
             {titleOddsUnavailableMessage(data.title_odds?.reason)}

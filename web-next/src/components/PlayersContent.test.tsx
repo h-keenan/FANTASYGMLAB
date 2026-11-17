@@ -94,7 +94,7 @@ describe("PlayersContent", () => {
   it("filters by search text", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Search players"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByLabelText("Search players"), { target: { value: "beta" } });
 
     expect(screen.getByText("Beta Back")).toBeInTheDocument();
     expect(screen.queryByText("Alpha Receiver")).not.toBeInTheDocument();
@@ -104,8 +104,8 @@ describe("PlayersContent", () => {
   it("filters by position", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
-    // Position is a one-tap pill row, not part of the Filters sheet.
-    fireEvent.click(screen.getByRole("tab", { name: "K" }));
+    // Position lives in the one Filters sheet (batch H: one control row).
+    applyFilters("K");
     expect(screen.getByText("Gamma Kicker")).toBeInTheDocument();
     expect(screen.queryByText("Alpha Receiver")).not.toBeInTheDocument();
   });
@@ -121,7 +121,7 @@ describe("PlayersContent", () => {
   it("shows the empty-filter message when nothing matches", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Search players"), { target: { value: "nonexistent" } });
+    fireEvent.change(screen.getByLabelText("Search players"), { target: { value: "nonexistent" } });
 
     expect(screen.getByText("No players match")).toBeInTheDocument();
   });
@@ -240,8 +240,7 @@ describe("PlayersContent", () => {
     it("offers every stat the visible pool carries, and re-sorts the board by raw value when picked", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={WITH_STATS} />);
 
-      const sortSelect = selectWithOption("Rec Yards");
-      fireEvent.change(sortSelect, { target: { value: "rec_yards" } });
+      applyFilters("Rec Yards");
 
       // Beta has the higher Rec Yards total (1400 vs 600) despite a lower
       // Value score — the stat sort, not the server's default order, wins.
@@ -256,8 +255,8 @@ describe("PlayersContent", () => {
     it("switches to percentile mode and re-sorts/re-displays by the stat's position-group percentile", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={WITH_STATS} />);
 
-      fireEvent.change(selectWithOption("Rec Yards"), { target: { value: "rec_yards" } });
-      fireEvent.click(screen.getByText("Percentile"));
+      applyFilters("Rec Yards");
+      applyFilters("Percentile");
 
       expandRow(0);
       expect(screen.getByText("97th")).toBeInTheDocument();
@@ -328,7 +327,8 @@ describe("PlayersContent", () => {
           idp={{ ok: true, idp: false, players: [] }}
         />,
       );
-      expect(screen.queryByRole("tab", { name: "DL" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+      expect(screen.queryByRole("radio", { name: "DL" })).not.toBeInTheDocument();
       expect(screen.queryByText("Edge Rusher")).not.toBeInTheDocument();
     });
 
@@ -336,7 +336,7 @@ describe("PlayersContent", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} idp={IDP} />);
       expect(screen.queryByText("Edge Rusher")).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("tab", { name: "DL" }));
+      applyFilters("DL");
 
       expect(screen.getByText("Edge Rusher")).toBeInTheDocument();
       expect(screen.queryByText("Thumper Backer")).not.toBeInTheDocument();
@@ -350,20 +350,14 @@ describe("PlayersContent", () => {
       expect(screen.queryByRole("link", { name: "Add to Trade" })).not.toBeInTheDocument();
     });
   });
-  it("folds the controls into two rows (search + Filters, positions + Sort) and keeps row stats/actions in one wrapping flow", () => {
+  it("folds the controls into one row: view select + search + Filters (position and sort live in the sheet)", () => {
     const { container } = render(<PlayersContent leagueId="L1" leagueName="Test League" data={DATA} rosters={[{ players: ["p1"] }]} />);
-    const search = screen.getByPlaceholderText("Search players");
-    const searchRow = search.parentElement as HTMLElement;
-    const bar = searchRow.parentElement as HTMLElement;
-    expect(bar.className).toContain("flex-col");
-    expect(search.className).toContain("flex-1");
-    expect(within(searchRow).getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
-    // The five facet selects are one Filters button now (FilterSheet); Sort sits with the position pills (the one select).
-    expect(bar.querySelectorAll("select")).toHaveLength(1);
-    expect(within(bar).getByRole("combobox", { name: "Sort by" })).toBeInTheDocument();
-    expect(within(bar).getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
-    // No nested `contents` wrapper / forced full-width stacking on rows.
-    expect(container.querySelector(".contents")).toBeNull();
+    const row = screen.getByTestId("players-controls");
+    expect(within(row).getByPlaceholderText("Search")).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
+    // Only the Players / Prospects view select is on the page; Sort moved into the sheet.
+    expect(container.querySelectorAll("select")).toHaveLength(1);
+    expect(screen.queryByRole("combobox", { name: "Sort by" })).not.toBeInTheDocument();
     expect(container.innerHTML).not.toContain("max-sm:w-full");
   });
 });

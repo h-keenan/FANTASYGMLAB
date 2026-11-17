@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/EmptyState";
-import { PillRow } from "@/components/PillRow";
+import { ViewSelect } from "@/components/ui/ViewSelect";
+import { PageControlsRow } from "@/components/ui/PageControls";
 import { parseNewsTab, type NewsTab } from "@/lib/newsLinks";
 import { PageTitle } from "@/components/PageTitle";
 import type { AlertsResponse, NewsItem, NewsPlayerIdentity, NewsResponse } from "@/lib/api";
@@ -283,29 +284,31 @@ export function NewsContent({
 
   return (
     <main className="page-shell">
-      <header className="flex flex-col gap-1">
-        <PageTitle page={playerName ? `News: ${playerName}` : "News"} />
-        {playerName ? (
+      <PageTitle page={playerName ? `News: ${playerName}` : "News"} />
+      {playerName ? (
+        <header className="flex flex-col gap-1">
           <p className="text-sm font-bold">News: {playerName}</p>
-        ) : null}
-        {playerName ? (
           <a className="text-sm underline" href="/news">
             All news
           </a>
-        ) : null}
-      </header>
+        </header>
+      ) : null}
 
-      {/* A player-filtered feed (the quick view's "See all news") is always the NFL feed: no tabs. */}
+      {/* A player-filtered feed (the quick view's "See all news") is always the NFL feed: no switch. One control row (UI audit batch H):
+          the NFL / My League view select, plus the tab body's own controls (News type filter, recap view and week) in the same row. */}
       {playerName ? null : (
-        <PillRow
-          ariaLabel="News section"
-          options={[
-            { label: "NFL", value: "nfl", glyph: "news" },
-            { label: "My League", value: "league", glyph: "recaps" },
-          ]}
-          active={tab}
-          onSelect={(value) => onTabChange?.(parseNewsTab(value))}
-        />
+        <PageControlsRow testId="news-controls">
+          <ViewSelect
+            label="News section"
+            className="shrink-0"
+            value={tab}
+            options={[
+              { value: "nfl", label: "NFL" },
+              { value: "league", label: "My League" },
+            ]}
+            onChange={(value) => onTabChange?.(parseNewsTab(value))}
+          />
+        </PageControlsRow>
       )}
 
       {!playerName && tab === "league" ? (
