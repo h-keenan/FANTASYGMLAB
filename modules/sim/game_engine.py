@@ -15,6 +15,7 @@ Engine events: ``waiver_result``, ``trade`` (source ``ai_ai``), ``drop``,
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any, Callable, Sequence
 
 from modules.sim import depth_incumbency
@@ -78,14 +79,27 @@ class ScoringSession:
             self._profiles[pid] = self.model.profile(self._mapping(pid), rng)
         return self._profiles[pid]
 
-    def week(self, pid: str, week: int, role_mult: float | None = None) -> PlayerWeek:
+    def healthy_profile(self, pid: str) -> Any:
+        """cover_v 1: a team defense has no injuries (it is a unit, not a person): the profile with the injury weeks and events removed, bye kept."""
+
+        key = ("healthy", pid)
+        if key not in self._profiles:
+            prof = self.profile(pid)
+            if hasattr(prof, "injury_events") and hasattr(prof, "games_available_mask"):
+                reasons = tuple("bye" if r == "bye" else "" for r in prof.unavailable_reason)
+                prof = dataclasses.replace(prof, injury_events=(), unavailable_reason=reasons, games_available_mask=tuple(r != "bye" for r in reasons))
+            self._profiles[key] = prof
+        return self._profiles[key]
+
+    def week(self, pid: str, week: int, role_mult: float | None = None, no_injury: bool = False) -> PlayerWeek:
         """``role_mult``: the team-level role multiplier for this week (``Evaluator.role_mult``), passed only
         for models that resolve team roles (player-model-3+); older models never see it."""
 
         rng = self.rng.stream(week, "gscore", self.snap.index[pid])
+        profile = self.healthy_profile(pid) if no_injury else self.profile(pid)
         if role_mult is not None and self.model.team_roles:
-            return self.model.week(self._mapping(pid), self.profile(pid), week, rng, self.scoring, role_mult=role_mult)
-        return self.model.week(self._mapping(pid), self.profile(pid), week, rng, self.scoring)
+            return self.model.week(self._mapping(pid), profile, week, rng, self.scoring, role_mult=role_mult)
+        return self.model.week(self._mapping(pid), profile, week, rng, self.scoring)
 
     def expected(self, pid: str, week: int, role: Any) -> float:
         """Hidden expected points for the week under ``role`` (world_v usage cap only; adapter models that give it)."""
@@ -725,7 +739,7 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
             f = cut.get(pid)
             if f is not None and role is not None:
                 role = (role[0] * f, role[1] * f)
-        res = session.week(pid, W, role)
+        res = session.week(pid, W, role, no_injury=True) if S.cover_v and snap.players[pid].pos == "DEF" else session.week(pid, W, role)
         if not res.active:
             continue
         played[pid] = PlayerWeek(round(max(0.0, res.points), 2), res.stats, True, res.newly_injured)

@@ -57,6 +57,7 @@ ROOKIE_VERSION = 1  # 1 = dynasty rookie classes are sized like real ones: the s
 WIRE_VERSION = 1  # 1 = the AI places real waiver claims on the players it wants even when the user queued the same player, and every claim resolves in waiver-priority order (0 = a save from before it: the AI avoids the user's queued targets, so the user always wins)
 NEED_VERSION = 1  # 1 = the Needs / Strength tags come from real roster holes (strict starting slots incl. superflex QB, no flex slots, shortfall against the league median after what the wire adds) instead of a fixed bottom tercile, and the trade AI's need and reasons read the same report (0 = a save from before it: bottom / top third per position, replays exactly as it did)
 CAP_VERSION = 1  # 1 = auto-pick, the draft hint, the AI draft and the AI waiver planner share one position limit (game_caps.position_cap: starting slots + flex + backups) instead of the draft's own QB 3 / TE 3 / RB 9 / WR 9 (0 = a save from before it: the old per-module caps, replays exactly as it did)
+COVER_VERSION = 1  # 1 = an AI team covers a starting slot its only player cannot fill (a kicker or defense on his bye, a lone QB / TE hurt) with a stand-in from the wire, and a defense is never injured, instead of starting an empty slot (0 = a save from before it: the slot stays empty, replays exactly as it did)
 POSTURE_VERSION = 1  # 1 = an AI team's win-now / future posture follows its standing and playoff odds from week 5 (buy / sell / hold with hysteresis, event-sourced) instead of staying its persona's constant (0 = a save from before it: a fixed horizon all season, replays exactly as it did)
 INJURY_VERSION = 1  # 1 = every new injury has a type (hamstring, ankle, concussion, ACL ...) sampled by position and severity, shown with the weeks out and kept in the player's injury history (0 = a save from before it: weeks only, replays exactly as it did)
 DEFENSE_VERSION = 1  # 1 = every NFL defense has a per-position strength (vs QB/RB/WR/TE) that evolves season to season and scales a player's weekly expected points and projection by that week's opponent (0 = a save from before it: no opponent modeling, replays exactly as it did)
@@ -263,6 +264,8 @@ class GameSettings:
     cap_v: int = 0
     # AI managers that react to the standings generation (0 = a save from before it).
     posture_v: int = 0
+    # AI managers that cover a hole in the lineup generation (0 = a save from before it).
+    cover_v: int = 0
     # Positional-trade generation (0 = a save from before it: a trade that would give a team a second kicker/defense is refused; K/DEF stay off the block).
     pos_v: int = 0
     # First week the game plays (0 = the usual week 1; >= 2 = a league import that picked up from the real league's current week).
@@ -457,7 +460,7 @@ class GameSettings:
             slots=slots, rounds=rounds, roster_limit=limit, playoff_teams=4 if teams <= 8 else 6,
             mode=mode, te_premium=float(te_premium), superflex=superflex, flex_type=flex_type, include_k=include_k,
             include_def=include_def, bench=bench, tiebreaker=tiebreaker,
-            reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION, limit_v=LIMIT_VERSION, hint_v=HINT_VERSION, world_v=WORLD_VERSION, econ_v=ECON_VERSION, stability_v=STABILITY_VERSION, vorp_v=VORP_VERSION, advice_v=ADVICE_VERSION, pos_v=POS_VERSION, incumbent_v=INCUMBENT_VERSION, defense_v=DEFENSE_VERSION, injury_v=INJURY_VERSION, wire_v=WIRE_VERSION, need_v=NEED_VERSION, cap_v=CAP_VERSION, posture_v=POSTURE_VERSION,
+            reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION, limit_v=LIMIT_VERSION, hint_v=HINT_VERSION, world_v=WORLD_VERSION, econ_v=ECON_VERSION, stability_v=STABILITY_VERSION, vorp_v=VORP_VERSION, advice_v=ADVICE_VERSION, pos_v=POS_VERSION, incumbent_v=INCUMBENT_VERSION, defense_v=DEFENSE_VERSION, injury_v=INJURY_VERSION, wire_v=WIRE_VERSION, need_v=NEED_VERSION, cap_v=CAP_VERSION, posture_v=POSTURE_VERSION, cover_v=COVER_VERSION,
             seasons=seasons, start_year=start_year, rookie_rounds=rookie_rounds,
             pick_years=PICK_YEARS if mode == "dynasty" else 0, dynasty_v=DYNASTY_VERSION if mode == "dynasty" else 0,
             names_v=NAMES_VERSION if mode == "dynasty" else 0, aging_v=AGING_VERSION if mode == "dynasty" else 0,
@@ -516,6 +519,8 @@ class GameSettings:
             out["injury_v"] = self.injury_v
         if self.posture_v:
             out["posture_v"] = self.posture_v
+        if self.cover_v:
+            out["cover_v"] = self.cover_v
         if self.cap_v:
             out["cap_v"] = self.cap_v
         if self.need_v:
@@ -563,7 +568,7 @@ class GameSettings:
             dynasty_v=int(raw.get("dynasty_v") or 0), reserve_v=int(raw.get("reserve_v") or 0), block_v=int(raw.get("block_v") or 0), kd_v=int(raw.get("kd_v") or 0),
             ir_slots=int(raw.get("ir_slots") or 0), taxi_slots=int(raw.get("taxi_slots") or 0),
             taxi_years=int(raw.get("taxi_years", 2)), ai_v=int(raw.get("ai_v") or 0), names_v=int(raw.get("names_v") or 0),
-            limit_v=int(raw.get("limit_v") or 0), hint_v=int(raw.get("hint_v") or 0), world_v=int(raw.get("world_v") or 0), aging_v=int(raw.get("aging_v") or 0), econ_v=int(raw.get("econ_v") or 0), stability_v=int(raw.get("stability_v") or 0), vorp_v=int(raw.get("vorp_v") or 0), advice_v=int(raw.get("advice_v") or 0), pos_v=int(raw.get("pos_v") or 0), incumbent_v=int(raw.get("incumbent_v") or 0), defense_v=int(raw.get("defense_v") or 0), injury_v=int(raw.get("injury_v") or 0), posture_v=int(raw.get("posture_v") or 0), cap_v=int(raw.get("cap_v") or 0), need_v=int(raw.get("need_v") or 0), wire_v=int(raw.get("wire_v") or 0), rookie_v=int(raw.get("rookie_v") or 0), start_week=int(raw.get("start_week") or 0),
+            limit_v=int(raw.get("limit_v") or 0), hint_v=int(raw.get("hint_v") or 0), world_v=int(raw.get("world_v") or 0), aging_v=int(raw.get("aging_v") or 0), econ_v=int(raw.get("econ_v") or 0), stability_v=int(raw.get("stability_v") or 0), vorp_v=int(raw.get("vorp_v") or 0), advice_v=int(raw.get("advice_v") or 0), pos_v=int(raw.get("pos_v") or 0), incumbent_v=int(raw.get("incumbent_v") or 0), defense_v=int(raw.get("defense_v") or 0), injury_v=int(raw.get("injury_v") or 0), posture_v=int(raw.get("posture_v") or 0), cover_v=int(raw.get("cover_v") or 0), cap_v=int(raw.get("cap_v") or 0), need_v=int(raw.get("need_v") or 0), wire_v=int(raw.get("wire_v") or 0), rookie_v=int(raw.get("rookie_v") or 0), start_week=int(raw.get("start_week") or 0),
         )
 
 
@@ -932,7 +937,7 @@ __all__ = [
     "GAME_ENGINE_VERSION", "DIFFICULTIES", "TEAM_COUNTS", "SCORING_NAMES", "DEFAULT_SLOTS",
     "FREE_SEASONS", "MAX_GAMES_PRO", "MAX_GAMES_FREE", "SCORING_PRESETS", "POOL_CAPS",
     "TE_PREMIUMS", "BENCH_RANGE", "DEFAULT_BENCH", "DEFAULT_TEAMS", "DEFAULT_SCORING", "IMPORT_TEAM_COUNTS",
-    "KD_VERSION", "HINT_VERSION", "WORLD_VERSION", "AGING_VERSION", "ECON_VERSION", "STABILITY_VERSION", "VORP_VERSION", "ADVICE_VERSION", "POS_VERSION", "INCUMBENT_VERSION", "DEFENSE_VERSION", "INJURY_VERSION", "POSTURE_VERSION", "CAP_VERSION", "NEED_VERSION", "WIRE_VERSION", "ROOKIE_VERSION", "FLEX_TYPES", "DEFAULT_FLEX_TYPE", "FLEX_SLOT_FOR_TYPE", "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
+    "KD_VERSION", "HINT_VERSION", "WORLD_VERSION", "AGING_VERSION", "ECON_VERSION", "STABILITY_VERSION", "VORP_VERSION", "ADVICE_VERSION", "POS_VERSION", "INCUMBENT_VERSION", "DEFENSE_VERSION", "INJURY_VERSION", "POSTURE_VERSION", "COVER_VERSION", "CAP_VERSION", "NEED_VERSION", "WIRE_VERSION", "ROOKIE_VERSION", "FLEX_TYPES", "DEFAULT_FLEX_TYPE", "FLEX_SLOT_FOR_TYPE", "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
     "DRAFT_SPARE_SPOTS", "derive_layout", "scoring_label", "GAME_POSITIONS", "GAME_STRICT_SLOTS",
     "ImportedTeam", "RealWeek", "LeagueImport", "START_POINTS", "START_POINT_PRESEASON", "START_POINT_CURRENT", "MIN_START_WEEK", "LeagueTeamChoice", "LeagueTeams", "GameError", "GameSettings", "GamePlayer", "GameTeam", "GameSnapshot", "slot_positions",
     "playoff_rounds", "POSITIONS", "STRICT_SLOTS", "FLEX_SLOTS",

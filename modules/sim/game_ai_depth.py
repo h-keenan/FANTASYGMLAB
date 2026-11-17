@@ -207,6 +207,12 @@ def ai_waiver_claims(
                     # HEALTHY depth is under the limit; routine depth and backup-gap claims count everyone on the roster, injured included, because the
                     # injured player comes back and the roster would keep the extra for good
                     held = sum(1 for q in roster if snap.players[q].pos == pos and q != drop and (not emergency or state.out.get(q, 0) <= 1))
+                    if snap.settings.cover_v >= 1 and emergency:
+                        # cover_v 1: a player who cannot play in the very week the hole is in (his bye, an injury) is not cover. Before it, a lone
+                        # kicker or defense on his bye counted as "held", the one-per-position limit refused the stand-in, and the slot stayed empty.
+                        gone = [w for w, slot in found if pos in slot_positions(slot)]
+                        if gone:
+                            held = sum(1 for q in roster if snap.players[q].pos == pos and q != drop and all(ev.status(q, w) == "healthy" for w in gone))
                     if held + 1 > _cap(ev, pos, need):
                         continue
                 elif after > _cap(ev, pos, need) and pos not in want:

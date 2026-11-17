@@ -47,6 +47,7 @@ from modules.sim.game_types import (
     INJURY_VERSION,
     ROOKIE_VERSION,
     POSTURE_VERSION,
+    COVER_VERSION,
     CAP_VERSION,
     NEED_VERSION,
     WIRE_VERSION,
@@ -81,6 +82,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "cap_v": (CAP_VERSION, NOW),
     "need_v": (NEED_VERSION, NOW),
     "wire_v": (WIRE_VERSION, WEEK),
+    "cover_v": (COVER_VERSION, WEEK),
 }
 
 # What the UI shows for each flag: a short label, one sentence of what changes, and whether it needs a dynasty with offseasons.
@@ -173,6 +175,11 @@ FLAGS: dict[str, dict[str, Any]] = {
     "posture_v": {
         "label": 'AI managers that react to the standings',
         "body": 'Contenders and rebuilders re-read their playoff odds every week: a team on the rise starts buying (win-now value in trades and waivers), a team falling out of the race starts selling for the future, with a buffer so they do not flip-flop week to week.',
+        "dynasty_only": False,
+    },
+    "cover_v": {
+        "label": "AI lineups with no empty slots",
+        "body": "An AI manager whose only kicker, defense or other starter is on his bye or hurt picks up a stand-in from the waiver wire instead of leaving the slot empty, and a team defense is never injured. Fewer 40 to 60 point weeks that no real league has.",
         "dynasty_only": False,
     },
     "names_v": {

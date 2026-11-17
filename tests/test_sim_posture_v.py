@@ -19,7 +19,7 @@ def _season(seed: int, posture_v: int):
     """A full redraft game: (snapshot, final state, every event including the draft)."""
 
     events: list = []
-    snap, state = rep._new_game(seed, {"posture_v": posture_v}, events=events)
+    snap, state = rep._new_game(seed, {"posture_v": posture_v, "cover_v": 0}, events=events)
     while state.status == "in_season":
         em = Emitter(state, snap)
         advance(em, snap, state, seed)
@@ -51,7 +51,7 @@ def test_hysteresis_keeps_a_team_on_the_line_from_flipping():
 
 
 def test_the_odds_use_record_roster_and_games_left():
-    snap, state = rep._new_game(1, {"posture_v": 1})
+    snap, state = rep._new_game(1, {"posture_v": 1, "cover_v": 0})
     for t in snap.tids:
         state.stand[t] = {"w": 3, "l": 3, "t": 0, "pf": 600.0, "pa": 600.0}
     good, bad = snap.tids[0], snap.tids[1]
@@ -63,7 +63,7 @@ def test_the_odds_use_record_roster_and_games_left():
 
 
 def test_a_posture_event_changes_the_ai_horizon_and_only_in_posture_v_1():
-    snap, state = rep._new_game(1, {"posture_v": 1})
+    snap, state = rep._new_game(1, {"posture_v": 1, "cover_v": 0})
     tid = next(t.tid for t in snap.teams if not t.is_user)
     base = team_params(snap, tid, state)
     state.posture[tid] = {"stance": "buy", "week": 6, "odds": 0.9}
