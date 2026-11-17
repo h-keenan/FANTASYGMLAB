@@ -351,6 +351,9 @@ class FaabCompetition:
     rivals_needing_richer: int
     rivals_needing_with_budget: int
     budgets_known: bool
+    # Remaining FAAB of every rival who would start him (known budgets only),
+    # so the bid can be checked against what those rivals can actually pay.
+    needing_budgets: tuple[int, ...] = ()
 
 
 def _healthy_scores_by_position(frame, score_field: str) -> dict[str, tuple[float, ...]]:
@@ -479,6 +482,7 @@ def estimate_competition(market: FaabMarket, position: str, candidate_score: flo
         rivals_needing_richer=richer,
         rivals_needing_with_budget=with_budget,
         budgets_known=budgets_known,
+        needing_budgets=tuple(int(r.remaining or 0) for r in needing) if budgets_known else (),
     )
 
 
@@ -662,6 +666,27 @@ def format_faab_block_html(guidance: FaabGuidance, *, compact: bool = False) -> 
         f"{extra}"
         "</div>"
     )
+
+
+# Weeks a Sleeper league plays (the same 17 the trade window uses). Unspent FAAB
+# is worth nothing once the season ends, so how many weeks are left changes
+# what a dollar is worth.
+FAAB_SEASON_END_WEEK = 17
+
+
+def season_urgency(week: int | None, last_week: int | None = None) -> tuple[float, int | None]:
+    """(multiplier on a startable add's bid, weeks left including this one).
+
+    With many weeks left a dollar can still buy a better player later, so a
+    bid is trimmed (down to 0.85); the last weeks have no later, so the same
+    player is worth more of what remains (up to 1.30). Eight weeks left is
+    neutral. Unknown week: no adjustment."""
+
+    if week is None or int(week) <= 0:
+        return 1.0, None
+    end = int(last_week) if last_week else FAAB_SEASON_END_WEEK
+    left = max(1, end - int(week) + 1)
+    return max(0.85, min(1.30, 1.0 + 0.04 * (8 - left))), left
 
 
 @runtime_trace.traced("waiver_generation", phase="waiver_generation")
@@ -884,6 +909,19 @@ def recommend_faab_guidance(
         elif league_format == "Dynasty" and not is_starter:
             base_pct *= 0.95
 
+    # Weeks left: a startable add is worth more of the remaining pool late (no
+    # later chance to spend it) and less early (budget can still buy a better
+    # player). A bench add keeps the redraft late-season discount above.
+    last_week = _safe_int(settings.get("last_scored_week") or settings.get("season_end_week"), 0) or None
+    urgency, weeks_left = season_urgency(resolved_week, last_week)
+    if is_starter and weeks_left is not None and urgency != 1.0:
+        base_pct *= urgency
+        if urgency > 1.0:
+            left_word = "week" if weeks_left == 1 else "weeks"
+            reasons.append(f"Only {weeks_left} {left_word} left, so unspent FAAB is worth little later")
+        else:
+            reasons.append(f"{weeks_left} weeks left, so budget can wait for a better target")
+
     # Value: linear in the player's real score with NO floor. The old 0.5
     # floor gave a 100-value scrub the same bid as a 2500-value player.
     score_factor = min(max(player_score / 5000.0, 0.0), 2.0)
@@ -922,16 +960,34 @@ def recommend_faab_guidance(
 
     # Competition: FAAB is an auction. Bid up when rivals would start him and
     # have money; bid low when nobody else needs him.
+    ceiling: int | None = None
     if competition is not None and competition.rival_count > 0:
         needing = competition.rivals_needing
-        if needing == 0:
+        richer = competition.rivals_needing_richer
+        with_budget = competition.rivals_needing_with_budget
+        unaffordable = False
+        budgets = tuple(competition.needing_budgets or ())
+        if needing and budgets and competition.budgets_known:
+            # A rival only competes if his budget covers a bid of this size, and
+            # nobody needs to be outbid by more than the richest of them can pay.
+            pre_bid = max(min_bid_i, 1, int(round(spend_pool * min(pct, 0.60))))
+            affordable = [b for b in budgets if b >= pre_bid]
+            ceiling = max(budgets) + 1
+            if affordable:
+                needing = with_budget = len(affordable)
+                richer = sum(1 for b in affordable if remaining is not None and b > remaining)
+            else:
+                unaffordable = True
+        team_word = "team needs" if needing == 1 else "teams need"
+        if unaffordable:
+            pct *= 0.7
+            reasons.insert(0, f"{competition.rivals_needing} {'team needs' if competition.rivals_needing == 1 else 'teams need'} a {pos}, but none can afford a bid this size")
+        elif needing == 0:
             pct *= 0.5
             reasons.insert(0, f"No other team would start him at {pos} — a low bid should win")
         else:
             pct *= 1.0 + 0.12 * min(needing, 5)
-            team_word = "team needs" if needing == 1 else "teams need"
             if competition.budgets_known:
-                richer = competition.rivals_needing_richer
                 pct *= 1.0 + 0.08 * min(richer, 3)
                 if richer:
                     reasons.insert(
@@ -939,7 +995,7 @@ def recommend_faab_guidance(
                         f"{needing} {team_word} a {pos} and {richer} of them "
                         f"{'has' if richer == 1 else 'have'} more FAAB than you",
                     )
-                elif competition.rivals_needing_with_budget == 0:
+                elif with_budget == 0:
                     pct *= 0.7
                     reasons.insert(0, f"{needing} {team_word} a {pos}, but none has FAAB left")
                 else:
@@ -951,6 +1007,10 @@ def recommend_faab_guidance(
     pct = min(pct, 0.60)
     faab = int(round(spend_pool * pct))
     faab = _clamp(faab, 0, spend_pool)
+    if ceiling is not None and faab > ceiling:
+        # Bid-to-win ceiling: no rival who needs him can pay more than this.
+        faab = _clamp(max(ceiling, min_bid_i), 0, spend_pool)
+        reasons.insert(0, f"No team that needs him can bid more than ${ceiling - 1}, so ${ceiling} wins")
     if faab > 0:
         faab = max(faab, min(min_bid_i, spend_pool)) if min_bid_i else faab
     elif player_score > 0 and min_bid_i > 0 and min_bid_i <= spend_pool:

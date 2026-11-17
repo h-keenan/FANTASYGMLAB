@@ -236,6 +236,11 @@ def test_build_league_glance_composes_all_five_fields(monkeypatch):
         return _roster_frame()
 
     monkeypatch.setattr(league_glance.league_value_settings, "build_valued_players_frame_cached", _valued)
+    # The glance ranks through the shared waiver source, which applies the has-played gate
+    # from season stats; the synthetic roster has none, so skip the gate here.
+    from modules import waivers_logic
+
+    monkeypatch.setattr(waivers_logic, "default_played_ids", lambda _league: None)
 
     trade_calls: list[dict] = []
     ideas = [{"id": "weak", "rank": 2}, {"id": "best", "rank": 1}]

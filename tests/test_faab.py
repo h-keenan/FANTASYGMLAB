@@ -416,3 +416,61 @@ def test_fractional_score_still_counts_as_clear_best_on_the_wire():
         player_score=4001, position="WR", budget=100, remaining_budget=100, wire_scores=[4000.6, 3900.0, 3800.0]
     )
     assert not any("similar" in reason for reason in crowded.reasons)
+
+
+# --- Realism P1: rival affordability, bid-to-win ceiling, weeks left ---
+
+
+def _budgeted(budgets, *, my_remaining=100):
+    return faab.FaabCompetition(
+        rival_count=11,
+        rivals_needing=len(budgets),
+        rivals_needing_richer=sum(1 for b in budgets if b > my_remaining),
+        rivals_needing_with_budget=sum(1 for b in budgets if b > 0),
+        budgets_known=True,
+        needing_budgets=tuple(budgets),
+    )
+
+
+def test_rivals_who_cannot_pay_do_not_raise_the_bid():
+    broke = _rb(3000, is_starter=True, competition=_budgeted([1, 1, 1, 1, 1]))
+    rich = _rb(3000, is_starter=True, competition=_budgeted([90, 90, 90, 90, 90]))
+    assert broke.point_bid < rich.point_bid
+    assert any("none can afford a bid this size" in r for r in broke.reasons)
+    # five $1 rivals are the bid-to-win ceiling: $2 is enough
+    assert broke.point_bid <= 2
+
+
+def test_bid_is_capped_at_what_the_richest_needy_rival_can_pay():
+    capped = _rb(9000, is_starter=True, competition=_budgeted([12, 8]))
+    assert capped.point_bid <= 13
+    assert any("can bid more than $12" in r for r in capped.reasons)
+    uncapped = _rb(9000, is_starter=True, competition=_budgeted([95, 8]))
+    assert uncapped.point_bid > capped.point_bid
+
+
+def test_market_competition_reports_needy_rival_budgets():
+    market = faab.FaabMarket(
+        rivals=(
+            faab.FaabRival("2", 5, {"RB": (100.0,)}),
+            faab.FaabRival("3", 70, {"RB": (100.0,)}),
+            faab.FaabRival("4", 90, {"RB": (9000.0, 8000.0)}),
+        ),
+        my_remaining=40,
+        slots_by_position={"RB": 2},
+        my_healthy_scores_by_position={"RB": (50.0,)},
+        wire_scores_by_position={"RB": (3000.0,)},
+        trending_adds={},
+    )
+    comp = faab.estimate_competition(market, "RB", 3000)
+    assert sorted(comp.needing_budgets) == [5, 70]
+    assert comp.rivals_needing == 2
+
+
+def test_a_starter_bids_more_of_the_pool_with_few_weeks_left_than_early():
+    early = _rb(3000, is_starter=True, week=3)
+    late = _rb(3000, is_starter=True, week=14)
+    assert late.point_bid > early.point_bid
+    assert any("weeks left" in r or "week left" in r for r in late.reasons + early.reasons)
+    assert faab.season_urgency(None) == (1.0, None)
+    assert faab.season_urgency(17)[1] == 1

@@ -263,6 +263,17 @@ Tests: `tests/test_sim_rookie_v.py` (gate, serialization and the stability depen
   boolean in valuation (lineup model reads the magnitude); `required_depth = starters + 1` ignores bye overlap; `live_big_plays` omits some bonuses; "less competition" wording on a
   Stash card compares wire rank, not rivals.
 
+### Desk P1 delivery: waivers and FAAB (FAAB bids, Add / Stash / Watch, one waiver source)
+
+| Item | Before | After |
+| --- | --- | --- |
+| FAAB rival affordability | five needy rivals with $1 left took a $12 bid to $19 | `FaabCompetition.needing_budgets` carries each needy rival's remaining FAAB; a rival counts only if his budget covers the pre-competition bid (none can: x0.7 and the reason says so), and the richest needy rival's budget plus $1 is a bid-to-win ceiling that is named in the reason when it binds |
+| FAAB weeks left | a starter RB bid the same in week 3 and week 14 | `faab.season_urgency`: a startable add is trimmed early (down to 0.85, "N weeks left, so budget can wait") and lifted late (up to 1.30, "Only N weeks left, so unspent FAAB is worth little later"), neutral at 8 weeks left; bench adds keep the redraft late discount. Waiver priority is still not read |
+| Add / Stash / Watch | an Out RB ranked #1 "Add, fills a real need"; the posture clause read a field nothing set; "Stash" fired in redraft on age alone | `waiver_recommendation` weighs the candidate's own injury (Out / Doubtful / IR never an Add, held only in a long-term format for a rebuild, a young or role-driven player; Questionable keeps the Add at Medium and says so), the stance (a contender's add "helps you now", an older short-term add is Medium for a rebuild, young upside fits a rebuild) and the league format (age alone is not a stash in redraft). The ranker stamps `roster_posture` and `league_format` on every row and never lets an Out candidate fill a need or a bigger upgrade |
+| One waiver answer | Waivers, Today, league glance, the waiver push and the trade card each ranked with different inputs | `waivers_logic.shared_waiver_adds` is the single ranking source: Waivers page, Today (`select_top_waiver_opportunity`), glance, push reminder and the trade-idea waiver guardrail all pass the same need model over the same pool, the has-played gate and the stance. The trade card passes the idea's own posture and rosters |
+
+Gaps: the Today, glance, push and trade-card surfaces build their need model from the plain valued frame, the Waivers page from its projection-adjusted bundle, so a borderline add can still differ; the scheduled waiver push has no stance in scope and ranks neutral; waiver priority is not used in FAAB.
+
 ### Inputs used and missing, by surface
 | Surface | Used | Missing or wrong |
 | --- | --- | --- |

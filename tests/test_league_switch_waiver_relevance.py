@@ -152,4 +152,7 @@ def test_dashboard_waiver_picker_uses_priority_ranker():
             "def _roster_has_viable_kicker("
         )
     ]
-    assert "rank_priority_add_candidates(" in picker
+    # The picker ranks through the one shared source, which wraps the priority ranker.
+    assert "shared_waiver_adds(" in picker
+    shared = source[source.index("def shared_waiver_adds(") : source.index("def select_top_waiver_opportunity(")]
+    assert "rank_priority_add_candidates(" in shared

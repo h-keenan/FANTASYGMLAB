@@ -1118,7 +1118,8 @@ def waiver_reminder_push_item(
         return None
     free_agents = players_df[~players_df["player_id"].astype(str).isin(all_rostered)]
     top = dashboard_engine.select_top_waiver_opportunity(
-        free_agents, roster_df, league_settings, score_field, needed_positions=needed
+        free_agents, roster_df, league_settings, score_field, needed_positions=needed,
+        league=league, rosters=rosters, roster_id=my_roster.get("roster_id"), valued=players_df,
     )
     if top is None or getattr(top, "empty", True):
         return None

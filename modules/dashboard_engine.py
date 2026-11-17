@@ -560,6 +560,7 @@ def _shared_trade_independent_tiles(
     score_field: str,
     injury_display_context: Mapping[str, Any],
     rosters: list[dict] | None = None,
+    waiver_posture: str = "",
 ) -> dict[str, Any]:
     frame_key = league_value_settings.valued_players_frame_cache_key(players_df)
     if not frame_key or os.environ.get("DASHBOARD_SHARED_TILES", "1") == "0":  # kill switch / A-B harness
@@ -576,6 +577,8 @@ def _shared_trade_independent_tiles(
             repr(sorted(injury_display_context.items(), key=lambda kv: str(kv[0]))),
             # Needs rank this roster against every other roster in the league.
             repr(roster_value_model._rosters_signature(rosters or ())),
+            # The waiver tile weighs the team's stance.
+            str(waiver_posture or ""),
         )
     except Exception:
         return compute()
@@ -698,7 +701,9 @@ def compose_next_move_briefing(
         free_agents_df = players_df[~players_df["player_id"].astype(str).isin(all_rostered_player_ids)]
         if include_trade_and_waiver:
             top_waiver = select_top_waiver_opportunity(
-                free_agents_df, roster_df, league_settings, score_field, needed_positions=needed_positions
+                free_agents_df, roster_df, league_settings, score_field, needed_positions=needed_positions,
+                league=league, rosters=rosters, roster_id=roster_id, valued=players_df,
+                posture=str(team_strategy or ""),
             )
         else:
             top_waiver = None
@@ -747,6 +752,7 @@ def compose_next_move_briefing(
         score_field=score_field,
         injury_display_context=injury_display_context,
         rosters=rosters,
+        waiver_posture=str(team_strategy or ""),
     )
     roster_pressure_tile = tiles["roster_pressure_tile"]
     waiver_tile = tiles["waiver_tile"]
