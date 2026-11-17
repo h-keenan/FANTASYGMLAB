@@ -49,6 +49,20 @@ describe("header guard", () => {
     expect(src).not.toContain('kicker: "TEAM"');
   });
 
+  it("sheet chrome (phase 4): every web sheet/popup close is the shared SheetCloseButton, never a bespoke pqv-close or ui-sheet-close", () => {
+    for (const f of ["components/ui/Sheet.tsx", "components/PopupShell.tsx", "components/PlayerQuickView.tsx", "components/SimGameParts.tsx", "components/TradePickerSheet.tsx"]) {
+      const src = read(WEB, f);
+      expect(src, f).toContain("SheetChrome");
+      expect(src, f).not.toMatch(/className="pqv-close|ui-sheet-close/);
+    }
+  });
+
+  it("sheet chrome (phase 4): app sheets use the shared SheetChrome close button", () => {
+    for (const f of ["Sheet", "PlayerQuickViewSheet", "SimGameParts", "TradePickerSheet", "PercentileExplorerSheet", "ManagerProfileModal"]) {
+      expect(read(APP, `components/${f}.tsx`), f).toContain("./SheetChrome");
+    }
+  });
+
   it("the Sim game header is one 52px row plus a folding ribbon (web and app), never the old two-row 97px block", () => {
     const web = read(WEB, "components/SimGameHeader.tsx");
     expect(web).toContain("sim-game-header-row");

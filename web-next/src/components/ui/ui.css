@@ -64,25 +64,6 @@
   font-size: 0.8rem;
   color: var(--color-text-muted);
 }
-.ui-sheet-close {
-  flex-shrink: 0;
-  display: inline-grid;
-  place-items: center;
-  width: var(--touch-target-min);
-  height: var(--touch-target-min);
-  margin: -4px -8px 0 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  border: 0;
-  color: var(--color-text-secondary);
-  font-size: 1.4rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.ui-sheet-close:hover,
-.ui-sheet-close:focus-visible {
-  color: var(--color-text-primary);
-}
 .ui-sheet-body {
   flex: 1 1 auto;
   min-height: 0;

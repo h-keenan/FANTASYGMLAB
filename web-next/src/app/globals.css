@@ -1280,6 +1280,14 @@ a {
   font-size: 1.15rem;
   cursor: pointer;
 }
+/* Inline placement (SheetHeader rows, trade picker): the same X as the last item of a header row, 44px target. */
+.pqv-close.sheet-close-inline {
+  position: static;
+  flex-shrink: 0;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  margin: -4px -4px 0 0;
+}
 .pqv-close:hover,
 .pqv-close:focus-visible {
   color: var(--color-text-primary);
@@ -4234,20 +4242,6 @@ main > header:has(> h1.sr-only:only-child) {
   .tps-modal {
     animation: none;
   }
-}
-.tps-header {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-md) var(--space-sm);
-}
-.tps-close {
-  position: static;
-  flex-shrink: 0;
-  width: var(--touch-target-min);
-  height: var(--touch-target-min);
 }
 .tps-chips {
   position: relative;

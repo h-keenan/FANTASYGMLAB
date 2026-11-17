@@ -50,6 +50,7 @@ import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { simSeeAllLabel } from "@/lib/simLayout";
 import { ProgressFill, SuccessCheck } from "@/components/Motion";
+import { SheetCloseButton } from "@/components/ui/SheetChrome";
 
 /** Semantic color token for a presentation tone (never a raw hex). */
 /** Text version of a tone: the tone mixed toward the primary text color so small colored text clears AA on cards and tints. */
@@ -542,9 +543,7 @@ export function SimSheet({ title, onClose, children, labelledBy = "sim-sheet-tit
       >
         <SheetHandle />
         <OverlayBack overlay={overlay} />
-        <button type="button" className="pqv-close" aria-label={`Close ${title}`} onClick={overlay.closeAll}>
-          ×
-        </button>
+        <SheetCloseButton label={`Close ${title}`} onClose={overlay.closeAll} />
         <div className="pqv-scroll">
           <h2 id={labelledBy} className="sr-only">
             {title}

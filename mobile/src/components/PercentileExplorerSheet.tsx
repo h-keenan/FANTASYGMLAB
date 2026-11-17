@@ -37,6 +37,7 @@ import {
 import { ordinal, percentileColor } from '../lib/percentile';
 import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 import ErrorState from './ErrorState';
+import { SheetCloseButton } from './SheetChrome';
 
 const LANE_STEP = 74;
 const BAR_AREA = 88;
@@ -289,9 +290,7 @@ export default function PercentileExplorerSheet({
               <AppText style={styles.title}>{metric.label} Percentile Explorer</AppText>
               <AppText style={styles.hint}>Drag across the chart or tap a bar to see who sits there.</AppText>
             </View>
-            <PressableScale onPress={onClose} style={styles.close} hitSlop={8} accessibilityLabel="Close percentile explorer">
-              <Ionicons name="close" size={22} color={colors.textSecondary} />
-            </PressableScale>
+            <SheetCloseButton label="Close percentile explorer" onClose={onClose} />
           </View>
           <SheetScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
             <SegmentedTabBar

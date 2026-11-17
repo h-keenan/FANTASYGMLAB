@@ -46,6 +46,7 @@ import {
 import { simSeeAllLabel } from '../lib/simLayout';
 import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 import { ProgressFill, SuccessCheck } from './Motion';
+import { SheetCloseButton } from './SheetChrome';
 
 /** Semantic theme color for a presentation tone (never a raw hex). */
 export function simToneColor(tone: SimGameTone, colors: ThemeColors): string {
@@ -403,9 +404,7 @@ export function SimSheet({ title, onClose, children }: { title: string; onClose:
               <AppText style={styles.sheetTitle} numberOfLines={2}>
                 {title}
               </AppText>
-              <Pressable onPress={onClose} hitSlop={10} style={styles.closeButton} accessibilityRole="button" accessibilityLabel={`Close ${title}`}>
-                <Ionicons name="close" size={18} color={colors.textSecondary} />
-              </Pressable>
+              <SheetCloseButton label={`Close ${title}`} onClose={onClose} />
             </View>
             {children}
           </SheetScrollView>
