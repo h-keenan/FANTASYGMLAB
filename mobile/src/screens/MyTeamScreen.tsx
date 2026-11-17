@@ -32,6 +32,7 @@ import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysis
 import ToneBadge from '../components/ToneBadge';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import ValuesCredit from '../components/ValuesCredit';
+import { buildRosterBasis } from '../lib/rosterBasis';
 import { api, type KeeperPlayerInfo, type KeepersResponse, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { buildRosterComposition, buildTeamAnalysisRows, type CompositionSegment, type TeamAnalysisRow } from '../lib/myTeamAnalysis';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -171,13 +172,11 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   const bestBall = myTeamData?.best_ball === true;
   const rawStarters = useMemo<LineupPlayer[]>(() => myTeamData?.starters ?? [], [myTeamData]);
   const rawBench = useMemo<LineupPlayer[]>(() => myTeamData?.bench ?? [], [myTeamData]);
-  const isActiveBench = (p: LineupPlayer) => p.roster_slot !== 'ir' && p.roster_slot !== 'taxi';
-  const starters: LineupPlayer[] = bestBall
-    ? [...rawStarters, ...rawBench.filter(isActiveBench)].map((p) => ({ ...p, slot: 'BENCH' }))
-    : rawStarters;
-  const activeBench = bestBall ? [] : rawBench.filter(isActiveBench);
-  const irBench = rawBench.filter((p) => p.roster_slot === 'ir');
-  const taxiBench = rawBench.filter((p) => p.roster_slot === 'taxi');
+  // One roster basis for web and app (lib/rosterBasis.ts): position-ordered bench, and the best-ball single roster list.
+  const basis = useMemo(() => buildRosterBasis(rawStarters, rawBench, bestBall), [rawStarters, rawBench, bestBall]);
+  const starters: LineupPlayer[] = bestBall ? basis.activeBench : basis.starters;
+  const activeBench: LineupPlayer[] = bestBall ? [] : basis.activeBench;
+  const { irBench, taxiBench } = basis;
   const notice = myTeamData?.reason ? reasonMessage(myTeamData.reason) : null;
   const leagueSize = teamRankingsQuery.data?.teams.length ?? 0;
   const myTeam: TeamRanking | null = myTeamData?.roster_id
@@ -607,7 +606,7 @@ function LineupRow({
   const isTeamDefense = (player.position ?? '').toUpperCase() === 'DEF';
   const statusLabel = lineupStatusLabel(player);
   const kind = badgeFromInjury(statusLabel) ?? (statusLabel === 'Bye' ? 'bye' : null);
-  const slotLabel = player.slot === 'BENCH' ? player.position : player.slot;
+  const slotLabel = !player.slot || player.slot === 'BENCH' ? player.position : player.slot;
   const surplus =
     keeper?.surplus != null && keeper.cost_round != null
       ? `${keeper.kept_round ? 'R' : '~R'}${keeper.cost_round} ${keeper.surplus > 0 ? '+' : ''}${keeper.surplus}`
