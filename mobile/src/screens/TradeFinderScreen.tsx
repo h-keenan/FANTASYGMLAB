@@ -13,6 +13,7 @@ import { SkeletonPage } from '../components/Skeleton';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import PickGroupList from '../components/PickGroupList';
 import EmptyState from '../components/EmptyState';
+import PremiumLock from '../components/PremiumLock';
 import GridBackground from '../components/GridBackground';
 import ExchangeSide from '../components/ExchangeSide';
 import PlayerAccordionRow from '../components/PlayerAccordionRow';
@@ -463,6 +464,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
 
   const selectionCount = selectedIds.size + selectedPickIds.size;
 
+  const [proLock, setProLock] = useState<{ title?: string; body?: string } | null>(null);
   const search = async (playerIds: string[] = Array.from(selectedIds)) => {
     setSearchError(null);
     setSearching(true);
@@ -474,6 +476,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
       });
       setIdeas(result.ideas);
       setNoResults({ search: result.search, closest: result.closest ?? [] });
+      setProLock(result.is_premium === false ? { title: result.upsell?.title, body: result.upsell?.body } : null);
       if (result.ideas.length === 0 && result.reason) {
         setSearchError(
           result.reason === 'no_players_selected'
@@ -519,6 +522,19 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
     return (
       <View style={[styles.center]}>
         <EmptyState icon="time-outline" title="Trade Finder is closed" subtitle={rosterNotice} />
+      </View>
+    );
+  }
+
+  if (proLock) {
+    return (
+      <View style={[styles.center]}>
+        <PremiumLock
+          feature="trade_finder"
+          leagueName={leagueName}
+          title={proLock.title || 'Build and search for a trade'}
+          description={proLock.body || 'Trade Finder is a Pro feature: build a custom package and search every roster in your league for a real match. Upgrade to Pro to unlock it.'}
+        />
       </View>
     );
   }
