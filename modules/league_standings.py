@@ -10,6 +10,8 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from modules import league_calendar
+
 
 def _safe_text(value: object, default: str = "") -> str:
     if value is None:
@@ -294,6 +296,14 @@ def build_league_standings_bundle(
         ]
 
     week_label = f"Through Week {current_week}" if current_week > 0 else ""
+    if league_calendar.is_offseason(league_data):
+        # `leg` keeps the last week Sleeper reached (17 or 18), which is not a
+        # regular-season week and would read as "Through Week 18".
+        week_label = "Final standings" if str(league_data.get("status") or "").lower() == "complete" else ""
+    else:
+        regular_season_end = _safe_int(league_settings.get("playoff_week_start"), 0) - 1
+        if regular_season_end > 0 and current_week > regular_season_end:
+            week_label = f"Through Week {regular_season_end}"
     return {
         "available": True,
         "empty_reason": None,

@@ -9,8 +9,9 @@ User-facing intelligence must use this module rather than treating
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Mapping
+
+from modules import season_clock
 
 REDRAFT = "redraft"
 KEEPER = "keeper"
@@ -121,7 +122,7 @@ def pick_is_actionable_capital(
         return False
     current = int(current_pick_year or 0)
     try:
-        calendar_year = int(as_of_year) if as_of_year is not None else int(datetime.now().year)
+        calendar_year = int(as_of_year) if as_of_year is not None else int(season_clock.calendar_year())
     except (TypeError, ValueError):
         calendar_year = 0
     if year <= 0:

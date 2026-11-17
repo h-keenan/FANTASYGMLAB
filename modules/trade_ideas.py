@@ -1,6 +1,5 @@
 import pandas as pd
 from typing import List, Dict, Any, Mapping, Sequence
-from datetime import datetime
 from collections import defaultdict
 from contextlib import contextmanager
 from copy import deepcopy
@@ -36,6 +35,7 @@ from modules.team_eval import (
     team_strategy_label,
     team_strategy_mode,
 )
+from modules import season_clock
 from modules import roster_value_model
 from modules.roster_needs import SHALLOW_POSITIONS, assessment_from_model, room_records, true_shallow_position_needs
 from modules.rankings import (
@@ -603,7 +603,7 @@ def _pick_value_components(
     if next_draft_year:
         years_out = max(0, season - int(next_draft_year))
     else:
-        years_out = max(0, season - (datetime.now().year + 1))
+        years_out = max(0, season - (season_clock.calendar_year() + 1))
     projection = _pick_range_projection(
         _safe_float(context.get("slot_percentile"), 0.5),
         years_out,
@@ -674,7 +674,7 @@ def _build_roster_pick_assets(
     draft_rounds = max(1, min(draft_rounds, 6))
 
     traded_picks = platform_adapter.get_traded_picks(league_id)
-    league_year = _safe_int(league.get("season"), datetime.now().year) or datetime.now().year
+    league_year = _safe_int(league.get("season"), season_clock.calendar_year()) or season_clock.calendar_year()
     draft_context = draft_status if isinstance(draft_status, dict) else {}
     current_pick_year = _safe_int(draft_context.get("draft_year"), league_year) or league_year
     # Redraft defaults to post-draft (no invented current-year board) unless
@@ -706,7 +706,7 @@ def _build_roster_pick_assets(
             current_pick_year=current_pick_year,
             current_year_picks_active=current_year_picks_active,
             settings=league_settings,
-            as_of_year=datetime.now().year,
+            as_of_year=season_clock.calendar_year(),
         )
     }
     seasons: set[int] = set(traded_seasons)
@@ -774,7 +774,7 @@ def _build_roster_pick_assets(
             current_pick_year=current_pick_year,
             current_year_picks_active=current_year_picks_active,
             settings=league_settings,
-            as_of_year=datetime.now().year,
+            as_of_year=season_clock.calendar_year(),
         ):
             continue
         original_team = team_name_by_roster.get(original_roster_id, f"Team {original_roster_id}")

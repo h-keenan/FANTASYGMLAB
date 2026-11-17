@@ -3318,6 +3318,8 @@ def get_league_team_sheet(
         week = int((league_settings or {}).get("leg") or 0)
     except (TypeError, ValueError):
         week = 0
+    if league_calendar.is_offseason(league):
+        week = 0  # no "this week" opponent between seasons
     profiles = sleeper.get_league_roster_profiles(league_id) or {}
     if week > 0:
         try:
@@ -14355,7 +14357,9 @@ def get_gm_plan(
     # Same "leg"/"week" field modules.league_standings already reads off
     # Sleeper's raw league settings — reused, not recomputed.
     raw_settings = league.get("settings") or {}
-    current_week = raw_settings.get("leg") or raw_settings.get("week")
+    # Between seasons Sleeper keeps last season's final week in `leg`; that is
+    # not "the current week" (it read as "Playoff Push" all February).
+    current_week = None if league_calendar.is_offseason(league) else (raw_settings.get("leg") or raw_settings.get("week"))
     playoff_week_start = raw_settings.get("playoff_week_start")
     # Sleeper's real settings.trade_deadline drives the deadline phase
     # (modules.league_calendar), not the old hardcoded weeks 4-11.
@@ -16929,7 +16933,9 @@ def _build_matchup(
             current_week = int((league_settings or {}).get("leg") or 0)
         except (TypeError, ValueError):
             current_week = 0
-        if current_week <= 0:
+        # A finished or not-yet-started league keeps its last `leg`; there is no
+        # live matchup to show, so say so instead of last season's Week 18.
+        if current_week <= 0 or league_calendar.is_offseason(league):
             return _empty_matchup("no_current_week")
 
         matchups = sleeper.get_matchups(league_id, current_week)
@@ -17717,6 +17723,8 @@ def get_league_waivers(
         current_week = int((league.get("settings") or {}).get("leg") or 0)
     except (TypeError, ValueError):
         current_week = 0
+    if league_calendar.is_offseason(league):
+        current_week = 0  # last season's final week is not an upcoming opponent
     if current_week > 0:
         season = sleeper.default_player_stats_season()
         games_df = nfl_schedule.load_games()

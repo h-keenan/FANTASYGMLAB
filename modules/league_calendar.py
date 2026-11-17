@@ -31,6 +31,10 @@ from typing import Any
 NO_DEADLINE_WEEK_THRESHOLD = 18
 
 IN_SEASON_STATUSES = frozenset({"in_season", "post_season"})
+# Sleeper statuses that mean "between seasons": last season is over
+# (``complete``) or the next one has not started (``pre_draft`` / ``drafting``).
+# Explicit on purpose: a payload with NO status is unknown, not off-season.
+OFFSEASON_STATUSES = frozenset({"complete", "pre_draft", "drafting"})
 
 TRADE_DEADLINE_PASSED_REASON = "trade_deadline_passed"
 TRADE_DEADLINE_PASSED_MESSAGE = "Trade deadline has passed; trades reopen after the season."
@@ -83,6 +87,24 @@ def is_in_season(league: Mapping[str, Any] | None) -> bool:
     if not isinstance(league, Mapping):
         return False
     return str(league.get("status") or "").strip().lower() in IN_SEASON_STATUSES
+
+
+def is_offseason(league: Mapping[str, Any] | None) -> bool:
+    """True only when the league payload positively says it is between seasons.
+
+    Sleeper keeps the last week it reached in ``settings.leg`` after the season
+    ends (17 or 18), so ``leg`` alone must never be read as "this week".
+    """
+
+    if not isinstance(league, Mapping):
+        return False
+    return str(league.get("status") or "").strip().lower() in OFFSEASON_STATUSES
+
+
+def active_league_week(league: Mapping[str, Any] | None) -> int | None:
+    """The league's current week, or None between seasons (no week to show)."""
+
+    return None if is_offseason(league) else current_league_week(league)
 
 
 def trade_deadline_passed(league: Mapping[str, Any] | None) -> bool:
