@@ -78,8 +78,6 @@ export const IDENTICAL = [
   "playersModules.ts",
   "rosterBasis.ts",
   "leagueStandings.ts",
-  "accountSections.ts",
-  "simErrorCopy.ts",
   "playerAnatomy.ts",
   "avatarFallback.ts",
   "multiTeamIdeas.ts",
@@ -134,6 +132,8 @@ export const IDENTICAL = [
   "tradeValueBands.generated.ts",
   "verdictText.ts",
   "presence.ts",
+  "accountSections.ts",
+  "simErrorCopy.ts",
 ];
 
 // Same code, differing only in comments / import specifiers / quote style.
