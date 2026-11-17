@@ -1,5 +1,6 @@
 "use client";
 
+// weekly-chart-ok: a radar of sub-ratings, not a weekly-points chart
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer } from "recharts";
 
 import { SUB_RATING_DISPLAY } from "@/lib/playerQuickViewPresentation";

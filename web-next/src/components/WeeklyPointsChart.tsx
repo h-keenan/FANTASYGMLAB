@@ -33,6 +33,7 @@ export function WeeklyPointsPanel({
   xLabel = "Week",
   byeWeeks = [],
   inactiveWeeks = [],
+  injuredWeeks = [],
   throughWeek = null,
 }: {
   name: string;
@@ -50,6 +51,8 @@ export function WeeklyPointsPanel({
   byeWeeks?: readonly number[];
   /** Weeks the provider confirms he did not play (his team did): a dashed, labelled gap, not missing data. */
   inactiveWeeks?: readonly number[];
+  /** Weeks he was out injured (a dashed, labelled gap, like inactive). */
+  injuredWeeks?: readonly number[];
   /** Current NFL week: the x axis runs to here; completed weeks with no data show a "no data" break. */
   throughWeek?: number | null;
   /** Kept for call-site compatibility; the shared chart ids its own gradient. */
@@ -65,7 +68,7 @@ export function WeeklyPointsPanel({
         {name}
       </div>
       <TrendChart
-        points={weeklyChartPoints(weeks, byeWeeks, xLabel === "Week" ? "Wk" : xLabel, { inactiveWeeks, throughWeek })}
+        points={weeklyChartPoints(weeks, byeWeeks, xLabel === "Week" ? "Wk" : xLabel, { inactiveWeeks, injuredWeeks, throughWeek })}
         xMax={throughWeek}
         band={band}
         name={name}

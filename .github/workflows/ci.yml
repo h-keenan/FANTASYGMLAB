@@ -88,6 +88,8 @@ jobs:
         run: node scripts/check_verdict_colors.mjs
       - name: Check short view switches are tabs, not dropdowns
         run: node scripts/check_view_select.mjs
+      - name: Check there is one weekly points chart
+        run: node scripts/check_weekly_chart.mjs
       - name: Check the legacy header is retired
         run: node scripts/check_legacy_header.mjs
       - name: Onboarding copy has no em-dashes

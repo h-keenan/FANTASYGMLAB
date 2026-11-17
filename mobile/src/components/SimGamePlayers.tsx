@@ -23,7 +23,7 @@ import { api } from '../lib/api';
 import { stubPlayer } from '../lib/playerQuickView';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
 import { simSuppressedBadges } from '../lib/simDraft';
-import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroGrade, simHeroTiles, simOutlookBand, simOutlookTiles, simProfileRead, simRosLine } from '../lib/simPlayerSheet';
+import { simWeeklySeries, simAvailabilityLine, simHeaderTags, simHeroGrade, simHeroTiles, simOutlookTiles, simProfileRead, simRosLine } from '../lib/simPlayerSheet';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
 import {
   SIM_PAGE_SIZE,
@@ -381,8 +381,9 @@ function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePla
   if (detail.failed) return <EmptyState icon="alert-circle-outline" title="Could not load the outlook" subtitle="Close the sheet and open him again." />;
   if (!body) return <SkeletonCard rows={2} />;
   const ros = body.ros ?? null;
-  const band = simOutlookBand(body);
-  const actual = simActualPoints(body);
+  const series = simWeeklySeries(body);
+  const band = series.projection;
+  const actual = series.weeks;
   const availability = ros ? simAvailabilityLine(ros) : null;
   if (!(actual.length > 0 || band || ros)) return <EmptyState icon="trending-up-outline" title="No outlook yet" subtitle="Projections appear once the season starts." />;
   const tiles = simOutlookTiles(ros);
@@ -395,7 +396,7 @@ function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePla
           </View>
         ) : null}
         {actual.length > 0 || band ? (
-          <WeeklyPointsChart weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))} projection={band} pointsLabel="pts" byeWeeks={ros?.bye_week ? [ros.bye_week] : []} />
+          <WeeklyPointsChart weeks={series.weeks} projection={series.projection} pointsLabel="pts" byeWeeks={series.byeWeeks} injuredWeeks={series.injuredWeeks} />
         ) : null}
         {ros ? (
           <AppText style={common.small} testID="sim-ros-line">

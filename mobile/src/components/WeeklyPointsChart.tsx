@@ -21,6 +21,7 @@ export default function WeeklyPointsChart({
   xLabel = 'Week',
   byeWeeks = [],
   inactiveWeeks = [],
+  injuredWeeks = [],
   throughWeek = null,
 }: {
   weeks: WeeklyStatPoint[];
@@ -34,13 +35,15 @@ export default function WeeklyPointsChart({
   byeWeeks?: readonly number[];
   /** Weeks the provider confirms he did not play (his team did). */
   inactiveWeeks?: readonly number[];
+  /** Weeks he was out injured (a dashed, labelled gap, like inactive). */
+  injuredWeeks?: readonly number[];
   /** Current NFL week: the axis runs to here; completed weeks with no data show a 'no data' break. */
   throughWeek?: number | null;
 }) {
   const band: ChartBandPoint[] | null = projection && projection.length > 0 ? projection.map((p) => ({ x: p.week, mean: p.mean, floor: p.floor, ceiling: p.ceiling })) : null;
   return (
     <TrendChart
-      points={weeklyChartPoints(weeks, byeWeeks, xLabel === 'Week' ? 'Wk' : xLabel, { inactiveWeeks, throughWeek })}
+      points={weeklyChartPoints(weeks, byeWeeks, xLabel === 'Week' ? 'Wk' : xLabel, { inactiveWeeks, injuredWeeks, throughWeek })}
       xMax={throughWeek}
       band={band}
       name="Points by week"
