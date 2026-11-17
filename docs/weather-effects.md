@@ -105,6 +105,10 @@ as % of the position mean. "Early/late" are the two halves of the sample;
 - WR: heavy rain -10.7%
 - TE: heavy rain -10.5%, wind 20+ mph -16.1%
 - K: wind 15+ mph -7.5%, freezing -9.1%
+- **Wind update (2026-11)**: a point-in-time replay of the production projection on observed stadium wind (outdoor games, 2016-2022 fit, 2023-26
+  holdout; `docs/audits/2026-11-projections-backtest.md` "Round 2") found a real windy-game shortfall for QB (-3%), WR (-5%), TE (-8% at 15-19, -26% at 20+) and K
+  (-6% / -11%), none for RB. The table now carries QB wind 15+ -1.5%, WR -2.5% (15-19) / -3.0% (20+), TE -2.0% (15-19), K -7.0% / -8.6%: each cell shrunk
+  toward the earlier value, scaled by 0.75 for forecast noise, and still under the -10% total cap. This supersedes "QB/WR wind is NOT applied" below.
 - **RB: no adjustment** (nothing clears the bar: rain -2% to -4% and wind are
   not distinguishable from zero, and cold is nominally positive but is not
   applied). **WR/TE light rain, QB/WR wind, and TE cold: no adjustment.**
@@ -136,7 +140,7 @@ the label with a shared chip (web `WeatherReasonChip`, mobile
   stadium-reported wind the same effects shrink to -4% (QB) and +1% (WR)
   and are not significant. The two wind measures only correlate 0.66, so
   which one reflects what a passer feels is unresolved. Failing to replicate
-  means QB/WR wind is NOT applied. The TE 20+ mph and K 15+ mph effects did
+  meant QB/WR wind was NOT applied (superseded by the 2026-11 update above). The TE 20+ mph and K 15+ mph effects did
   replicate, but TE rests on only 24 games, so treat it as thin.
 - **Rain uses modeled precipitation** (reanalysis, not a gauge at the field),
   so each tier is a noisy proxy. The forecast is noisier still; the

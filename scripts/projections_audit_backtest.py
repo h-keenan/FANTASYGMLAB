@@ -159,6 +159,11 @@ def team_game_table(games: pd.DataFrame, season: int) -> pd.DataFrame:
     return out
 
 
+def _team_history(prior_rows, rows_before):
+    """Team of each game played, oldest first (what ``player_projections.team_history_for_player`` reads in production)."""
+    return [x.get("team") for x in (prior_rows or [])] + [x.get("team") for x in (rows_before or [])]
+
+
 def _ros_rows(season, V, games, week_players, cur_rows, prev_rows, tg_idx, full, weekly_stats):
     """Rest-of-season totals as the weekly projection loop in production would produce them at week V.
 
@@ -181,14 +186,16 @@ def _ros_rows(season, V, games, week_players, cur_rows, prev_rows, tg_idx, full,
             if not rem:
                 continue
             rows_before = [x for x in cur_rows.get(pid, []) if x["week"] < V]
-            total, n_ok = 0.0, 0
+            total, mean_total, n_ok = 0.0, 0.0, 0
             lows = highs = 0.0
             for w in rem:
                 res = pp.project_player_week(pid, w, season, players=week_players, player_weekly_rows=rows_before,
                                              prior_weekly_rows=prev_rows.get(pid), defense_strength={}, team_qb_quality={},
-                                             weekly_stats=weekly_stats, team_qb_pass_attempts_by_team={}, stats_through_week=V - 1)
+                                             weekly_stats=weekly_stats, team_qb_pass_attempts_by_team={}, stats_through_week=V - 1,
+                                             team_history=_team_history(prev_rows.get(pid), rows_before))
                 if res.get("status") == "ok":
                     total += res["point_estimate"]
+                    mean_total += res.get("mean_estimate", res["point_estimate"])
                     n_ok += 1
             if n_ok == 0:
                 continue
@@ -196,7 +203,7 @@ def _ros_rows(season, V, games, week_players, cur_rows, prev_rows, tg_idx, full,
             cur_pts = [x["fantasy_points_ppr"] for x in rows_before]
             act = [float(full[(pid, season, w)].fantasy_points_ppr) for w in rem if (pid, season, w) in full]
             out.append({"season": season, "vantage": V, "pid": pid, "pos": pl["position"], "team": team, "rem_games": len(rem),
-                        "ros_est": total, "ros_actual": sum(act), "games_played": len(act),
+                        "ros_est": total, "ros_mean_est": mean_total, "ros_actual": sum(act), "games_played": len(act),
                         "b_last3": float(np.mean(hist_all[-3:])) * len(rem) if hist_all else np.nan,
                         "b_std": (float(np.mean(cur_pts)) if cur_pts else (float(np.mean([x["fantasy_points_ppr"] for x in prev_rows.get(pid, [])])) if prev_rows.get(pid) else np.nan)) * len(rem),
                         "ppg_est": total / max(1, n_ok), "inj": pl["injury_status"], "status": pl["status"]})
@@ -308,6 +315,7 @@ def run_season(nv: Path, season: int, last_week: int, scorings: bool = True, ros
                 pid, W, season, players=week_players,
                 player_weekly_rows=rows_before, prior_weekly_rows=prev_rows.get(pid), defense_strength={},
                 team_qb_quality={}, weekly_stats=weekly_stats, team_qb_pass_attempts_by_team={}, stats_through_week=W - 1,
+                team_history=_team_history(prev_rows.get(pid), rows_before),
             )
             status = res.get("status")
             rec = {"season": season, "week": W, "pid": pid, "pos": pl["position"], "team": team_now, "status": status,
@@ -330,7 +338,9 @@ def run_season(nv: Path, season: int, last_week: int, scorings: bool = True, ros
             rec["n_prev"] = len(prev_rows.get(pid, []))
             if status == "ok":
                 b = res["basis"]
-                rec.update(est=res["point_estimate"], low=res["low"], high=res["high"], conf=res["confidence"],
+                rec.update(est=res["point_estimate"], mean_est=res.get("mean_estimate", res["point_estimate"]),
+                           low=res["low"], high=res["high"], conf=res["confidence"],
+                           part_mult=b["participation"]["multiplier"], nt_mult=b.get("new_team", {}).get("multiplier", 1.0),
                            avail=b["availability"]["reason"], avail_mult=b["availability"]["multiplier"],
                            role=b["role"]["reason"], prior_seeded=b["prior_season_seeded"], games_used=b["season_games_played"],
                            usage_implied=b["usage_implied_ppr"], questionable_applied=b["questionable_plays"]["applied"],
@@ -362,6 +372,7 @@ def run_season(nv: Path, season: int, last_week: int, scorings: bool = True, ros
             rec["missed_season"] = sum(1 for w in range(1, W) if (team_now, w) in tg_idx and w not in pw)
             rec["team_games_season"] = sum(1 for w in range(1, W) if (team_now, w) in tg_idx)
             rec["team_last"] = rows_before[-1]["team"] if rows_before else (prev_rows[pid][-1]["team"] if prev_rows.get(pid) else None)
+            rec["team_prior"] = prev_rows[pid][-1]["team"] if prev_rows.get(pid) else None
             info = rw_info.loc[pid] if pid in rw_info.index else None
             if info is not None:
                 bd = pd.to_datetime(info.birth_date, errors="coerce")

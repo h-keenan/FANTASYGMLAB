@@ -2604,6 +2604,8 @@ export interface PlayerWeekProjection {
     | 'unknown_player'
     | 'no_team';
   point_estimate: number | null;
+  /** Mean-calibrated twin of point_estimate: what team totals and the win probability sum. */
+  mean_estimate?: number | null;
   low: number | null;
   high: number | null;
   confidence: 'low' | 'medium' | 'high' | null;

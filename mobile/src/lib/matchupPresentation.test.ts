@@ -57,6 +57,21 @@ test('lineupPlayerPoints: real points once started, projection before, bye noted
   assert.equal(lineupPlayerPoints({ projection: { status: 'bye_week' } } as never).note, 'bye');
 });
 
+test('lineupPlayerPoints / lineupTotals: totals sum the mean-calibrated projection, start/sit keeps the point estimate', () => {
+  const withMean = (point: number, mean: number | undefined) =>
+    ({ game_started: false, actual_points: 0, projection: { status: 'ok', point_estimate: point, mean_estimate: mean } }) as never;
+  assert.equal(lineupPlayerPoints(withMean(9.5, 10.2)).value, 9.5);
+  assert.equal(lineupPlayerPoints(withMean(9.5, 10.2), 'mean').value, 10.2);
+  assert.equal(lineupPlayerPoints(withMean(9.5, undefined), 'mean').value, 9.5);
+  assert.deepEqual(
+    lineupTotals([
+      { slot: 'QB', mine: withMean(10, 11), opponent: withMean(9, 9) },
+      { slot: 'WR', mine: withMean(8, 9), opponent: withMean(7, undefined) },
+    ]),
+    { mine: 20, opponent: 16, margin: 4 },
+  );
+});
+
 test('lineupComparisonRows zips by slot and keeps empty slots', () => {
   const p = (id: string, slot: string) => ({ player_id: id, slot }) as never;
   const rows = lineupComparisonRows([p('a', 'QB'), p('b', 'RB')], [p('c', 'QB')], ['WR'], []);

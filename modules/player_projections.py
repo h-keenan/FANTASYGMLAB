@@ -131,7 +131,7 @@ an oversight.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import pandas as pd
 
@@ -207,7 +207,7 @@ _MIN_TEAMS_FOR_QB_QUALITY_LEAGUE_AVERAGE = 2
 _MIN_BAND_HALF_WIDTH = 2.5
 
 # Bumped whenever the estimator changes; surfaced in ``basis.model_version``.
-PROJECTION_MODEL_VERSION = "v3.3-participation-2026-11"
+PROJECTION_MODEL_VERSION = "v3.4-p1-2026-11"
 
 
 def _recency_weight(weeks_ago: int, half_life_weeks: float) -> float:
@@ -1066,7 +1066,40 @@ _DURABILITY_KNOTS: Dict[str, tuple] = {
     "RB": ((0.0, 1.0), (1.5, 0.928), (3.9, 0.877), (7.4, 0.851), (12.5, 0.802)),
     "WR": ((0.0, 1.0), (1.5, 0.933), (3.9, 0.874), (7.4, 0.845), (12.5, 0.811)),
     "TE": ((0.0, 1.0), (1.5, 0.922), (3.9, 0.875), (7.4, 0.839), (12.5, 0.821)),
+    # v3.4 kickers (2016-25, 4,000+ kickers with a field-goal attempt, share still on the field k games later
+    # relative to the next game): kickers are rarely hurt but are cut / replaced, so rest-of-season totals were
+    # +11.7% over. Same measurement on QB/RB/WR/TE reproduces the knots above within 2 points.
+    "K": ((0.0, 1.0), (1.5, 0.962), (3.9, 0.930), (7.4, 0.900), (12.4, 0.860)),
 }
+
+
+# --- v3.4 mean-calibrated estimate -----------------------------------------------------------
+# ``point_estimate`` is MAE-optimal (median-like: fantasy points are right-skewed), so a lineup
+# built from it is light: summed over a 9-starter lineup it under-projects the team total by 6-8
+# points. ``mean_estimate`` is the same projection times a per-position lift (ratio of mean actual
+# to mean estimate over the top-N pool incl. non-appearances). Walk-forward (each season 2022-26 scored
+# with the lift fit on the seasons before it, 2016 on) the lifts stay at QB 1.025 / RB 1.045-1.05 / WR
+# 1.066-1.074 / TE 1.13-1.14 and the pool bias goes from -0.42..-0.93 to -0.35..+0.17 points; the constants
+# are the 2021-26 pooled fit. Use it wherever projections are SUMMED (team totals, win probability, trade
+# lineup totals); keep ``point_estimate`` for single-player start/sit, where the median-like number has the
+# better MAE, and for rest-of-season sums (the durability knots below were fit so that point-estimate totals are
+# unbiased, so a lifted rest-of-season total would run 5% high).
+MEAN_LIFT: Dict[str, float] = {"QB": 1.02, "RB": 1.05, "WR": 1.07, "TE": 1.15, "K": 1.0}
+
+# --- v3.4 new-team prior -----------------------------------------------------------------------
+# A RB/WR/TE whose last game was for another team is projected from his old team's usage. Backtest
+# 2016-26 (about 700 movers with an estimate >= 4): before his first game for the new team he scores
+# 0.76 of the estimate (played 77-81%, vs 93% for everyone else; the same in 2016-22 and 2023-26),
+# after one game 0.91-0.96, after two 1.0. The loss is concentrated where the role is unclear:
+# depth-1 players 0.87-0.95, depth 2+ 0.64. The prior is therefore ``1 - cut(role) x decay(games with
+# the new team)``: the cut by depth-chart role (clear role = small, unclear = large, unknown =
+# between) and the decay by how many games he has already played for the new team (weeks 1-3 of a
+# new season for a player who moved in the offseason). QB movers were not over-projected (0.97).
+_NEW_TEAM_POSITIONS = ("RB", "WR", "TE")
+_NEW_TEAM_DECAY = ((0.0, 1.0), (1.0, 0.3), (2.0, 0.0))
+_NEW_TEAM_CUT_DEPTH1 = 0.08
+_NEW_TEAM_CUT_BACKUP = 0.36
+_NEW_TEAM_CUT_UNKNOWN = 0.22
 
 
 def _interp(x: float, xs: tuple, ys: tuple) -> float:
@@ -1172,6 +1205,26 @@ def _v2_range(estimate: float, position: str, confidence: str) -> tuple:
     z_low = _interp(estimate, z_knots, z_lows)
     z_high = _interp(estimate, z_knots, z_highs)
     return max(0.0, estimate + z_low * scale), max(0.0, estimate + z_high * scale)
+
+
+# v3.4 high-end trim for low estimates (``_high_scale``): the share of the (point estimate -> high) distance kept so
+# that P(actual > high) is the nominal 16%. Fit on 2016-22 point-in-time rows (78,000 player-weeks, non-appearances
+# included) in estimate buckets per position, validated on 2023-26 (miss rate moves from 1-12% toward 16%). Only
+# trims (<= 1.0): the top tier's slightly narrow high end is left alone. Knots: (point estimate, share kept).
+_HIGH_SCALE_KNOTS: Dict[str, tuple] = {
+    "QB": ((0.4, 0.25), (1.7, 0.25), (3.2, 0.40), (4.9, 0.83), (7.7, 0.95), (11.4, 1.0)),
+    "RB": ((0.4, 0.30), (1.8, 0.40), (3.3, 0.68), (5.0, 0.80), (7.5, 0.90), (11.0, 1.0)),
+    "WR": ((0.4, 0.30), (1.8, 0.58), (3.3, 0.90), (5.0, 0.95), (7.5, 0.95), (10.9, 1.0)),
+    "TE": ((0.5, 0.25), (1.75, 0.43), (3.3, 0.70), (5.0, 0.78), (7.3, 1.0), (10.4, 1.0)),
+}
+
+
+def _high_scale(position: str, estimate: float) -> float:
+    knots = _HIGH_SCALE_KNOTS.get(position)
+    if not knots:
+        return 1.0
+    xs, ys = zip(*knots)
+    return min(1.0, _interp(float(estimate), xs, ys))
 
 
 def _games_ahead(schedule: List[Dict[str, Any]], week: int) -> int:
@@ -1410,6 +1463,7 @@ def _participation_adjustment(
     games_ahead: int,
     stats_through_week: Optional[int],
     stats_built_at: Optional[float] = None,
+    inactive_weeks: Optional[Iterable[int]] = None,
 ) -> Dict[str, Any]:
     """Participation prior for the NEXT game: how many of his team's last completed games (up to
     ``PARTICIPATION_WINDOW_GAMES``) did he not appear in?
@@ -1421,11 +1475,13 @@ def _participation_adjustment(
     (no double counting); K is not adjusted."""
 
     none = {"multiplier": 1.0, "applied": False, "missed": None, "window": None}
-    if games_ahead != 0 or stats_through_week is None or position not in ("QB", "RB", "WR", "TE"):
+    if games_ahead != 0 or position not in ("QB", "RB", "WR", "TE"):
         return none
     cls = injury_status.classify(str(player.get("status") or ""), str(player.get("injury_status") or ""))
     if cls.ruled_out or cls.p_play < 1.0:
         return none
+    if stats_through_week is None:
+        return _confirmed_scratch_adjustment(schedule, week, inactive_weeks, none)
     completed = sorted(
         (
             int(row["week"])
@@ -1454,6 +1510,96 @@ def _participation_adjustment(
         "missed": missed,
         "window": len(completed),
     }
+
+
+def _confirmed_scratch_adjustment(
+    schedule: List[Dict[str, Any]], week: int, inactive_weeks: Optional[Iterable[int]], none: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Secondary participation signal, used only when the stats-coverage guard cannot vouch for the schedule rule
+    (``stats_through_week`` unknown): the weeks Sleeper itself lists as the player's confirmed inactive games
+    (``inactive_weeks`` on the weekly stats record). Sleeper lists only about 70% of healthy no-shows (10% of injured
+    ones), so this is a lower bound on misses and is never the primary rule; when the schedule rule is available it
+    already counts every one of these weeks (a listed inactive week has no played row), so nothing is added twice."""
+
+    listed = {int(w) for w in (inactive_weeks or ()) if isinstance(w, (int, float))}
+    if not listed:
+        return none
+    completed = sorted(
+        (int(row["week"]) for row in schedule if not row.get("bye") and row.get("played") and int(row["week"]) < int(week)),
+        reverse=True,
+    )[:PARTICIPATION_WINDOW_GAMES]
+    if len(completed) < PARTICIPATION_MIN_WINDOW_GAMES:
+        return none
+    missed = sum(1 for w in completed if w in listed)
+    if not missed:
+        return none
+    share = missed / len(completed)
+    multiplier = next((m for cap, m in _PARTICIPATION_FACTORS if share <= cap + 1e-9), _PARTICIPATION_FACTORS[-1][1])
+    return {
+        "multiplier": multiplier,
+        "applied": multiplier < 1.0,
+        "missed": missed,
+        "window": len(completed),
+        "source": "sleeper_inactive_weeks",
+    }
+
+
+def _new_team_adjustment(
+    player: Dict[str, Any],
+    position: str,
+    team: Any,
+    team_history: Optional[Sequence[Optional[str]]],
+    games_ahead: int,
+) -> Dict[str, Any]:
+    """New-team prior (see ``_NEW_TEAM_DECAY``): ``team_history`` is the team code of each game he played,
+    oldest first (last season's games, then this season's). ``None`` / empty / unknown teams switch it off."""
+
+    none = {"multiplier": 1.0, "applied": False, "games_with_team": None, "cut": None}
+    if position not in _NEW_TEAM_POSITIONS or not team or not team_history:
+        return none
+    current = str(team).strip().upper()
+    codes = [str(t).strip().upper() if t else None for t in team_history]
+    games_with_team = 0
+    for code in reversed(codes):
+        if code == current:
+            games_with_team += 1
+        else:
+            break
+    earlier = codes[: len(codes) - games_with_team]
+    if not earlier or earlier[-1] is None or earlier[-1] == current:
+        return none  # never moved (or the previous team is unknown): nothing to say
+    depth = _depth_order(player)
+    cut = _NEW_TEAM_CUT_UNKNOWN if depth is None else (_NEW_TEAM_CUT_DEPTH1 if depth <= 1 else _NEW_TEAM_CUT_BACKUP)
+    xs, ys = zip(*_NEW_TEAM_DECAY)
+    decay = _interp(float(games_with_team + max(0, games_ahead)), xs, ys)
+    multiplier = 1.0 - cut * decay
+    return {
+        "multiplier": multiplier,
+        "applied": multiplier < 0.995,
+        "games_with_team": games_with_team,
+        "cut": cut,
+    }
+
+
+def team_history_for_player(player_id: str, season: int) -> List[Optional[str]]:
+    """Teams of the games a RB/WR/TE played last season and this season, oldest first, from the nflverse
+    advanced-stats files the scheduled job already builds (``modules.nflverse_advanced_stats``; no QB or K
+    rows). ``[]`` when a file or the player is missing: the new-team prior is then off, never guessed."""
+
+    history: List[Optional[str]] = []
+    try:
+        from modules import nflverse_advanced_stats
+
+        for year in (int(season) - 1, int(season)):
+            data = nflverse_advanced_stats.weekly_for_sleeper_id(player_id, year)
+            if not data.get("available"):
+                continue
+            for week in sorted(data.get("weeks") or {}):
+                team = (data["weeks"][week] or {}).get("team")
+                history.append(str(team) if team else None)
+    except Exception:
+        return []
+    return history
 
 
 def _durability_multiplier(position: str, games_ahead: int) -> float:
@@ -1542,8 +1688,15 @@ def project_player_week(
     prior_weekly_rows: Optional[List[Dict[str, Any]]] = None,
     stats_through_week: Optional[int] = None,
     stats_built_at: Optional[float] = None,
+    team_history: Optional[Sequence[Optional[str]]] = None,
+    inactive_weeks: Optional[Iterable[int]] = None,
 ) -> Dict[str, Any]:
     """A first-pass real weekly point projection for one player, one week.
+
+    ``team_history`` (team of each game he played, oldest first; see ``team_history_for_player``) switches on the
+    new-team prior for RB/WR/TE; ``None`` or empty leaves it off. When ``player_weekly_rows`` is not injected the
+    history is read from the nflverse advanced-stats files. ``inactive_weeks`` (Sleeper's confirmed inactive weeks
+    for this player) is the secondary participation signal used only when ``stats_through_week`` is unknown.
 
     ``stats_through_week`` is the highest week whose weekly stats are known to be fully loaded (see
     ``sleeper.complete_stats_through_week``). It is what lets the participation prior treat "no played row"
@@ -1688,6 +1841,7 @@ def project_player_week(
             **identity_fields,
         }
 
+    injected_rows = player_weekly_rows is not None
     if player_weekly_rows is not None:
         weekly_rows = player_weekly_rows
     else:
@@ -1820,17 +1974,26 @@ def project_player_week(
         scored_estimate = handcuff["estimate"]
     games_ahead_now = _games_ahead(schedule, week)
     participation = _participation_adjustment(
-        player, position, schedule, weekly_rows, week, games_ahead_now, stats_through_week, stats_built_at
+        player, position, schedule, weekly_rows, week, games_ahead_now, stats_through_week, stats_built_at,
+        inactive_weeks,
     )
+    if team_history is None and injected_rows is False:
+        team_history = team_history_for_player(player_id, season)
+    new_team = _new_team_adjustment(player, position, team, team_history, games_ahead_now)
+    # Both say "he may not play / not in the role the baseline assumes" for the same next game: take the
+    # stronger one instead of stacking them (a mover who also missed games is not penalised twice).
+    presence = min(participation["multiplier"], new_team["multiplier"])
     durability = _durability_multiplier(position, games_ahead_now)
     point_estimate = (
         scored_estimate
         * availability["multiplier"]
         * role["multiplier"]
         * plays["multiplier"]
-        * participation["multiplier"]
+        * presence
         * durability
     )
+    mean_lift = MEAN_LIFT.get(position, 1.0)
+    mean_estimate = point_estimate * mean_lift
     confidence = _v2_confidence(trend["games_played"])
     if prior_seeded and current_season_games < 2 and confidence == "high":
         # Mostly last season's games: usable, but not the same trust as a
@@ -1851,15 +2014,20 @@ def project_player_week(
         # prior, so the label drops to "low".
         low = 0.0
         confidence = "low"
-    if participation["applied"]:
+    if participation["applied"] or new_team["applied"]:
         # He may not appear at all, and his own range was built from games he did play.
-        if participation["multiplier"] < _PARTICIPATION_ZERO_LOW_BELOW:
+        if presence < _PARTICIPATION_ZERO_LOW_BELOW:
             low = 0.0
             confidence = "low"
         high = max(high, point_estimate)
     if durability < 1.0:
         # A future game: the point estimate is an expectation over availability; keep it inside the band.
         low = min(low, point_estimate)
+    # v3.4: low-estimate players (deep bench, handcuffs, backup QBs: the 'may sit' rows whose low end is 0) had a high
+    # end of a full starter's game, so the 68% band covered 83-94%. Trim the high end toward the 84th percentile.
+    high_scale = _high_scale(position, point_estimate)
+    if high_scale < 1.0:
+        high = max(point_estimate, point_estimate + high_scale * (high - point_estimate))
 
     defense_entry = (defense_strength.get(str(opponent)) or {}).get(position)
 
@@ -1878,6 +2046,9 @@ def project_player_week(
         "played": bool(matchup.get("played")),
         **identity_fields,
         "point_estimate": round(point_estimate, 1),
+        # Mean-calibrated twin of ``point_estimate`` (see ``MEAN_LIFT``): use it for sums (team totals, win
+        # probability), ``point_estimate`` for single-player start/sit.
+        "mean_estimate": round(mean_estimate, 1),
         "low": round(low, 1),
         "high": round(high, 1),
         "confidence": confidence,
@@ -1900,6 +2071,8 @@ def project_player_week(
             "role": role,
             "questionable_plays": plays,
             "participation": participation,
+            "new_team": new_team,
+            "mean_lift": mean_lift,
             "future_game_durability": round(durability, 3),
             "opponent_multiplier_applied": False,
             "team_qb_quality_multiplier_applied": False,
@@ -1986,6 +2159,8 @@ def baseline_weekly_points(
         estimate, low, high = projection_calibration.apply_scoring_to_projection(estimate, low, high, adjustment)
         out[pid] = {
             "ppg": round(estimate, 2),
+            # Mean-calibrated twin (see ``MEAN_LIFT``) for callers that SUM lineups; ``ppg`` is unchanged.
+            "mean_ppg": round(estimate * MEAN_LIFT.get(position, 1.0), 2),
             "sd": round(max(0.5, (high - low) / 2.0), 2),
             "games": trend["games_played"],
             "confidence": confidence,

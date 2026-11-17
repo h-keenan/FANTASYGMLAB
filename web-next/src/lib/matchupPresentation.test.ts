@@ -163,6 +163,30 @@ describe("lineupPlayerPoints", () => {
   });
 });
 
+describe("mean-calibrated team totals", () => {
+  const withMean = (point: number, mean: number | undefined) =>
+    ({
+      game_started: false,
+      actual_points: 0,
+      projection: { status: "ok", point_estimate: point, mean_estimate: mean, low: 1, high: 20, confidence: "medium", opponent: "SEA" },
+    }) as never;
+
+  it("lineupPlayerPoints: point by default (start/sit), mean on request, falling back to point", () => {
+    expect(lineupPlayerPoints(withMean(9.5, 10.2)).value).toBe(9.5);
+    expect(lineupPlayerPoints(withMean(9.5, 10.2), "mean").value).toBe(10.2);
+    expect(lineupPlayerPoints(withMean(9.5, undefined), "mean").value).toBe(9.5);
+  });
+
+  it("lineupTotals sums the mean-calibrated projections, like the server's win probability", () => {
+    expect(
+      lineupTotals([
+        { slot: "QB", mine: withMean(10, 11), opponent: withMean(9, 9) },
+        { slot: "WR", mine: withMean(8, 9), opponent: withMean(7, undefined) },
+      ]),
+    ).toEqual({ mine: 20, opponent: 16, margin: 4 });
+  });
+});
+
 describe("lineupComparisonRows", () => {
   it("zips each slot group, keeps empty slots, and leaves unmatched cells null", () => {
     const mine = [

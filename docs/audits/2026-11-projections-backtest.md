@@ -20,7 +20,7 @@ sleeper), `scripts/projections_audit_analyze.py` (tables, charts), `scripts/real
   every future game assumed full health; (2) players with missed recent games and no injury tag (healthy scratches, slow
   returns) were projected like regulars (bias **+2.1 to +2.5 points**, 58% / 52% coverage); (3) the game-time probabilities
   were never measured: Questionable played **68-72%** (not 85%), Doubtful played **0.5%** (not 15%).
-* Not fixed, needs owner approval (P1): the mean/median gap for regulars, the unmodeled-starter fallback anchors, wind for
+* Not fixed in this first pass, needs owner approval (P1; items 1-5 and the interval/version/inactive-weeks items were then implemented, see "Round 2 (P1 fixes)" at the end): the mean/median gap for regulars, the unmodeled-starter fallback anchors, wind for
   QB/WR/TE, and Sim persistence tails for WR/TE (the p10 *season-outcome* tail is fixed by model-8, the next-year tail is not).
 
 ## Method
@@ -286,7 +286,246 @@ python scripts/projections_audit_backtest.py ros   --nv /tmp/nv --out /tmp/pa --
 python scripts/projections_audit_backtest.py sleeper --nv /tmp/nv --sl /tmp/sl --out /tmp/pa   # sl = projection_walkforward.py fetch cache
 python scripts/projections_audit_analyze.py --after /tmp/pa --before /tmp/pa_before --out /tmp/pa --charts docs/audits/projections-backtest --sl /tmp/sl
 python scripts/real_history_rows.py --nv /tmp/nv --out /tmp/real_rows.json
+# Round 2: build both commits over 2016-2026 (one process per season), merge the per-season rows.parquet, then
+python scripts/projections_audit_round2.py --before /tmp/pa_b --after /tmp/pa_a --out /tmp/pa_r2 --charts docs/audits/projections-backtest
 python -m modules.sim.calibration.real_history_report --real /tmp/real_rows.json --json /tmp/partb.json
 ```
 
 `--before` is a `build` run on the commit before this change. Caches live outside the repo and were deleted afterwards.
+
+
+## Round 2 (P1 fixes)
+
+Owner-approved follow-up to the P1 list above: model `v3.4-p1-2026-11` (`EXTERNAL_PROJECTIONS_MODEL_VERSION` `v3.4`). Same point-in-time harness, no
+lookahead; every constant below was fit on **2016-22** (2021-22 alone is too small for the new-team, wind and draft-round cells; nothing is fit on
+2023-26) and is only scored on the 2023-26 headline weeks 2+ unless a row says otherwise. Reproduce with `scripts/projections_audit_round2.py`
+(`--before` = a build on the commit before this change, `--after` = this commit, both over 2016-2026).
+
+### In plain English
+
+* **Team totals and win odds were light, so we added a second number.** A single player's weekly estimate is deliberately the "typical" outcome
+  (right for start/sit), but fantasy points are skewed: a few big games drag the average above it. Add up nine starters and the team total ran
+  6 points short. Every projection now also carries a `mean_estimate` (the average outcome, per-position lift QB 1.02 / RB 1.05 / WR 1.07 / TE 1.15).
+  Team totals and win probability use it, the lineup summary on web and the app uses it, and start/sit still uses the original number. Team-total
+  error goes from -6.2 to -2.1 points; single-player accuracy is untouched.
+* **Rookies and no-history players were over-credited.** A quarterback with no NFL games was assumed to score 12 in a lineup; the ones who played
+  scored 5 (8 for first-rounders). The fallback is now 8, and when a player's draft round is known (rookie contracts file) it follows it (RB
+  round 1 about 11, later rounds 2-5). Error on those players falls from 4.4 to 3.1 points per game.
+* **Wind: a small, deliberate nudge.** The earlier study said wind did not matter once you use real stadium wind. Re-running it on observed stadium
+  wind (domes and closed roofs excluded) shows quarterbacks, receivers, tight ends and kickers do score less in 15+ mph games (about 3 / 5 / 12 / 7%),
+  running backs do not. We moved the table only part of the way toward that and capped it (QB -1.5%, WR -2.5% / -3%, TE -2% and the old -16% capped at
+  -10% for 20+, K -7% / -8.6%), so windy-game error shrinks without swinging to the other side. No position flips from over- to under-projecting
+  beyond noise (table below).
+* **A player who just changed teams is projected from his old role, and that over-projected him.** Confirmed on 2016-22 (461 players, not the
+  earlier 41): before his first game for the new team a running back / receiver / tight end scores 0.76 of his estimate (and plays 77% of the time
+  vs 93% for everyone else); after one game it is 0.9-0.96, after two it is gone. The prior is a cut by how clear his new role is (depth-chart
+  starter 8%, backup 36%, unknown 22%) that fades over his first three games with the new team. Bias on those players +2.2 to +0.4 points, error
+  5.8 to 5.1, coverage 54% to 78%; everyone else is unchanged.
+* **Kicker rest-of-season totals** were 11% high because kickers get cut or replaced; now +2.7%.
+* **Ranges** for deep bench players, handcuffs and backup quarterbacks were too wide (a 68% band that held the answer 83-94% of the time). They are
+  narrower now (deeper tier 83% to 79%, handcuffs 87% to 83%, backup QB 94% to 91%): they cannot get all the way to 68% because most of those
+  players score exactly zero, which any honest band must include.
+* **Sleeper's confirmed-inactive list** is now a second, weaker signal for the "he has been sitting" discount, used only when the stats-freshness
+  guard cannot vouch for the schedule rule (Sleeper lists about 70% of healthy no-shows, so the schedule rule stays the primary signal and this can
+  never double count).
+* **Nothing was reverted:** no change made overall accuracy worse (weekly MAE 4.27 / 5.69 unchanged to the second decimal, rest-of-season MAE 37.03 to 36.98).
+
+### Overall, before (v3.3) and after (v3.4), 2023-26 weeks 2+
+
+|  | n | MAE before | bias before | rho before | cov68 before | MAE after | bias after | rho after | cov68 after |
+|---|---|---|---|---|---|---|---|---|---|
+| played player-weeks | 21,106 | 4.27 | -0.92 | 0.51 | 73.95 | 4.27 | -0.93 | 0.51 | 70.43 |
+| top-N pool (non-appearances 0) | 10,320 | 5.69 | -0.72 | 0.30 | 71.10 | 5.69 | -0.74 | 0.30 | 70.60 |
+| pool, top-12 by estimate | 3,600 | 6.04 | -0.95 | 0.17 | 67.69 | 6.04 | -0.97 | 0.17 | 67.64 |
+
+By position (played player-weeks):
+
+|  | n | MAE before | bias before | rho before | cov68 before | MAE after | bias after | rho after | cov68 after |
+|---|---|---|---|---|---|---|---|---|---|
+| QB | 2,145 | 6.02 | -1.60 | 0.51 | 67.09 | 6.02 | -1.61 | 0.51 | 62.47 |
+| RB | 4,987 | 4.31 | -0.83 | 0.71 | 74.87 | 4.31 | -0.84 | 0.71 | 70.68 |
+| WR | 8,102 | 4.29 | -0.90 | 0.65 | 75.38 | 4.29 | -0.92 | 0.65 | 73.07 |
+| TE | 4,077 | 3.46 | -1.03 | 0.62 | 76.48 | 3.45 | -1.04 | 0.62 | 70.47 |
+| K | 1,795 | 3.79 | -0.16 | 0.07 | 67.35 | 3.79 | -0.19 | 0.09 | 67.24 |
+
+Per-fix table by fix follows. The weekly point estimate is the MAE-optimal number and is kept for start/sit; the mean-calibrated field trades about
+0.04 points of single-player MAE for unbiased sums, which is the point of it.
+
+### Fix 1: mean-calibrated estimate (`mean_estimate`)
+
+Lift = actual / estimate over the top-N pool (non-appearances count as 0), constants are the 2021-26 pooled fit and the walk-forward check (each season
+2022-26 scored with lifts fit on earlier seasons only, from 2016) gives lifts QB 1.025 / RB 1.045-1.05 / WR 1.066-1.074 / TE 1.13-1.14 and a pool bias of
++0.17 / -0.16 / -0.35 / +0.11 / -0.19 points for 2022-26 (point estimate -0.42 to -0.93). The lift is flat across estimate quartiles (RB 1.00-1.09, WR
+1.03-1.10, TE 1.10-1.19), so a per-position scalar is enough. It is exposed as `mean_estimate` on every projection (`/v1/players/{id}/schedule`,
+the matchup starters, `projected_points_mean` on the external API, `mean_ppg` on `baseline_weekly_points`), used by `compute_live_win_probability`
+(team totals, margin, in-game final) and by the lineup totals of web and mobile (`lineupTotals`, shared twin libs), and scaled by the weather
+multiplier like the point estimate. It is not used for rest-of-season sums: the future-game durability knots were fit so that point-estimate totals
+are unbiased, so a lifted rest-of-season total would run 5-6% high (+7.3% below).
+
+|  | n | point bias | mean-field bias | point MAE | mean-field MAE | point rho | mean-field rho |
+|---|---|---|---|---|---|---|---|
+| QB | 1,440 | -0.42 | -0.09 | 6.32 | 6.33 | 0.27 | 0.27 |
+| RB | 2,880 | -0.65 | -0.12 | 5.74 | 5.79 | 0.50 | 0.50 |
+| WR | 3,600 | -0.87 | -0.13 | 6.13 | 6.18 | 0.37 | 0.37 |
+| TE | 1,440 | -1.32 | -0.10 | 5.16 | 5.22 | 0.31 | 0.30 |
+| K | 960 | -0.14 | -0.14 | 3.71 | 3.71 | 0.08 | 0.08 |
+| all | 10,320 | -0.74 | -0.12 | 5.69 | 5.73 | - | - |
+
+|  | team-weeks | actual total | point total | mean total | point bias | mean-field bias | point MAE | mean-field MAE |
+|---|---|---|---|---|---|---|---|---|
+| 2023-26 holdout | 1803.00 | 71.95 | 65.74 | 69.84 | -6.21 | -2.11 | 18.24 | 17.82 |
+| 2016-22 fit window | 3400.00 | 73.57 | 67.81 | 72.00 | -5.76 | -1.57 | 17.80 | 17.36 |
+
+![mean-calibrated field](projections-backtest/07_round2_mean_field.png)
+
+### Fix 2: draft-capital fallback anchors for no-history players
+
+`REPLACEMENT_WEEK`: QB 12.0 to 8.0 (RB / WR / TE 4.5 / 5.0 / 3.5 unchanged, which are right for rounds 2-3). `REPLACEMENT_WEEK_BY_ROUND`
+applies when the draft round is known: realized weekly PPR of no-history players who played, 2016-22 fit (n 1,107; 2021-22 alone has 1-14 players per
+cell), validated on 2023-26 (n 569). Round 1 / 2 / 3 / 4-7 / undrafted anchors: QB 8.0 / 6.0 / 6.0 / 4.7 / 4.5, RB 11.5 / 6.0 / 5.0 / 3.2 / 2.6,
+WR 8.0 / 5.5 / 4.5 / 2.7 / 2.3, TE 8.0 / 3.0 / 2.8 / 2.2 / 1.5 (spread = empirical sd). TE round 1 is 8.0, not the 9.5 of the 2023-26 audit table,
+because 14 round-1 TEs over 2016-26 average 7.6. Sleeper does not carry draft capital, so the round comes from the nflverse contracts file the app
+already caches (`modules/draft_capital.py`, disk cache only, never fetches; a rookie missing from the file is "unknown" and gets the position anchor).
+Conditional on having played, so this is an upper bound for lineup starters, as before.
+
+| window | pos | n | actual mean | old anchor | bias old | MAE old | unknown-capital anchor | bias unknown | MAE unknown | by-round anchor | bias by-round | MAE by-round |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2016-22 (fit) | QB | 137 | 5.71 | 12.00 | 6.29 | 8.40 | 8.00 | 2.29 | 6.43 | 5.62 | -0.09 | 5.54 |
+| 2016-22 (fit) | RB | 277 | 4.07 | 4.50 | 0.43 | 4.29 | 4.50 | 0.43 | 4.29 | 3.54 | -0.53 | 3.55 |
+| 2016-22 (fit) | WR | 450 | 3.38 | 5.00 | 1.62 | 4.47 | 5.00 | 1.62 | 4.47 | 3.22 | -0.15 | 3.42 |
+| 2016-22 (fit) | TE | 243 | 2.22 | 3.50 | 1.28 | 2.94 | 3.50 | 1.28 | 2.94 | 2.12 | -0.10 | 2.21 |
+| 2016-22 (fit) | all | 1,107 | 3.59 | 5.41 | 1.83 | 4.58 | 4.92 | 1.33 | 4.33 | 3.36 | -0.23 | 3.45 |
+| 2023-26 (holdout) | QB | 64 | 4.99 | 12.00 | 7.01 | 9.29 | 8.00 | 3.01 | 6.81 | 5.71 | 0.73 | 5.50 |
+| 2023-26 (holdout) | RB | 152 | 2.67 | 4.50 | 1.83 | 3.79 | 4.50 | 1.83 | 3.79 | 3.58 | 0.92 | 2.77 |
+| 2023-26 (holdout) | WR | 235 | 3.31 | 5.00 | 1.69 | 4.13 | 5.00 | 1.69 | 4.13 | 3.54 | 0.22 | 3.14 |
+| 2023-26 (holdout) | TE | 118 | 2.26 | 3.50 | 1.24 | 3.06 | 3.50 | 1.24 | 3.06 | 2.30 | 0.04 | 2.06 |
+| 2023-26 (holdout) | all | 569 | 3.11 | 5.34 | 2.23 | 4.40 | 4.89 | 1.78 | 4.12 | 3.54 | 0.43 | 3.08 |
+
+### Fix 3: wind (stadium wind, domes excluded)
+
+Re-ran on observed stadium wind in outdoor games (domes and closed roofs excluded; retractable roofs keep their reduced weight) as the relative
+`actual / estimate` of games with wind >= 15 mph vs calmer outdoor games, 2016-22: QB -3.1% (se 3.3), RB +0.8% (3.4, no adjustment), WR -5.4% (2.7), TE -7.6%
+at 15-19 mph and -26% at 20+ (5.1 / 7.1), K -6.2% and -10.7% (4.2 / 6.8). Each cell was shrunk toward the previous table value with an empirical-Bayes weight
+(prior sd 5 points, weight 25 / (25 + se^2)), then scaled by 0.75 because the product applies a forecast wind that is noisier than the observed wind
+this was measured on, then capped by the existing 10% total cap. Result in `WEATHER_EFFECTS`: QB 15-19 -1.5%; WR -2.5% / -3.0%; TE -2.0% / -16.1% (capped to
+-10% in use, the previous value kept); K -7.0% / -8.6%; RB none. The goal was bias near zero in windy games that does not flip: the point estimate ends within
++-0.3 of zero in every position except, in the 2023-26 holdout, QB (+1.2 on 91 games, the largest and noisiest cell) and K (+0.8), and no cell moves past zero by more than
+noise (TE 2023-26 +0.10 to -0.11 on 137 games, QB 20+ over 2016-26 -0.04 to -0.27 on 78). The mean-calibrated field is above zero in windy games (+0.3 to +0.9)
+because the lift is fit on all games and the wind term is deliberately small; we judged that the safe side.
+
+Bias = estimate - actual (positive = over-projected); high-wind rows (the calm rows are in the script output):
+
+| window | pos | games | n | mean mult | bias before | bias after | bias mean-field | MAE before | MAE after |
+|---|---|---|---|---|---|---|---|---|---|
+| 2023-26 holdout | QB | wind >= 15 | 91 | 0.98 | 1.38 | 1.17 | 1.45 | 6.54 | 6.49 |
+| 2023-26 holdout | RB | wind >= 15 | 177 | 1.00 | -0.11 | -0.11 | 0.36 | 5.11 | 5.11 |
+| 2023-26 holdout | RB | wind >= 20 | 22 | 1.00 | -0.78 | -0.78 | -0.27 | 5.58 | 5.58 |
+| 2023-26 holdout | WR | wind >= 15 | 289 | 0.97 | 0.52 | 0.31 | 0.87 | 4.77 | 4.73 |
+| 2023-26 holdout | WR | wind >= 20 | 38 | 0.97 | 1.50 | 1.26 | 1.79 | 5.08 | 4.99 |
+| 2023-26 holdout | TE | wind >= 15 | 137 | 0.97 | 0.10 | -0.11 | 0.80 | 4.14 | 4.08 |
+| 2023-26 holdout | TE | wind >= 20 | 20 | 0.90 | 1.71 | 1.00 | 1.95 | 4.34 | 4.08 |
+| 2023-26 holdout | K | wind >= 15 | 90 | 0.93 | 1.33 | 0.77 | 0.77 | 3.41 | 3.29 |
+| 2023-26 holdout | all | wind >= 15 | 784 | 0.98 | 0.50 | 0.30 | 0.80 | 4.79 | 4.74 |
+| 2023-26 holdout | all | wind >= 20 | 102 | 0.96 | 0.64 | 0.32 | 0.85 | 5.13 | 5.06 |
+| 2016-26 all | QB | wind >= 15 | 372 | 0.98 | 0.28 | 0.06 | 0.35 | 6.43 | 6.41 |
+| 2016-26 all | QB | wind >= 20 | 78 | 0.98 | -0.04 | -0.27 | 0.03 | 6.56 | 6.54 |
+| 2016-26 all | RB | wind >= 15 | 822 | 1.00 | -0.23 | -0.30 | 0.14 | 5.37 | 5.38 |
+| 2016-26 all | RB | wind >= 20 | 166 | 1.00 | -1.14 | -1.19 | -0.73 | 5.93 | 5.89 |
+| 2016-26 all | WR | wind >= 15 | 1,277 | 0.97 | 0.25 | -0.01 | 0.55 | 5.19 | 5.14 |
+| 2016-26 all | WR | wind >= 20 | 286 | 0.97 | 0.51 | 0.24 | 0.80 | 5.44 | 5.36 |
+| 2016-26 all | TE | wind >= 15 | 558 | 0.96 | 0.27 | 0.02 | 0.92 | 4.33 | 4.26 |
+| 2016-26 all | TE | wind >= 20 | 125 | 0.90 | 1.35 | 0.68 | 1.56 | 4.38 | 4.16 |
+| 2016-26 all | K | wind >= 15 | 370 | 0.93 | 1.10 | 0.54 | 0.54 | 3.51 | 3.38 |
+| 2016-26 all | K | wind >= 20 | 82 | 0.91 | 1.20 | 0.54 | 0.54 | 3.68 | 3.53 |
+| 2016-26 all | all | wind >= 15 | 3,399 | 0.97 | 0.23 | -0.01 | 0.49 | 5.04 | 5.00 |
+| 2016-26 all | all | wind >= 20 | 737 | 0.96 | 0.30 | -0.03 | 0.47 | 5.29 | 5.20 |
+
+![wind](projections-backtest/08_round2_wind.png)
+
+### Fix 4: new-team prior (RB / WR / TE)
+
+Confirmation on 2016-22 (7 seasons, estimate >= 4), where "new team" = last game for another team (last season's last team differs from his current team):
+
+* Before his first game for the new team (n 461 in 2016-22, 242 in 2023-26): played 77% / 81%, scored 6.4 / 6.4 against an estimate of 8.5 / 8.5 (bias +2.0 /
+  +2.2, ratio 0.76 / 0.74), coverage 59% / 54%. The audit's n = 41 was a narrower cohort (week 2-3 players with no game this season yet, which mixes in
+  injured and benched players); the effect is smaller per player (+2.0 to +2.2 vs +3.5) and about 10x the sample.
+* After one game for the new team: ratio 0.96 / 0.91; after two: 1.02 / 1.06; 3-6 games: 1.01 / 1.0. By role: depth-1 0.95 / 0.87, depth 2+ 0.64 / 0.64.
+  QB movers are not over-projected (0.97 / 1.03), so QBs are excluded.
+* The prior: `1 - cut(role) x decay(games with new team)`, cut = 0.08 (depth-chart starter), 0.36 (depth 2+), 0.22 (unknown); decay = 1.0 / 0.30 / 0.0 at 0 / 1 /
+  2 games (also counted ahead for future games in the schedule view). It takes the smaller of this and the participation multiplier rather than
+  stacking them, drops the low end to 0 and confidence to low when below 0.85. In production the team history comes from the nflverse advanced-stats
+  files already built by the scheduled job (`team_history_for_player`; RB/WR/TE only; empty or missing means off), injected by `_weekly_projection_for_player`.
+
+| window | cohort | n | played % | actual | est before | est after | bias before | bias after | MAE before | MAE after | cov before | cov after |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2016-22 (fit) | non-movers, weeks 1-3 | 4,189 | 91.81 | 10.29 | 10.22 | 10.22 | -0.07 | -0.07 | 5.77 | 5.77 | 65.46 | 64.76 |
+| 2016-22 (fit) | movers, 0 games for new team | 461 | 76.57 | 6.41 | 8.45 | 6.55 | 2.03 | 0.14 | 5.66 | 5.06 | 59.00 | 79.18 |
+| 2016-22 (fit) | movers, 1 game | 356 | 92.98 | 8.28 | 8.65 | 8.01 | 0.37 | -0.26 | 5.39 | 5.33 | 69.94 | 69.38 |
+| 2016-22 (fit) | movers, 2 games | 358 | 92.74 | 8.60 | 8.45 | 8.28 | -0.15 | -0.32 | 5.50 | 5.52 | 68.44 | 68.16 |
+| 2016-22 (fit) | movers, 3-6 games | 1,120 | 94.11 | 9.12 | 8.98 | 8.78 | -0.14 | -0.34 | 5.37 | 5.39 | 69.91 | 69.55 |
+| 2023-26 (holdout) | non-movers, weeks 1-3 | 2,256 | 93.84 | 10.08 | 10.09 | 10.09 | 0.01 | 0.01 | 5.53 | 5.53 | 68.53 | 67.73 |
+| 2023-26 (holdout) | movers, 0 games for new team | 242 | 80.99 | 6.35 | 8.54 | 6.70 | 2.19 | 0.35 | 5.81 | 5.05 | 54.13 | 78.10 |
+| 2023-26 (holdout) | movers, 1 game | 218 | 90.83 | 7.56 | 8.30 | 7.90 | 0.74 | 0.34 | 5.02 | 4.92 | 75.23 | 75.23 |
+| 2023-26 (holdout) | movers, 2 games | 199 | 93.97 | 8.97 | 8.45 | 8.45 | -0.52 | -0.52 | 5.14 | 5.14 | 78.89 | 76.88 |
+| 2023-26 (holdout) | movers, 3-6 games | 619 | 94.51 | 9.01 | 8.87 | 8.86 | -0.14 | -0.16 | 5.39 | 5.39 | 70.44 | 69.79 |
+
+The prior alone, on all projected player-weeks (it is a small cohort, so the aggregate is neutral by construction and the gain is in the rows above):
+
+|  | n | MAE without | MAE with | rho without | rho with |
+|---|---|---|---|---|---|
+| 2016-22 (fit), played | 39,143 | 4.47 | 4.47 | 0.49 | 0.49 |
+| 2016-22 (fit), pool | 19,608 | 5.77 | 5.77 | 0.29 | 0.29 |
+| 2023-26 (holdout), played | 21,106 | 4.27 | 4.27 | 0.51 | 0.51 |
+| 2023-26 (holdout), pool | 10,320 | 5.69 | 5.69 | 0.30 | 0.30 |
+
+![new team](projections-backtest/09_round2_new_team.png)
+
+### Fix 5: kickers, interval widths, version, inactive weeks
+
+* **Kicker durability** (`_DURABILITY_KNOTS["K"]`: 0.962 / 0.930 / 0.900 / 0.860 at 1.5 / 3.9 / 7.4 / 12.4 games ahead; measured on 4,000+ kicker field-goal games
+  2016-25, and the same measurement reproduces the QB/RB/WR/TE knots within 2 points). Kickers are rarely hurt but are cut or replaced.
+* **Interval widths** (`_HIGH_SCALE_KNOTS`): the 68% band's high end for low-estimate players (deep bench, handcuffs, backup quarterbacks: the "may sit" rows whose
+  low end is 0 and whose high end was a full starter's game) is trimmed toward the 84th percentile: share of the (estimate to high) distance kept, fit on
+  2016-22 in estimate buckets per position, only ever trimming (<= 1.0). Top-12 and 13-24 tiers are unchanged. Coverage of players that did play drops by
+  construction (a played backup QB scored 12 outside a [0, 3] band); the all-rows pool, which is what a 68% band means, moves toward 68.
+* **`EXTERNAL_PROJECTIONS_MODEL_VERSION`** `v2` to `v3.4` (a bot caching on it now invalidates), `PROJECTION_MODEL_VERSION` `v3.4-p1-2026-11`.
+* **`inactive_weeks`** wired into the participation prior as a secondary signal (see above); backtest-neutral by construction (the harness has no Sleeper inactive list).
+
+|  | n | cov before | cov after |
+|---|---|---|---|
+| tier top-12 | 3,600 | 67.69 | 67.64 |
+| tier 13-24 | 3,600 | 70.31 | 70.06 |
+| tier 25-48 | 6,149 | 76.08 | 73.49 |
+| tier deeper | 14,159 | 82.88 | 78.96 |
+| handcuff, starter Out/Doubtful | 3,610 | 87.29 | 83.49 |
+| backup QB role | 1,932 | 94.36 | 90.89 |
+| position QB | 3,932 | 81.66 | 79.15 |
+| position RB | 6,163 | 77.06 | 73.75 |
+| position WR | 9,784 | 77.27 | 75.45 |
+| position TE | 5,800 | 80.00 | 75.83 |
+| position K | 1,829 | 66.76 | 66.65 |
+
+|  | n | MAE before | MAE after | bias % before | bias % after (point) | bias % after (mean-field) | rho before | rho after |
+|---|---|---|---|---|---|---|---|---|
+| all | 3,440 | 37.03 | 36.98 | 2.08 | 1.39 | 7.29 | 0.44 | 0.44 |
+| QB | 480 | 48.09 | 48.09 | 0.54 | 0.54 | 2.54 | 0.44 | 0.44 |
+| RB | 960 | 40.53 | 40.48 | 6.32 | 6.14 | 11.45 | 0.57 | 0.57 |
+| WR | 1,200 | 37.58 | 37.51 | 1.23 | 1.07 | 8.14 | 0.55 | 0.55 |
+| TE | 480 | 29.43 | 29.41 | -8.07 | -8.15 | 5.61 | 0.41 | 0.42 |
+| K | 320 | 19.29 | 19.17 | 11.19 | 2.73 | 2.73 | 0.22 | 0.21 |
+| vantage week 1 | 860 | 57.39 | 57.25 | 4.34 | 3.35 | 9.42 | 0.40 | 0.40 |
+| vantage week 5 | 860 | 42.80 | 42.73 | 0.69 | 0.10 | 5.89 | 0.39 | 0.39 |
+| vantage week 9 | 860 | 29.97 | 29.97 | 2.10 | 1.57 | 7.45 | 0.51 | 0.51 |
+| vantage week 13 | 860 | 17.96 | 17.98 | -1.51 | -1.82 | 3.85 | 0.46 | 0.46 |
+
+![coverage and rest of season](projections-backtest/10_round2_coverage_ros.png)
+
+### Notes and limits
+
+* The wind rows use the observed stadium wind; production applies the forecast, so the realized effect will be a little smaller (that is why the cells were scaled by 0.75).
+* The draft-round table only applies where the nflverse contracts file knows the player; brand-new rookies are often missing from it and then use the position
+  anchor (QB 8.0 etc.). Wiring a better draft-capital source (NFL draft results as soon as the draft ends) would sharpen it.
+* The new-team prior needs the nflverse advanced-stats files for last season and this season (RB/WR/TE); without them the prior is off (never guessed).
+* Rest-of-season totals use point estimates (see Fix 1). Trade grading and lineup pricing still use `ppg` (point); `mean_ppg` is available in `baseline_weekly_points`
+  for a deliberate follow-up, which would also re-price positions against each other (a +15% TE lift vs +2% QB moves relative values).
+* Sim WR/TE swings (P1 item 6) ship in a separate change; see the Sim subsection below when present.
