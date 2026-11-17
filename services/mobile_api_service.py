@@ -17421,17 +17421,22 @@ def get_league_waivers(
         except Exception:
             faab_season_stats = {}
     played_ids = waivers_logic.players_with_games(faab_season_stats) if faab_season_stats else None
-    priority_df = waivers_logic.rank_priority_add_candidates(
+    # The one waiver recommendation source (modules.waivers_logic.shared_waiver_adds):
+    # Today, the league glance, the waiver push and the trade-card guardrail rank
+    # through the same function with the same stance, format, need model and
+    # has-played gate. The Waivers page passes its richer projection-based model.
+    priority_df = waivers_logic.shared_waiver_adds(
         free_agents,
-        score_field=score_field,
+        roster_df,
+        settings,
+        score_field,
         needed_positions=needed_positions,
-        league_settings=settings,
-        roster_df=roster_df,
-        max_items=6,
-        league=league,
-        rosters=rosters,
         needs_model=needs_model,
         played_ids=played_ids,
+        posture=str(((value_bundle or {}).get("posture") or {}).get("key") or ""),
+        league=league,
+        rosters=rosters,
+        max_items=6,
     )
     if needs_model is not None:
         needs_model["headline"] = waivers_logic.align_headline_with_adds(needs_model, priority_df)

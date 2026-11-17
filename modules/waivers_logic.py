@@ -2,6 +2,7 @@ import time
 from typing import Any, Mapping
 import pandas as pd
 from modules import derived_cache
+from modules import injury_status
 from modules import league_maturity
 from modules.frame_records import frame_records
 from modules import league_display
@@ -12,6 +13,7 @@ from modules import league_value_settings
 from modules import rankings
 from modules import redis_cache
 from modules import sleeper
+from modules import roster_value_model
 from modules.roster_value_model import FILLS_NEED_MIN_PPW
 
 # Same live-time-bucket idiom modules.trade_hub_engine/modules.league_rankings/
@@ -270,6 +272,36 @@ def _clear_elite_bar(row, score: float) -> bool:
     return score >= ELITE_MIN_SCORE
 
 
+_CONTENDING_POSTURES = frozenset({"contender", "fringe_contender", "win-now", "win now", "competing"})
+_REBUILDING_POSTURES = frozenset({"rebuild", "rebuilding", "tank", "retool"})
+
+
+def posture_lean(posture: Any) -> str:
+    """``"contend"``, ``"rebuild"`` or ``""`` for a posture / GM stance string."""
+
+    key = _safe_text(posture).strip().casefold()
+    key = key.replace(" ", "_") if key.replace(" ", "_") in _CONTENDING_POSTURES | _REBUILDING_POSTURES else key
+    if key in _CONTENDING_POSTURES:
+        return "contend"
+    if key in _REBUILDING_POSTURES:
+        return "rebuild"
+    return ""
+
+
+def candidate_availability(row) -> tuple[bool, float, str]:
+    """``(out_now, p_play, label)`` for a waiver candidate's own injury status.
+
+    ``out_now`` is a confirmed or near-certain absence (Out, IR, PUP,
+    suspended, Doubtful): he cannot fill a lineup hole this week."""
+
+    status = _safe_text(row.get("status")).strip()
+    designation = _safe_text(row.get("injury_status")).strip()
+    cls = injury_status.classify(status, designation)
+    label = designation if designation and designation.lower() not in {"nan", "none"} else status
+    out_now = bool(cls.ruled_out or cls.p_play <= injury_status.LIKELY_OUT_P_PLAY)
+    return out_now, float(cls.p_play), label
+
+
 def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
     """ONE verdict for a waiver candidate: ``(label, tone, confidence, reason)``.
 
@@ -280,15 +312,23 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
       starter/bench player it replaces.
     * Stash (Medium/Low) - cheap upside for later: the best stash at a need
       nobody on the wire fills, elite wire value with no need today, or a
-      young / contingent-role player.
+      young / contingent-role player (age alone is a long-term-format lever:
+      in redraft it is not a reason to hold a bench spot).
     * Watch (Low)    - nothing to do now.
 
     ``position_rank`` (rank among free agents) only appears in the reason
     text; it never decides the label. Rows that never went through
     ``rank_priority_add_candidates`` carry no need signals, so their
     confidence is "" (never fabricated) and they can only be Stash or Watch.
-    The reason is one plain line weighing need, upgrade size, age/upside,
-    competition on the wire and the team's posture when the row carries one.
+
+    The verdict weighs the candidate's own availability (a player who is Out
+    cannot fill a hole this week, so he is never an "Add"; a Questionable one
+    keeps the label at lower confidence), the team's stance (``roster_posture``
+    on the row: a contender wants help now, a rebuilding team does not spend a
+    claim on a short-term veteran and values youth), the league format
+    (``league_format``: dynasty holds for later, redraft does not), need,
+    upgrade size, age/upside and wire competition. The reason says which of
+    those moved it.
     """
 
     computed = any(col in row for col in _PRIORITY_SIGNAL_COLUMNS)
@@ -298,6 +338,9 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
     ppw = _row_number(row, "priority_wire_ppw", "lineup_ppw")
     opportunity = _safe_text(row.get("opportunity_label")).strip()
     posture = _safe_text(row.get("roster_posture") or row.get("posture")).strip()
+    lean = posture_lean(posture)
+    redraft = _safe_text(row.get("league_format")).strip().casefold() == "redraft"
+    out_now, p_play, injury_label = candidate_availability(row)
     try:
         rank = int(position_rank or 0)
     except Exception:
@@ -317,7 +360,7 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
             parts.append(f"#{rank} {pos} on the wire")
         elif rank and pos:
             parts.append(f"only #{rank} {pos} on the wire, so less competition")
-        if posture:
+        if posture and not lean:
             parts.append(f"fits a {posture.lower()} posture")
         text = "; ".join(parts[:4])
         return text[:1].upper() + text[1:] + "." if text else ""
@@ -325,28 +368,72 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
     if bool(row.get("stale_free_agent")) or (computed and score <= 0):
         return ("Watch", "neutral", "Low" if computed else "",
                 "Stale or low value under the current lens; nothing to do now.")
+
+    # The candidate himself is out: whatever the team needs, he cannot fill it
+    # this week. Hold him only where holding makes sense (a long-term format
+    # and a rebuilding team or a young / role-driven player); otherwise watch.
+    if out_now:
+        held = (not redraft) and bool(lean == "rebuild" or (age and age <= 26) or opportunity in _STASH_OPPORTUNITIES)
+        why = (
+            f"Listed {injury_label}, so he cannot fill a lineup hole this week"
+            if injury_label
+            else "Not available this week, so he cannot fill a lineup hole"
+        )
+        if held:
+            tail = (
+                "a contender gets nothing from him now, so only hold him if a spot is free"
+                if lean == "contend"
+                else "worth holding for later"
+            )
+            return ("Stash", "information", "Low" if computed else "", f"{why}; {tail}.")
+        return ("Watch", "neutral", "Low" if computed else "", f"{why}; check back when he returns.")
+
+    availability_note = ""
+    if p_play < 1.0 and injury_label:
+        availability_note = f"listed {injury_label}, so he may not play this week"
+
+    def softened(confidence: str) -> str:
+        # An uncertain game-time status lowers a High add to Medium.
+        return "Medium" if (availability_note and confidence == "High") else confidence
+
     need_fit = bool(row.get("priority_need_fit")) or bool(row.get("injury_replacement_fit"))
-    if bool(row.get("priority_bigger_upgrade")):
-        return ("Add", "opportunity", "High",
-                ctx("Bigger lineup upgrade than the best fix at your biggest need"))
+    bigger = bool(row.get("priority_bigger_upgrade"))
+    older_rebuild = bool(lean == "rebuild" and age and age >= 29)
+    stance_note = ""
+    if lean == "contend" and (need_fit or bigger):
+        stance_note = "helps you now, which fits a contending team"
+    elif older_rebuild and (need_fit or bigger):
+        stance_note = "an older short-term fix, a weak fit for a rebuild"
+    if bigger:
+        conf = "Medium" if older_rebuild else softened("High")
+        return ("Add", "opportunity", conf,
+                ctx("Bigger lineup upgrade than the best fix at your biggest need", availability_note, stance_note))
     if need_fit:
         lead = (
             "Covers an injury hole in your lineup"
             if bool(row.get("injury_replacement_fit"))
             else f"Fills a real {pos or 'roster'} need".replace("  ", " ")
         )
-        return "Add", "opportunity", "High", ctx(lead)
+        conf = "Medium" if older_rebuild else softened("High")
+        return "Add", "opportunity", conf, ctx(lead, availability_note, stance_note)
     if bool(row.get("priority_stash_for_need")):
         return ("Stash", "information", "Medium",
-                ctx("Best stash at your top need; nobody on the wire would start there"))
+                ctx("Best stash at your top need; nobody on the wire would start there", availability_note))
     if bool(row.get("priority_value_opportunity")):
-        return ("Stash", "information", "Medium",
-                ctx("Elite value on the wire, but no roster need today"))
-    if (age and age <= 24) or opportunity in _STASH_OPPORTUNITIES:
-        return ("Stash", "information", "Low" if computed else "",
-                ctx("Cheap upside for later, no need today"))
+        lead = "Elite value on the wire, but no roster need today"
+        if lean == "contend":
+            lead += " (a contender can wait on this)"
+        return ("Stash", "information", "Medium", ctx(lead, availability_note))
+    young = bool(age and age <= 24) and not redraft
+    if young or opportunity in _STASH_OPPORTUNITIES:
+        lead = "Cheap upside for later, no need today"
+        conf = "Low" if computed else ""
+        if lean == "rebuild" and young:
+            lead = "Young upside that fits a rebuild, no need today"
+            conf = "Medium" if computed else ""
+        return ("Stash", "information", conf, ctx(lead, availability_note))
     return ("Watch", "neutral", "Low" if computed else "",
-            ctx("Depth only; no need or value signal"))
+            ctx("Depth only; no need or value signal", availability_note))
 
 
 _safe_text = league_display._safe_text
@@ -366,6 +453,85 @@ def waiver_recommendation_label(row, position_rank: int) -> tuple[str, str]:
     return label, tone
 
 
+def default_played_ids(league: Mapping[str, Any] | None) -> set[str] | None:
+    """Ids with a game this season (``players_with_games``), best effort.
+
+    None when the league has no current week yet or the stats fetch fails:
+    callers then skip the "has played" gate, as the Waivers page does."""
+
+    try:
+        week = int(((league or {}).get("settings") or {}).get("leg") or 0)
+    except (TypeError, ValueError):
+        week = 0
+    if week <= 0:
+        return None
+    try:
+        stats = sleeper.get_season_player_stats(
+            season=sleeper.default_player_stats_season(), retain_weekly=True
+        )
+    except Exception:
+        return None
+    return players_with_games(stats) if stats else None
+
+
+def shared_waiver_adds(
+    free_agents: pd.DataFrame,
+    roster_df: pd.DataFrame | None,
+    league_settings: dict | None,
+    score_field: str,
+    *,
+    needed_positions: list[str] | None = None,
+    needs_model: Mapping[str, Any] | None = None,
+    played_ids: set[str] | None = None,
+    posture: str = "",
+    league: Mapping[str, Any] | None = None,
+    rosters: list[Mapping[str, Any]] | None = None,
+    roster_id: Any = None,
+    valued: pd.DataFrame | None = None,
+    max_items: int = 6,
+) -> pd.DataFrame:
+    """THE waiver recommendation source: every screen that names a waiver add
+    (Waivers page, Today tile, league glance, push reminder, trade-idea
+    waiver guardrail) ranks through here, so one player gets one answer.
+
+    It resolves the same inputs for all of them: the lineup need model (built
+    from ``valued``/``rosters``/``roster_id`` over this exact free-agent pool
+    when the caller has no model of its own), the has-played gate, the team
+    posture and the league format, then ranks with
+    ``rank_priority_add_candidates``. Callers that already hold a richer
+    need model (the Waivers page builds one with projections) pass it and
+    get exactly their own model back."""
+
+    if free_agents is None or free_agents.empty:
+        return free_agents.iloc[0:0].copy() if free_agents is not None else pd.DataFrame()
+    settings = league_settings or {}
+    if needs_model is None and valued is not None and rosters and roster_id is not None:
+        strategy = posture if posture in roster_value_model.tlm.POSTURE_WEIGHTS else roster_value_model.NEUTRAL_STRATEGY
+        needs_model = roster_value_model.league_needs(
+            valued=valued, rosters=rosters, league=league, settings=settings,
+            score_field=score_field, strategy=strategy, pool=free_agents,
+        ).for_roster(roster_id)
+        # A model that priced no free agent at all (no per-game data behind
+        # the frame) says nothing about needs; fall back to the position list.
+        if needs_model is not None and not any(e.get("wire") for e in needs_model.get("positions") or ()):
+            needs_model = None
+    if played_ids is None:
+        played_ids = default_played_ids(league)
+    return rank_priority_add_candidates(
+        free_agents,
+        score_field=score_field,
+        needed_positions=needed_positions or [],
+        league_settings=settings,
+        roster_df=roster_df if roster_df is not None else pd.DataFrame(),
+        max_items=max_items,
+        league=league,
+        rosters=rosters,
+        needs_model=needs_model,
+        played_ids=played_ids,
+        posture=posture,
+    )
+
+
 def select_top_waiver_opportunity(
     free_agents: pd.DataFrame,
     roster_df: pd.DataFrame,
@@ -376,20 +542,28 @@ def select_top_waiver_opportunity(
     league: Mapping[str, Any] | None = None,
     rosters: list[Mapping[str, Any]] | None = None,
     needs_model: Mapping[str, Any] | None = None,
+    played_ids: set[str] | None = None,
+    posture: str = "",
+    roster_id: Any = None,
+    valued: pd.DataFrame | None = None,
 ):
     if free_agents is None or free_agents.empty:
         return pd.Series(dtype="object")
 
-    ranked = rank_priority_add_candidates(
+    ranked = shared_waiver_adds(
         free_agents,
-        score_field=score_field,
-        needed_positions=needed_positions or [],
-        league_settings=league_settings or {},
-        roster_df=roster_df if roster_df is not None else pd.DataFrame(),
-        max_items=1,
+        roster_df,
+        league_settings,
+        score_field,
+        needed_positions=needed_positions,
+        needs_model=needs_model,
+        played_ids=played_ids,
+        posture=posture,
         league=league,
         rosters=rosters,
-        needs_model=needs_model,
+        roster_id=roster_id,
+        valued=valued,
+        max_items=1,
     )
     if ranked.empty:
         return pd.Series(dtype="object")
@@ -521,6 +695,7 @@ def rank_priority_add_candidates(
     rosters: list[Mapping[str, Any]] | None = None,
     needs_model: Mapping[str, Any] | None = None,
     played_ids: set[str] | None = None,
+    posture: str = "",
 ) -> pd.DataFrame:
     """Order Priority Adds for THIS roster — not bare dynasty-score tops.
 
@@ -541,6 +716,14 @@ def rank_priority_add_candidates(
     ``played_ids`` (optional, from ``players_with_games``): when given, a player
     with no game this season is never a Priority Add. A value score alone must
     not recommend someone who has not scored a point (coridian_, 2026-11-08).
+
+    ``posture`` (the GM stance / auto posture key, optional) and the league
+    format from ``league_settings`` are stamped on every returned row
+    (``roster_posture`` / ``league_format``) so ``waiver_recommendation`` and
+    every surface reading the row weigh the same stance and format. A
+    candidate who is himself Out (or Doubtful) never fills a need or a bigger
+    upgrade: in a long-term format he can still be a value stash, in redraft
+    he is not actionable at all.
 
     `league`/`rosters` (both optional, for callers that already have them —
     the real Waivers endpoint does) let this detect a pre-/mid-draft league
@@ -647,6 +830,8 @@ def rank_priority_add_candidates(
         kicker_required and not has_viable_kicker and not league_is_pre_draft
     )
     qb_format = _qb_format(settings)
+    league_format = _safe_text(settings.get("league_format")).strip()
+    redraft = league_format.casefold() == "redraft"
 
     model_positions = list((needs_model or {}).get("positions") or [])
     use_model = needs_model is not None and bool(model_positions)
@@ -730,6 +915,12 @@ def rank_priority_add_candidates(
         # The shared model's "bigger upgrade than your need" (roster_value_model.
         # outsized_adds): always actionable and ranked first, whatever its tag.
         is_bigger = bool(use_model and pid in bigger_ids)
+        if candidate_availability(positive.loc[idx])[0]:
+            # He is out himself: he cannot fill a hole this week. Only a
+            # long-term format keeps him on the board, as a value stash.
+            is_need = is_bigger = is_stash = False
+            injured = False
+            is_elite_value = bool(is_elite_value and not redraft)
         bigger_flags.append(is_bigger)
         stash_flags.append(is_stash)
         need_fit.append(is_need)
@@ -742,6 +933,8 @@ def rank_priority_add_candidates(
     positive["priority_actionable"] = actionable
     positive["_priority_score"] = pos_scores
     positive["_injury_fit"] = injury_fit.reindex(positive.index).fillna(False)
+    positive["roster_posture"] = _safe_text(posture).strip()
+    positive["league_format"] = league_format
     positive["priority_stash_for_need"] = stash_flags
     positive["priority_bigger_upgrade"] = bigger_flags
     positive["priority_wire_ppw"] = [

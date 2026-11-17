@@ -278,8 +278,23 @@ def build_league_glance(
         all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
     needed_positions = get_needed_positions(assessment, include_fallback=False)
     free_agents_df = valued[~valued["player_id"].astype(str).isin(all_rostered_player_ids)]
+    # Same posture every trade surface uses (declared > auto > default), and it
+    # also steers the waiver answer so the glance names the add Waivers names.
+    posture = None
+    try:
+        posture = trade_hub_engine.roster_posture(
+            league_id=league_id,
+            roster=my_roster,
+            lens=lens,
+            players_db_path=players_db_path,
+            declared_stance=team_stance_value,
+        )
+    except (TypeError, ValueError):
+        posture = None
     top_waiver = select_top_waiver_opportunity(
-        free_agents_df, roster_df, settings, score_field, needed_positions=needed_positions
+        free_agents_df, roster_df, settings, score_field, needed_positions=needed_positions,
+        league=league, rosters=rosters, roster_id=roster_id, valued=valued,
+        posture=posture["key"] if posture else "",
     )
     waiver = project_waiver_tile(
         dashboard_engine.build_waiver_tile(
@@ -289,14 +304,8 @@ def build_league_glance(
 
     trade = None
     try:
-        # Same posture every trade surface uses (declared > auto > default).
-        posture = trade_hub_engine.roster_posture(
-            league_id=league_id,
-            roster=my_roster,
-            lens=lens,
-            players_db_path=players_db_path,
-            declared_stance=team_stance_value,
-        )
+        if posture is None:
+            raise TypeError("posture unavailable")
         records = trade_hub_engine.generate_trade_idea_records_cached(
             league_id=league_id,
             roster_id=int(roster_id),

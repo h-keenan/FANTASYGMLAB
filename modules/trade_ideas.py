@@ -3058,6 +3058,10 @@ def _waiver_alternative_for_need(
         waiver_context.get("league_settings"),
         score_field,
         needed_positions=[position],
+        rosters=waiver_context.get("rosters"),
+        roster_id=waiver_context.get("roster_id"),
+        valued=waiver_context.get("valued"),
+        posture=str(waiver_context.get("posture") or ""),
     )
     if selected is None or selected.empty:
         memo[position] = None
@@ -4874,6 +4878,12 @@ def _build_trade_ideas_impl(
                     "my_team_df": my_team_df,
                     "league_settings": league_settings,
                     "score_field": score_field,
+                    # Same inputs the Waivers page ranks with, so the card's
+                    # "better option on waivers" names who Waivers would list.
+                    "valued": df_players,
+                    "rosters": rosters,
+                    "roster_id": my_roster_key,
+                    "posture": active_strategy,
                 }
 
     pos_focus = my_needs if my_needs else ["WR", "RB", "QB", "TE"]
