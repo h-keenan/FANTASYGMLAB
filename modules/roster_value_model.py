@@ -987,8 +987,15 @@ def league_needs(
     strategy: str = NEUTRAL_STRATEGY,
     pool: pd.DataFrame | None = None,
     status: Mapping[str, Any] | None = None,
+    only_roster_ids: Iterable[Any] | None = None,
 ) -> LeagueNeeds:
     """Need / surplus for every roster, from one lineup-model calibration.
+
+    ``only_roster_ids`` limits the per-roster assessment to those rosters (the league-wide
+    calibration, rostered-value scale and position table are still built from every roster, so
+    each assessed roster's entry is identical to the full table's). Callers that read a single
+    roster (``for_roster``) pass it and skip the other rosters' lineup-model runs. A cached
+    full-league table serves a subset request.
 
     The one entry point for surfaces that are not Waivers (Waivers builds its
     own context with the caller's posture, projections and real free-agent
@@ -1003,9 +1010,11 @@ def league_needs(
     settings = dict(settings)
     pool_id = id(pool) if pool is not None else None
     settings_key = repr(sorted((str(k), repr(v)) for k, v in settings.items()))
-    key = (id(valued), pool_id, score_field, strategy, _rosters_signature(rosters), settings_key)
+    wanted = None if only_roster_ids is None else frozenset(str(r) for r in only_roster_ids)
+    base_key = (id(valued), pool_id, score_field, strategy, _rosters_signature(rosters), settings_key)
+    key = base_key + (wanted,)
     for entry_key, _held, cached in _LEAGUE_NEEDS_CACHE:
-        if entry_key == key:
+        if entry_key == key or (wanted is not None and entry_key == base_key + (None,)):
             return cached
 
     out_status = model_status.merge(status)
@@ -1027,6 +1036,8 @@ def league_needs(
         league_table = league_position_table(valued, rosters, model_ctx)
         for roster in rosters:
             rid = str(roster.get("roster_id"))
+            if wanted is not None and rid not in wanted:
+                continue
             roster_df = valued[valued["player_id"].astype(str).isin(ids_by_roster[rid])].copy()
             if roster_df.empty:
                 continue
