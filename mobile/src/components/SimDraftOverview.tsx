@@ -1,3 +1,4 @@
+import { swipeLockProps } from './swipeLock';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -80,7 +81,7 @@ export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: Si
           </Pressable>
         ) : null}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} accessibilityLabel="Recent picks" testID="recent-picks">
+      <ScrollView horizontal {...swipeLockProps} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} accessibilityLabel="Recent picks" testID="recent-picks">
         {cards.length === 0 ? (
           <AppText style={styles.muted}>No picks yet. The first ones land here.</AppText>
         ) : (

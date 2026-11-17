@@ -1,3 +1,4 @@
+import { swipeLockProps } from './swipeLock';
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
@@ -27,7 +28,7 @@ export function SimDynastyStrip({ years }: { years: SimDynastyYear[] }) {
   if (years.length === 0) return null;
   const views = years.map(simDynastyYearView);
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} testID="dynasty-strip" accessibilityLabel="Your seasons so far">
+    <ScrollView horizontal {...swipeLockProps} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} testID="dynasty-strip" accessibilityLabel="Your seasons so far">
       {views.map((v) => (
         <View key={v.year} style={[styles.cell, { borderTopColor: v.youWon ? colors.success : simToneColor(v.resultTone, colors) }]}>
           <View style={styles.cellTop}>

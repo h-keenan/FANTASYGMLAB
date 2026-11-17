@@ -1,3 +1,4 @@
+import { swipeLockProps } from './swipeLock';
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -25,7 +26,7 @@ export function SimDraftGrid({ draft, teams, onOpen }: { draft: SimDraftState; t
   const grid = useMemo(() => simDraftBoardGrid(draft, teams), [draft, teams]);
   if (grid.teams.length === 0) return <EmptyState icon="grid-outline" title="No board yet" subtitle="The draft grid shows up once teams are set." />;
   return (
-    <ScrollView horizontal nestedScrollEnabled style={styles.box} testID="draft-grid-scroll">
+    <ScrollView horizontal {...swipeLockProps} nestedScrollEnabled style={styles.box} testID="draft-grid-scroll">
       <View>
         <View style={styles.row}>
           <View style={{ width: ROUND_W }} />

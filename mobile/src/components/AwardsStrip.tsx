@@ -1,3 +1,4 @@
+import { swipeLockProps } from './swipeLock';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
@@ -130,7 +131,7 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
           </PressableScale>
         ) : null}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+      <ScrollView horizontal {...swipeLockProps} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
         {awards.map((award) => (
           <AwardChip key={award.badge_id} award={award} onPress={() => setSelectedAward(award)} />
         ))}
