@@ -1,3 +1,4 @@
+import { verdictColorVar } from "@/lib/verdictToneCss";
 import { TERMS } from "@/lib/terms";
 import { PageTabBar } from "@/components/PageTabBar";
 import type { TabIconName } from "@/lib/tabIcons";
@@ -172,7 +173,7 @@ function UsageFlagChip({ player }: { player: WaiverPriorityAdd }) {
   if (!flag) return null;
   return (
     <div className="flex flex-wrap gap-1.5" data-testid="waiver-usage-flag">
-      <ToneBadge label={flag.label} color={flag.tone === "positive" ? "var(--color-success)" : "var(--color-danger)"} />
+      <ToneBadge label={flag.label} color={verdictColorVar(flag.tone)} />
     </div>
   );
 }
@@ -277,7 +278,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
 type ReasonIconKind = "up" | "down" | "spark";
 
 function ReasonPill({ label, kind, tone }: { label: string; kind: ReasonIconKind; tone: "accent" | "success" | "danger" }) {
-  const color = tone === "success" ? "var(--color-success)" : tone === "danger" ? "var(--color-danger)" : "var(--color-accent)";
+  const color = tone === "accent" ? "var(--color-accent)" : verdictColorVar(tone);
   const path = kind === "up" ? "M7 17 17 7M9 7h8v8" : kind === "down" ? "M7 7l10 10M17 9v8H9" : "M13 3 5 13h6l-1 8 8-10h-6z";
   return (
     <span

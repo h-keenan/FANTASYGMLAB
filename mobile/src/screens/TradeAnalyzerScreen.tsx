@@ -1,3 +1,4 @@
+import { bandColor, verdictColor } from '../lib/verdictToneTheme';
 import { TRADE_SIDE_LABEL } from '../lib/tradeSideLabels';
 import ExchangeSide from '../components/ExchangeSide';
 import { dropRepeatedSentences, shortSummary } from '../lib/verdictText';
@@ -104,8 +105,9 @@ type Side = 'send' | 'receive';
 
 function toneColors(colors: ThemeColors): Record<TradeVerdict['tone'], string> {
   return {
-    accept: colors.success,
-    decline: colors.danger,
+    // The verdict WORD (ACCEPT / DECLINE chip) takes its colour from the shared verdict map.
+    accept: verdictColor(colors, 'accept'),
+    decline: verdictColor(colors, 'decline'),
     counter: colors.accent,
     fair: colors.textSecondary,
     // Never actually produced here — Trade Analyzer only ever renders a
@@ -850,6 +852,8 @@ function VerdictCard({
   const [shareOpen, setShareOpen] = useState(false);
   const [readMore, setReadMore] = useState(false);
   const toneColor = toneColors(colors)[verdict.tone];
+  // The card itself stays neutral: semantic colour is only on the verdict chip, never a red border or glow.
+  const cardAccent = colors.accent;
   // The lineup sentence used to print twice (lineup explanation + rationale).
   // Default view shows a one-sentence summary; the rest is behind Read more.
   const lineupExplanation = verdict.lineup_model?.explanation ?? '';
@@ -876,7 +880,7 @@ function VerdictCard({
     <AnimatedCard
       style={StyleSheet.flatten([
         styles.verdictCard,
-        { borderLeftColor: toneColor },
+        { borderLeftColor: cardAccent },
         isExtreme && styles.verdictCardExtreme,
       ])}
       // `glow` is this app's existing "the one card on screen that matters"
@@ -885,7 +889,7 @@ function VerdictCard({
       // tone so an extreme accept glows success-green and an extreme decline
       // glows danger-red.
       glow={isExtreme}
-      glowColor={toneColor}
+      glowColor={cardAccent}
     >
       {isExtreme ? (
         <View style={[styles.extremeEyebrowRow, { backgroundColor: toneColor }]}>
@@ -939,7 +943,7 @@ function VerdictCard({
             label="CONFIDENCE"
             value={verdict.confidence_pct != null ? `${verdict.confidence} (${Math.round(verdict.confidence_pct)}%)` : verdict.confidence}
             level={confidenceLevel(verdict)}
-            color={toneColor}
+            color={cardAccent}
           />
         </View>
       </View>
@@ -970,7 +974,7 @@ function VerdictCard({
           <AppText
             style={[
               styles.lineupModelHeadline,
-              verdict.posture_assessment?.lineup_costly && { color: colors.danger },
+              verdict.posture_assessment?.lineup_costly && { color: bandColor(colors, 'caution') },
             ]}
           >
             {formatLineupPoints(verdict.lineup_model.points.ros_delta)} lineup pts over Weeks{' '}
@@ -1040,10 +1044,10 @@ function VerdictCard({
               your posture.
             </AppText>
           ) : null}
-          <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
-          <VerdictSection icon="people-outline" label="Roster fit" text={verdict.roster_summary} color={toneColor} />
-          <VerdictSection icon="compass-outline" label="Strategy fit" text={verdict.strategy_summary} color={toneColor} />
-          <VerdictSection icon="warning-outline" label="Risk" text={verdict.risk_summary} color={colors.warning} />
+          <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={cardAccent} />
+          <VerdictSection icon="people-outline" label="Roster fit" text={verdict.roster_summary} color={cardAccent} />
+          <VerdictSection icon="compass-outline" label="Strategy fit" text={verdict.strategy_summary} color={cardAccent} />
+          <VerdictSection icon="warning-outline" label="Risk" text={verdict.risk_summary} color={bandColor(colors, 'caution')} />
           {verdict.counter_guidance ? (
             <VerdictSection
               icon="arrow-forward"

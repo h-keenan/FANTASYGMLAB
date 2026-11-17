@@ -5,12 +5,13 @@
  */
 import type { CompactPart, CompactTone } from "./compactModule";
 import type { TeamStatusLineup, TeamStatusMatchup, TeamStatusPosition, TeamStatusStanding } from "./teamStatus";
+import { bandSimTone, percentBand } from "./verdictTone.ts";
 
 export interface TeamStatusHeroModel {
   label: string;
   value: string;
   context: string | null;
-  tone: "success" | "danger" | "accent";
+  tone: "success" | "warning" | "danger" | "accent";
 }
 
 /**
@@ -31,7 +32,7 @@ export function teamStatusHeroModel(
         label: "Your win chance",
         value: `${matchup.winPercent}%`,
         context: `${week} vs ${matchup.opponentName}${state}${proj}`,
-        tone: matchup.winPercent >= 55 ? "success" : matchup.winPercent <= 45 ? "danger" : "accent",
+        tone: bandSimTone(percentBand(matchup.winPercent)),
       };
     }
     if (matchup.live) {

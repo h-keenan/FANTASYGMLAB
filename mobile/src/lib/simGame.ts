@@ -11,6 +11,7 @@
  * reads or writes real league data.
  */
 
+import { bandSimTone, probabilityBand } from "./verdictTone.ts";
 import type { SimAttributeGrade, SimGradeLetter } from "./simGrade";
 import type { SimAchievementsPayload, SimRecapAchievements } from "./simAchievements";
 import type { ReviewGlyph } from "./simReview";
@@ -3072,10 +3073,7 @@ export function simWinChanceLabel(prob: number | null | undefined): string {
 }
 
 export function simWinChanceTone(prob: number | null | undefined): SimGameTone {
-  if (prob == null) return "muted";
-  if (prob >= 0.55) return "success";
-  if (prob <= 0.45) return "danger";
-  return "warning";
+  return prob == null ? "muted" : bandSimTone(probabilityBand(prob));
 }
 
 /** Green up / red down trend text, e.g. "+6.1" with a matching arrow. */

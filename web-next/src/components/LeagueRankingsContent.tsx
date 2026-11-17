@@ -1,5 +1,6 @@
 "use client";
 
+import { percentColorVar } from "@/lib/verdictToneCss";
 import { TERMS } from "@/lib/terms";
 import { useHeaderContext } from "@/lib/headerContext";
 import { PageTabBar } from "@/components/PageTabBar";
@@ -328,7 +329,7 @@ function PlayoffOddsRow({ team, rankLabel, myRosterId }: { team: PlayoffOddsTeam
       ownerName={team.owner_name}
       primaryMetric={`${Math.round(team.playoff_probability)}%`}
       metricLabel="Playoff Odds"
-      toneColor={metricToneColor(team.playoff_probability)}
+      toneColor={percentColorVar(team.playoff_probability)}
       isCurrent={team.roster_id === myRosterId}
       firstPlace={rankLabel === "#1"}
       secondary={[`Proj ${team.median_final_wins}-${team.median_final_losses}`, `Seed #${team.median_seed}`, team.record_label || "0-0"]}

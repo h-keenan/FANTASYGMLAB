@@ -1,3 +1,4 @@
+import { verdictColorVar } from "./verdictToneCss";
 import type { PastTradeOutcome, TradeAsset, TradeOutcomeAssetSummary, TradeOutcomeResultSummary } from "@/lib/api";
 
 /**
@@ -39,10 +40,7 @@ export function outcomeToneColorVar(outcome: string): string {
  * modules/trade_outcomes_page.py's VERDICT_BADGE_VARIANT (where "mixed"
  * is the "premium" badge variant) and mobile's verdictTone. */
 export function verdictToneColorVar(verdict: string | null | undefined): string {
-  if (verdict === "worked_out") return "var(--color-success)";
-  if (verdict === "didnt_pan_out") return "var(--color-danger)";
-  if (verdict === "mixed") return "var(--color-premium)";
-  return "var(--color-text-secondary)";
+  return verdictColorVar(verdict);
 }
 
 /** Mirrors mobile/src/screens/TradeHistoryScreen.tsx's verdictDetailText and

@@ -1,3 +1,4 @@
+import { percentColor } from '../lib/verdictToneTheme';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
@@ -13,7 +14,6 @@ import TeamAvatar from '../components/TeamAvatar';
 import { api, type PlayoffOddsTeam } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
-import { percentileColor } from '../lib/percentile';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import PremiumLock from '../components/PremiumLock';
@@ -180,7 +180,7 @@ function PlayoffOddsRow({
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const probabilityColor = percentileColor(item.playoff_probability, colors);
+  const probabilityColor = percentColor(colors, item.playoff_probability);
   const statusLabel = item.clinched ? 'Clinched' : item.eliminated ? 'Eliminated' : null;
 
   return (

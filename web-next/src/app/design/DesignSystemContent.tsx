@@ -1,5 +1,6 @@
 "use client";
 
+import { bandColorVar } from "@/lib/verdictToneCss";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { AlertRow } from "@/components/AlertsContent";
@@ -781,8 +782,8 @@ export function DesignSystemContent() {
           <EmptyState title="No trade ideas yet" subtitle="Check back after the next value refresh." actionLabel="Refresh" onAction={noop} />
         </Spec>
         <Spec name="VerdictCallout" path="web-next/src/components/VerdictCallout.tsx">
-          <VerdictCallout color="var(--color-success)" label="You win" detail="+1,240 value" />
-          <VerdictCallout color="var(--color-warning)" label="Close" detail="Within 3%" />
+          <VerdictCallout color={bandColorVar("good")} label="You win" detail="+1,240 value" />
+          <VerdictCallout color={bandColorVar("caution")} label="Close" detail="Within 3%" />
         </Spec>
       </Family>
 

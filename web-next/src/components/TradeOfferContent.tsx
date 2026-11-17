@@ -1,5 +1,6 @@
 "use client";
 
+import { bandColorVar } from "@/lib/verdictToneCss";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -16,9 +17,9 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { offerAnalyzerHref } from "@/lib/tradeOffer";
 
 const ACCEPT_COLOR: Record<TradeTargetOffer["acceptance"]["label"], string> = {
-  Likely: "var(--color-success)",
-  Possible: "var(--color-warning)",
-  "Long shot": "var(--color-danger)",
+  Likely: bandColorVar("good"),
+  Possible: bandColorVar("caution"),
+  "Long shot": bandColorVar("bad"),
 };
 
 /**

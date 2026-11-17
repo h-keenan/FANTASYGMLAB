@@ -1,3 +1,4 @@
+import { bandColor } from '../lib/verdictToneTheme';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -72,7 +73,7 @@ export default function TradeOfferScreen({ route, navigation }: Props) {
   }, [load]);
 
   const acceptColor = (label: TradeTargetOffer['acceptance']['label']) =>
-    label === 'Likely' ? colors.success : label === 'Possible' ? colors.warning : colors.danger;
+    bandColor(colors, label === 'Likely' ? 'good' : label === 'Possible' ? 'caution' : 'bad');
 
   const openInAnalyzer = (offer: TradeTargetOffer) => {
     trackUse('trade_offer_opened_in_analyzer', 'used');

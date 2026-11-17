@@ -33,6 +33,8 @@ import { StatStrip } from "@/components/StatStrip";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { MatchupHeroCard } from "@/components/ui/MatchupModule";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
+import { bandColorVar, probabilityColorVar } from "@/lib/verdictToneCss";
+import { deltaBand } from "@/lib/verdictTone";
 import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, swingInputsFromMatchup, teamsValuesParts } from "@/lib/matchupModules";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -77,6 +79,11 @@ import { parseMatchupPlan } from "@/lib/todayView";
  */
 
 const MOVES_PREVIEW_COUNT = 3;
+
+/** Margin colouring: green when up, muted otherwise (a down move gets an arrow, not red; verdictTone.ts). */
+function deltaTone(value: number | null | undefined): "positive" | "neutral" {
+  return deltaBand(value) === "good" ? "positive" : "neutral";
+}
 
 function signedTone(value: number | null | undefined): "positive" | "risk" | "neutral" {
   if (value == null || Math.abs(value) < 0.05) return "neutral";
@@ -310,7 +317,7 @@ function TeamsValues({ matchup, leagueId, leagueName = "" }: { matchup: MatchupR
               <span className="winprob-bar-fill" style={{ transform: `scaleX(${(myPct ?? 0) / 100})` }} aria-hidden="true" />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-base font-extrabold" style={{ color: "var(--color-success)" }}>
+              <span className="text-base font-extrabold" style={{ color: probabilityColorVar((myPct ?? 0) / 100) }} data-testid="matchup-my-pct">
                 {myPct}%
               </span>
               <span
@@ -339,14 +346,14 @@ function TeamsValues({ matchup, leagueId, leagueName = "" }: { matchup: MatchupR
               glyph: "power",
               label: "Proj margin",
               value: projectedMargin != null ? formatSigned(projectedMargin) : "—",
-              tone: signedTone(projectedMargin),
+              tone: deltaTone(projectedMargin),
             },
             { glyph: "starter", label: "Their value", value: formatSeasonValue(comparison.opponent_season_value) },
             {
               glyph: "franchise",
               label: "Value margin",
               value: valueMargin,
-              tone: comparison.edge === "you" ? "positive" : comparison.edge === "opponent" ? "risk" : "neutral",
+              tone: comparison.edge === "you" ? "positive" : "neutral",
             },
           ]}
         />
@@ -357,8 +364,7 @@ function TeamsValues({ matchup, leagueId, leagueName = "" }: { matchup: MatchupR
 
 function EdgeArrow({ edge }: { edge: number }) {
   const tone = signedTone(edge);
-  const color =
-    tone === "positive" ? "var(--color-success)" : tone === "risk" ? "var(--color-danger)" : "var(--color-text-muted)";
+  const color = tone === "positive" ? bandColorVar("good") : "var(--color-text-muted)";
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" style={{ color }}>
       {tone === "neutral" ? (
@@ -382,8 +388,7 @@ function EdgeChips({ edges }: { edges: MatchupPositionEdge[] }) {
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Position edges">
       {edgeChips(edges).map((chip) => {
-        const color =
-          chip.tone === "success" ? "var(--color-success)" : chip.tone === "danger" ? "var(--color-danger)" : "var(--color-text-muted)";
+        const color = chip.tone === "success" ? bandColorVar("good") : "var(--color-text-muted)";
         const edge = edges.find((e) => e.position === chip.position)!;
         return (
           <li
@@ -420,8 +425,8 @@ function MatchupInsights({ matchup }: { matchup: MatchupResponse }) {
       title="Matchup Insights"
       testId="matchup-insights"
       defaultOpen
-      tone={verdict.tone === "positive" ? "success" : verdict.tone === "risk" ? "danger" : "accent"}
-      parts={insightsParts(verdict.headline, verdict.tone === "positive" ? "success" : verdict.tone === "risk" ? "danger" : "accent", edges)}
+      tone="accent"
+      parts={insightsParts(verdict.headline, edges)}
     >
       <div className="flex flex-col gap-2.5">
         {explanation ? (
@@ -601,8 +606,7 @@ function LineupComparison({
 
 function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: string }) {
   const tone = signedTone(move.gain);
-  const gainColor =
-    tone === "positive" ? "var(--color-success)" : tone === "risk" ? "var(--color-danger)" : "var(--color-text-muted)";
+  const gainColor = tone === "positive" ? bandColorVar("good") : "var(--color-text-muted)";
   return (
     <li
       className="flex flex-col gap-2 p-3"

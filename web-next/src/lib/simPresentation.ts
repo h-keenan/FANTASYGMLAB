@@ -13,6 +13,8 @@
  * docs/fantasy-sim-api.md.
  */
 
+import { bandSimTone, probabilityBand } from "./verdictTone.ts";
+
 export interface SimUpsell {
   title: string;
   body: string;
@@ -143,11 +145,7 @@ export type SimTone = "success" | "accent" | "warning" | "danger";
 
 /** Odds colour: how comfortable the position is. */
 export function simOddsTone(probability: number | undefined): SimTone {
-  const p = typeof probability === "number" ? probability : 0;
-  if (p >= 0.6) return "success";
-  if (p >= 0.35) return "accent";
-  if (p >= 0.15) return "warning";
-  return "danger";
+  return bandSimTone(probabilityBand(probability));
 }
 
 /** Whole-percent odds, never a false 0% or 100%. */

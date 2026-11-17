@@ -25,8 +25,8 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * Cyan / neutral only, gold never.
  */
 
-function toneColor(tone: 'success' | 'danger' | 'accent', colors: ThemeColors): string {
-  return tone === 'success' ? colors.success : tone === 'danger' ? colors.danger : colors.accent;
+function toneColor(tone: 'success' | 'warning' | 'danger' | 'accent', colors: ThemeColors): string {
+  return tone === 'success' ? colors.success : tone === 'danger' ? colors.danger : tone === 'warning' ? colors.warning : colors.accent;
 }
 
 /** The widest-range player still to play on each side, with avatars; tapping one opens the player peek. Shared by the Matchup hero and Today's matchup card. */

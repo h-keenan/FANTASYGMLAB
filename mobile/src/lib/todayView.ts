@@ -4,6 +4,7 @@
  * page already has (lib/teamStatus.ts, lib/decisionQueue.ts); nothing is estimated here, and a fact lives in exactly one
  * of these models so it is never drawn twice. Import-light, byte-identical twin of mobile/src/lib/todayView.ts.
  */
+import { bandSimTone, percentBand } from "./verdictTone.ts";
 import type { DecisionSwap } from "./decisionQueue";
 import type { TeamStatusMatchup, TeamStatusPosition, TeamStatusStanding } from "./teamStatus";
 
@@ -39,7 +40,7 @@ export function todayMatchupRing(m: TeamStatusMatchup): TodayMatchupRing {
   const pct = m.winPercent;
   return {
     pct,
-    tone: pct == null ? "muted" : pct >= 55 ? "success" : pct <= 45 ? "danger" : "accent",
+    tone: pct == null ? "muted" : bandSimTone(percentBand(pct)),
     kicker: `${week} · VS ${m.opponentName.toUpperCase()}${state}`,
     scoreLine: known ? `${(mine as number).toFixed(1)} vs ${(theirs as number).toFixed(1)}` : null,
     scoreCaption: known ? (m.stateLabel === "Final" ? "final" : m.live ? "live" : "projected") : null,
@@ -117,7 +118,8 @@ function oddsTone(odds: string, standingTone: TeamStatusStanding["tone"]): Tone 
   if (standingTone === "positive") return "success";
   if (standingTone === "risk") return "danger";
   const n = Number.parseFloat(odds);
-  return Number.isFinite(n) ? (n >= 60 ? "success" : n < 25 ? "danger" : "warning") : "muted";
+  if (!Number.isFinite(n)) return "muted";
+  return bandSimTone(percentBand(n));
 }
 
 /**

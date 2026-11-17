@@ -1,5 +1,6 @@
 "use client";
 
+import { bandColorVar } from "@/lib/verdictToneCss";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -33,9 +34,9 @@ function fetchOnce(leagueId: string, send: string[], receive: string[], hasPicks
 }
 
 const TONE_COLOR: Record<WhatIfTone, string> = {
-  positive: "var(--color-success)",
-  negative: "var(--color-danger)",
-  neutral: "var(--color-text-secondary)",
+  positive: bandColorVar("good"),
+  negative: bandColorVar("bad"),
+  neutral: bandColorVar("neutral"),
 };
 
 export function splitTradeAssets(assets: TradeAsset[]): { ids: string[]; hasPicks: boolean } {

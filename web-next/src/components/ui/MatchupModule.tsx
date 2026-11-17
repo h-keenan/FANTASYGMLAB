@@ -23,7 +23,7 @@ import { feedAgeLabel, feedPointsLabel } from "@/lib/liveFeed";
  * Cyan / neutral glass only, gold never. Mobile twin: mobile/src/components/MatchupModule.tsx.
  */
 
-const TONE = { success: "var(--color-success)", danger: "var(--color-danger)", accent: "var(--color-accent)" } as const;
+const TONE = { success: "var(--color-success)", warning: "var(--color-warning)", danger: "var(--color-danger)", accent: "var(--color-accent)" } as const;
 
 /** The widest-range player still to play on each side, with avatars; tapping one opens the player peek. Shared by the Matchup hero and Today's matchup card. */
 export function SwingPlayers({ swing, onOpenPlayer }: { swing: MatchupSwingPlayer[]; onOpenPlayer?: (player: MatchupSwingPlayer) => void }) {

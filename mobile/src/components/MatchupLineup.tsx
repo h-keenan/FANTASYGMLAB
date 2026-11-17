@@ -16,6 +16,7 @@ import { changedPlayerIds, slotTotals, sortSlots, type SlotComparison, type Slot
 import { freshnessLabel } from '../lib/liveScores';
 import { formatSigned, type LineupPlayer } from '../lib/matchupPresentation';
 import { headlinePoints, playerCardAriaLabel, playerStatusChips, trendVsProjection, type ChipTone } from '../lib/playerCard';
+import { probabilityColor } from '../lib/verdictToneTheme';
 import { radii, spacing, type ThemeColors } from '../theme';
 import { Collapse } from './Presence';
 
@@ -86,7 +87,7 @@ export function ComparisonHeader({
         </View>
         <View style={{ alignItems: 'center', gap: 4 }}>
           {pct != null ? (
-            <AppText style={[styles.winPct, { color: pct >= 50 ? colors.successBright : colors.danger }]}>{`${pct}% win`}</AppText>
+            <AppText style={[styles.winPct, { color: probabilityColor(colors, pct / 100) }]}>{`${pct}% win`}</AppText>
           ) : null}
           <ToneBadge
             label={Math.abs(totals.marginNow) < 0.05 ? 'Even' : formatSigned(totals.marginNow)}

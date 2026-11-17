@@ -36,6 +36,7 @@ import DashboardStatRow from '../components/DashboardStatRow';
 import CompactModule from '../components/CompactModule';
 import { MatchupHeroCard } from '../components/MatchupModule';
 import type { MatchupSwingPlayer } from '../lib/matchupModules';
+import { bandColor, probabilityColor } from '../lib/verdictToneTheme';
 import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, swingInputsFromMatchup, teamsValuesParts } from '../lib/matchupModules';
 import TeamAvatar from '../components/TeamAvatar';
 import RangeCompare from '../components/RangeCompare';
@@ -138,9 +139,8 @@ function signedTone(value: number | null | undefined): VerdictTone {
 }
 
 function toneColor(colors: ThemeColors, tone: VerdictTone): string {
-  if (tone === 'positive') return colors.successBright;
-  if (tone === 'risk') return colors.danger;
-  return colors.textSecondary;
+  // A down move is muted with an arrow, never red (verdictTone.ts).
+  return tone === 'positive' ? bandColor(colors, 'good') : colors.textTertiary;
 }
 
 export default function MatchupScreen({ route, navigation }: Props) {
@@ -582,7 +582,7 @@ function TeamsValues({
             <View style={[styles.oddsFill, { width: `${myPct ?? 0}%` }]} />
           </View>
           <View style={styles.oddsLabels}>
-            <AppText style={[styles.oddsPct, { color: colors.successBright }]}>{myPct}%</AppText>
+            <AppText style={[styles.oddsPct, { color: probabilityColor(colors, (myPct ?? 0) / 100) }]}>{myPct}%</AppText>
             <AppText style={styles.oddsCaption}>WIN PROBABILITY</AppText>
             <AppText style={[styles.oddsPct, { color: colors.textSecondary }]}>{100 - myPct!}%</AppText>
           </View>
@@ -596,13 +596,13 @@ function TeamsValues({
           {
             label: 'Proj margin',
             value: margin != null ? formatSigned(margin) : '—',
-            tone: margin != null && signedTone(margin) !== 'neutral' ? (signedTone(margin) as 'positive' | 'risk') : undefined,
+            tone: margin != null && signedTone(margin) === 'positive' ? 'positive' : undefined,
           },
           { label: 'Their value', value: formatSeasonValue(comparison.opponent_season_value) },
           {
             label: 'Value margin',
             value: valueMargin,
-            tone: comparison.edge === 'you' ? 'positive' : comparison.edge === 'opponent' ? 'risk' : undefined,
+            tone: comparison.edge === 'you' ? 'positive' : undefined,
           },
         ]}
       />
@@ -622,15 +622,14 @@ function Insights({ matchup }: { matchup: MatchupResponse }) {
       ? 'Position edges: your Sleeper lineups, real points for started games plus projections.'
       : 'Position edges: this week’s projections for your Sleeper lineups.'
     : 'Position edges: projections for each team’s suggested lineup (Sleeper lineups aren’t posted yet).';
-  const tone = verdict.tone === 'positive' ? 'success' : verdict.tone === 'risk' ? 'danger' : 'accent';
   return (
     <CompactModule
       id="matchup.insights"
       title="Matchup Insights"
       testID="matchup-insights"
       defaultOpen
-      tone={tone}
-      parts={insightsParts(verdict.headline, tone, edges)}
+      tone="accent"
+      parts={insightsParts(verdict.headline, edges)}
     >
       <View style={{ gap: spacing.sm }}>
         <AppText style={styles.insightsBody}>{explanation ?? 'No position projections yet to compare.'}</AppText>

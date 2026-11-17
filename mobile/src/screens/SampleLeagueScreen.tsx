@@ -1,3 +1,4 @@
+import { bandColor, verdictColor } from '../lib/verdictToneTheme';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
@@ -90,8 +91,7 @@ export default function SampleLeagueScreen({ navigation }: Props) {
   };
 
   const verdict = sampleTradeVerdict(SAMPLE_TRADE);
-  const verdictColor =
-    verdict.tone === 'success' ? colors.success : verdict.tone === 'danger' ? colors.danger : colors.accent;
+  const verdictToneColor = verdict.tone === 'warning' ? bandColor(colors, 'caution') : verdictColor(colors, verdict.tone);
 
   return (
     <>
@@ -147,7 +147,7 @@ export default function SampleLeagueScreen({ navigation }: Props) {
           <>
             <SectionHeading title="Trade" caption={`Sample offer with ${SAMPLE_TRADE.partner}`} />
             <View style={styles.verdictRow}>
-              <ToneBadge label={verdict.label} color={verdictColor} />
+              <ToneBadge label={verdict.label} color={verdictToneColor} />
               <AppText style={styles.muted}>
                 You send {verdict.giveTotal}, you get {verdict.getTotal}
               </AppText>

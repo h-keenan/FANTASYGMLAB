@@ -4,6 +4,7 @@
  * Lineup comparison, Suggested moves). Import-light, byte-identical twin of mobile/src/lib/matchupModules.ts.
  */
 import type { CompactPart, CompactTone } from "./compactModule";
+import { bandSimTone, percentBand } from "./verdictTone.ts";
 
 export interface MatchupEdgeInput {
   position: string;
@@ -30,7 +31,7 @@ export interface MatchupHeroModel {
   label: string;
   value: string;
   context: string;
-  tone: "success" | "danger" | "accent";
+  tone: "success" | "warning" | "danger" | "accent";
 }
 
 function fixed(n: number | null | undefined): string | null {
@@ -51,7 +52,7 @@ export function matchupHeroModel(input: MatchupHeroInput): MatchupHeroModel {
   const context = [`vs ${input.opponentName}`, score, proj].filter(Boolean).join(" · ");
   const label = [state, input.winPercent != null ? "Win chance" : "Matchup"].filter(Boolean).join(" · ");
   if (input.winPercent != null) {
-    const tone = input.winPercent >= 55 ? "success" : input.winPercent <= 45 ? "danger" : "accent";
+    const tone = bandSimTone(percentBand(input.winPercent));
     return { label, value: `${Math.round(input.winPercent)}%`, context, tone };
   }
   if (score) return { label, value: score, context: [`vs ${input.opponentName}`, proj].filter(Boolean).join(" · "), tone: "accent" };
@@ -61,7 +62,7 @@ export function matchupHeroModel(input: MatchupHeroInput): MatchupHeroModel {
 export interface EdgeChip {
   position: string;
   label: string;
-  tone: "success" | "danger" | "muted";
+  tone: "success" | "muted";
 }
 
 /** Position edges as chips, biggest swing first ("RB +16.7"). */
@@ -71,19 +72,19 @@ export function edgeChips(edges: ReadonlyArray<MatchupEdgeInput> | null | undefi
     .map((e) => ({
       position: e.position,
       label: `${e.position} ${signedPoints(e.edge)}`,
-      tone: Math.abs(e.edge) < 0.05 ? "muted" : e.edge > 0 ? "success" : "danger",
+      tone: Math.abs(e.edge) < 0.05 ? "muted" : e.edge > 0 ? "success" : "muted",
     }));
 }
 
 /** Insights collapsed: the verdict, the best edge and the worst edge ("You're favored · RB +16.7 · WR -4.6"). */
-export function insightsParts(headline: string, tone: CompactTone, edges: ReadonlyArray<MatchupEdgeInput> | null | undefined): CompactPart[] {
+export function insightsParts(headline: string, edges: ReadonlyArray<MatchupEdgeInput> | null | undefined): CompactPart[] {
   const sorted = [...(edges ?? [])].sort((a, b) => b.edge - a.edge);
   const best = sorted[0];
   const worst = sorted.length > 1 ? sorted[sorted.length - 1] : null;
   const parts: Array<CompactPart | null> = [
-    { key: "verdict", text: headline.replace(/\.$/, ""), tone, strong: true },
+    { key: "verdict", text: headline.replace(/\.$/, ""), strong: true },
     best && best.edge >= 0.05 ? { key: "best", text: `${best.position} ${signedPoints(best.edge)}`, tone: "success" as const } : null,
-    worst && worst.edge <= -0.05 ? { key: "worst", text: `${worst.position} ${signedPoints(worst.edge)}`, tone: "danger" as const } : null,
+    worst && worst.edge <= -0.05 ? { key: "worst", text: `${worst.position} ${signedPoints(worst.edge)}`, tone: "muted" as const } : null,
   ];
   return parts.filter((p): p is CompactPart => p != null);
 }
@@ -96,12 +97,12 @@ export function teamsValuesParts(input: {
   edge: "you" | "opponent" | "even" | string;
   projectedMargin: number | null;
 }): CompactPart[] {
-  const tone: CompactTone = input.edge === "you" ? "success" : input.edge === "opponent" ? "danger" : "muted";
+  const tone: CompactTone = input.edge === "you" ? "success" : "muted";
   const parts: Array<CompactPart | null> = [
     { key: "value", text: `Value ${input.myValue} vs ${input.opponentValue}` },
     { key: "margin", text: input.valueMargin, tone },
     input.projectedMargin != null
-      ? { key: "proj", text: `Proj margin ${signedPoints(input.projectedMargin)}`, tone: input.projectedMargin >= 0.05 ? ("success" as const) : input.projectedMargin <= -0.05 ? ("danger" as const) : ("muted" as const) }
+      ? { key: "proj", text: `Proj margin ${signedPoints(input.projectedMargin)}`, tone: input.projectedMargin >= 0.05 ? ("success" as const) : ("muted" as const) }
       : null,
   ];
   return parts.filter((p): p is CompactPart => p != null);
@@ -122,7 +123,7 @@ export function lineupParts(input: {
   const parts: Array<CompactPart | null> = [
     { key: "view", text: input.bestBall ? "Best ball" : input.view === "actual" ? "Actual" : "Suggested" },
     m && o ? { key: "totals", text: `${m} vs ${o}`, strong: true } : null,
-    margin != null ? { key: "margin", text: signedPoints(margin), tone: margin >= 0.05 ? ("success" as const) : margin <= -0.05 ? ("danger" as const) : ("muted" as const) } : null,
+    margin != null ? { key: "margin", text: signedPoints(margin), tone: margin >= 0.05 ? ("success" as const) : ("muted" as const) } : null,
     { key: "slots", text: `${input.slotCount} slots` },
   ];
   return parts.filter((p): p is CompactPart => p != null);
@@ -220,7 +221,7 @@ export interface MatchupCardInput {
 
 export interface MatchupCardModel {
   kicker: string;
-  win: { pct: number; label: string; tone: "success" | "danger" | "accent" } | null;
+  win: { pct: number; label: string; tone: "success" | "warning" | "danger" | "accent" } | null;
   mine: { name: string; score: string };
   opponent: { name: string; score: string };
   /** Which numbers the big scores are: "points" (live/final) or "projected". */
@@ -235,7 +236,7 @@ export function matchupCardModel(input: MatchupCardInput): MatchupCardModel {
   const state = input.final ? "FINAL" : input.live ? "LIVE" : null;
   const kicker = [input.omitWeek ? null : input.week != null ? `WEEK ${input.week}` : "THIS WEEK", state ?? (input.omitWeek ? "HEAD TO HEAD" : null)].filter(Boolean).join(" · ");
   const wp = input.winPercent != null ? Math.round(input.winPercent) : null;
-  const win = wp != null ? { pct: wp, label: `${wp}% win`, tone: (wp >= 55 ? "success" : wp <= 45 ? "danger" : "accent") as "success" | "danger" | "accent" } : null;
+  const win = wp != null ? { pct: wp, label: `${wp}% win`, tone: bandSimTone(percentBand(wp)) } : null;
   const useReal = input.kickedOff && input.myScore != null && input.opponentScore != null;
   const mineScore = useReal ? fixed(input.myScore) : fixed(input.myProjected);
   const oppScore = useReal ? fixed(input.opponentScore) : fixed(input.opponentProjected);

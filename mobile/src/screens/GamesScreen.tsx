@@ -1,3 +1,4 @@
+import { percentColor } from '../lib/verdictToneTheme';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
@@ -157,14 +158,14 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
       />
       <GlassCard radius="md" style={styles.card}>
         <View>
-          <AppText style={[styles.bigOdds, { color: percentileColor(mine.playoff_probability, colors) }]}>
+          <AppText style={[styles.bigOdds, { color: percentColor(colors, mine.playoff_probability) }]}>
             {formatOdds(mine.playoff_probability)}
           </AppText>
           <AppText style={styles.muted}>Playoff odds</AppText>
         </View>
         {titleAvailable ? (
           <View>
-            <AppText style={[styles.metric, { color: percentileColor(mine.title_probability!, colors) }]}>
+            <AppText style={[styles.metric, { color: percentColor(colors, mine.title_probability!) }]}>
               {formatTitleOdds(mine.title_probability)}
             </AppText>
             <AppText style={styles.muted}>Title odds</AppText>
@@ -199,7 +200,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
                 {titleAvailable && team.title_probability != null ? ` · Title ${formatTitleOdds(team.title_probability)}` : ''}
               </AppText>
             </View>
-            <AppText style={[styles.metric, { color: percentileColor(team.playoff_probability, colors) }]}>
+            <AppText style={[styles.metric, { color: percentColor(colors, team.playoff_probability) }]}>
               {formatOdds(team.playoff_probability)}
             </AppText>
           </View>

@@ -677,8 +677,8 @@ describe("home dashboard helpers", () => {
     expect(simWinChanceLabel(1)).toBe("99%");
     expect(simWinChanceLabel(null)).toBe("-");
     expect(simWinChanceTone(0.7)).toBe("success");
-    expect(simWinChanceTone(0.3)).toBe("danger");
-    expect(simWinChanceTone(0.5)).toBe("warning");
+    expect(simWinChanceTone(0.1)).toBe("danger");
+    expect(simWinChanceTone(0.5)).toBe("accent");
   });
 
   it("trend text is green up, red down", () => {

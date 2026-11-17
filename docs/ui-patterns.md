@@ -1341,3 +1341,12 @@ Run both with `npm run guard:layout` from `web-next/` (or `scripts/run_layout_gu
 
 - **D3**: a page's explainer is one "?" in the header (`PageTitle info`), built with `usePageHelp(lines)` (`components/PageHelpLines.tsx`, respects the account's help level). The labelled inline `BeginnerHelp` rows on My Team, Matchup, League Rankings and Waivers ("? this matchup page", "? playoff odds", "? waiver value" ...) are gone; their lines are in the popover. App: it never had the labelled orphan rows (its `BeginnerHelp` is plain explanatory text), so no app change.
 - **D9**: the Trade Finder roster row is `PlayerAccordionRow` in selection mode (`selected` prop: leading check, `aria-pressed`, the whole row toggles, `nonInteractive`), showing TEAM · OVR in the meta line and Value at the right. App: `PlayerAccordionRow` inside the existing checkbox `SelectableRow`.
+
+## Verdict colours
+
+One shared map, `lib/verdictTone.ts` (byte-identical web/app twin; web wraps it in `verdictToneCss.ts`, the app in `verdictToneTheme.ts`), turns a probability, win %, odds figure or verdict word into a band: good (green), neutral (secondary text), caution (amber), bad (red). Probability cuts: 60% and up good, 40-60% neutral, 20-40% caution, under 20% bad.
+
+- A verdict sentence ("Your opponent is on track to win") is neutral text. Its card has no semantic border.
+- Semantic colour appears only on small chips, badges, pills and numbers (a "3% WIN" chip, ACCEPT / DECLINE).
+- Negative deltas are muted with a down arrow, never red. Green only for positive.
+- `node scripts/check_verdict_colors.mjs` (CI, lib-twins job) fails on a hard-coded semantic colour or threshold ladder on a win / odds / probability / verdict line. Use the map instead.
