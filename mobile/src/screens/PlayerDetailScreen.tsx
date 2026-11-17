@@ -471,7 +471,7 @@ function CareerSeasonCard({
   const label = `${season.season} ${season.current_season ? 'Regular Season (in progress)' : 'Regular Season'}`;
   return (
     <GlassCard radius="md" padding="lg" style={[styles.cardSpaced]}>
-      <PressableScale style={styles.seasonCardHeader} onPress={onToggle}>
+      <PressableScale style={styles.seasonCardHeader} onPress={onToggle} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ expanded }}>
         <SectionHeading title={label} icon="calendar-outline" />
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
       </PressableScale>

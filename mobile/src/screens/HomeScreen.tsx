@@ -737,7 +737,8 @@ export default function HomeScreen({ navigation, route }: Props) {
                   the fake name back into saved_leagues for real. */}
               {showcaseMode ? null : (
                 <PressableScale accessibilityRole="button"
-                  hitSlop={8}
+                  accessibilityLabel={`Rename ${item.league_name || 'league'}`}
+                  hitSlop={12}
                   style={styles.renameButton}
                   onPress={() => {
                     setRenamingLeague(item);
