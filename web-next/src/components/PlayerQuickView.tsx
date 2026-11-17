@@ -106,6 +106,10 @@ export interface SimPqvSections {
   heroTiles?: { label: string; value: string; note: string }[];
   /** Real-NFL record cut to the as-of season (career + game log), shown first in the Stats tab. */
   stats?: ReactNode;
+  /** A Profile tab of the world's own (college prospect: recruiting, hometown). */
+  profile?: ReactNode;
+  /** College prospect header: the "Class of 2027 · 6'4" · 215 lb" line that replaces "Age N", and the school logo. */
+  headerMeta?: { line: string; logo?: string | null };
 }
 
 /**
@@ -131,6 +135,7 @@ export function PlayerQuickView({
   simOverlay,
   asOfSeason,
   simSections,
+  customSections,
   remote: remoteProp = true,
 }: {
   identity: PlayerQuickViewIdentity;
@@ -151,13 +156,18 @@ export function PlayerQuickView({
    * (generated rookies) and History (draft slot, moves, seasons). Present = this is the sim's world, not the real one.
    */
   simSections?: SimPqvSections;
+  /**
+   * A player who is not an NFL player (a college prospect): the same shell, but every tab is the caller's own and nothing
+   * real-NFL (news, injuries, depth chart, bye, value) shows. Same slots as `simSections`; use with `remote={false}`.
+   */
+  customSections?: SimPqvSections;
   /** false for a synthetic sim player with no real data behind the id: same layout, no remote fetches. */
   remote?: boolean;
 }) {
   // Fantasy Sim (coridian_, 2026-11-13: "inside of Fantasy Sim there should not be real news in there whatsoever"): the sim
   // overlay marks this as the game's own world. Real news, real injury / availability notes, the real depth-chart note and
   // the real bye never show here; the sim's own status, news and outlook (simOverlay) are the only source.
-  const sim: SimPqvSections | null = simSections ?? (simOverlay != null ? { overview: simOverlay } : null);
+  const sim: SimPqvSections | null = simSections ?? customSections ?? (simOverlay != null ? { overview: simOverlay } : null);
   const isSim = sim != null;
   // The sim's own ids (generated rookies, DEF-<TEAM>, fixtures) are not Sleeper ids: they never hit the real endpoints.
   const remote = remoteProp && (!isSim || /^\d+$/.test(identity.player_id));
@@ -424,6 +434,8 @@ export function PlayerQuickView({
           ovrChart={model && !isSim ? <SubRatingRow model={model} bare /> : null}
           depthChartNote={realWorld.showDepthChartNote ? model?.depth_chart_note : null}
           rookie={rookieBadge(bio)}
+          metaLine={sim?.headerMeta?.line ?? null}
+          teamLogo={sim?.headerMeta?.logo ?? null}
         />
 
         {detail?.adp && detail.adp.adp != null ? (
@@ -564,14 +576,15 @@ export function PlayerQuickView({
                     },
                   ]
                 : []),
-              ...(remote
+              ...(remote || sim?.profile
                 ? [
                     {
                       key: "profile",
                       label: "Profile",
                       render: () => (
                         <div className="pqv-body">
-                          {bodyGate ?? (
+                          {sim?.profile ?? null}
+                          {!remote ? null : bodyGate ?? (
                             <>
                               {shownAwards.length > 0 ? <AwardsStrip awards={shownAwards} /> : null}
                               {bio ? <BioGrid bio={pqvBioForContext(bio, isSim)} /> : null}
@@ -621,7 +634,7 @@ export function PlayerQuickView({
             </a>
           </div>
         ) : null}
-        <ValuesCredit className="text-center" />
+        {customSections ? null : <ValuesCredit className="text-center" />}
         </div>
       </div>
     </div>

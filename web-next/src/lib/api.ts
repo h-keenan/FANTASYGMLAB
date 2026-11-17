@@ -1,4 +1,5 @@
 import type { DraftSignalRow } from "./draftSignals";
+import { normalizeProspectProfile, type ProspectProfileResponse } from "./prospectProfile";
 import { normalizeCollegeProspects, normalizeLeagueRankings, normalizeMe, normalizeCommissionerIntegrity, normalizeCommunityTrades, normalizeLeagueRosters, normalizeLeagueTeamProfiles, normalizeSharedCommunityTrades } from "./apiDefaults";
 import type { SimNotificationsResponse } from "@/lib/simNotifications";
 import { env } from "./env";
@@ -4155,6 +4156,8 @@ export interface CollegeProspect {
   aggregate: ProspectScoutingAggregate;
   my_report: MyScoutingReport | null;
   on_watchlist: boolean;
+  /** Set once he is drafted and mapped: the card hands off to the normal NFL player card. */
+  sleeper_player_id?: string | null;
 }
 
 export interface CollegeProspectsResponse {
@@ -5282,6 +5285,9 @@ export const api = {
   // endpoints mobile's CollegeProspectsScreen.tsx / ProspectScoutingDetail
   // Screen.tsx already call; no new backend logic for this page.
   getCollegeProspects: () => authorizedRequest<CollegeProspectsResponse>("/v1/scouting/prospects").then(normalizeCollegeProspects),
+  /** The prospect detail sheet: CFBD stats, weekly log, recruiting, rookie ADP (advanced metrics are Pro, withheld server-side). */
+  getProspectProfile: (prospectId: string) =>
+    authorizedRequest<ProspectProfileResponse>(`/v1/scouting/prospects/${encodeURIComponent(prospectId)}/profile`).then(normalizeProspectProfile),
   submitScoutingReport: (
     prospectId: string,
     body: { grade: number; round_projection: number | null; note: string },
