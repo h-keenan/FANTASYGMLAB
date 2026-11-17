@@ -25,7 +25,7 @@ MODEL = "player_model-player-model-5"  # explicit, like the id recorded in a sav
 
 def snap_of(hint_v: int, seed: int = 11):
     s = build_snapshot(ROWS, BYES, GameSettings.parse({"user_slot": 4}), seed, scoring_model=MODEL)
-    return dataclasses.replace(s, settings=dataclasses.replace(s.settings, hint_v=hint_v, advice_v=0))  # hint_v's own rule; advice_v is covered by tests/test_sim_advice_v.py
+    return dataclasses.replace(s, settings=dataclasses.replace(s.settings, hint_v=hint_v, advice_v=0, cap_v=0))  # hint_v's own rule; advice_v is covered by tests/test_sim_advice_v.py
 
 
 def scrambled(snap):

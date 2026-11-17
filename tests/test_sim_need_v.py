@@ -17,7 +17,7 @@ PIN_OLD_SUPERFLEX_SEED1 = "9309f4f3e2dfe73d"
 
 
 def _report(seed: int, need_v: int, **extra):
-    snap, state = rep._new_game(seed, {"need_v": need_v}, extra)
+    snap, state = rep._new_game(seed, {"need_v": need_v, "cap_v": 0}, extra)  # the digest pin predates cap_v
     return snap, state, position_report(snap, Evaluator(snap, state))
 
 

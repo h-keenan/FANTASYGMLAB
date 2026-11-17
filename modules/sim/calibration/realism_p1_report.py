@@ -167,14 +167,50 @@ def need_table(seeds: int, flags: dict[str, int]) -> dict[str, Any]:
     return out
 
 
+def cap_table(seeds: int, flags: dict[str, int]) -> dict[str, Any]:
+    """Position counts after the startup draft (AI teams, and the user's auto-pick) and at the end of the season (AI teams), per format."""
+
+    out: dict[str, Any] = {}
+    for fmt, extra in (("one_qb", {}), ("superflex", {"superflex": True})):
+        draft_ai: dict[str, Counter] = {p: Counter() for p in ("QB", "RB", "WR", "TE")}
+        draft_user: dict[str, Counter] = {p: Counter() for p in ("QB", "RB", "WR", "TE")}
+        final_ai: dict[str, Counter] = {p: Counter() for p in ("QB", "RB", "WR", "TE")}
+        for seed in range(1, seeds + 1):
+            snap, state = _new_game(seed, flags, extra)
+            user = snap.user_team.tid
+
+            def tally(into, tids):
+                for t in tids:
+                    c = Counter(snap.players[p].pos for p in state.rosters[t])
+                    for pos in into:
+                        into[pos][c.get(pos, 0)] += 1
+
+            tally(draft_ai, [t for t in snap.tids if t != user])
+            tally(draft_user, [user])
+            while state.status == "in_season":
+                advance(Emitter(state, snap), snap, state, seed)
+            tally(final_ai, [t for t in snap.tids if t != user])
+
+        def share(cnt: Counter) -> dict[str, float]:
+            n = sum(cnt.values()) or 1
+            return {str(k): round(v / n, 3) for k, v in sorted(cnt.items())}
+
+        out[fmt] = {
+            "AI_after_draft": {p: share(c) for p, c in draft_ai.items()},
+            "user_auto_after_draft": {p: share(c) for p, c in draft_user.items()},
+            "AI_end_of_season": {p: share(c) for p, c in final_ai.items()},
+        }
+    return out
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("table", choices=["wire", "need"])
+    ap.add_argument("table", choices=["wire", "need", "cap"])
     ap.add_argument("--seeds", type=int, default=8)
     ap.add_argument("--flags", default="{}", help="JSON of GameSettings overrides, e.g. '{\"wire_v\": 0}'")
     args = ap.parse_args(argv)
     flags = {str(k): int(v) for k, v in json.loads(args.flags).items()}
-    out = {"wire": wire_table, "need": need_table}[args.table](args.seeds, flags)
+    out = {"wire": wire_table, "need": need_table, "cap": cap_table}[args.table](args.seeds, flags)
     print(json.dumps(out, indent=1, separators=(",", ": ")) if args.table == "wire" else "\n".join(f"{k}: {json.dumps(v)}" for k, v in out.items()))
 
 

@@ -28,6 +28,7 @@ def _game(seed: int, *, vorp: bool, superflex: bool = False, week: int = 3):
         d.pop("vorp_v", None)
     d.pop("defense_v", None)  # these price pins predate opponent defenses
     d.pop("incumbent_v", None)
+    d.pop("cap_v", None)  # ... and the shared position limit (tests/test_sim_cap_v.py)
     snap = build_snapshot(ROWS, BYES, GameSettings.from_dict(d), seed, scoring_model=MODEL)
     state = GameState(snap)
     em = Emitter(state, snap)

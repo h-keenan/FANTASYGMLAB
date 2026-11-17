@@ -46,11 +46,11 @@ class Run:
     def __init__(self, seed=SEED, **kw):
         self.seed = seed
         econ = kw.pop("econ_v", None)  # pin econ_v before the draft (a save from before it) rather than after it
+        cap = kw.pop("cap_v", 0)  # the seeded dynasty drafts here predate the shared position limit (tests/test_sim_cap_v.py)
         self.root = new_snapshot(seed, **kw)
-        if econ is not None:
-            from dataclasses import replace as _replace
+        from dataclasses import replace as _replace
 
-            object.__setattr__(self.root, "settings", _replace(self.root.settings, econ_v=econ))
+        object.__setattr__(self.root, "settings", _replace(self.root.settings, cap_v=cap, **({"econ_v": econ} if econ is not None else {})))
         self.state = GameState(self.root)
         self.em = Emitter(self.state, self.root)
         ctx = draft.DraftContext(self.root, self.state)

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Sequence
 
+from modules.sim.game_caps import position_cap
 from modules.sim.game_eval import NEED_K, Evaluator, team_params
 from modules.sim.game_types import SINGLETON_POSITIONS, GameSnapshot, slot_positions
 from modules.sim.lineup import pick_lineup
@@ -113,6 +114,8 @@ def hole_positions(found: Iterable[tuple[int, str]]) -> set[str]:
 def _cap(ev: Evaluator, pos: str, need: dict[str, int]) -> int:
     """Most players of a position worth holding: its slots (plus flex share) plus the backups byes and injuries call for."""
 
+    if ev.snap.settings.cap_v >= 1:  # one shared position limit (game_caps), the same one the draft and auto-pick hold
+        return position_cap(ev.snap.settings, pos)
     if pos in SINGLETON_POSITIONS:
         return 1
     flex = flex_slots(ev, pos) if pos in ("RB", "WR", "TE") else 0
@@ -199,7 +202,14 @@ def ai_waiver_claims(
             pos = snap.players[add].pos
             for drop in drops:
                 after = counts.get(pos, 0) + 1 - (1 if drop and snap.players[drop].pos == pos else 0)
-                if after > _cap(ev, pos, need) and pos not in want:
+                if snap.settings.cap_v >= 1:
+                    # cap_v 1: the one shared limit, no exemption for a "wanted" position. A hole this week or next (nobody can play) is covered while the
+                    # HEALTHY depth is under the limit; routine depth and backup-gap claims count everyone on the roster, injured included, because the
+                    # injured player comes back and the roster would keep the extra for good
+                    held = sum(1 for q in roster if snap.players[q].pos == pos and q != drop and (not emergency or state.out.get(q, 0) <= 1))
+                    if held + 1 > _cap(ev, pos, need):
+                        continue
+                elif after > _cap(ev, pos, need) and pos not in want:
                     continue  # no hoarding: a position holds its slots plus the backups byes and injuries need
                 new_roster = [p for p in roster if p != drop] + [add]
                 gain_pts = (horizon_value(ev, new_roster, week, need) - base) / weights
