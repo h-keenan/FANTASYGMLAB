@@ -20,7 +20,7 @@ from modules.sim.types import is_pick_id
 
 def world(seed: int, pos_v: int = 1):
     r = np.random.default_rng(seed)
-    flags = {"limit_v": 1, "econ_v": 1, "hint_v": 1, "vorp_v": 1, "pos_v": pos_v}
+    flags = {"limit_v": 1, "econ_v": 1, "hint_v": 1, "vorp_v": 1, "pos_v": pos_v, "need_v": 0}  # these pin pos_v on the bottom-tercile tags; need_v has its own tests
     s = Stress(seed, make_settings(r, kd_v=1, dynasty=False, flags=flags), r)
     return s, s.view()
 

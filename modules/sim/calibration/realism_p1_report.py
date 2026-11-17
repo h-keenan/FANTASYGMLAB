@@ -104,15 +104,78 @@ def wire_table(seeds: int, flags: dict[str, int]) -> dict[str, Any]:
     }
 
 
+def need_table(seeds: int, flags: dict[str, int]) -> dict[str, Any]:
+    """The Needs / Strength tags against real holes. Per format (one QB / superflex), every league-week from week 2 on:
+    how many of the 12 teams carry a tag at each position, and what the tag predicts (the AI team's realized points from that position's starters
+    that week against the league mean of the same position and week: a real need should score under 1.0, a strength over)."""
+
+    from modules.sim.game_need import position_report
+
+    out: dict[str, Any] = {}
+    for fmt, extra in (("one_qb", {}), ("superflex", {"superflex": True})):
+        counts: dict[str, list[int]] = {}
+        str_counts: dict[str, list[int]] = {}
+        realized: dict[str, dict[str, list[float]]] = {"need": {}, "ok": {}, "strength": {}}
+        empty = {"need": [0, 0], "ok": [0, 0], "strength": [0, 0]}
+        qb_need_sf = 0
+        for seed in range(1, seeds + 1):
+            snap, state = _new_game(seed, flags, extra)
+            user = snap.user_team.tid
+            while state.status == "in_season":
+                w = state.week
+                if w >= 2:
+                    ev = Evaluator(snap, state)
+                    rep = position_report(snap, ev)
+                    for pos in {e["pos"] for e in rep[user]}:
+                        counts.setdefault(pos, []).append(sum(1 for t in snap.tids if next(e for e in rep[t] if e["pos"] == pos)["level"] == "need"))
+                        str_counts.setdefault(pos, []).append(sum(1 for t in snap.tids if next(e for e in rep[t] if e["pos"] == pos)["level"] == "strength"))
+                    tags = {(t, e["pos"]): e["level"] for t in snap.tids for e in rep[t]}
+                else:
+                    tags = {}
+                em = Emitter(state, snap)
+                advance(em, snap, state, seed)
+                if tags and state.week == w + 1:
+                    byposweek: dict[str, dict[str, float]] = {}
+                    for t in snap.tids:
+                        if t == user:
+                            continue
+                        for pos in {p for (_, p) in tags}:
+                            pts = 0.0
+                            holes = 0
+                            for slot, pid in state.lineups[t]:
+                                if pid and snap.players[pid].pos == pos and slot == pos:
+                                    v = state.points.get(pid, [])
+                                    pts += v[w - 1] if len(v) >= w and v[w - 1] is not None else 0.0
+                                elif not pid and slot == pos:
+                                    holes += 1
+                            byposweek.setdefault(pos, {})[t] = pts
+                            empty[tags[(t, pos)]][0] += int(holes > 0)
+                            empty[tags[(t, pos)]][1] += 1
+                    for pos, d in byposweek.items():
+                        mean = sum(d.values()) / max(1, len(d))
+                        if mean <= 0:
+                            continue
+                        for t, v in d.items():
+                            realized[tags[(t, pos)]].setdefault(pos, []).append(v / mean)
+        out[fmt] = {
+            "teams_tagged_need_per_league_week": {k: {"mean": round(sum(v) / len(v), 2), "min": min(v), "max": max(v)} for k, v in sorted(counts.items())},
+            "teams_tagged_strength_per_league_week": {k: round(sum(v) / len(v), 2) for k, v in sorted(str_counts.items())},
+            "realized_pts_vs_league_mean_by_tag": {tag: {k: round(sum(v) / len(v), 3) for k, v in sorted(d.items())} for tag, d in realized.items()},
+            "empty_starting_slot_rate_by_tag": {k: round(a / max(1, b), 4) for k, (a, b) in empty.items()},
+        }
+    del qb_need_sf
+    return out
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("table", choices=["wire"])
+    ap.add_argument("table", choices=["wire", "need"])
     ap.add_argument("--seeds", type=int, default=8)
     ap.add_argument("--flags", default="{}", help="JSON of GameSettings overrides, e.g. '{\"wire_v\": 0}'")
     args = ap.parse_args(argv)
     flags = {str(k): int(v) for k, v in json.loads(args.flags).items()}
-    out = {"wire": wire_table}[args.table](args.seeds, flags)
-    print(json.dumps(out, indent=1))
+    out = {"wire": wire_table, "need": need_table}[args.table](args.seeds, flags)
+    print(json.dumps(out, indent=1, separators=(",", ": ")) if args.table == "wire" else "\n".join(f"{k}: {json.dumps(v)}" for k, v in out.items()))
 
 
 if __name__ == "__main__":
