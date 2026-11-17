@@ -49,4 +49,3 @@ export const FIRST_MODULE = () => {
   const cid = cardEl && cardEl.getAttribute("data-testid");
   return { cardGap, card: cardEl ? `${cardEl.tagName.toLowerCase()}${cid ? `[${cid}]` : ""}` : null, top: Math.round(r.top + scrollY), navBottom: Math.round(navBottom), gap: Math.round(r.top + scrollY - navBottom), el: `${node.tagName.toLowerCase()}${id ? `[${id}]` : ""}`, text: (node.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40) };
 };
-
