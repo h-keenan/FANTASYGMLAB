@@ -256,9 +256,8 @@ describe("MatchupContent", () => {
     expect(screen.getByLabelText("Games in progress")).toBeInTheDocument();
     expect(screen.getAllByText("42.3").length).toBeGreaterThan(0);
     expect(screen.getByText("Proj 124.8")).toBeInTheDocument();
-    expect(screen.getAllByText("64%").length).toBeGreaterThan(0);
-    expect(screen.getByText("36%")).toBeInTheDocument();
-    expect(container.querySelector("[aria-label^='Win probability: you'] .winprob-bar-fill")).toHaveStyle({ transform: "scaleX(0.64)" });
+    expect(screen.getByTestId("matchup-win-chip")).toHaveTextContent("64% win · Favored");
+    expect(container.querySelector("[aria-label='Win chance 64%'] > div")).toHaveStyle({ width: "64%" });
     expect(screen.getByText("You're on track to win")).toBeInTheDocument();
   });
 

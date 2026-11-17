@@ -103,7 +103,6 @@ export function TeamSituationCard({
         selected
           ? { key: "stance", text: selected.label, strong: true, tone: "action" }
           : { key: "stance", text: "Not set yet", tone: "warning" },
-        selectedLook ? { key: "tag", text: selectedLook.tagline } : { key: "tag", text: "Pick the stance that fits your team" },
         banner ? { key: "deadline", text: `Trade deadline Wk ${banner.week}` } : pastDeadline ? { key: "deadline", text: "Past the trade deadline", tone: "muted" } : null,
       ]}
     >
@@ -170,7 +169,7 @@ export function TeamSituationCard({
               Trade deadline: Week {banner.week}
             </span>
             <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-              Declaring a stance sharpens your recommendations.
+              {selected ? "Your stance shapes the trade ideas below." : "Declaring a stance sharpens your recommendations."}
             </span>
           </span>
           {tradeHubHref ? (

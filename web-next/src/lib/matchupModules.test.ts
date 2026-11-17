@@ -93,7 +93,7 @@ describe("matchup hero card and ticker", () => {
   it("live: real points big, projection and players left under them", () => {
     const model = matchupCardModel(base);
     expect(model.kicker).toBe("WEEK 7 · LIVE");
-    expect(model.win).toMatchObject({ pct: 71, label: "71% win", tone: "success" });
+    expect(model.win).toMatchObject({ pct: 71, label: "71% win · Favored", tone: "success" });
     expect(model.mine.score).toBe("112.4");
     expect(model.detail).toBe("Proj final 131.2 - 124.0 · 3 players left");
     expect(matchupTickerParts(model, 7).map((p) => p.text)).toEqual(["WK 7", "You 112.4 - 98.1 Mike", "71%"]);

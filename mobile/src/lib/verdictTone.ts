@@ -30,6 +30,22 @@ export function percentBand(percent: number | null | undefined): VerdictBand {
   return typeof percent === "number" && Number.isFinite(percent) ? probabilityBand(percent / 100) : "neutral";
 }
 
+/**
+ * The one-word read of a win chance, from the SAME bands as the colour (>= 60% Favored, 40-60% Toss-up, 20-40% Underdog,
+ * below that Long shot). Every "57% win" label and every "Even / Favored" word beside it comes from here, so a number and
+ * its label can never disagree. Missing reads "".
+ */
+export function probabilityWord(probability: number | null | undefined): string {
+  if (typeof probability !== "number" || !Number.isFinite(probability)) return "";
+  const band = probabilityBand(probability);
+  return band === "good" ? "Favored" : band === "neutral" ? "Toss-up" : band === "caution" ? "Underdog" : "Long shot";
+}
+
+/** The same word for a 0..100 percentage. */
+export function percentWord(percent: number | null | undefined): string {
+  return typeof percent === "number" && Number.isFinite(percent) ? probabilityWord(percent / 100) : "";
+}
+
 /** A verdict word from any surface (trade accept/decline/counter/fair, positive/risk, success/danger...) -> band. */
 export function verdictBand(verdict: string | null | undefined): VerdictBand {
   switch (verdict) {

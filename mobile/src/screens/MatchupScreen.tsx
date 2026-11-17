@@ -36,7 +36,7 @@ import DashboardStatRow from '../components/DashboardStatRow';
 import CompactModule from '../components/CompactModule';
 import { MatchupHeroCard } from '../components/MatchupModule';
 import type { MatchupSwingPlayer } from '../lib/matchupModules';
-import { bandColor, probabilityColor } from '../lib/verdictToneTheme';
+import { bandColor } from '../lib/verdictToneTheme';
 import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, swingInputsFromMatchup, teamsValuesParts } from '../lib/matchupModules';
 import TeamAvatar from '../components/TeamAvatar';
 import RangeCompare from '../components/RangeCompare';
@@ -524,7 +524,7 @@ function TeamsValues({
   const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const comparison = matchup.comparison!;
-  const { hasOdds, myPct, myProjected, opponentProjected, margin } = scoreboardFacts(matchup);
+  const { myProjected, opponentProjected, margin } = scoreboardFacts(matchup);
   const valueMargin =
     comparison.margin === 0 ? '0' : `${comparison.margin > 0 ? '+' : '-'}${formatSeasonValue(Math.abs(comparison.margin))}`;
   const kickedOff = hasKickedOff(matchup);
@@ -571,23 +571,6 @@ function TeamsValues({
           avatarId={opponent.avatar_url}
         />
       </View>
-
-      {hasOdds ? (
-        <View style={styles.oddsBlock}>
-          <View
-            style={styles.oddsTrack}
-            accessible
-            accessibilityLabel={`Win probability: you ${myPct}%, opponent ${100 - myPct!}%.`}
-          >
-            <View style={[styles.oddsFill, { width: `${myPct ?? 0}%` }]} />
-          </View>
-          <View style={styles.oddsLabels}>
-            <AppText style={[styles.oddsPct, { color: probabilityColor(colors, (myPct ?? 0) / 100) }]}>{myPct}%</AppText>
-            <AppText style={styles.oddsCaption}>WIN PROBABILITY</AppText>
-            <AppText style={[styles.oddsPct, { color: colors.textSecondary }]}>{100 - myPct!}%</AppText>
-          </View>
-        </View>
-      ) : null}
 
       <DashboardStatRow
         style={{ marginBottom: 0 }}
@@ -972,17 +955,6 @@ function createStyles(colors: ThemeColors) {
     scoreValue: { fontSize: 31, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
     scoreCaption: { fontSize: 13.5, color: colors.textTertiary },
     vs: { fontSize: 13.5, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, paddingHorizontal: spacing.xs },
-    oddsBlock: { gap: spacing.xs },
-    oddsTrack: {
-      height: 8,
-      borderRadius: radii.pill,
-      backgroundColor: colors.border,
-      overflow: 'hidden',
-    },
-    oddsFill: { height: '100%', backgroundColor: colors.accent },
-    oddsLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    oddsPct: { fontSize: 17, fontWeight: '800' },
-    oddsCaption: { fontSize: 12, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
     oddsUnavailable: { fontSize: 13.5, color: colors.textTertiary, textAlign: 'center' },
     insightsRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
     insightsText: { flex: 1, gap: spacing.xs },

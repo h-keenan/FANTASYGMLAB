@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { bandCompactTone, bandSimTone, bandToken, deltaBand, percentBand, probabilityBand, verdictBand } from "./verdictTone";
+import { bandCompactTone, bandSimTone, bandToken, deltaBand, percentBand, percentWord, probabilityBand, probabilityWord, verdictBand } from "./verdictTone";
 import { bandColorVar, percentColorVar, verdictColorVar } from "./verdictToneCss";
-import { simOddsTone } from "./simPresentation.ts";
+import { simHeadline, simOddsTone } from "./simPresentation.ts";
 import { simWinChanceTone as gameTone } from "./simGame";
 import { statusRingTone } from "./statusHeader";
 import { matchupVerdict } from "./matchupPresentation";
-import { insightsParts } from "./matchupModules";
+import { insightsParts, marginNowLabel, matchupCardModel } from "./matchupModules";
 
 describe("probabilityBand", () => {
   it("bands a probability at the shared cut points", () => {
@@ -75,5 +75,38 @@ describe("verdict sentences are neutral text", () => {
     const parts = insightsParts(verdict.headline, [{ position: "QB", edge: 8.8 }, { position: "TE", edge: -14.6 }]);
     expect(parts[0].tone).toBeUndefined();
     expect(parts.some((p) => p.tone === "danger")).toBe(false);
+  });
+});
+
+describe("label and percentage come from one source", () => {
+  it("probabilityWord follows the same bands as the colour", () => {
+    expect(probabilityWord(0.57)).toBe("Toss-up");
+    expect(probabilityWord(0.6)).toBe("Favored");
+    expect(probabilityWord(0.4)).toBe("Toss-up");
+    expect(probabilityWord(0.39)).toBe("Underdog");
+    expect(probabilityWord(0.1)).toBe("Long shot");
+    expect(probabilityWord(null)).toBe("");
+    for (const pct of [3, 20, 39, 40, 57, 59, 60, 100]) {
+      const band = percentBand(pct);
+      expect(percentWord(pct) === "Favored").toBe(band === "good");
+      expect(percentWord(pct) === "Toss-up").toBe(band === "neutral");
+    }
+  });
+  it("the Matchup chip carries the percentage and the word of the same band", () => {
+    const model = (winPercent: number) =>
+      matchupCardModel({ week: 10, live: false, final: false, myName: "You", opponentName: "Opp", myScore: null, opponentScore: null, myProjected: 118.3, opponentProjected: 109.7, winPercent, kickedOff: false, playersLeft: null, swing: [] });
+    expect(model(57).win?.label).toBe("57% win · Toss-up");
+    expect(model(62).win?.label).toBe("62% win · Favored");
+    expect(model(30).win?.label).toBe("30% win · Underdog");
+  });
+  it("the lineup margin badge names its basis, so Even never contradicts a win chance", () => {
+    expect(marginNowLabel(0, "0.0")).toBe("Even now");
+    expect(marginNowLabel(3.2, "+3.2")).toBe("+3.2 now");
+  });
+  it("the sim playoff sentence cuts at the same 40% edge as the band", () => {
+    const f = (playoffs: number) => simHeadline({ odds: { playoffs, title: 0.04, playoff_spots: 6 } } as never);
+    expect(f(0.4)).toMatch(/coin flip/);
+    expect(f(0.39)).not.toMatch(/coin flip/);
+    expect(f(0.6)).toMatch(/good shape/);
   });
 });

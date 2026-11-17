@@ -4,7 +4,7 @@
  * Lineup comparison, Suggested moves). Import-light, byte-identical twin of mobile/src/lib/matchupModules.ts.
  */
 import type { CompactPart, CompactTone } from "./compactModule";
-import { bandSimTone, percentBand } from "./verdictTone.ts";
+import { bandSimTone, percentBand, percentWord } from "./verdictTone.ts";
 
 export interface MatchupEdgeInput {
   position: string;
@@ -221,7 +221,7 @@ export interface MatchupCardInput {
 
 export interface MatchupCardModel {
   kicker: string;
-  win: { pct: number; label: string; tone: "success" | "warning" | "danger" | "accent" } | null;
+  win: { pct: number; word: string; label: string; tone: "success" | "warning" | "danger" | "accent" } | null;
   mine: { name: string; score: string };
   opponent: { name: string; score: string };
   /** Which numbers the big scores are: "points" (live/final) or "projected". */
@@ -236,7 +236,7 @@ export function matchupCardModel(input: MatchupCardInput): MatchupCardModel {
   const state = input.final ? "FINAL" : input.live ? "LIVE" : null;
   const kicker = [input.omitWeek ? null : input.week != null ? `WEEK ${input.week}` : "THIS WEEK", state ?? (input.omitWeek ? "HEAD TO HEAD" : null)].filter(Boolean).join(" · ");
   const wp = input.winPercent != null ? Math.round(input.winPercent) : null;
-  const win = wp != null ? { pct: wp, label: `${wp}% win`, tone: bandSimTone(percentBand(wp)) } : null;
+  const win = wp != null ? { pct: wp, word: percentWord(wp), label: `${wp}% win · ${percentWord(wp)}`, tone: bandSimTone(percentBand(wp)) } : null;
   const useReal = input.kickedOff && input.myScore != null && input.opponentScore != null;
   const mineScore = useReal ? fixed(input.myScore) : fixed(input.myProjected);
   const oppScore = useReal ? fixed(input.opponentScore) : fixed(input.opponentProjected);
@@ -252,6 +252,11 @@ export function matchupCardModel(input: MatchupCardInput): MatchupCardModel {
     detail: [useReal ? proj : null, left].filter(Boolean).join(" · ") || null,
     swing: input.swing,
   };
+}
+
+/** The lineup comparison's margin badge: names its basis ("now" = current totals) so it cannot read as contradicting the win chance. */
+export function marginNowLabel(margin: number, signed: string): string {
+  return Math.abs(margin) < 0.05 ? "Even now" : `${signed} now`;
 }
 
 /** The compact ticker's collapsed line: "WK 7 · You 112.4 - 98.1 Mike · 71%". Used where matchup is one module in a stack. */

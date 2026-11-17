@@ -129,7 +129,7 @@ describe("Fantasy Sim adapters", () => {
     const model = buildSimStatusHeader(base);
     expect(model.kicker).toBe("WEEK 7 · SEASON 3");
     expect(model.headline).toBe("You are 5-1");
-    expect(model.context).toBe("Next: vs Titans, 62% to win");
+    expect(model.context).toBe("Next: vs Titans");
     expect(model.ring?.pct).toBe(62);
     expect(model.stats.map((s) => s.key)).toEqual(["standing", "injuries", "waivers"]);
     expect(model.primary).toEqual({ label: "Set your lineup", actionKey: "team" });
