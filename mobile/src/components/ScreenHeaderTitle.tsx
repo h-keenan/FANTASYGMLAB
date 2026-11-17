@@ -16,10 +16,17 @@ export default function ScreenHeaderTitle({ screen, league }: { screen: string; 
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.container}>
-      <AppText style={styles.screen} numberOfLines={1}>
-        {screen}
-      </AppText>
-      {league ? (
+      {screen ? (
+        <AppText style={styles.screen} numberOfLines={1}>
+          {screen}
+        </AppText>
+      ) : league ? (
+        // A tab page (the pill names it): the league is the title.
+        <AppText style={styles.screen} numberOfLines={2}>
+          {league}
+        </AppText>
+      ) : null}
+      {screen && league ? (
         <AppText style={styles.league} numberOfLines={1}>
           {league.toUpperCase()}
         </AppText>
