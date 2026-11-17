@@ -47,8 +47,8 @@ def test_league_week_overrides_the_calendar():
 @pytest.mark.parametrize(
     ("status", "injury_status", "weeks"),
     (
-        ("Active", "Questionable", 0.15),
-        ("Active", "Doubtful", 0.85),
+        ("Active", "Questionable", 0.3),
+        ("Active", "Doubtful", 0.98),
         ("Active", "Out", 2.0),
         ("Inactive", "IR", 4.0),
         ("Injured Reserve", "", 4.0),

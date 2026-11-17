@@ -19,10 +19,11 @@ designation:
 * ``tone``      the UI colour family (see ``modules.injury_tone``).
 
 The two availability numbers are the same fact stated twice, so for a
-single-game designation ``weeks_out = 1 - p_play`` (Questionable: 0.85 plays,
-0.15 weeks). Multi-week statuses carry documented defaults. None of the
-play-probability priors can be backtested (Sleeper publishes no point-in-time
-injury history); they are flagged ``calibrated=False``.
+single-game designation ``weeks_out = 1 - p_play`` (Questionable: 0.70 plays,
+0.30 weeks). Multi-week statuses carry documented defaults. Questionable and
+Doubtful are calibrated (nflverse point-in-time reports vs who played, see the
+constants below); the other play-probability priors have no measured history and
+are flagged ``calibrated=False``.
 
 No import from rankings / trade code: this is the base layer.
 """
@@ -72,8 +73,15 @@ class StatusRow:
     designation: bool = True  # a real Sleeper designation worth showing
 
 
-_QUESTIONABLE_P = 0.85
-_DOUBTFUL_P = 0.15
+# Game-time designations, calibrated 2026-11 on nflverse's final weekly injury report vs who actually
+# played (2021-26 regular seasons, QB/RB/WR/TE/K with a baseline >= 2 points,
+# docs/audits/2026-11-projections-backtest.md): Questionable played 67.6% of 1,851 player-weeks (72.5% weighted
+# by baseline points, i.e. starters play more; 70-75% in every season weighted), Doubtful 0.5% of 219 (1 player).
+# The earlier priors (0.85 / 0.15) were never backtested and were far too optimistic. Day-to-day is
+# a Sleeper-only label with no measured history and keeps its old prior, as does Probable.
+_QUESTIONABLE_P = 0.70
+_DOUBTFUL_P = 0.02
+_DAY_TO_DAY_P = 0.85
 _PROBABLE_P = 0.95
 
 ROWS: tuple[StatusRow, ...] = (
@@ -124,19 +132,19 @@ ROWS: tuple[StatusRow, ...] = (
     ),
     StatusRow(
         "doubtful", "Doubtful", "moderate", "game_time", False, _DOUBTFUL_P, round(1 - _DOUBTFUL_P, 2),
-        tone="danger", terms=("doubtful",), aliases=("d",), tone_keys=("doubtful", "d"), calibrated=False,
+        tone="danger", terms=("doubtful",), aliases=("d",), tone_keys=("doubtful", "d"), calibrated=True,
     ),
     StatusRow(
         "questionable", "Questionable", "minor", "game_time", False, _QUESTIONABLE_P, round(1 - _QUESTIONABLE_P, 2),
-        tone="warning", terms=("questionable",), aliases=("q",), tone_keys=("questionable", "q"), calibrated=False,
+        tone="warning", terms=("questionable",), aliases=("q",), tone_keys=("questionable", "q"), calibrated=True,
     ),
     StatusRow(
-        "day_to_day", "Day-to-day", "minor", "game_time", False, _QUESTIONABLE_P, round(1 - _QUESTIONABLE_P, 2),
+        "day_to_day", "Day-to-day", "minor", "game_time", False, _DAY_TO_DAY_P, round(1 - _DAY_TO_DAY_P, 2),
         tone="warning", terms=("day-to-day", "day to day"), aliases=("dtd",),
         tone_keys=("day-to-day", "day to day", "dtd"), calibrated=False,
     ),
     StatusRow(
-        "limited", "Limited", "minor", "game_time", False, _QUESTIONABLE_P, round(1 - _QUESTIONABLE_P, 2),
+        "limited", "Limited", "minor", "game_time", False, _DAY_TO_DAY_P, round(1 - _DAY_TO_DAY_P, 2),
         terms=("limited",), calibrated=False,
     ),
     StatusRow(
@@ -158,7 +166,7 @@ ROWS_BY_KEY: dict[str, StatusRow] = {row.key: row for row in ROWS}
 # Not in the table: Sleeper tags we do not know. Treated like a game-time
 # designation (the conservative minor bucket), never as healthy.
 UNKNOWN_DESIGNATION = StatusRow(
-    "unknown", "", "minor", "game_time", False, _QUESTIONABLE_P, round(1 - _QUESTIONABLE_P, 2),
+    "unknown", "", "minor", "game_time", False, _DAY_TO_DAY_P, round(1 - _DAY_TO_DAY_P, 2),
     calibrated=False, designation=False,
 )
 

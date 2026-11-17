@@ -111,9 +111,10 @@ def test_backup_qb_behind_a_doubtful_starter_gets_most_of_the_snaps():
     assert out["applied"] and out["multiplier"] == pytest.approx(1.0 - p_play, abs=0.001) and out["multiplier"] > 0.8
     # the two QBs together now cover the team's QB production (starter p_play + backup share), most of one QB
     assert p_play + (1.0 - p_play) * out["multiplier"] > 0.85  # was 0.15 + 0.85 * 0.2 = 0.32
-    # a Questionable starter (p_play 0.85) keeps the old floor
+    # a Questionable starter (p_play 0.70, calibrated 2026-11) leaves his backup the larger of the garbage-time floor and the miss chance
     q = {"qb1": _qb(1, injury_status="Questionable"), "qb2": _qb(2)}
-    assert pp._role_adjustment(q["qb2"], q)["multiplier"] == pp.BACKUP_QB_PLAY_SHARE
+    q_play = injury_status.classify("Active", "Questionable").p_play
+    assert pp._role_adjustment(q["qb2"], q)["multiplier"] == pytest.approx(max(pp.BACKUP_QB_PLAY_SHARE, 1.0 - q_play), abs=0.001)
 
 
 def test_backup_qb_is_not_scaled_when_the_starter_is_out():

@@ -840,6 +840,60 @@ def season_stats_completeness(season: int | None = None) -> Dict[str, Any]:
     return {"season": selected, "status": "incomplete" if missing else "complete", "expected_through": expected, "missing_weeks": missing, "suspect_weeks": suspect, "age_seconds": age}
 
 
+def complete_stats_through_week(season: int | None = None) -> int | None:
+    """Highest week W such that the on-disk season aggregate verifiably holds EVERY week 1..W with a
+    plausible number of played rows, or None when that cannot be verified (no manifest, legacy manifest).
+
+    A caller that wants to treat "no played row for week w" as a real non-appearance (rather than a week
+    whose stats have not been fetched yet) may only look at weeks <= this value."""
+
+    selected = int(season or default_player_stats_season())
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
+    try:
+        stamp = os.stat(stats_manifest_path(cache_path)).st_mtime_ns
+    except OSError:
+        return None
+    held = _COMPLETE_THROUGH_CACHE.get(cache_path)
+    if held is not None and held[0] == stamp:
+        return held[1]
+    value = _complete_stats_through_week_uncached(cache_path)
+    _COMPLETE_THROUGH_CACHE[cache_path] = (stamp, value)
+    return value
+
+
+_COMPLETE_THROUGH_CACHE: Dict[str, tuple] = {}
+
+
+def stats_built_at(season: int | None = None) -> float | None:
+    """Epoch seconds at which the season aggregate was last (re)built, from its manifest; None when unknown.
+
+    A game that finished AFTER this instant cannot be in the aggregate yet, so "no row for that game" proves
+    nothing about the player (see ``player_projections._participation_adjustment``)."""
+
+    selected = int(season or default_player_stats_season())
+    manifest = read_stats_manifest(PLAYER_STATS_CACHE_TEMPLATE.format(season=selected))
+    try:
+        return float(manifest["built_at"]) if manifest else None
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _complete_stats_through_week_uncached(cache_path: str) -> int | None:
+    manifest = read_stats_manifest(cache_path)
+    if manifest is None or int(manifest.get("schema") or 0) < STATS_MANIFEST_SCHEMA:
+        return None
+    have = {int(w) for w in manifest.get("weeks_ok", []) if isinstance(w, (int, float))}
+    counts = manifest.get("week_played_counts") or {}
+    through = 0
+    for week in range(1, 19):
+        if week not in have:
+            break
+        if str(week) in counts and int(counts[str(week)]) < MIN_PLAYED_ROWS_PER_COMPLETED_WEEK:
+            break
+        through = week
+    return through or None
+
+
 def _stats_cache_needs_rebuild(cache_path: str, selected_season: int) -> bool:
     """True when a TTL-fresh aggregate is nevertheless known (or unverifiable) to be
     missing weeks, rate-limited so a persistently failing provider is retried every
