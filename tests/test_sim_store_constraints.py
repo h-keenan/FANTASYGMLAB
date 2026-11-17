@@ -20,7 +20,9 @@ from modules.sim.game_store import GameConflict, GameStore
 from modules.sim.store import InMemoryBackend, SimStoreError, classify_store_error
 from tests.test_sim_dynasty import H, PoolInputs
 
-STATUSES = ("drafting", "in_season", "playoffs", "complete")
+STATUSES = ("drafting", "in_season", "playoffs", "complete")  # the schema before docs/supabase_sim_game_offseason_status.sql
+MIGRATED = STATUSES + ("offseason",)
+ALLOWED = {"statuses": STATUSES}
 NOT_NULL = {
     "sim_games": ("id", "user_id", "seed", "engine_version", "status", "current_week", "event_count"),
     "sim_events": ("game_id", "user_id", "seq", "week", "actor", "type", "payload"),
@@ -38,7 +40,7 @@ def _check(table, row, *, partial=False):
     for col in INTS.get(table, ()):
         if col in row and (isinstance(row[col], bool) or not isinstance(row[col], int) or abs(row[col]) > 2**31 - 1):
             return f"pg=22P02: bad integer for {col}"
-    if "status" in row and table == "sim_games" and row["status"] not in STATUSES:
+    if "status" in row and table == "sim_games" and row["status"] not in ALLOWED["statuses"]:
         return "pg=23514: violates check constraint sim_games_status_check"
     try:
         json.dumps(dict(row), allow_nan=False)
@@ -77,6 +79,8 @@ def client(backend):
 @pytest.fixture(autouse=True)
 def _pool(monkeypatch):
     monkeypatch.setattr(gs, "RETRY_DELAY", 0)
+    monkeypatch.setattr(gs, "_offseason_status_rejected", False)
+    monkeypatch.setitem(ALLOWED, "statuses", STATUSES)
     game_api.clear_pool_cache()
     yield
     game_api.clear_pool_cache()
@@ -181,3 +185,50 @@ def test_error_classification():
     assert classify_store_error("Supabase insert failed (413).") == "payload_too_large"
     assert classify_store_error("Could not reach Supabase table storage (timed out or network error).") == "timeout"
     assert classify_store_error("event log has a gap") == "log_inconsistent"
+
+
+def _game_row(store, uid="u1", gid="g1"):
+    store.backend.upsert("sim_games", {"id": gid, "user_id": uid, "seed": 1, "engine_version": "x", "status": "in_season",
+                                       "current_week": 1, "event_count": 0, "settings": {}}, on_conflict="id")
+
+
+def test_offseason_status_falls_back_once_when_the_check_constraint_predates_the_migration(caplog):
+    store = GameStore(StrictBackend())
+    _game_row(store)
+    with caplog.at_level("WARNING"):
+        store.touch("u1", "g1", status="offseason", week=18, event_count=5)
+        store.touch("u1", "g1", status="offseason", week=18, event_count=6)
+    assert store.list_games("u1")[0]["status"] == "in_season"
+    assert sum("rejects 'offseason'" in r.message for r in caplog.records) == 1
+    assert gs.db_status("offseason") == "in_season"
+    assert gs.db_status("playoffs") == "playoffs"
+
+
+def test_offseason_status_passes_through_once_the_migration_is_applied():
+    ALLOWED["statuses"] = MIGRATED
+    store = GameStore(StrictBackend())
+    _game_row(store)
+    store.touch("u1", "g1", status="offseason", week=18, event_count=5)
+    assert store.list_games("u1")[0]["status"] == "offseason"
+    assert gs.db_status("offseason") == "offseason"
+
+
+def test_unrelated_update_errors_are_not_swallowed():
+    class Boom(StrictBackend):
+        def update(self, table, *, user_id, filters, values):
+            return False, "Supabase update failed (500). boom"
+
+    store = GameStore(Boom())
+    with pytest.raises(SimStoreError):
+        store.touch("u1", "g1", status="offseason", week=18, event_count=5)
+    assert gs.db_status("offseason") == "offseason"
+
+
+def test_list_rows_derive_offseason_from_week_when_the_column_cannot_say_so():
+    dyn = {"mode": "dynasty", "regular_weeks": 14, "playoff_weeks": 3}
+    row = {"status": "in_season", "current_week": 18, "settings": dyn}
+    assert gs.public_game_row(row)["status"] == "offseason"
+    assert gs.public_game_row({**row, "current_week": 14})["status"] == "in_season"
+    assert gs.public_game_row({**row, "status": "playoffs"})["status"] == "playoffs"
+    assert gs.public_game_row({**row, "settings": {**dyn, "mode": "redraft"}})["status"] == "in_season"
+    assert gs.public_game_row({**row, "status": "offseason", "current_week": 3})["status"] == "offseason"

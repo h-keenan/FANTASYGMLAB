@@ -2813,6 +2813,7 @@ export function simGameLiteLine(game: Pick<SimGameLite, "status" | "current_week
   if (game.status === "drafting") return "Draft in progress";
   if (game.status === "complete") return game.grade_letter ? `Finished · Grade ${game.grade_letter}` : "Finished";
   if (game.status === "playoffs") return `Playoffs · Week ${game.current_week}`;
+  if (game.status === "offseason") return "Offseason · next: Rookie draft";
   const total = game.settings.regular_weeks;
   return total ? `Week ${game.current_week} of ${total}` : `Week ${game.current_week}`;
 }

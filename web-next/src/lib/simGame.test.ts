@@ -209,6 +209,7 @@ describe("stage, headings and rounds", () => {
     const base = { settings: { regular_weeks: 14 } };
     expect(simGameLiteLine({ ...base, status: "drafting", current_week: 0, grade_letter: null })).toBe("Draft in progress");
     expect(simGameLiteLine({ ...base, status: "in_season", current_week: 5, grade_letter: null })).toBe("Week 5 of 14");
+    expect(simGameLiteLine({ ...base, status: "offseason", current_week: 18, grade_letter: null })).toBe("Offseason · next: Rookie draft");
     expect(simGameLiteLine({ ...base, status: "complete", current_week: 17, grade_letter: "B+" })).toBe("Finished · Grade B+");
   });
 
