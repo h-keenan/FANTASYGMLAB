@@ -1,6 +1,7 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import React, { createContext, lazy, Suspense, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
-import PlayerQuickViewSheet from '../components/PlayerQuickViewSheet';
+// Lazy: the sheet (32 KB) is only mounted on a player tap, so its module is evaluated then, not at app launch.
+const PlayerQuickViewSheet = lazy(() => Promise.resolve(require('../components/PlayerQuickViewSheet')));
 import type { RankedPlayer } from '../lib/api';
 import { buildQuickViewRequest, type QuickViewRequest } from '../lib/playerQuickView';
 
@@ -52,7 +53,11 @@ export function PlayerQuickViewProvider({ children }: { children: React.ReactNod
   return (
     <PlayerQuickViewContext.Provider value={value}>
       {children}
-      {request ? <PlayerQuickViewSheet key={request.player.player_id} request={request} onClose={closePlayer} /> : null}
+      {request ? (
+        <Suspense fallback={null}>
+          <PlayerQuickViewSheet key={request.player.player_id} request={request} onClose={closePlayer} />
+        </Suspense>
+      ) : null}
     </PlayerQuickViewContext.Provider>
   );
 }
