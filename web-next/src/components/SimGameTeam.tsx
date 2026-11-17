@@ -52,6 +52,9 @@ import {
 } from "@/lib/simGame";
 
 /** Lineup, bench and this week's matchup. Every change saves at once (PUT /lineup). */
+/** Sim Players opens on the waiver wire (owner request); the last view picked is remembered for the rest of the session. */
+let lastSimPlayersMode: "all" | "waivers" = "waivers";
+
 export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void }) {
   const { gameId, game, call } = ctx;
   const [lineup, setLineup] = useState<SimLineupResponse | null>(null);
@@ -435,7 +438,8 @@ export function SimPlayersTab({
   onTradeFor: (player: SimGamePlayer) => void;
 }) {
   const { gameId, game, call } = ctx;
-  const [mode, setMode] = useState<"all" | "waivers">("all");
+  const [mode, setModeState] = useState<"all" | "waivers">(() => lastSimPlayersMode);
+  const setMode = (next: "all" | "waivers") => { lastSimPlayersMode = next; setModeState(next); };
   const [roster, setRoster] = useState<SimGamePlayer[]>([]);
   const [claiming, setClaiming] = useState<SimGamePlayer | null>(null);
   const teamId = game.you?.team_id;
@@ -493,8 +497,8 @@ export function SimPlayersTab({
         ariaLabel="Players view"
         variant="fill"
         options={[
-          { label: "All players", value: "all", glyph: "team" },
           { label: `Waivers${claims.length ? ` ${claims.length}` : ""}`, value: "waivers", glyph: "addDrop" },
+          { label: "All players", value: "all", glyph: "team" },
         ]}
         active={mode}
         onSelect={(value) => setMode(value as "all" | "waivers")}
