@@ -24,12 +24,18 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from modules import trade_outcome_results
+from modules import decision_log, trade_outcome_results
 
 
 def main() -> int:
     stats = trade_outcome_results.run_trade_outcome_result_sweep()
-    print(json.dumps({"trade_outcome_result_sweep": stats}, indent=2))
+    # Decision Memory depth: grade due decision_log rows in the same daily run.
+    # Fails soft so it can never fail the trade sweep above.
+    try:
+        decision_stats = decision_log.run_decision_grading_sweep()
+    except Exception as exc:  # pragma: no cover - defensive
+        decision_stats = {"errors": [str(exc)]}
+    print(json.dumps({"trade_outcome_result_sweep": stats, "decision_grading_sweep": decision_stats}, indent=2))
     return 0 if stats.get("configured") else 1
 
 

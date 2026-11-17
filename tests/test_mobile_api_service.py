@@ -17063,3 +17063,51 @@ def test_weekly_stats_reports_inactive_weeks_bye_and_through_week(monkeypatch):
     assert body["inactive_weeks"] == [5, 6, 7, 8]
     assert body["bye_week"] == 10
     assert body["through_week"] == 11
+
+
+def test_track_record_requires_auth_and_gates_advanced_on_pro(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/decisions/track-record").status_code == 401
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    trades = Mock(status_code=200)
+    trades.json.return_value = [
+        {
+            "outcome": "yes",
+            "trade_summary": {"source": "advice", "confidence": "high"},
+            "result_summary": {
+                "status": "ready",
+                "production": {"net_points_ppr": 34.0, "avg_net_per_week": 8.5, "weeks_counted": 4},
+            },
+        }
+    ]
+    for entitlement, expect_advanced in (("free", False), ("premium", True)):
+        monkeypatch.setattr(
+            "services.mobile_api_service._fetch_profile_fields", lambda *a, _e=entitlement, **k: {"entitlement": _e}
+        )
+        def _get(url, *args, **kwargs):
+            if "trade_outcomes" in url:
+                return trades
+            if "decision_log" in url:
+                return Mock(status_code=404)
+            return auth_user_response
+
+        with patch("requests.get", side_effect=_get):
+            response = client.get("/v1/decisions/track-record", headers={"Authorization": "Bearer good-token"})
+        body = response.json()
+        assert body["basic"]["net_points_total"] == 34.0
+        assert (body["advanced"] is not None) is expect_advanced
+
+
+def test_record_decision_rejects_bad_kind_and_fails_soft(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    headers = {"Authorization": "Bearer good-token"}
+    with patch("requests.get", side_effect=[auth_user_response]):
+        bad = client.post("/v1/decisions", json={"kind": "nope", "rec_key": "k"}, headers=headers)
+    assert bad.status_code == 422
+    with patch("requests.get", side_effect=[auth_user_response]), patch("requests.post", return_value=Mock(status_code=404)):
+        soft = client.post("/v1/decisions", json={"kind": "waiver_add", "rec_key": "w:1"}, headers=headers)
+    assert soft.json() == {"ok": False, "reason": "not_available"}

@@ -18,6 +18,8 @@ import {
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { EmptyState } from "@/components/EmptyState";
 import { LeagueLinkStep } from "@/components/LeagueLinkStep";
+import { TrackRecordModule } from "@/components/TrackRecordModule";
+import { signedPts, tradePointsLine } from "@/lib/trackRecordView";
 
 /**
  * Ports modules/trade_outcomes_page.py's render_trade_history_page — the
@@ -51,6 +53,9 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
 
   const accent = verdict ? verdictToneColorVar(verdict) : outcomeToneColorVar(outcome.outcome);
   const netPct = result && result.status === "ready" ? (result.value?.net_delta_pct ?? null) : null;
+  // Per-trade outcome card: real PPR points for you since the trade (free; the sweep already computed it).
+  const pointsLine = outcome.outcome === "yes" ? tradePointsLine(result) : null;
+  const netPts = result && result.status === "ready" ? (result.production?.net_points_ppr ?? null) : null;
 
   const sent = tradeIdeaNamesText(toTradeAssets(summary.send).map((asset) => abbreviatePlayerName(asset.name)));
   const received = tradeIdeaNamesText(toTradeAssets(summary.receive).map((asset) => abbreviatePlayerName(asset.name)));
@@ -64,11 +69,17 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
       parts={[
         { key: "outcome", text: outcomeLabel(outcome.outcome), strong: true },
         verdict && result ? { key: "verdict", text: result.verdict_label ?? "" } : null,
+        netPts !== null ? { key: "pts", text: signedPts(netPts), tone: netPts > 0 ? "success" : netPts < 0 ? "danger" : undefined } : null,
         netPct !== null ? { key: "net", text: `${netPct > 0 ? "+" : ""}${Math.round(netPct)}% net` } : null,
         sent && received ? { key: "swap", text: `${sent} for ${received}` } : null,
         date ? { key: "date", text: date, tone: "muted" } : null,
       ]}
     >
+      {pointsLine ? (
+        <p className="m-0 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }} data-testid="trade-points-line">
+          {pointsLine}
+        </p>
+      ) : null}
       {verdict && result ? (
         <VerdictCallout color={verdictToneColorVar(verdict)} label={result.verdict_label} detail={detailText} />
       ) : null}
@@ -116,6 +127,7 @@ export function TradeHistoryContent({ data, leagueId, leagueName }: { data: Trad
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-4">
+          <TrackRecordModule />
           {data.outcomes.map((outcome) => (
             <TradeHistoryRow key={outcome.id} outcome={outcome} />
           ))}

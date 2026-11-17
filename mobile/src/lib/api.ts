@@ -2243,6 +2243,56 @@ export interface PastTradeOutcome {
   result_computed_at: string | null;
 }
 
+/** Decision Memory depth: mirrors modules/decision_log.py build_track_record. */
+export type TrackReliability = "too_early" | "early" | "solid";
+
+export interface TrackHitSummary {
+  n: number;
+  right: number;
+  wrong: number;
+  even: number;
+  hit_rate: number | null;
+  mean_edge_pts: number | null;
+  reliability: TrackReliability;
+}
+
+export interface TrackRecordResponse {
+  ok: boolean;
+  is_pro: boolean;
+  basic: {
+    trades_confirmed: number;
+    trades_graded: number;
+    worked_out: number;
+    didnt_pan_out: number;
+    even: number;
+    net_points_total: number;
+    reliability: TrackReliability;
+  };
+  advanced: null | {
+    advice: TrackHitSummary;
+    own_calls: TrackHitSummary;
+    followed: TrackHitSummary;
+    skipped: TrackHitSummary;
+    compare: { verdict: "too_early" | "within_noise" | "advice_ahead" | "own_ahead"; diff_pts?: number };
+    calibration: Record<"low" | "medium" | "high", TrackHitSummary & { supported: boolean }>;
+    by_kind: Record<string, TrackHitSummary>;
+    caveat: string;
+  };
+}
+
+export interface RecordDecisionBody {
+  kind: "trade_idea" | "waiver_add" | "start_sit" | "stance";
+  rec_key: string;
+  league_id?: string;
+  /** Omit for a "shown" ping; it never downgrades a row already acted on. */
+  action?: "accepted" | "ignored" | "opposite";
+  confidence?: string;
+  recommended_ids?: string[];
+  alternative_ids?: string[];
+  label?: string;
+  names?: string[];
+}
+
 export interface TradeOutcomeHistoryResponse {
   ok: true;
   outcomes: PastTradeOutcome[];
@@ -4678,6 +4728,8 @@ export const api = {
       receive: Array<{ name: string; position: string; player_id?: string; value_score?: number | null }>;
       valueEdgeLabel?: string;
       valuationLens?: string;
+      source?: 'advice' | 'own';
+      confidence?: string;
     },
   ) =>
     authorizedPost<{ ok: boolean; reason: string }>(
@@ -4688,6 +4740,8 @@ export const api = {
         receive: body.receive,
         value_edge_label: body.valueEdgeLabel ?? '',
         valuation_lens: body.valuationLens ?? '',
+        source: body.source ?? 'own',
+        confidence: body.confidence ?? '',
       },
     ),
   getPendingTradeOutcomes: () => authorizedFetch<PendingTradeOutcomesResponse>('/v1/trade-outcomes/pending'),
@@ -4706,6 +4760,10 @@ export const api = {
   reportSharedCommunityTrade: (id: string, reason = '') =>
     authorizedPost<{ ok: boolean }>(`/v1/community/shared-trades/${encodeURIComponent(id)}/report`, { reason }),
   getTradeOutcomeHistory: () => authorizedFetch<TradeOutcomeHistoryResponse>('/v1/trade-outcomes/history'),
+  // Decision Memory: "Your track record" (basic free, advanced Pro) + decision log write (fails soft server-side).
+  getTrackRecord: () => authorizedFetch<TrackRecordResponse>('/v1/decisions/track-record'),
+  recordDecision: (body: RecordDecisionBody) =>
+    authorizedPost<{ ok: boolean; reason: string }>('/v1/decisions', body),
   answerTradeOutcome: (outcomeId: string, outcome: TradeOutcomeAnswer) =>
     authorizedPost<{ ok: boolean; reason: string }>(
       `/v1/trade-outcomes/${encodeURIComponent(outcomeId)}/answer`,

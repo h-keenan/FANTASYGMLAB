@@ -14,9 +14,11 @@ import GridBackground from '../components/GridBackground';
 import InfoMark from '../components/InfoMark';
 import SectionHeading from '../components/SectionHeading';
 import SharedTradesFeed from '../components/SharedTradesFeed';
+import TrackRecordModule from '../components/TrackRecordModule';
 import ValuesCredit from '../components/ValuesCredit';
 import { NetEdgeBar, TradeSwapGlyph } from '../components/TradeOutcomeHeader';
 import { api, type PastTradeOutcome, type SharedCommunityTrade, type TradeOutcomeAnswer, type TradeOutcomeAssetSummary } from '../lib/api';
+import { tradePointsLine } from '../lib/trackRecordView';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -111,6 +113,7 @@ export default function TradeHistoryScreen({ navigation }: Props) {
         contentContainerStyle={[styles.content, { paddingTop: headerHeight + spacing.md, paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
         ListHeaderComponent={
+          <View style={styles.headerStack}>
           <SectionHeading
             title="Trade history"
             info={
@@ -120,6 +123,8 @@ export default function TradeHistoryScreen({ navigation }: Props) {
               />
             }
           />
+          {(outcomes ?? []).length > 0 ? <TrackRecordModule /> : null}
+          </View>
         }
         renderItem={({ item }) => <TradeHistoryRow outcome={item} />}
         ListEmptyComponent={
@@ -179,6 +184,8 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
 
   const accent = verdict ? verdictTone : outcomeTone;
   const netPct = result && result.status === 'ready' ? (result.value?.net_delta_pct ?? null) : null;
+  // Per-trade outcome card: real PPR points for you since the trade (free; the sweep already computed it).
+  const pointsLine = outcome.outcome === 'yes' ? tradePointsLine(result) : null;
 
   return (
     <AccentCard accent={accent} compact>
@@ -196,6 +203,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
       {/* Primary insight first when there is one — the real "did it work?"
           read outranks the plain trade summary below it, per the app's
           hierarchy rule of leading with the conclusion. */}
+      {pointsLine ? <AppText style={styles.pointsLine}>{pointsLine}</AppText> : null}
       {verdict && result ? (
         <View style={[styles.verdictRow, { borderColor: `${verdictTone}55`, backgroundColor: `${verdictTone}14` }]}>
           <Ionicons name={VERDICT_ICON[verdict] ?? 'remove'} size={16} color={verdictTone} />
@@ -286,6 +294,8 @@ function createStyles(colors: ThemeColors) {
     outcomeBadge: { borderRadius: radii.sm, paddingHorizontal: spacing.sm, paddingVertical: 3 },
     outcomeBadgeText: { fontSize: 12.5, fontWeight: '700' },
     date: { fontSize: 13.5, color: colors.textTertiary },
+    headerStack: { gap: spacing.md },
+    pointsLine: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs },
     verdictRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',

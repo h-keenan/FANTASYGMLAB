@@ -208,6 +208,8 @@ export function tradeIdeaShareRecord(idea: TradeIdea, lens: string): RecordTrade
     receive: idea.package.receive,
     valueEdgeLabel: idea.market_realism_label || "Trade Hub idea",
     lens,
+    source: "advice",
+    confidence: idea.confidence_label,
   });
 }
 
@@ -220,6 +222,8 @@ export function tradeShareRecord(input: {
   receive: TradeAsset[];
   valueEdgeLabel: string;
   lens: string;
+  source?: "advice" | "own";
+  confidence?: string;
 }): RecordTradeShareBody {
   const players = (assets: TradeAsset[]) =>
     (assets ?? []).filter((asset) => asset.asset_type !== "pick").map(shareRecordAsset);
@@ -229,5 +233,7 @@ export function tradeShareRecord(input: {
     receive: players(input.receive),
     valueEdgeLabel: input.valueEdgeLabel,
     valuationLens: input.lens,
+    source: input.source ?? "own",
+    confidence: input.confidence,
   };
 }
