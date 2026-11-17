@@ -26,6 +26,7 @@ import {
   sumScore,
 } from "@/lib/myTeamPresentation";
 import { percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
+import { buildRosterBasis } from "@/lib/rosterBasis";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { NextSteps } from "@/components/NextSteps";
 import { PageTitle } from "@/components/PageTitle";
@@ -47,14 +48,6 @@ import { PageTitle } from "@/components/PageTitle";
  * scope cut.
  */
 
-// coridian_, 2026-10-18: "the bench should be in order so. QBs, RBs, WRs,
-// TEs, K, DST" — any position not in this list (a rare/unknown value)
-// sorts after every known one rather than being dropped or erroring.
-const BENCH_POSITION_ORDER = ["QB", "RB", "WR", "TE", "K", "DEF", "DST"];
-function positionSortIndex(position: string | null | undefined): number {
-  const index = BENCH_POSITION_ORDER.indexOf((position || "").toUpperCase());
-  return index === -1 ? BENCH_POSITION_ORDER.length : index;
-}
 
 function positionRoomText(room: string): ReactNode {
   const cls = positionTextClass(room);
@@ -128,24 +121,9 @@ export function MyTeamContent({
 
   const starters = myTeam.starters;
   const bench = myTeam.bench;
-  // coridian_, 2026-10-18, screenshot: "the bench should be in order so.
-  // QBs, RBs, WRs, TEs, K, DST" — the API returns bench players in value
-  // order (mixing positions together); sort is stable, so within each
-  // position group the existing value order is preserved.
-  const byPosition = (list: LineupPlayer[]) =>
-    [...list].sort((a, b) => positionSortIndex(a.position) - positionSortIndex(b.position));
-  // Best ball (Sleeper settings.best_ball): Sleeper sets the lineup itself
-  // from the highest weekly scorers, so there's no suggested starters/bench
-  // split to recommend — one position-ordered roster list instead, with the
-  // optimizer's suggested slot labels stripped.
+    // One roster basis for web and app (lib/rosterBasis.ts): position-ordered bench, and the best-ball single roster list.
   const bestBall = myTeam.best_ball === true;
-  const activeBench = byPosition(
-    [...(bestBall ? starters : []), ...bench.filter((p) => p.roster_slot !== "ir" && p.roster_slot !== "taxi")].map(
-      (p) => (bestBall ? { ...p, slot: null } : p),
-    ),
-  );
-  const irBench = byPosition(bench.filter((p) => p.roster_slot === "ir"));
-  const taxiBench = byPosition(bench.filter((p) => p.roster_slot === "taxi"));
+  const { activeBench, irBench, taxiBench } = buildRosterBasis(starters, bench, bestBall);
 
   const startersTotalValue = sumScore(starters);
   const teamTotalValue = sumScore(starters) + sumScore(bench);
