@@ -565,6 +565,13 @@ def _draw_out_weeks(rng: np.random.Generator, ip: InSeasonParams) -> int:
     return int(rng.integers(9, SEASON_WEEKS + 1))
 
 
+def without_injuries(profile: SeasonProfile) -> SeasonProfile:
+    """The same season with no injury weeks or events (bye kept): what a team defense plays (the game's ``cover_v`` 1)."""
+
+    reasons = tuple("bye" if r == "bye" else "" for r in profile.unavailable_reason)
+    return replace(profile, injury_events=(), unavailable_reason=reasons, games_available_mask=tuple(r != "bye" for r in reasons))
+
+
 def draw_season_profile(player: Mapping[str, Any], rng: np.random.Generator) -> SeasonProfile:
     return _draw_season_profile(player, rng, SEASON, INSEASON)
 

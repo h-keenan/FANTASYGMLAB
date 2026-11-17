@@ -59,6 +59,11 @@ class ScoringModel:
     def profile(self, player: Mapping[str, Any], rng: Any) -> Any:  # pragma: no cover - interface
         raise NotImplementedError
 
+    def healthy_profile(self, profile: Any) -> Any:
+        """``profile`` without any injury (a team defense is a unit, not a person; cover_v 1). Models without injury weeks return it as is."""
+
+        return profile
+
     # True when the engine should resolve team-level roles and pass ``role_mult`` (player-model-3 and later).
     team_roles = False
     # "mult": the engine passes a float multiplier (player-model-3); "additive": a (scale, points) pair (player-model-4+).
@@ -175,6 +180,10 @@ class PlayerModelAdapter(ScoringModel):
             else:
                 profile = self._m.with_role_multiplier(profile, week, role_mult)
         return float(self._m.expected_week_points(player, profile, week))
+
+    def healthy_profile(self, profile):
+        fn = getattr(self._m, "without_injuries", None)
+        return fn(profile) if fn else profile
 
     def week(self, player, profile, week, rng, scoring, role_mult=None):
         overflow = week > self.model_week(profile, week)

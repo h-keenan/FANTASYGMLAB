@@ -15,7 +15,6 @@ Engine events: ``waiver_result``, ``trade`` (source ``ai_ai``), ``drop``,
 
 from __future__ import annotations
 
-import dataclasses
 from typing import Any, Callable, Sequence
 
 from modules.sim import depth_incumbency
@@ -84,10 +83,7 @@ class ScoringSession:
 
         key = ("healthy", pid)
         if key not in self._profiles:
-            prof = self.profile(pid)
-            if hasattr(prof, "injury_events") and hasattr(prof, "games_available_mask"):
-                reasons = tuple("bye" if r == "bye" else "" for r in prof.unavailable_reason)
-                prof = dataclasses.replace(prof, injury_events=(), unavailable_reason=reasons, games_available_mask=tuple(r != "bye" for r in reasons))
+            prof = self.model.healthy_profile(self.profile(pid))
             self._profiles[key] = prof
         return self._profiles[key]
 
