@@ -52,7 +52,7 @@ def test_dark_palette_is_untouched_by_the_light_mode_addition():
     # additive, never a side effect of it.
     assert DESIGN_TOKEN_HEX["--color-bg"] == "#000000"
     assert DESIGN_TOKEN_HEX["--color-accent"] == "#67e8f9"
-    assert DESIGN_TOKEN_HEX["--color-danger"] == "#ef4444"
+    assert DESIGN_TOKEN_HEX["--color-danger"] == "#ff9090"
 
 
 def test_every_dark_leaf_color_token_has_an_independent_light_value():

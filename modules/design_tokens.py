@@ -68,12 +68,12 @@ DESIGN_TOKEN_CSS = """
     --color-accent: #67e8f9;
     --color-accent-strong: #22d3ee;
     --color-accent-soft: rgba(103, 232, 249, 0.14);
-    --color-success: #22c55e;
+    --color-success: #25cc61;
     --color-money: #4ade80;
     --color-opportunity: #14b8a6;
     --color-action: #facc15;
     --color-warning: #f59e0b;
-    --color-danger: #ef4444;
+    --color-danger: #ff9090;
     --color-information: #67e8f9;
     --color-diagnostic: #8b93ff;
     --color-premium: #facc15;

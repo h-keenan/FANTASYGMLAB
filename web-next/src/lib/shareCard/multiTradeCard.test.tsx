@@ -52,8 +52,8 @@ describe("multi-team share card", () => {
       expect(svg.startsWith("<svg")).toBe(true);
       expect(svg).toContain('width="1080"');
       expect(svg).toContain('height="1350"');
-      expect(svg).toContain("#22c55e");
-      expect(svg).not.toContain("#ef4444");
+      expect(svg).toContain("#25cc61");
+      expect(svg).not.toContain("#ff9090");
       const out = process.env.MULTI_CARD_SAMPLE_DIR;
       if (out) {
         mkdirSync(out, { recursive: true });

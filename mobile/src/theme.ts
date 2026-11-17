@@ -108,9 +108,9 @@ const darkColors = {
   onAccent: '#0B1220',
   // Status colors synced to web-next (--color-danger / --color-success / --color-warning and their
   // -soft fills) so red send / green get read identically on both platforms (parity pass 4).
-  danger: '#ef4444',
+  danger: '#ff9090',
   dangerMuted: 'rgba(239,68,68,0.15)',
-  success: '#22c55e',
+  success: '#25cc61',
   successBright: '#4ADE80',
   // Money text (FAAB, prices, budgets). Same green family as success but its own token so
   // money is always green without reading as a win/healthy judgment; synced to web --color-money.

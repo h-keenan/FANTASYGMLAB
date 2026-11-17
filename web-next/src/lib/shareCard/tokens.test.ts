@@ -35,14 +35,14 @@ describe("share card tokens", () => {
   });
 
   it("resolves var(--token) strings from the shared presentation helpers", () => {
-    expect(resolveTokenColor("var(--color-success)")).toBe("#22c55e");
+    expect(resolveTokenColor("var(--color-success)")).toBe("#25cc61");
     expect(resolveTokenColor("var(--color-premium)")).toBe("#facc15");
     expect(resolveTokenColor("#123456")).toBe("#123456");
   });
 
   it("mirrors overallRatingTint's red -> gold -> green ramp", () => {
-    expect(overallRatingTintHex(0)).toBe("#ef4444");
+    expect(overallRatingTintHex(0)).toBe("#ff9090");
     expect(overallRatingTintHex(50)).toBe("#facc15");
-    expect(overallRatingTintHex(100)).toBe("#22c55e");
+    expect(overallRatingTintHex(100)).toBe("#25cc61");
   });
 });

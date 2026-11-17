@@ -40,3 +40,5 @@ Local: `LARGE=1 LARGE_PCT=200 GUARD=1 OVERFLOW=1 node scripts/sim_layout_playwri
 - Not covered by axe: sheets (PQV, GM orb), Sim home, Account, signed-out landing. Add routes when the fixtures allow; each extra route costs about 5s in CI.
 - App: no automated check for `accessibilityRole` on tab rows or `accessibilityState` on toggles; the scan only covers labels on icon-only pressables. The orb and avatar labels were not audited in this pass.
 - No VoiceOver / TalkBack or physical Dynamic Type run was possible.
+
+**Update (dark danger/success contrast):** dark `--color-danger` `#ef4444` -> `#ff9090` (2.69:1 -> 4.66:1 on `--color-surface-raised` `#3d4248`; 4.24 -> 7.04 on surface-primary) and `--color-success` `#22c55e` -> `#25cc61` (4.45 -> 4.77:1 on raised). Same hue family; soft fills unchanged; light-mode values unchanged. Verdict text stays neutral (#2034); colour is on chips only.
