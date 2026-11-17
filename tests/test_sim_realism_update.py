@@ -34,7 +34,7 @@ GOLDEN_OLD = {
     "redraft": "1c4fc89f0f26d9a75c02265a03c0b7252ab92a0a511ead91893a2e0110471fec",
     "dynasty3": "67fa6cb0ebeb536b641b15bbe3b898a30771b8169a3fa8c0d1b634db3822fd84",
 }
-OLD_FLAGS = ("hint_v", "limit_v", "kd_v", "world_v", "aging_v", "names_v", "econ_v", "stability_v", "vorp_v", "advice_v", "incumbent_v", "defense_v", "pos_v", "injury_v", "rookie_v", "wire_v", "need_v", "cap_v", "posture_v")
+OLD_FLAGS = ("hint_v", "limit_v", "kd_v", "world_v", "aging_v", "names_v", "econ_v", "stability_v", "vorp_v", "advice_v", "incumbent_v", "defense_v", "pos_v", "injury_v", "rookie_v", "wire_v", "need_v", "cap_v", "posture_v", "cover_v")
 
 
 def _old_settings(**extra) -> GameSettings:

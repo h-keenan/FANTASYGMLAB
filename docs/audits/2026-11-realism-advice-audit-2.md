@@ -448,6 +448,61 @@ the posture): the personas' roster-building (draft, weights) is a separate const
 Tests: `tests/test_sim_posture_v.py` (gate, hysteresis table, odds, the params shift and its gates, a pinned old-save digest, a replay-exact season with tenure respected). Reproducing:
 `realism_p1_report posture --seeds 16 [--flags '{"posture_v": 0}']`, `realism_p1_report values --seeds 6`, `realism_p1_report posture --dynasty --seeds 6`.
 
+## Sim: weekly team scores in the 40s and 50s (`cover_v 1`)
+
+Owner report: weekly TEAM scores in the 40s-50s happen in the Sim; in real 12-team PPR leagues they are nearly nonexistent. Harness: `modules/sim/calibration/team_score_report.py` (`sim`, `real`, `decompose`, `starters`).
+
+**Real target (method).** Sleeper public weekly stats and weekly projections 2021-25 (the payloads `scripts/projection_calibration_backtest.py fetch` writes, with DEF added; no real-league bundles exist in the repo or its caches, and `data/players.db` is never touched). Per season, 12 independent 12-team leagues: snake draft by the real preseason ADP (`adp_dd_ppr`, log-noise 0.18, K/DEF in the last two rounds, position caps), a waiver wire (a starting slot nobody can fill gets the best free agent by that week's projection), and every week each manager starts the best lineup by that week's published Sleeper projection (QB RB RB WR WR TE FLEX K DEF, plus SUPER_FLEX), scored with the week's real Sleeper points (PPR / half / standard). Weeks 1-14: 12 leagues x 5 seasons x 14 weeks x 12 teams = 10,080 team-weeks per format. A 10% share of stale lineups changes nothing. Caveat: projection-set lineups are a competent manager; real leagues also have absent ones.
+
+**Sim.** Redraft games on the committed 2025 panel pool, 12 teams, 16 seeds x 2 back-to-back seasons (32 games, 14 regular weeks), AI-managed teams only (4,928 team-weeks per row). The user's own team is reported separately because its lineup is whatever the human leaves.
+
+### Before / after against the real target (PPR, 1QB, K + DEF)
+
+| | n | mean | sd | p1 | p5 | p10 | p50 | p90 | p99 | <50 | <60 | <70 | <80 | >170 | >200 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| real (Sleeper rebuild) | 10080 | 111.4 | 23.6 | 58.4 | 73.4 | 82.0 | 110.8 | 142.2 | 167.6 | 0.30% | 1.19% | 3.59% | 8.63% | 0.82% | 0.01% |
+| Sim before (`cover_v 0`) | 4928 | 107.9 | 23.8 | 59.0 | 70.9 | 78.1 | 106.8 | 138.9 | 170.3 | 0.26% | 1.12% | 4.59% | 11.85% | 1.03% | 0.04% |
+| Sim after (`cover_v 1`) | 4928 | 109.8 | 23.6 | 61.5 | 73.5 | 80.5 | 108.4 | 140.5 | 171.9 | 0.20% | 0.79% | 3.37% | 9.54% | 1.22% | 0.06% |
+| Sim user team, lineup never touched after the draft | 448 | 95.0 | 28.1 | 36.2 | 48.9 | 57.4 | 93.0 | 132.6 | 159.8 | 5.58% | 11.16% | 18.53% | 30.58% | 0.45% | 0.00% |
+
+Other formats (mean / sd / p1 / p10, then share under 60 / 70 / 80 and over 170):
+
+| format | source | mean | sd | p1 | p10 | <60 | <70 | <80 | >170 |
+|---|---|---|---|---|---|---|---|---|---|
+| superflex, K+DEF | real | 125.3 | 25.3 | 68.0 | 93.6 | 0.40% | 1.30% | 3.52% | 4.17% |
+| | before | 121.0 | 25.0 | 67.5 | 90.0 | 0.37% | 1.40% | 4.06% | 3.37% |
+| | after | 123.0 | 25.1 | 70.2 | 92.1 | 0.20% | 0.95% | 3.25% | 4.18% |
+| K only (the game's default lineup) | before | 100.6 | 22.9 | 52.8 | 72.0 | 2.50% | 8.10% | 19.07% | 0.43% |
+| | after | 101.3 | 22.7 | 54.4 | 72.8 | 2.27% | 7.45% | 17.94% | 0.43% |
+| no K / DEF | before | 93.9 | 21.6 | 48.3 | 66.6 | 5.03% | 13.58% | 26.77% | 0.06% |
+| | after | 94.0 | 21.6 | 48.4 | 66.8 | 4.95% | 13.35% | 26.50% | 0.06% |
+| bench 4 | before | 108.6 | 23.3 | 60.7 | 80.0 | 0.87% | 3.73% | 10.04% | 0.87% |
+| | after | 110.7 | 23.0 | 63.2 | 82.4 | 0.51% | 2.68% | 7.85% | 1.01% |
+| bench 10 | before | 107.5 | 23.8 | 58.2 | 77.5 | 1.36% | 4.55% | 12.76% | 0.77% |
+
+Real half-PPR is mean 100.2 / sd 21.9 / p1 52.3 / under 70: 7.86%; real standard is 89.1 / 20.5 / 45.4 / 17.59%. The harness pool is projected in PPR and the model re-solves stat volume to hold a player's mean, so the Sim's half and standard rows keep the PPR mean (109.4 / 108.8). That is a harness artefact (the app projects its pool in the league's own scoring, `RealSimInputs.player_pool(scoring_settings)`), so half / standard tails are comparable only after rescaling by the mean; nothing was changed there.
+
+### What the 40-50 weeks are
+
+1. **The player-level weekly variance is not the cause.** Started player-weeks under 40% of the pre-game expectation, real (Sleeper projection) vs Sim (rest-of-season mean): QB 9.5 / 9.3%, RB 12.4 / 14.6%, WR 16.4 / 16.6%, TE 17.9 / 19.7%. The in-season player p10 calibration and the WR/TE stability work (#2027 / #2029 / #2075) are untouched. Residuals: Sim kickers are dud-prone (<= 2 points in 17.3% of starts, real 9.1%) and Sim defenses too steady (9.0%, real 19.2%); in a lineup they roughly cancel.
+2. **AI lineups left slots empty.** In 8 instrumented games 16% of AI team-weeks had an empty starting slot (K 92, DEF 85, QB 16, TE 2, RB 1, WR 1 of 1,232 team-weeks): a lone kicker or defense on his bye counted as "held" under the one-per-position limit (`cap_v`), so the waiver planner refused the stand-in and nothing covered the slot (it scores 0). Defenses were also modelled with a WR's injury hazard (a defense "out 4 weeks").
+3. **The 40s are mostly the user's own team when its lineup is not maintained** (a started player who is out or on a bye): with the lineup left as the draft set it, mean 95, p1 36, 5.6% under 50, which is the whole fat tail. `auto_lineup` and the sim-to-end paths already start the best healthy lineup, so a human who uses them is not exposed; nothing to change in the model.
+4. **What is left in a low AI week is real football**: in the rebuilt real leagues 74% of weeks under 70 have a starter at exactly 0 (a scratch or a hurt player) and 97% have one at 2 or less. There is no floor in real leagues either.
+
+Decomposition of AI team-weeks under 70 (shortfall = expected minus scored, summed over starters), before -> after: player bust game (< 40% of mean) 42.2% -> 45.1%; ordinary below-mean games 28.8% -> 29.7%; K / DEF below mean 10.2% -> 12.9%; hurt in the game (partial) 10.0% -> 10.9%; empty slot **8.8% -> 1.4%** (an empty slot in 36.7% of those weeks before, 3.6% after; under 60: 52.7% of weeks and 12.7% of the shortfall before, 5.1% and 2.0% after). A healthy starter who did not play: 0.3-0.6% of weeks. A started out / bye player: none for AI teams (for the untouched user lineup, 27% of the shortfall under 70 is an out or bye starter).
+
+### The flag: `cover_v 1` (boundary: next simulated week; offered by the Realism update)
+
+- The AI waiver planner, in an emergency (a slot nobody can fill this week or next), no longer counts a player who cannot play in the hole week (his bye, a known injury) as "held" against the position limit, so a stand-in kicker / defense / QB / TE is added (`game_ai_depth.ai_waiver_claims`).
+- A team defense has no injuries: its season profile is replaced by one without injury weeks (bye kept) and it never gets a `newly_injured` event (`ScoringSession.healthy_profile`).
+- No floor on scores and no change to any player draw. Old saves have no `cover_v` key and replay identically; the legacy digest pins and `OLD_FLAGS` pin `cover_v 0` like the earlier flags (`tests/test_sim_cover_v.py`).
+
+Effect on AI team-weeks: under 70 from 4.59% to 3.37% (real 3.59%), under 60 from 1.12% to 0.79% (real 1.19%), p10 78.1 -> 80.5 (real 82.0), mean +1.9. After the fix the Sim is within about 0.4 points of share of the real target at every cut; it is slightly thinner than the reconstruction at p1 (61.5 vs 58.4) and heavier at the top (over 170: 1.22% vs 0.82%).
+
+Residuals: (1) K / DEF variance shapes as above (a player-model change, deliberately not touched); (2) the Sim's PPR mean is 1.6 below the real reconstruction with the same sd; (3) the real target is a projection-managed reconstruction, not crawled league histories; (4) the user's own team is whatever the human sets.
+
+Reproducing: `python -m modules.sim.calibration.team_score_report sim --seeds 16 --seasons 2 [--flags '{"cover_v": 0}'] [--who user]`, `... decompose --seeds 16 --seasons 2`, `... starters --cache DIR`, `... real --cache DIR`.
+
 ## Decisions needed (product)
 1. Ship the late-career age curve and a lower `REVERSION` (`stability_v 2`)? Done as an upgradable offseason change (it changes dynasty values for 27+ players, so it is not silent); the owner may still veto the Realism update copy.
 2. Cap rookie class strength (`rookie_v 1`)? Done as an upgradable offseason change (it lowers rookie pick values and the top of the draft board; real classes are far less top-heavy); the owner may still veto the Realism update copy.

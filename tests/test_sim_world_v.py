@@ -53,6 +53,7 @@ def _settings(world: bool, **extra) -> GameSettings:
     d.pop("injury_v", None)
     d.pop("cap_v", None)
     d.pop("posture_v", None)
+    d.pop("cover_v", None)
     return GameSettings.from_dict(d)
 
 

@@ -33,7 +33,7 @@ from modules.sim.synthetic import build_synthetic_pool
 ROWS, BYES = build_synthetic_pool(7)
 
 
-def make_snapshot(seed=11, hint_v=0, world_v=0, econ_v=0, cap_v=0, posture_v=0, **settings):
+def make_snapshot(seed=11, hint_v=0, world_v=0, econ_v=0, cap_v=0, posture_v=0, cover_v=0, **settings):
     """hint_v defaults to 0 here: these seeded-world engine tests were written against the original value-for-need auto-pick
     (the public-information helpers are covered by tests/test_sim_hint_v.py)."""
     opts = {"user_slot": 4, **settings}

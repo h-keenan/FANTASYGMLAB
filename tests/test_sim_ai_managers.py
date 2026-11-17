@@ -79,13 +79,13 @@ def test_ai_v0_game_replays_identically_and_ai_v1_is_pinned(monkeypatch):
     # the ai_v 1 game on player-model-4 (a model id pins the player model; the AI generation is the settings)
     monkeypatch.setattr(game_scoring, "default_model", lambda: game_scoring.get_model(V4_ID))
     snap, state, em = drafted(11)
-    object.__setattr__(snap, "settings", dataclasses.replace(snap.settings, defense_v=0, injury_v=0, incumbent_v=0, cap_v=0, posture_v=0))  # the pin predates defense_v (tests/test_sim_incumbent_defense.py covers it)
+    object.__setattr__(snap, "settings", dataclasses.replace(snap.settings, defense_v=0, injury_v=0, incumbent_v=0, cap_v=0, posture_v=0, cover_v=0))  # the pin predates defense_v (tests/test_sim_incumbent_defense.py covers it)
     assert snap.settings.ai_v == 1 and snap.scoring_model == V4_ID
     for _ in range(5):
         advance(em, snap, state, 11)
     assert state.digest() == GOLDEN_AI1_DIGESTS[6]
     snap2, state2, em2 = drafted(11)
-    object.__setattr__(snap2, "settings", dataclasses.replace(snap2.settings, defense_v=0, injury_v=0, incumbent_v=0, cap_v=0, posture_v=0))
+    object.__setattr__(snap2, "settings", dataclasses.replace(snap2.settings, defense_v=0, injury_v=0, incumbent_v=0, cap_v=0, posture_v=0, cover_v=0))
     for _ in range(5):
         advance(em2, snap2, state2, 11)
     assert state2.digest() == state.digest()
