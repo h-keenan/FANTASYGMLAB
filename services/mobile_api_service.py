@@ -9723,20 +9723,47 @@ def get_player_weekly_stats(
     season_stats = sleeper.get_season_player_stats(target_season, retain_weekly=True)
     player_stats = season_stats.get(str(player_id))
     weeks = player_stats.get("weekly") if isinstance(player_stats, dict) else None
-    if not weeks:
-        return {"ok": True, "season": target_season, "weeks": []}
+    inactive_weeks = (
+        sorted(int(w) for w in (player_stats.get("inactive_weeks") or []) if isinstance(w, (int, float)))
+        if isinstance(player_stats, dict)
+        else []
+    )
 
+    # Context the chart needs to be honest about gaps: the player's bye and how far the
+    # season has run (current season only; a finished season's axis is just its played range).
+    bye_week: int | None = None
+    through_week: int | None = None
+    if target_season == sleeper.default_player_stats_season():
+        try:
+            through_week = int(season_clock.nfl_week()) or None
+        except Exception:
+            through_week = None
+        try:
+            raw_player = (sleeper.get_players() or {}).get(str(player_id))
+        except Exception:
+            raw_player = None
+        team = raw_player.get("team") if isinstance(raw_player, dict) else None
+        bye_week, _on_bye = _quick_view_bye(str(team) if team else None)
+
+    rows = [
+        {
+            "week": int(row.get("week") or 0),
+            "fantasy_points_ppr": _clean_json_value(row.get("fantasy_points_ppr")),
+            "snap_share": _clean_json_value(row.get("snap_share")),
+        }
+        for row in (weeks or [])
+        # Only games the player appeared in are plotted; weeks listed with no gp are
+        # reported separately as confirmed inactive, never as points or as missing data.
+        if sleeper.week_row_played(row) or row.get("fantasy_points_ppr") is not None
+    ]
+    played = {r["week"] for r in rows}
     return {
         "ok": True,
         "season": target_season,
-        "weeks": [
-            {
-                "week": int(row.get("week") or 0),
-                "fantasy_points_ppr": _clean_json_value(row.get("fantasy_points_ppr")),
-                "snap_share": _clean_json_value(row.get("snap_share")),
-            }
-            for row in weeks
-        ],
+        "weeks": rows,
+        "inactive_weeks": [w for w in inactive_weeks if w not in played],
+        "bye_week": bye_week,
+        "through_week": through_week,
     }
 
 

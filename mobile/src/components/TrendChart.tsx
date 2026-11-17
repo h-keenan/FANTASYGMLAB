@@ -49,6 +49,8 @@ export interface TrendChartProps {
   clamp?: [number, number] | null;
   yDomain?: [number, number] | null;
   yTickCount?: number;
+  /** Extend the x axis to at least here (the current week) even with no row that far. */
+  xMax?: number | null;
   invertY?: boolean;
   smooth?: boolean;
   emptyText?: string;
@@ -76,6 +78,7 @@ export default function TrendChart(props: TrendChartProps) {
     clamp = null,
     yDomain = null,
     yTickCount = 4,
+    xMax = null,
     invertY = false,
     smooth = true,
     emptyText,
@@ -93,8 +96,8 @@ export default function TrendChart(props: TrendChartProps) {
   const selected = pick.points === points ? pick.key : null;
   const setSelected = (next: string | null | ((cur: string | null) => string | null)) => setPick({ points, key: typeof next === 'function' ? next(selected) : next });
 
-  const options: PrepareOptions = { includeZero, yPad, clamp, yDomain, yTickCount, band };
-  const series = useMemo(() => prepareSeries(points, options), [points, band, includeZero, yPad, clamp, yDomain, yTickCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  const options: PrepareOptions = { includeZero, yPad, clamp, yDomain, yTickCount, band, xMax };
+  const series = useMemo(() => prepareSeries(points, options), [points, band, includeZero, yPad, clamp, yDomain, yTickCount, xMax]); // eslint-disable-line react-hooks/exhaustive-deps
   const summary = chartSummary(series, name, unit, xNoun, formatY);
 
   if (series.status === 'empty') {
@@ -184,9 +187,13 @@ export default function TrendChart(props: TrendChartProps) {
             {series.segments.filter((s) => s.length > 1).map((s) => (
               <Path key={`l${s[0].x}`} d={linePath(toPx(s), smooth)} fill="none" stroke={colors.accent} strokeWidth={compact ? 1.75 : 2} strokeLinecap="round" strokeLinejoin="round" />
             ))}
-            {series.gaps.map((g) => (
-              <Circle key={`gm${g.x}`} cx={scales.x(g.x)} cy={scales.y(g.y)} r={compact ? 2.5 : 3.5} fill={colors.background} stroke={colors.textTertiary} strokeWidth={1.5} />
-            ))}
+            {series.gaps.map((g) =>
+              g.kind === 'missing' ? (
+                <Path key={`gm${g.x}`} d={`M ${scales.x(g.x) - 3} ${scales.y(g.y) - 3} L ${scales.x(g.x) + 3} ${scales.y(g.y) + 3} M ${scales.x(g.x) + 3} ${scales.y(g.y) - 3} L ${scales.x(g.x) - 3} ${scales.y(g.y) + 3}`} stroke={colors.textTertiary} strokeWidth={1.5} strokeLinecap="round" fill="none" />
+              ) : (
+                <Circle key={`gm${g.x}`} cx={scales.x(g.x)} cy={scales.y(g.y)} r={compact ? 2.5 : 3.5} fill={colors.background} stroke={colors.textTertiary} strokeWidth={1.5} />
+              ),
+            )}
             {series.played.map((p, i) => {
               const isLast = i === series.played.length - 1;
               if (compact && !isLast) return null;

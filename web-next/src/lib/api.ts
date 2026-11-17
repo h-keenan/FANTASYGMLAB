@@ -2671,6 +2671,12 @@ export interface WeeklyStatsResponse {
   ok: true;
   season: number;
   weeks: WeeklyStatPoint[];
+  /** Weeks the provider lists the player for but he did not appear in (healthy scratch / out). Absent on older servers. */
+  inactive_weeks?: number[];
+  /** The player's team bye (current season only). */
+  bye_week?: number | null;
+  /** Current NFL week (current season only): the chart axis runs to here. */
+  through_week?: number | null;
 }
 
 /** GET /v1/players/{id}/quick-view's `model` field — the same composite

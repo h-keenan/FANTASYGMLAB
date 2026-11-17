@@ -1,8 +1,10 @@
 // Shared (web + mobile twin, byte-identical): the data side of EVERY trend chart.
 // One module turns "rows of x/y where y may be missing" into something a chart can draw
 // without ever leaving a blank hole or a lone dot:
-//   - a missing / bye / injured week is a GAP: the line breaks into solid runs, a dashed
-//     bridge crosses the gap and a muted hollow marker sits on it (never an empty area);
+//   - a bye / injured / inactive week is a REAL gap: the line breaks into solid runs, a dashed
+//     bridge crosses it and a muted hollow marker sits on it (never an empty area);
+//   - a "missing" week (we simply have no data) is an honest BREAK: no bridge, so it can never read
+//     as a projection slope, and a small "no data" cross marks the spot;
 //   - one played point is a "single" status: the chart shows a labelled stat instead of a dot;
 //   - two or three points are "sparse": direct value labels and wider dots, no axis noise;
 //   - axes use nice ticks, optional zero baseline, optional clamp (ratings 0-99);
@@ -10,7 +12,10 @@
 //   - an optional projection band (floor / ceiling / mean) shares the same scales.
 // Components (web ui/TrendChart.tsx, mobile components/TrendChart.tsx) only draw the result.
 
-export type GapKind = "missing" | "bye" | "injured";
+export type GapKind = "missing" | "bye" | "injured" | "inactive";
+
+/** Only weeks the player really did not play (bye, injured, inactive) are bridged. "missing" is no data. */
+export const isBridgedGap = (kind: GapKind): boolean => kind !== "missing";
 
 /** One input row. y === null means nothing was recorded for this x (a gap), whatever the reason. */
 export interface ChartInputPoint {
@@ -44,6 +49,8 @@ export interface PrepareOptions {
   maxXTicks?: number;
   /** Projection band drawn behind / after the played data. */
   band?: readonly ChartBandPoint[] | null;
+  /** Extend the x axis at least to here (the current week), even when no row exists that far. */
+  xMax?: number | null;
 }
 
 export interface ChartPoint {
@@ -59,6 +66,8 @@ export interface ChartGap {
   kind: GapKind;
   /** True when the marker sits between two played points (a dashed bridge crosses it). */
   between: boolean;
+  /** False for "missing" (no data): drawn as a break with a "no data" marker, never bridged. */
+  bridged: boolean;
   label?: string;
 }
 
@@ -167,7 +176,7 @@ export function prepareSeries(input: readonly ChartInputPoint[], options: Prepar
   let pendingGapRows: ChartInputPoint[] = [];
   let lastPlayed: ChartPoint | null = null;
   const flushLeadingGaps = (next: ChartPoint) => {
-    for (const g of pendingGapRows) gaps.push({ x: g.x, y: next.y, kind: g.gap ?? "missing", between: false, label: g.label });
+    for (const g of pendingGapRows) gaps.push({ x: g.x, y: next.y, kind: g.gap ?? "missing", between: false, bridged: isBridgedGap(g.gap ?? "missing"), label: g.label });
     pendingGapRows = [];
   };
   for (const r of rows) {
@@ -179,10 +188,14 @@ export function prepareSeries(input: readonly ChartInputPoint[], options: Prepar
       } else if (pendingGapRows.length > 0) {
         segments.push(run);
         run = [pt];
-        bridges.push({ from: lastPlayed, to: pt });
+        // One unknown week in the span breaks the whole span: a dashed line over data we do not have
+        // would read as a projection slope.
+        const bridgeable = pendingGapRows.every((g) => isBridgedGap(g.gap ?? "missing"));
+        if (bridgeable) bridges.push({ from: lastPlayed, to: pt });
         for (const g of pendingGapRows) {
+          const kind = g.gap ?? "missing";
           const t = (g.x - lastPlayed.x) / (pt.x - lastPlayed.x || 1);
-          gaps.push({ x: g.x, y: lastPlayed.y + (pt.y - lastPlayed.y) * t, kind: g.gap ?? "missing", between: true, label: g.label });
+          gaps.push({ x: g.x, y: bridgeable ? lastPlayed.y + (pt.y - lastPlayed.y) * t : lastPlayed.y, kind, between: bridgeable, bridged: bridgeable && isBridgedGap(kind), label: g.label });
         }
         pendingGapRows = [];
       } else {
@@ -194,7 +207,7 @@ export function prepareSeries(input: readonly ChartInputPoint[], options: Prepar
     }
   }
   if (run.length) segments.push(run);
-  if (lastPlayed) for (const g of pendingGapRows) gaps.push({ x: g.x, y: lastPlayed.y, kind: g.gap ?? "missing", between: false, label: g.label });
+  if (lastPlayed) for (const g of pendingGapRows) gaps.push({ x: g.x, y: lastPlayed.y, kind: g.gap ?? "missing", between: false, bridged: isBridgedGap(g.gap ?? "missing"), label: g.label });
 
   const ys = [...played.map((p) => p.y), ...band.flatMap((b) => [b.floor, b.ceiling, b.mean])];
   const yPad = options.yPad ?? 0;
@@ -205,8 +218,12 @@ export function prepareSeries(input: readonly ChartInputPoint[], options: Prepar
 
   const xs = [...rows.map((r) => r.x), ...band.map((b) => b.x)];
   const xDomain: [number, number] = [Math.min(...xs), Math.max(...xs)];
+  const xMax = options.xMax;
+  if (isNum(xMax) && xMax > xDomain[1]) xDomain[1] = xMax;
   if (xDomain[1] === xDomain[0]) xDomain[1] = xDomain[0] + 1;
-  const xTicks = thinTicks([...new Set(xs)].sort((a, b) => a - b), options.maxXTicks ?? 6);
+  const tickXs = new Set(xs);
+  if (isNum(xMax) && xMax > Math.max(...xs)) for (let x = Math.max(...xs) + 1; x <= xMax; x += 1) tickXs.add(x);
+  const xTicks = thinTicks([...tickXs].sort((a, b) => a - b), options.maxXTicks ?? 6);
 
   const peak = played.length ? played.reduce((best, p) => (p.y > best.y ? p : best), played[0]) : null;
   const low = played.length ? played.reduce((best, p) => (p.y < best.y ? p : best), played[0]) : null;
@@ -226,20 +243,37 @@ export function prepareSeries(input: readonly ChartInputPoint[], options: Prepar
   return { status, played, segments, bridges, gaps, band, xDomain, yDomain, yTicks, xTicks, stats };
 }
 
-/** Weekly rows -> chart rows: every week from the first to the last reported one, absent weeks explicit gaps
- * (a bye when listed, otherwise "missing"). Never extends past the latest reported week (that week has not
- * happened yet, it is not a gap). */
-export function weeklyGapRows(weeks: readonly { week: number; points: number | null }[], byeWeeks: readonly number[] = [], prefix = "Wk"): ChartInputPoint[] {
+export interface WeeklyGapOptions {
+  /** Weeks the provider confirms the player was inactive / did not play (his team played). */
+  inactiveWeeks?: readonly number[];
+  /** Weeks the player was out injured. */
+  injuredWeeks?: readonly number[];
+  /** Current NFL week: the axis runs to here. Completed weeks before it with no data are "missing" gaps. */
+  throughWeek?: number | null;
+}
+
+/** Weekly rows -> chart rows: every week from the first to the last reported one (and on to the current
+ * week when `throughWeek` is given), absent weeks explicit gaps: bye / injured / inactive when we know
+ * why, otherwise "missing" (no data, drawn as a break, never bridged). The current week itself is not a
+ * gap unless it is a bye: it has not finished, so it is left as open axis. */
+export function weeklyGapRows(weeks: readonly { week: number; points: number | null }[], byeWeeks: readonly number[] = [], prefix = "Wk", options: WeeklyGapOptions = {}): ChartInputPoint[] {
   const valid = weeks.filter((w) => isNum(w.week));
   if (valid.length === 0) return [];
   const byWeek = new Map(valid.map((w) => [w.week, w.points]));
   const bye = new Set(byeWeeks);
-  const first = Math.min(...valid.map((w) => w.week));
-  const last = Math.max(...valid.map((w) => w.week));
+  const inactive = new Set(options.inactiveWeeks ?? []);
+  const injured = new Set(options.injuredWeeks ?? []);
+  const first = Math.min(...valid.map((w) => w.week), ...inactive);
+  let last = Math.max(...valid.map((w) => w.week));
+  const through = options.throughWeek;
+  if (isNum(through) && through > last) last = through;
   const rows: ChartInputPoint[] = [];
   for (let week = first; week <= last; week += 1) {
     const y = byWeek.get(week);
-    rows.push({ x: week, y: isNum(y) ? y : null, gap: bye.has(week) ? "bye" : "missing", label: `${prefix} ${week}` });
+    const known = isNum(y);
+    const gap: GapKind = bye.has(week) ? "bye" : injured.has(week) ? "injured" : inactive.has(week) ? "inactive" : "missing";
+    if (!known && gap === "missing" && isNum(through) && week >= through) continue; // the week in progress / not yet played
+    rows.push({ x: week, y: known ? y : null, gap, label: `${prefix} ${week}` });
   }
   return rows;
 }
@@ -330,13 +364,17 @@ export function bandPathFor(band: readonly ChartBandPoint[], scales: ChartScales
 
 /* ---------------- copy ---------------- */
 
-export const GAP_LABEL: Record<GapKind, string> = { missing: "No game", bye: "Bye week", injured: "Injured" };
+export const GAP_LABEL: Record<GapKind, string> = { missing: "No data", bye: "Bye week", injured: "Injured", inactive: "Did not play" };
 
 export function gapCaption(series: Pick<PreparedSeries, "gaps">): string | null {
   if (series.gaps.length === 0) return null;
-  const kinds = new Set(series.gaps.map((g) => g.kind));
-  if (kinds.size === 1) return `Dashed: ${GAP_LABEL[[...kinds][0]].toLowerCase()}`;
-  return "Dashed: bye, injured or missed weeks";
+  const bridged = [...new Set(series.gaps.filter((g) => isBridgedGap(g.kind)).map((g) => g.kind))];
+  const hasMissing = series.gaps.some((g) => g.kind === "missing");
+  const parts: string[] = [];
+  if (bridged.length === 1) parts.push(`Dashed: ${GAP_LABEL[bridged[0]].toLowerCase()}`);
+  else if (bridged.length > 1) parts.push("Dashed: bye, injured or inactive weeks");
+  if (hasMissing) parts.push("x: no data");
+  return parts.join(" · ");
 }
 
 export function chartPlaceholder(status: ChartStatus, noun = "weeks"): string | null {
