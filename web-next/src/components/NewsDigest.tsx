@@ -2,7 +2,8 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
-import { PillRow } from "@/components/PillRow";
+import { PageControl } from "@/components/ui/PageControls";
+import { FilterSheet } from "@/components/ui/FilterSheet";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerName } from "@/components/PlayerName";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -35,12 +36,18 @@ const TONE: Record<NewsVerdictTone, string> = {
   accent: "var(--color-accent)",
 };
 
+/** The roster PFP strip as a collapsed module (UI audit batch H): one tap to open, so the first player row sits right under the control row. */
 function RosterStrip({ players, active, onPick }: { players: NewsStripPlayer[]; active: string | null; onPick: (key: string | null) => void }) {
+  const picked = players.find((p) => p.key === active);
   return (
-    <div className="flex flex-col gap-1.5" data-testid="news-strip">
-      <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-        Your roster · {players.length} with news
-      </span>
+    <CompactModule
+      id="news.strip"
+      title={`Your roster · ${players.length} with news`}
+      label="Your roster"
+      parts={[{ key: "who", text: picked ? `Showing ${picked.name}` : players.slice(0, 3).map((p) => p.name).join(", ") + (players.length > 3 ? ` +${players.length - 3}` : ""), tone: "muted" }]}
+      summaryWhenCollapsed
+      testId="news-strip"
+    >
       <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filter news by player">
         {players.map((p) => {
           const on = p.key === active;
@@ -65,7 +72,7 @@ function RosterStrip({ players, active, onPick }: { players: NewsStripPlayer[]; 
           );
         })}
       </div>
-    </div>
+    </CompactModule>
   );
 }
 
@@ -135,24 +142,34 @@ export function NewsDigest({
   const picked = digest.strip.find((p) => p.key === playerKey);
   return (
     <div className="flex flex-col gap-3" data-testid="news-digest">
-      <PillRow ariaLabel="News filter" variant="fill" options={NEWS_FILTERS.map((f) => ({ label: f.label, value: f.key }))} active={filter} onSelect={(v) => setFilter(v as NewsFilterKey)} />
+      <PageControl>
+        <FilterSheet
+          title="Show"
+          groups={[{ id: "filter", label: "News type", anyValue: "all", options: NEWS_FILTERS.map((f) => ({ value: f.key, label: f.label })) }]}
+          values={{ filter: filter === "all" ? [] : [filter] }}
+          onApply={(next) => setFilter((next.filter?.[0] ?? "all") as NewsFilterKey)}
+          showChips={false}
+          testId="news-filter"
+        />
+      </PageControl>
       {digest.strip.length > 0 ? <RosterStrip players={digest.strip} active={playerKey} onPick={setPlayerKey} /> : null}
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-          {picked ? `${picked.name} · ${digest.rows.length} ${digest.rows.length === 1 ? "item" : "items"}` : `Your players · ${digest.rows.length}`}
-        </span>
-        {chip ? <ToneBadge label={chip} color="var(--color-accent)" size="xs" testId="news-headline-chip" /> : null}
-      </div>
       {digest.rows.length > 0 ? (
-        <div className="flex flex-col">
-          {digest.rows.map((row) => <DigestRow key={row.key} row={row} acc={acc} />)}
-        </div>
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+              {picked ? `${picked.name} · ${digest.rows.length} ${digest.rows.length === 1 ? "item" : "items"}` : `Your players · ${digest.rows.length}`}
+            </span>
+            {chip ? <ToneBadge label={chip} color="var(--color-accent)" size="xs" testId="news-headline-chip" /> : null}
+          </div>
+          <div className="flex flex-col">
+            {digest.rows.map((row) => <DigestRow key={row.key} row={row} acc={acc} />)}
+          </div>
+        </>
       ) : (
-        <div className="flex flex-col gap-2" data-testid="news-roster-empty">
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            {reasonNote ?? (hasRoster ? "No news on your players for this filter." : "No news on your players right now.")}
-          </p>
-        </div>
+        // One muted line, not a heading + paragraph (UI audit batch H): the league feed below is the first module.
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }} data-testid="news-roster-empty">
+          {reasonNote ?? (hasRoster ? "No news on your players for this filter." : "No news on your players right now.")}
+        </p>
       )}
       {digest.league.length > 0 ? (
         <CompactModule

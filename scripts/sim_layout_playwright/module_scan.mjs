@@ -9,6 +9,7 @@
 //   PW_CORE=.../playwright-core/index.mjs BASE=http://localhost:3197 OUT=/tmp/module-scan [WIDTHS=360,390] node scripts/sim_layout_playwright/module_scan.mjs
 import fs from "fs";
 import { GUARD } from "./guard_checks.mjs";
+import { createMock } from "./simmock.mjs";
 
 const pw = await import(process.env.PW_CORE || "playwright-core");
 // WebKit by default (coridian_ sees these pages in iPhone Safari); BROWSER=chromium [CHROME=path] for Chromium.
@@ -28,7 +29,7 @@ const NAV = process.env.NAV || "";
 // Pages whose first row legitimately sits under a control stack are ratcheted at their current value (the number may go down, never up); fixture-only or
 // banner pages are exempt.
 const TOP_BUDGET = 110;
-const TOP_BUDGET_OVERRIDES = { players: 210, "players-prospects": 280, "news-nfl": 300, "news-league": 230, "news-league-history": 165, "news-league-storylines": 165, "news-league-roundup": 165, recaps: 220, games: 150 };
+const TOP_BUDGET_OVERRIDES = {}; // batch H: every override is gone, all pages pass the 110px budget
 const TOP_EXEMPT = new Set(["sample-league", "landing", "commissioner", "commissioner-missing", "trade-analyzer", "trade-analyzer-missing"]);
 // OVERFLOW=1: every route (incl. the overflow-only ones), failing ONLY on a sideways-scrolling document and naming the elements that cause it.
 const OVERFLOW_MODE = process.env.OVERFLOW === "1";
@@ -172,6 +173,8 @@ const ROUTES = [
   { name: "draft-center", path: `/draft-center/${LID}?name=Donk`, family: "none" },
   { name: "sample-league", path: `/sample-league`, family: "none", maxTablists: 2, noAuth: true },
   // Overflow-only routes (OVERFLOW=1, scripts/sim_layout_playwright/route_overflow in CI): every other main route, checked for sideways scroll only.
+  // Fantasy Sim (batch H): Sim Home, the game shell with the simmock API after "Open game". Team / League / Players sit behind the bottom pill and are not reachable by the scan yet.
+  { name: "sim-home", path: `/gm-game`, overflowOnly: true, sim: "" },
   { name: "news-nfl", path: `/news?league=${LID}&name=Donk`, overflowOnly: true },
   { name: "news-league", path: `/news?tab=league&league=${LID}&name=Donk`, overflowOnly: true },
   { name: "news-league-history", path: `/news?tab=league&recaps=history&league=${LID}&name=Donk`, overflowOnly: true },
@@ -221,7 +224,7 @@ const OFFENDERS = () => {
 // piece of page content starts. Walks into layout wrappers (no background/border/shadow) until it reaches a card, a control row or a heading.
 const FIRST_MODULE = () => {
   const vis = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 4 && r.height > 4 && cs.display !== "none" && cs.visibility !== "hidden" && cs.position !== "absolute" && !el.classList.contains("sr-only"); };
-  const sticky = [...document.querySelectorAll(".shell-header, .pill-row-glass, body > header")].filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top < 140; });
+  const sticky = [...document.querySelectorAll(".shell-header, .pill-row-glass, body > header, [data-testid=sim-game-header]")].filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top < 140; });
   const navBottom = Math.max(0, ...sticky.map((el) => el.getBoundingClientRect().bottom));
   const isChrome = (el) => el.matches(".pill-row-glass, [data-testid=page-tab-bar]") || Boolean(el.querySelector(":scope > .pill-row-glass"));
   const isCard = (el) => { const cs = getComputedStyle(el); const bg = cs.backgroundColor; return (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") || cs.boxShadow !== "none" || parseFloat(cs.borderTopWidth) > 0 || cs.backdropFilter !== "none" && cs.backdropFilter !== undefined || el.matches("button,input,select,h1,h2,h3,p,[role=tablist]"); };
@@ -236,7 +239,7 @@ const FIRST_MODULE = () => {
   }
   // First card/row: the first visible surface (shadow, backdrop blur or a list row) at least 48px tall that is not a control or the tab strip; what the owner means by "the first module".
   const cardEl = [...document.querySelectorAll("main *")].find((el) => {
-    if (!vis(el) || isChrome(el) || el.closest(".pill-row-glass") || el.matches("button,input,select,a,[role=tab],[role=tablist]")) return false;
+    if (!vis(el) || isChrome(el) || el.closest(".pill-row-glass, [data-testid=sim-game-header]") || el.matches("button,input,select,a,[role=tab],[role=tablist]")) return false;
     const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
     return r.height >= 48 && r.width >= 200 && (cs.boxShadow !== "none" || (cs.backdropFilter && cs.backdropFilter !== "none") || el.matches("[data-testid$=-row],[data-testid=player-accordion-row]"));
   });
@@ -351,6 +354,8 @@ const CENSUS = () => {
   return { radii, sizes, weights, btnH, headings, controls, small, gold: gold.slice(0, 40), goldCount: gold.length };
 };
 
+let SIM_ON = false;
+const SIM_MOCK = createMock({ status: "in_season", week: 4 });
 const browser = await engine.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 const results = [];
 for (const w of WIDTHS) {
@@ -361,6 +366,11 @@ for (const w of WIDTHS) {
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
     if (u.hostname === "localhost" && u.port === "8000") {
       if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+      if (SIM_ON) {
+        let json = null; try { json = route.request().postData() ? JSON.parse(route.request().postData()) : null; } catch {}
+        const res = SIM_MOCK(route.request().method(), u.pathname, Object.fromEntries(u.searchParams.entries()), json);
+        if (res) return route.fulfill({ status: res.status, contentType: "application/json", body: JSON.stringify(res.body), headers: cors });
+      }
       if (u.pathname === "/v1/news") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, items: NEWS_GENERAL }), headers: cors });
       if (/\/alerts$/.test(u.pathname)) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, reason: "", items: NEWS_ALERTS }), headers: cors });
       const m = u.pathname.match(/\/v1\/leagues\/[^/]+\/(games\/season-sim|commissioner\/integrity)$/) || u.pathname.match(/\/v1\/leagues\/[^/]+\/([a-z-]+)$/) || u.pathname.match(/\/v1\/players\/(value-signals)$/) || (u.pathname.endsWith("/trade-ideas/multi") ? [0, "multi"] : null);
@@ -376,10 +386,16 @@ for (const w of WIDTHS) {
     if (process.env.ONLY && !process.env.ONLY.split(",").includes(r.name)) continue;
     if (OVERFLOW_MODE ? false : r.overflowOnly) continue;
     MISSING = Boolean(r.missing);
+    SIM_ON = r.sim !== undefined;
     try {
       await page.goto(`${BASE}${r.path}`, { waitUntil: "domcontentloaded", timeout: 90000 });
       await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" }).catch(() => {});
       await sleep(r.name === "today" && w === WIDTHS[0] ? 12000 : 5000);
+      if (r.sim !== undefined) {
+        await page.getByRole("button", { name: "Open game", exact: false }).first().click({ timeout: 8000 }).catch(() => {});
+        await sleep(1500);
+        if (r.sim) { await page.getByRole("tab", { name: r.sim, exact: false }).first().click({ timeout: 8000 }).catch(() => {}); await sleep(1200); }
+      }
       // The app shell / Sim root carry an overflow-x: clip backstop; measure without it so a real overflow is still caught (and named).
       if (OVERFLOW_MODE) await page.addStyleTag({ content: ".app-shell,.sim-root{overflow-x:visible!important}" }).catch(() => {});
       if (LARGE) await page.addStyleTag({ content: "html{font-size:125%!important}" }).catch(() => {});

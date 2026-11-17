@@ -6,7 +6,8 @@ import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
-import { PillRow, TabStack } from "@/components/PillRow";
+import { ViewSelect } from "@/components/ui/ViewSelect";
+import { PageControl } from "@/components/ui/PageControls";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SkeletonBlock } from "@/components/Skeleton";
@@ -84,15 +85,15 @@ export function LeagueRoundupTab({ leagueId, initialWeek }: { leagueId: string; 
   return (
     <div className="flex flex-col gap-4" style={{ opacity: loading ? 0.6 : 1 }}>
       {weeks.length > 1 ? (
-        <TabStack>
-          <PillRow
-            ariaLabel="Roundup week"
-            variant="scroll"
-            options={weeks.map((w) => ({ label: `Wk ${w}`, value: String(w) }))}
-            active={String(selected)}
-            onSelect={(value) => setWeek(Number(value))}
+        <PageControl>
+          <ViewSelect
+            label="Roundup week"
+            className="min-w-0 flex-1"
+            value={String(selected)}
+            options={weeks.map((w) => ({ value: String(w), label: `Wk ${w}` }))}
+            onChange={(value) => setWeek(Number(value))}
           />
-        </TabStack>
+        </PageControl>
       ) : null}
       <RoundupSummary roundup={data.roundup} />
       <SwapsSection roundup={data.roundup} isPremium={data.is_premium} />

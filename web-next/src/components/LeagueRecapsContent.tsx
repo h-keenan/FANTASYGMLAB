@@ -8,7 +8,8 @@ import type {
   RecapResponse,
   StorylinesResponse,
 } from "@/lib/api";
-import { PillRow, } from "@/components/PillRow";
+import { ViewSelect } from "@/components/ui/ViewSelect";
+import { PageControl } from "@/components/ui/PageControls";
 import { RecapWeekView } from "@/components/RecapWeekView";
 
 
@@ -143,9 +144,10 @@ export function LeagueRecapsContent({
         </header>
       )}
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2" data-testid="recaps-controls">
-          <PillRow ariaLabel="League memory view" variant="scroll" options={MEMORY_VIEWS.map((v) => ({ value: v, label: v }))} active={view} onSelect={(value) => setView(value as MemoryView)} />
-        </div>
+        {/* The recap view is a compact select in the page's one control row (docs/ui-patterns.md, "One tab row, one control row"). */}
+        <PageControl>
+          <ViewSelect label="League memory view" className="min-w-0 flex-1" value={view} options={MEMORY_VIEWS.map((v) => ({ value: v, label: v }))} onChange={(value) => setView(value as MemoryView)} />
+        </PageControl>
         {body}
       </div>
     </Shell>

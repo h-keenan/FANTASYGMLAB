@@ -984,6 +984,8 @@ are a `ui/ViewSelect` (a 44px native select) in ONE compact control row together
 All/Add/Stash/Watch select, or search + Filters), never a second tab row. App twin: `FilterDropdownButton` labelled "View"
 (+ "Show" / `FilterSheet`) in a `controlRow`. Pages with no family strip (Draft Center, GM Plan) keep their one `PillRow`.
 
+**One control row (UI audit batch H, 2026-11-17).** `ui/PageControls.tsx` (`PageControlsRow` + `PageControl`, a portal into the row's slot) puts a page's view switch and filters on ONE 44px line, then `--page-top-gap` to the first module: Players = view select (Players / Prospects) + search + one Filters button (position, age, status, health, roster, sort, stat view all live in the sheet); Prospects = view select + Show + Scouting view selects; News = NFL / My League select + (NFL) News type filter or (My League) recap view + week selects; Games = view select, with the odds sentence as a note under the card instead of a heading block. The News roster PFP strip is a collapsed compact module. Pages render `<PageTitle>` directly (no empty `<header>` that adds a 16px gap). `module_scan.mjs` budgets are 110px at 390px; Sim Home is now scanned too (Sim Team / League / Players need the bottom-pill navigation and are not reachable by the scan yet).
+
 ## Page tab families and glass chrome (2026-11)
 
 Related pages are tabs of one page family (`lib/pageFamilies.ts`: Trades, Team, League), rendered by `PageTabBar` over

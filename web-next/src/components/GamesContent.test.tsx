@@ -94,7 +94,7 @@ describe("GamesContent season sim", () => {
   it("shows my odds and the league table", async () => {
     vi.mocked(api.getGamesSeasonSim).mockResolvedValue(sim());
     render(<GamesContent leagueId="9" leagueName="Test League" />);
-    expect(await screen.findByText("Your odds")).toBeInTheDocument();
+    expect(await screen.findByTestId("games-odds-note")).toBeInTheDocument();
     expect(screen.getAllByText("62%").length).toBeGreaterThan(0);
     expandAll();
     expect(screen.getAllByText("Bravo").length).toBeGreaterThan(0);
@@ -122,7 +122,7 @@ describe("GamesContent season sim", () => {
       factors: [{ label: "Lineup strength", detail: "+20 starter value" }],
     });
     render(<GamesContent leagueId="9" leagueName="Test League" />);
-    await screen.findByText("Your odds");
+    await screen.findByTestId("games-odds-note");
     expandAll();
     fireEvent.click(await screen.findByRole("button", { name: "Drop" }));
     fireEvent.click(screen.getByRole("button", { name: "Run what-if" }));
@@ -141,7 +141,7 @@ describe("GamesContent season sim", () => {
       ],
     } as never);
     render(<GamesContent leagueId="9" leagueName="Test League" />);
-    await screen.findByText("Your odds");
+    await screen.findByTestId("games-odds-note");
     expandAll();
     fireEvent.change(await screen.findByLabelText("Search players to add"), { target: { value: "beck" } });
     expect(await screen.findByText("Carson Beck")).toBeInTheDocument();

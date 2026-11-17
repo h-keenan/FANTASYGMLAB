@@ -24,7 +24,8 @@ import {
   playersPositionOptions,
 } from "@/lib/idpPresentation";
 import { PickRow, draftPickRowProps } from "@/components/PickRow";
-import { PillRow } from "@/components/PillRow";
+import { ViewSelect } from "@/components/ui/ViewSelect";
+import { PageControlsRow } from "@/components/ui/PageControls";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { picksSummaryParts } from "@/lib/playersModules";
 import { FilterSheet } from "@/components/ui/FilterSheet";
@@ -298,17 +299,19 @@ export function PlayersContent({
   // facets, committed together with Apply.
   const filterGroups = useMemo<FilterGroup[]>(
     () => [
-      { id: "position", label: "Position", anyValue: "ALL", hidden: true, options: positionOptions.map((pos) => ({ value: pos, label: pos === "ALL" ? "Any" : pos })) },
+      { id: "position", label: "Position", anyValue: "ALL", options: positionOptions.map((pos) => ({ value: pos, label: pos === "ALL" ? "Any" : pos })) },
       { id: "age", label: "Age", anyValue: "ALL", options: PLAYERS_AGE_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any age" : option })) },
       { id: "status", label: "Status", anyValue: "ALL", options: PLAYERS_STATUS_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any status" : option })) },
       { id: "health", label: "Health", anyValue: "ALL", options: PLAYERS_AVAILABILITY_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any health" : option })) },
       { id: "roster", label: "Roster", anyValue: "ALL", hidden: !rosterOwnershipKnown, options: PLAYERS_ROSTER_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any roster status" : option })) },
+      { id: "sort", label: "Sort by", anyValue: VALUE_SORT_KEY, options: sortOptions.map((option) => ({ value: option.key, label: option.label })) },
+      { id: "sortMode", label: "Stat view", anyValue: "raw", hidden: !activeSortOption.supportsPercentile, options: [{ value: "raw", label: "Raw" }, { value: "percentile", label: "Percentile" }] },
     ],
-    [positionOptions, rosterOwnershipKnown],
+    [positionOptions, rosterOwnershipKnown, sortOptions, activeSortOption.supportsPercentile],
   );
   const filterValues = useMemo(
-    () => valuesFromSingles(filterGroups, { position, age: ageFilter, status: statusFilter, health: availabilityFilter, roster: rosterFilter }),
-    [filterGroups, position, ageFilter, statusFilter, availabilityFilter, rosterFilter],
+    () => valuesFromSingles(filterGroups, { position, age: ageFilter, status: statusFilter, health: availabilityFilter, roster: rosterFilter, sort: activeSortOption.key, sortMode }),
+    [filterGroups, position, ageFilter, statusFilter, availabilityFilter, rosterFilter, activeSortOption.key, sortMode],
   );
   // How many players a draft selection would show, so Apply can say "Show 24 results".
   const filterResultCount = (draft: FilterValues) => {
@@ -329,94 +332,63 @@ export function PlayersContent({
   return (
     <main className="page-shell">
       {leagueId ? <PageTabBar family="team" active="players" leagueId={leagueId} leagueName={leagueName} /> : null}
-      <header className="flex flex-col gap-1">
-        <PageTitle page="Players" leagueName={leagueName} />
-      </header>
+      <PageTitle page="Players" leagueName={leagueName} />
 
-      {/* College Scouting moved here (2026-11-16 nav consolidation). The tab hides when the college-football
-          preference is off, unless a link opened it directly. */}
-      {showProspectsTab ? (
-        <PillRow
-          ariaLabel="Players section"
-          options={[
-            { label: "Players", value: "players", glyph: "players" },
-            { label: "Prospects", value: "prospects", glyph: "scouting" },
-          ]}
-          active={tab}
-          onSelect={(value) => {
-            const next = parsePlayersTab(value);
-            setTab(next);
-            onTabChange?.(next);
-          }}
-        />
-      ) : null}
+      {/* One control row (UI audit batch H): the Players / Prospects switch (College Scouting moved here in the 2026-11-16 nav
+          consolidation; hidden when the college-football preference is off, unless a link opened it) plus, on Players, search and
+          the one Filters button (position, age, status, health, roster, sort). The first player row starts <= 110px under the nav. */}
+      <PageControlsRow testId="players-controls">
+        {showProspectsTab ? (
+          <ViewSelect
+            label="Players section"
+            className="shrink-0"
+            value={tab}
+            options={[
+              { value: "players", label: "Players" },
+              { value: "prospects", label: "Prospects" },
+            ]}
+            onChange={(value) => {
+              const next = parsePlayersTab(value);
+              setTab(next);
+              onTabChange?.(next);
+            }}
+          />
+        ) : null}
+        {tab === "players" ? (
+          <>
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search"
+              aria-label="Search players"
+              className="filter-input min-w-0 flex-1 px-3 py-2 text-sm"
+            />
+            <FilterSheet
+              groups={filterGroups}
+              values={filterValues}
+              resultCount={filterResultCount}
+              showChips={false}
+              testId="players-filters"
+              onApply={(next) => {
+                setPosition(singleValue(filterGroups[0], next));
+                setAgeFilter(singleValue(filterGroups[1], next) as PlayersAgeFilter);
+                setStatusFilter(singleValue(filterGroups[2], next) as PlayersStatusFilter);
+                setAvailabilityFilter(singleValue(filterGroups[3], next) as PlayersAvailabilityFilter);
+                setRosterFilter(singleValue(filterGroups[4], next) as PlayersRosterFilter);
+                // Madden-style stat sort (Revision 20): Value/OVR always, plus the position-relevant raw stats of the current pool.
+                setSortKey(singleValue(filterGroups[5], next));
+                setSortMode(singleValue(filterGroups[6], next) as PlayersSortMode);
+              }}
+            />
+          </>
+        ) : null}
+      </PageControlsRow>
 
       {tab === "prospects" ? (
         <ProspectsTab leagueId={leagueId} lens={lens} />
       ) : (
       <>
-          {/* Batch B: two control rows instead of four. Row 1 = search + Filters; row 2 = position pills (one tap, applied at once) + the
-              Sort select. Filters keeps everything else (age, status, health, roster). The Raw/Percentile toggle only matters for a real
-              stat column (hidden for Value/OVR) and appears as a third row only then. */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-start gap-2">
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search players"
-                className="filter-input min-w-0 flex-1 px-3 py-2 text-sm"
-              />
-              <FilterSheet
-                groups={filterGroups}
-                values={filterValues}
-                resultCount={filterResultCount}
-                onApply={(next) => {
-                  setPosition(singleValue(filterGroups[0], next));
-                  setAgeFilter(singleValue(filterGroups[1], next) as PlayersAgeFilter);
-                  setStatusFilter(singleValue(filterGroups[2], next) as PlayersStatusFilter);
-                  setAvailabilityFilter(singleValue(filterGroups[3], next) as PlayersAvailabilityFilter);
-                  setRosterFilter(singleValue(filterGroups[4], next) as PlayersRosterFilter);
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <PillRow
-                  variant="scroll"
-                  ariaLabel="Position"
-                  options={positionOptions.map((pos) => ({ label: pos === "ALL" ? "All" : pos, value: pos }))}
-                  active={position}
-                  onSelect={setPosition}
-                />
-              </div>
-              {/* Madden-style stat sort (Revision 20): Value/OVR always, plus the position-relevant raw stats of the current pool. */}
-              <select
-                aria-label="Sort by"
-                value={activeSortOption.key}
-                onChange={(event) => setSortKey(event.target.value)}
-                className="filter-select shrink-0 px-3 py-2 text-sm"
-                style={{ maxWidth: "8.5rem" }}
-              >
-                {sortOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {activeSortOption.supportsPercentile ? (
-              <PillRow
-                options={[
-                  { label: "Raw", value: "raw" },
-                  { label: "Percentile", value: "percentile" },
-                ]}
-                active={sortMode}
-                onSelect={(value) => setSortMode(value as PlayersSortMode)}
-              />
-            ) : null}
-          </div>
-
           {visible.length === 0 ? (
             <EmptyState
               title="No players match"
