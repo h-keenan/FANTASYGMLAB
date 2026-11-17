@@ -14,7 +14,7 @@ import PlayerAccordionRow, { usePlayerAccordion } from './PlayerAccordionRow';
 import { PresenceSwap } from './Presence';
 import RoundupPanel from './RoundupPanel';
 import RecapSharePreviewModal from './RecapSharePreviewModal';
-import SegmentedTabBar from './SegmentedTabBar';
+import PageControlRow, { ViewSelect, WeekSelect } from './PageControlRow';
 import { SkeletonModule, SkeletonPage, SkeletonRegion, SkeletonStatusHeader } from './Skeleton';
 import StatusHeader from './StatusHeader';
 import TeamAvatar from './TeamAvatar';
@@ -31,6 +31,9 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
+type RecapView = 'Recaps' | 'Roundup';
+const RECAP_VIEWS: readonly RecapView[] = ['Recaps', 'Roundup'];
+
 export type RosterMap = Record<string, { playerIds: string[]; teamName: string; avatarId: string; ownerName: string }>;
 
 /**
@@ -45,11 +48,14 @@ export default function LeagueRecapPanel({
   leagueName,
   initialTab,
   week: requestedRoundupWeek,
+  leading = null,
 }: {
   leagueId: string;
   leagueName: string;
   initialTab?: 'recap' | 'roundup';
   week?: number;
+  /** The page's section select (NFL / My League): first in the one control row. */
+  leading?: React.ReactNode;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const orbClearance = useOrbClearance();
@@ -117,37 +123,49 @@ export default function LeagueRecapPanel({
 
   const openTeam = (rosterId: string, fallbackName: string) => setProfile({ rosterId, teamName: rosterMap[rosterId]?.teamName || fallbackName });
 
-  const viewBar = (
-    <View>
-      <View style={styles.tabBarRow}>
-        <SegmentedTabBar<'recap' | 'roundup'>
-          options={[
-            { key: 'recap', label: 'Recap' },
-            { key: 'roundup', label: 'Roundup' },
-          ]}
-          active={tab}
-          onChange={setTab}
-        />
-      </View>
-    </View>
+  const viewSelect = (
+    <ViewSelect<RecapView>
+      options={RECAP_VIEWS}
+      value={tab === 'roundup' ? 'Roundup' : 'Recaps'}
+      onChange={(label) => setTab(label === 'Roundup' ? 'roundup' : 'recap')}
+      testID="recap-view-select"
+    />
+  );
+  const controlRow = (weekSelect: React.ReactNode = null) => (
+    <PageControlRow testID="recap-controls">
+      {leading}
+      {viewSelect}
+      {weekSelect}
+    </PageControlRow>
   );
 
   if (tab === 'roundup') {
     return (
       <View style={styles.root}>
-        {viewBar}
-        <RoundupPanel leagueId={leagueId} leagueName={leagueName} initialWeek={requestedRoundupWeek} bottomInset={orbClearance} />
+        <RoundupPanel
+          leagueId={leagueId}
+          leagueName={leagueName}
+          initialWeek={requestedRoundupWeek}
+          bottomInset={orbClearance}
+          leading={<>{leading}{viewSelect}</>}
+        />
       </View>
     );
   }
 
   if (loading && !recap) {
-    return <SkeletonPage label="League Recaps" layout="detail" style={{ paddingHorizontal: 0 }} />;
+    return (
+      <View style={styles.root}>
+        {controlRow()}
+        <SkeletonPage label="League Recaps" layout="detail" style={{ paddingHorizontal: 0 }} />
+      </View>
+    );
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
+      <View style={styles.root}>
+        {controlRow()}
         <ErrorState title="Couldn't load the recap" message={error} onRetry={() => void recapQuery.refetch()} />
       </View>
     );
@@ -155,17 +173,11 @@ export default function LeagueRecapPanel({
 
   const chips = recapWeekChips(maxCompletedWeek);
   const activeWeek = String(selectedWeek ?? recap?.week ?? maxCompletedWeek);
-  const weekStrip =
-    chips.length > 1 ? (
-      <View style={styles.weekRow}>
-        <SegmentedTabBar<string> options={chips.map((c) => ({ key: c.value, label: c.label }))} active={activeWeek} scrollable snap onChange={(key) => setSelectedWeek(Number(key))} />
-      </View>
-    ) : null;
+  const weekStrip = controlRow(<WeekSelect weeks={chips.map((c) => Number(c.value))} value={Number(activeWeek)} onChange={setSelectedWeek} />);
 
   if (notReady || !recap) {
     return (
       <View style={styles.root}>
-        {viewBar}
         {weekStrip}
         <EmptyState icon="newspaper-outline" title="Recap not ready yet" subtitle="Check back after this week's matchups finish scoring." />
       </View>
@@ -174,7 +186,6 @@ export default function LeagueRecapPanel({
 
   return (
     <View style={styles.root}>
-      {viewBar}
       {weekStrip}
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         {loading ? (
@@ -507,11 +518,8 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1, backgroundColor: 'transparent' },
-    content: { paddingTop: spacing.md, gap: spacing.md },
+    content: { gap: spacing.md },
     stack: { gap: spacing.sm },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-    tabBarRow: { paddingTop: spacing.sm },
-    weekRow: { paddingTop: spacing.sm },
     muted: { fontSize: 14, color: colors.textTertiary },
     leaderStrip: { backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, minHeight: 44 },
     teamRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },

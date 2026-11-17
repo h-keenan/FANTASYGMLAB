@@ -6,7 +6,7 @@ import SegmentedTabBar from './SegmentedTabBar';
 import { pageTabFamily, activePageTab, type PageTabFamilyKey } from '../lib/pageFamilies';
 import { familyRoute, familyTabOptions } from '../lib/pageFamilyRoutes';
 import { useShowProTags } from '../lib/useShowProTags';
-import { spacing } from '../theme';
+import { PAGE_TOP_GAP, spacing } from '../theme';
 
 /**
  * The app's twin of web's PageTabBar: the ONE tab row of a page family (Trades / Team / League), the same tabs, labels
@@ -57,6 +57,6 @@ export default function PageFamilyTabs({
 }
 
 const styles = StyleSheet.create({
-  inline: { paddingBottom: spacing.sm },
-  wrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  inline: { paddingBottom: PAGE_TOP_GAP },
+  wrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: PAGE_TOP_GAP },
 });
