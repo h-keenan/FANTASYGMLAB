@@ -29,7 +29,7 @@ export function TrackRecordView({ record, plan }: { record: TrackRecordResponse;
     key: `b${index}`,
     text,
     strong: index === 0,
-    tone: index > 0 && text.endsWith("net") ? (basic.net_points_total > 0 ? ("success" as const) : basic.net_points_total < 0 ? ("danger" as const) : undefined) : undefined,
+    tone: index > 0 && text.endsWith("net") ? (basic.net_points_total > 0 ? ("success" as const) : undefined) /* a net loss is muted, never red */ : undefined,
   }));
   const showLock = !advanced && plan === "free";
   const levels: TrackLevel[] = ["high", "medium", "low"];

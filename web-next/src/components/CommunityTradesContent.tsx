@@ -98,7 +98,7 @@ function CommunityTradeCard({
     value: item.value,
   });
 
-  const accent = verdictToneColorVar(item.verdict);
+  const accent = "var(--color-text-secondary)"; // one calm stripe: the verdict lives on a chip, never red
   const netPct = item.value?.net_delta_pct ?? null;
 
   return (

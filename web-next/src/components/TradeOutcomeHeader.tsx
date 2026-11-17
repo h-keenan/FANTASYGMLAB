@@ -53,10 +53,10 @@ export function AnonymousTeamPair({ color }: { color: string }) {
   );
 }
 
-/** Centered bar: fills right (success) for a positive net %, left (danger) for negative. */
+/** Centered bar: fills right (success) for a positive net %, left (muted, never red) for negative. */
 export function NetEdgeBar({ netPct, label }: { netPct: number; label?: ReactNode }) {
   const clamped = Math.max(-50, Math.min(50, netPct));
-  const color = netPct > 0 ? "var(--color-success)" : netPct < 0 ? "var(--color-danger)" : "var(--color-text-muted)";
+  const color = netPct > 0 ? "var(--color-success)" : netPct < 0 ? "var(--color-text-secondary)" : "var(--color-text-muted)";
   return (
     <div className="flex flex-col gap-1">
       <div

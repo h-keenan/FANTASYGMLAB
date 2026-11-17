@@ -25,5 +25,8 @@ describe("verdict colour guard", () => {
     expect(run('const gainColor = gain > 0 ? colors.success : gain < 0 ? colors.danger : colors.textSecondary;')).toHaveLength(1);
     expect(run('const accent = injuryDisplay ? "var(--color-danger)" : "var(--color-accent)";')).toHaveLength(1);
     expect(run("tone: bandCompactTone(deltaBand(input.gain)),")).toHaveLength(0);
+    // Trade History "-12 pts" in red and its red verdict stripe (2026-11-17).
+    expect(run('{ key: "pts", tone: netPts > 0 ? "success" : netPts < 0 ? "danger" : undefined }')).toHaveLength(1);
+    expect(run("const accent = verdict ? verdictToneColorVar(verdict) : outcomeToneColorVar(o);")).toHaveLength(1);
   });
 });

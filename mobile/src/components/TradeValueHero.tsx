@@ -26,7 +26,7 @@ const SIZES: Record<HeroSize, { value: number; label: number; tracking: number }
 /** Same green/red/neutral mapping TradeShareCard uses for its hero number,
  * so the inline treatment and the shared PNG agree on what a gain looks like. */
 export function tradeValueColor(delta: number, colors: ThemeColors): string {
-  return delta > 0 ? colors.successBright : delta < 0 ? colors.danger : colors.textSecondary;
+  return delta > 0 ? colors.successBright : colors.textSecondary;
 }
 
 export function tradeValueLabel(delta: number): string {
