@@ -5,7 +5,7 @@ import { env } from "./env";
 import type { TradeCaution } from "./tradeCautions";
 import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } from "@/lib/verdictTrust";
 import { supabase } from "./supabase";
-import { simDynastyPaths } from "./simGame";
+import { simDynastyPaths } from "./simPaths";
 import type * as SimGameTypes from "./simGame";
 import type { SimForecastResponse } from "./simPresentation";
 import type { CandidateCompare, MoveRange } from "./startSitRange";

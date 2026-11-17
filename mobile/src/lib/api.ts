@@ -6,7 +6,7 @@ import type { VerdictAssumptions, VerdictFeedbackReason } from './verdictTrust';
 import type { TradeCaution } from './tradeCautions';
 
 import { supabase } from './supabase';
-import { simDynastyPaths } from './simGame';
+import { simDynastyPaths } from './simPaths';
 import type * as SimGameTypes from './simGame';
 import type { SimForecastResponse } from './simPresentation';
 import type { CandidateCompare, MoveRange } from './startSitRange';
