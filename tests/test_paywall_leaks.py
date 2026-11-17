@@ -8,6 +8,7 @@ allowance. Redis is conftest's autouse fakeredis, fresh per test.
 from __future__ import annotations
 
 import contextlib
+import json
 from unittest.mock import patch
 
 import pytest
@@ -399,3 +400,35 @@ def test_college_scouting_is_pro_only(pro_feature_client, monkeypatch, entitleme
         assert follow["ok"] is False and follow["reason"] == "premium_required"
         cat.assert_not_called()
         upsert.assert_not_called()
+
+
+@pytest.mark.parametrize("entitlement,allowed", _PRO_FEATURE_ENTITLEMENTS)
+def test_prospect_profile_basics_free_advanced_pro(pro_feature_client, monkeypatch, entitlement, allowed):
+    """The prospect detail sheet: basics for everyone, advanced metrics (PPA / usage) withheld server-side for Free."""
+
+    _set_profile(monkeypatch, entitlement)
+    prospect = {"id": "p1", "name": "Real Prospect", "position": "QB", "school": "State", "draft_year": 2027}
+    stats = {
+        "seasons": [{"season": 2026, "team": "State", "passing": {"yds": 3000, "td": 25}}],
+        "advanced": {"season": 2026, "ppa": {"avg": {"all": 0.4}}, "usage": {"overall": 0.3}},
+    }
+    with (
+        patch("modules.college_scouting.fetch_prospect_row", return_value=prospect),
+        patch("modules.college_scouting.fetch_prospect_stats_row", return_value=stats),
+        patch("modules.rookie_adp.find_prospect_adp", return_value=None),
+    ):
+        body = pro_feature_client.get("/v1/scouting/prospects/p1/profile", headers=AUTH).json()
+    assert body["ok"] is True and body["seasons"][0]["passing"]["yds"] == 3000  # basics always
+    assert body["adp"] is None
+    if allowed:
+        assert body["advanced"]["usage"] == {"overall": 0.3} and body["advanced_locked"] is False
+    else:
+        assert body["advanced"] is None and body["advanced_locked"] is True
+        assert '"ppa"' not in json.dumps(body)
+
+
+def test_prospect_profile_unknown_id_and_auth(pro_feature_client, monkeypatch):
+    _set_profile(monkeypatch, "premium")
+    with patch("modules.college_scouting.fetch_prospect_row", return_value=None):
+        assert pro_feature_client.get("/v1/scouting/prospects/nope/profile", headers=AUTH).json() == {"ok": False, "reason": "not_found"}
+    assert pro_feature_client.get("/v1/scouting/prospects/p1/profile").status_code == 401

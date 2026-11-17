@@ -401,3 +401,58 @@ def test_get_cached_crowd_class_strength_by_year_reuses_the_prospects_and_report
     cs.get_cached_crowd_class_strength_by_year({}, "token", now=3000.0)
     assert calls["n"] == 2  # unchanged — reused both warm caches
     cs._reset_cache_for_tests()
+
+
+# ---------------------------------------------------------------------------
+# Prospect detail sheet (stats + profile)
+# ---------------------------------------------------------------------------
+_STATS_ROW = {
+    "prospect_id": "p1",
+    "class_year": 3,
+    "height_in": 76,
+    "weight_lb": 220,
+    "hometown": "New Orleans, LA",
+    "school_logo_url": "https://example.test/tx.png",
+    "seasons": [
+        {"season": 2025, "team": "Texas", "passing": {"yds": 2000, "td": 15, "int": 5}},
+        {"season": 2026, "team": "Texas", "passing": {"yds": 3000, "td": 25, "int": 5}, "rushing": {"yds": 200, "td": 3}},
+    ],
+    "advanced": {"season": 2026, "ppa": {"avg": {"all": 0.4}}, "usage": {"overall": 0.3}},
+    "game_log": {"season": 2026, "games": [{"week": 1, "opponent": "Ohio State", "passing": {"yds": 250, "td": 2}}, {"week": 2}]},
+    "recruiting": {"stars": 5, "national_rank": 1},
+    "source": "College Football Data API (...)",
+    "source_url": "https://collegefootballdata.com/player/1",
+    "ingested_at": "2026-11-16T09:00:00+00:00",
+}
+_PROSPECT = {"id": "p1", "name": "Arch Manning", "position": "QB", "school": "Texas", "draft_year": 2027}
+
+
+def test_college_fantasy_points_is_derived_from_cfbd_lines_only():
+    assert cs.college_fantasy_points({"passing": {"yds": 250, "td": 2, "int": 1}}) == 16.0  # 10 + 8 - 2
+    assert cs.college_fantasy_points({"receiving": {"rec": 7, "yds": 100, "td": 1}}) == 23.0
+    assert cs.college_fantasy_points({}) is None and cs.college_fantasy_points(None) is None
+
+
+def test_profile_free_gets_basics_and_a_lock_not_advanced():
+    body = cs.build_prospect_profile(_PROSPECT, _STATS_ROW, is_pro=False)
+    assert [s["season"] for s in body["seasons"]] == [2026, 2025]  # newest first
+    assert body["seasons"][0]["fantasy_points"] == 248.0  # 120 + 100 - 10 passing, 20 + 18 rushing
+    assert body["advanced"] is None and body["advanced_locked"] is True and body["advanced_available"] is True
+    assert body["weekly"]["games"][0] == {"week": 1, "opponent": "Ohio State", "passing": {"yds": 250, "td": 2}, "fantasy_points": 18.0}
+    assert body["weekly"]["games"][1]["fantasy_points"] is None  # no stat line: no invented zero
+    assert body["bio"]["hometown"] == "New Orleans, LA" and body["recruiting"]["stars"] == 5
+    assert body["source"]["name"] == "College Football Data" and body["source"]["as_of"] == "2026-11-16"
+
+
+def test_profile_pro_gets_advanced_and_no_row_is_an_honest_empty():
+    body = cs.build_prospect_profile(_PROSPECT, _STATS_ROW, is_pro=True)
+    assert body["advanced"]["usage"] == {"overall": 0.3} and body["advanced_locked"] is False
+    empty = cs.build_prospect_profile(_PROSPECT, None, is_pro=True)
+    assert empty["stats_available"] is False and empty["seasons"] == [] and empty["weekly"] is None
+    assert empty["advanced"] is None and empty["advanced_locked"] is False and empty["recruiting"] is None
+
+
+def test_profile_hand_off_fields_for_a_drafted_prospect():
+    drafted = {**_PROSPECT, "drafted": True, "nfl_team": "NYG", "draft_round": 1, "draft_pick": 3, "sleeper_player_id": "12345"}
+    p = cs.build_prospect_profile(drafted, None, is_pro=False)["prospect"]
+    assert p["drafted"] is True and p["sleeper_player_id"] == "12345" and p["nfl_team"] == "NYG"

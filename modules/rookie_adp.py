@@ -405,6 +405,70 @@ def fetch_latest(fmt: str, *, config: AdpConfig | None = None) -> dict[str, Any]
     }
 
 
+def latest_rows(fmt: str, *, config: AdpConfig | None = None) -> dict[str, Any]:
+    """{"as_of", "total_drafts", "rows": [raw newest-snapshot rows incl. unmapped ones]} or {}.
+    Unlike ``fetch_latest`` this keeps rows with no Sleeper id (college prospects, not yet NFL players)."""
+
+    config = config or load_config()
+    if not config.configured or fmt not in FORMATS:
+        return {}
+    base = {"source": f"eq.{SOURCE}", "format": f"eq.{fmt}"}
+    head = _get(config, {**base, "select": "snapshot_date", "order": "snapshot_date.desc", "limit": "1"})
+    if not head:
+        return {}
+    as_of = str(head[0].get("snapshot_date") or "")
+    rows = _get(
+        config,
+        {**base, "snapshot_date": f"eq.{as_of}", "select": "name,position,team,sleeper_id,adp,adp_formatted,times_drafted,total_drafts", "limit": "1000"},
+    )
+    if not rows:
+        return {}
+    return {"as_of": as_of, "total_drafts": rows[0].get("total_drafts"), "rows": rows}
+
+
+_rows_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def latest_rows_cached(fmt: str, *, config: AdpConfig | None = None) -> dict[str, Any]:
+    now = time.time()
+    hit = _rows_cache.get(fmt)
+    if hit and now - hit[0] < _CACHE_TTL_SECONDS:
+        return hit[1]
+    try:
+        value = latest_rows(fmt, config=config)
+    except Exception:
+        value = {}
+    _rows_cache[fmt] = (now, value)
+    return value
+
+
+def find_prospect_adp(name: str, position: str, sleeper_id: str | None = None, *, snapshot: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
+    """Rookie ADP for one prospect: by Sleeper id when drafted and mapped, else by exact normalized
+    name + position, only when that is unambiguous. None = "No ADP yet" (off-season, or not in the
+    window). Never a guess and never a carried-forward value."""
+
+    snap = snapshot if snapshot is not None else latest_rows_cached("rookie_1qb")
+    rows = (snap or {}).get("rows") or []
+    if not rows:
+        return None
+    hit = [r for r in rows if sleeper_id and str(r.get("sleeper_id") or "") == str(sleeper_id)]
+    if not hit:
+        key = player_names.normalize_player_name(name)
+        hit = [r for r in rows if player_names.normalize_player_name(r.get("name") or "") == key and str(r.get("position") or "").upper() == str(position or "").upper()]
+    if len(hit) != 1:
+        return None
+    adp = _num(hit[0].get("adp"))
+    if adp is None:
+        return None
+    return {
+        "adp": adp,
+        "adp_formatted": hit[0].get("adp_formatted"),
+        "drafts": hit[0].get("times_drafted"),
+        "label": ONE_QB_LABEL,
+        "source": attribution("rookie_1qb", {"as_of": snap.get("as_of"), "total_drafts": snap.get("total_drafts"), "players": {"x": 1}}),
+    }
+
+
 def newest_snapshot_date(config: AdpConfig | None = None) -> str | None:
     """Newest stored snapshot date across formats (cheap one-row query), or None."""
 

@@ -18,7 +18,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--force-classes", action="store_true", help="run the CFBD class listing even when it is not Monday")
     args = parser.parse_args()
-    status = ingest.run(force_classes=args.force_classes)
+    previous = None
+    try:  # last run's status carries the month-to-date CFBD call count (free tier: 1000/month)
+        previous = json.loads((ROOT / ingest.STATUS_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        previous = None
+    status = ingest.run(force_classes=args.force_classes, previous_status=previous)
     ingest.write_status(status, str(ROOT / ingest.STATUS_FILE))
     print(json.dumps(status, indent=2, sort_keys=True))
     return 0 if status.get("ok") else 1

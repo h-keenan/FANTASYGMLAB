@@ -80,6 +80,7 @@ Deployment topology (Render):
   - POST /v1/leagues/{id}/gm-stance             — set/update that stance (null strategy clears it)
   - GET/POST /v1/leagues/{id}/commissioner/draft-order — the caller's saved draft-order rule (record | lottery | unknown)
   - GET    /v1/scouting/prospects                    — shared college prospect catalog + aggregate + my report + watchlist flag
+  - GET    /v1/scouting/prospects/{id}/profile       — prospect detail sheet: CFBD stats, weekly log, recruiting, rookie ADP (advanced = Pro)
   - POST   /v1/scouting/prospects/{id}/report        — upsert my own scouting grade/round projection/note
   - DELETE /v1/scouting/prospects/{id}/report        — remove my own scouting report
   - POST   /v1/scouting/watchlist/{id}                — follow a prospect (personal watchlist)
@@ -11766,6 +11767,34 @@ def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict
         "is_premium": True,
         "upsell": None,
     }
+
+
+@app.get("/v1/scouting/prospects/{prospect_id}/profile")
+def get_scouting_prospect_profile(prospect_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """One prospect's detail sheet: college stats (College Football Data), weekly log,
+    recruiting profile, hometown / size, and rookie ADP when it exists.
+
+    Basics are free for any signed-in user; advanced metrics (PPA, usage) are withheld
+    server-side unless the caller is Pro (``advanced_locked`` tells the client to show the
+    Pro lock). Reads only from Supabase (``college_prospect_stats``, filled by the weekly
+    ingest job). Fails soft: no row / table not migrated = ``stats_available: false``;
+    nothing is invented. Once drafted the row carries ``sleeper_player_id`` so the client
+    opens the normal NFL player card instead.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    prospect = college_scouting.fetch_prospect_row(config, access_token, prospect_id)
+    if prospect is None:
+        return {"ok": False, "reason": "not_found"}
+    stats_row = college_scouting.fetch_prospect_stats_row(config, access_token, prospect_id)
+    try:
+        adp = rookie_adp.find_prospect_adp(
+            str(prospect.get("name") or ""), str(prospect.get("position") or ""), prospect.get("sleeper_player_id")
+        )
+    except Exception:
+        adp = None
+    return college_scouting.build_prospect_profile(prospect, stats_row, is_pro=_is_pro_caller(user), adp=adp)
 
 
 class SubmitScoutingReportRequest(BaseModel):

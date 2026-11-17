@@ -42,6 +42,7 @@ from collections import defaultdict
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
 import requests
+from urllib.parse import quote
 
 from modules import auth_supabase
 from modules import experimental_graduation
@@ -328,6 +329,8 @@ def build_prospect_views(
                     else None
                 ),
                 "on_watchlist": pid in watchlist_ids,
+                # Post-draft hand-off: once drafted and mapped, the card opens the normal NFL player card.
+                "sleeper_player_id": _safe_text(prospect.get("sleeper_player_id")) or None,
             }
         )
     rows.sort(key=lambda row: (-(row["draft_year"] or 0), row["position"], row["name"]))
@@ -363,7 +366,11 @@ def fetch_all_prospects(
     response = None
     # Ask for the post-draft flag first; fall back to the base columns when the
     # optional migration (docs/supabase_college_prospects_ingest.sql) is absent.
-    for select in ("select=id,name,position,school,draft_year,drafted", "select=id,name,position,school,draft_year"):
+    for select in (
+        "select=id,name,position,school,draft_year,drafted,nfl_team,sleeper_player_id",
+        "select=id,name,position,school,draft_year,drafted",
+        "select=id,name,position,school,draft_year",
+    ):
         try:
             response = requests.get(
                 auth_supabase.rest_api_url(config, PROSPECTS_TABLE, select),
@@ -527,3 +534,164 @@ def _reset_cache_for_tests() -> None:
     _prospects_cache["fetched_at"] = 0.0
     _reports_cache["data"] = None
     _reports_cache["fetched_at"] = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Prospect detail sheet (stats + profile) — reads public.college_prospect_stats,
+# filled weekly by modules/college_prospect_ingest.py from College Football Data.
+# Every number is CFBD's; fantasy points are derived from CFBD stat lines here and
+# labelled as derived. Fail-soft: no table / no row = "no stats yet", never invented.
+# ---------------------------------------------------------------------------
+STATS_TABLE = "college_prospect_stats"
+STATS_SOURCE_NAME = "College Football Data"
+STATS_SOURCE_URL = "https://collegefootballdata.com"
+# College PPR-style fantasy scoring. CFBD has no fumbles / 2-pt data, so those are not scored.
+COLLEGE_FANTASY_RULES = (
+    "PPR: 0.04 per pass yd, 4 per pass TD, -2 per INT, 0.1 per rush/rec yd, 6 per rush/rec TD, "
+    "1 per catch. No fumbles or 2-pt (CFBD does not carry them)."
+)
+
+
+def college_fantasy_points(line: Mapping[str, Any] | None) -> float | None:
+    """Derived PPR-style points from one CFBD stat line ({passing, rushing, receiving}); None with no scoring stats."""
+
+    if not isinstance(line, Mapping):
+        return None
+    total = 0.0
+    seen = False
+    for category, weights in (
+        ("passing", {"yds": 0.04, "td": 4.0, "int": -2.0}),
+        ("rushing", {"yds": 0.1, "td": 6.0}),
+        ("receiving", {"yds": 0.1, "td": 6.0, "rec": 1.0}),
+    ):
+        part = line.get(category)
+        if not isinstance(part, Mapping):
+            continue
+        for key, weight in weights.items():
+            try:
+                value = float(part.get(key))
+            except (TypeError, ValueError):
+                continue
+            seen = True
+            total += value * weight
+    return round(total, 1) if seen else None
+
+
+def fetch_prospect_row(config: dict, access_token: str, prospect_id: str, *, timeout: float = 10) -> Dict[str, Any] | None:
+    if not auth_supabase.is_configured(config) or not prospect_id:
+        return None
+    for select in (
+        "select=id,name,position,school,draft_year,drafted,nfl_team,draft_round,draft_pick,sleeper_player_id",
+        "select=id,name,position,school,draft_year",
+    ):
+        try:
+            response = requests.get(
+                auth_supabase.rest_api_url(config, PROSPECTS_TABLE, f"{select}&id=eq.{quote(prospect_id, safe='')}&limit=1"),
+                headers=auth_supabase.auth_headers(config, access_token),
+                timeout=timeout,
+            )
+            if response.status_code >= 400:
+                continue
+            rows = response.json()
+        except Exception:
+            return None
+        return rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else None
+    return None
+
+
+def fetch_prospect_stats_row(config: dict, access_token: str, prospect_id: str, *, timeout: float = 10) -> Dict[str, Any] | None:
+    """The stats row, or None when absent / the migration (docs/supabase_college_prospect_stats.sql) is not applied."""
+
+    if not auth_supabase.is_configured(config) or not prospect_id:
+        return None
+    try:
+        response = requests.get(
+            auth_supabase.rest_api_url(config, STATS_TABLE, f"select=*&prospect_id=eq.{quote(prospect_id, safe='')}&limit=1"),
+            headers=auth_supabase.auth_headers(config, access_token),
+            timeout=timeout,
+        )
+        if response.status_code >= 400:
+            return None
+        rows = response.json()
+    except Exception:
+        return None
+    return rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else None
+
+
+def _clean_season(entry: Mapping[str, Any]) -> Dict[str, Any]:
+    out: Dict[str, Any] = {"season": entry.get("season"), "team": entry.get("team")}
+    for category in ("passing", "rushing", "receiving"):
+        if isinstance(entry.get(category), Mapping) and entry[category]:
+            out[category] = dict(entry[category])
+    out["fantasy_points"] = college_fantasy_points(out)
+    return out
+
+
+def build_prospect_profile(
+    prospect: Mapping[str, Any],
+    stats_row: Mapping[str, Any] | None,
+    *,
+    is_pro: bool,
+    adp: Mapping[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """The prospect detail payload. Basics (season lines, weekly log, bio, recruiting, ADP) are free;
+    advanced metrics (PPA, usage) are withheld server-side unless the caller is Pro."""
+
+    row = stats_row or {}
+    seasons = [_clean_season(e) for e in (row.get("seasons") or []) if isinstance(e, Mapping)]
+    seasons = [s for s in seasons if any(k in s for k in ("passing", "rushing", "receiving"))]
+    seasons.sort(key=lambda s: -(int(s["season"]) if str(s.get("season") or "").isdigit() else 0))
+    log = row.get("game_log") if isinstance(row.get("game_log"), Mapping) else None
+    weekly = None
+    if log and log.get("games"):
+        games = []
+        for g in log["games"]:
+            if not isinstance(g, Mapping) or g.get("week") is None:
+                continue
+            clean = {"week": g.get("week"), "opponent": g.get("opponent")}
+            for category in ("passing", "rushing", "receiving"):
+                if isinstance(g.get(category), Mapping):
+                    clean[category] = dict(g[category])
+            clean["fantasy_points"] = college_fantasy_points(clean)
+            games.append(clean)
+        weekly = {"season": log.get("season"), "games": games} if games else None
+    advanced = row.get("advanced") if isinstance(row.get("advanced"), Mapping) else None
+    has_advanced = bool(advanced and (advanced.get("ppa") or advanced.get("usage")))
+    ingested = row.get("ingested_at")
+    return {
+        "ok": True,
+        "prospect": {
+            "id": _safe_text(prospect.get("id")),
+            "name": _safe_text(prospect.get("name")),
+            "position": _safe_text(prospect.get("position")),
+            "school": _safe_text(prospect.get("school")),
+            "draft_year": prospect.get("draft_year"),
+            "drafted": prospect.get("drafted") is True,
+            "nfl_team": prospect.get("nfl_team"),
+            "draft_round": prospect.get("draft_round"),
+            "draft_pick": prospect.get("draft_pick"),
+            "sleeper_player_id": _safe_text(prospect.get("sleeper_player_id")) or None,
+        },
+        "bio": {
+            "class_year": row.get("class_year"),
+            "height_in": row.get("height_in"),
+            "weight_lb": row.get("weight_lb"),
+            "hometown": row.get("hometown"),
+            "school_logo_url": row.get("school_logo_url"),
+        },
+        "stats_available": bool(seasons or weekly),
+        "seasons": seasons,
+        "weekly": weekly,
+        "fantasy_rules": COLLEGE_FANTASY_RULES,
+        "advanced": dict(advanced) if (has_advanced and is_pro) else None,
+        "advanced_available": has_advanced,
+        "advanced_locked": bool(has_advanced and not is_pro),
+        "recruiting": row.get("recruiting") if isinstance(row.get("recruiting"), Mapping) else None,
+        "adp": dict(adp) if adp else None,
+        "source": {
+            "name": STATS_SOURCE_NAME,
+            "url": row.get("source_url") or STATS_SOURCE_URL,
+            "detail": row.get("source"),
+            "as_of": str(ingested)[:10] if ingested else None,
+        },
+    }
