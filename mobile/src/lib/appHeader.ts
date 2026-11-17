@@ -77,6 +77,39 @@ export function repeatsLabel(title: string | null | undefined, labels: ReadonlyA
   return t.length > 0 && labels.some((l) => norm(l ?? "") === t);
 }
 
+/**
+ * Rule 1, one source (running-findings row 9). Every page title the header may show goes through `headerTitleFor`: a tab page (the
+ * bottom pill and family strip already name it) resolves to "", everything else keeps its title. Web checks the route
+ * (`headerShowsTitle`); the app has no pathname, so it passes the screen title and the labels in `TAB_PAGE_TITLES`.
+ */
+export const TAB_PAGE_TITLES: readonly string[] = [
+  "Today",
+  "Dashboard",
+  "My Team",
+  "Roster",
+  "Players",
+  "Waivers",
+  "Matchup",
+  "Trade Hub",
+  "Trade Finder",
+  "Trade Analyzer",
+  "Trade History",
+  "Ideas",
+  "Finder",
+  "History",
+  "League Rankings",
+  "Rankings",
+  "Games",
+  "News",
+  "Your leagues",
+];
+
+/** The title a header may show for a screen title; "" when the pill / family strip already says it. */
+export function headerTitleFor(title: string | null | undefined): string {
+  const t = (title ?? "").trim();
+  return t && !TAB_PAGE_TITLES.some((label) => norm(label) === norm(t)) ? t : "";
+}
+
 /** Scroll distance (px) after which the ribbon folds into the first row. */
 export const HEADER_COLLAPSE_AT = 24;
 /** Whether the ribbon is collapsed at a scroll offset. A little hysteresis (the ribbon returns only near the top) stops flicker. */

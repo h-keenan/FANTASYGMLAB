@@ -2,6 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import { filterLeagues, headerShowsTitle, headerTemplateFor, normalizeHeaderChips, repeatsLabel, ribbonCollapsed } from "./appHeader";
 import { leagueCrestColors, leagueCrestHue, leagueInitials } from "./leagueCrest";
+import { headerTitleFor, TAB_PAGE_SEGMENTS, TAB_PAGE_TITLES } from "./appHeader";
+import { PAGE_TITLE_BY_SEGMENT } from "./navDestinations";
+
+describe("headerTitleFor (one title source, running-findings row 9)", () => {
+  it("drops a title a pill / family tab already names, keeps detail titles", () => {
+    for (const t of ["Today", "My Team", "Trade Hub", "League Rankings", " players "]) expect(headerTitleFor(t), t).toBe("");
+    for (const t of ["Build an Offer", "GM Plan", "Account", "Patrick Mahomes"]) expect(headerTitleFor(t), t).toBe(t);
+    expect(headerTitleFor(null)).toBe("");
+    expect(TAB_PAGE_TITLES.length).toBeGreaterThan(10);
+  });
+
+  it("the web route table agrees: every tab page segment's title resolves to nothing", () => {
+    for (const seg of TAB_PAGE_SEGMENTS) {
+      const title = PAGE_TITLE_BY_SEGMENT[seg];
+      if (title) expect(headerTitleFor(title), `${seg} -> ${title}`).toBe("");
+    }
+  });
+});
 
 describe("appHeader rules", () => {
   it("tab pages are root headers with no title; detail pages keep theirs", () => {

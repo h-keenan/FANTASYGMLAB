@@ -63,6 +63,10 @@ describe("header guard", () => {
     }
   });
 
+  it("app: every screen title goes through headerTitleFor, so a tab page never repeats the pill label", () => {
+    expect(read(APP, "lib/useScreenHeaderTitle.tsx")).toContain("headerTitleFor");
+  });
+
   it("the Sim game header is one 52px row plus a folding ribbon (web and app), never the old two-row 97px block", () => {
     const web = read(WEB, "components/SimGameHeader.tsx");
     expect(web).toContain("sim-game-header-row");
