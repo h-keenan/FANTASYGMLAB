@@ -73,6 +73,15 @@ App: `APP_BASE_URL` (post-payment return origin, e.g. the production web origin)
 
 Never put any value in the repo, docs, `.env` files, or web/mobile bundles.
 
+## Manual deploy fallback (GitHub Actions)
+
+Production deploys go through Supabase's GitHub deployment integration. As a manual fallback,
+`.github/workflows/supabase-functions-deploy.yml` can be run from the Actions tab
+(`workflow_dispatch`, one function or `all`); it has no automatic trigger so it never races the integration. `verify_jwt` follows
+`supabase/config.toml`. It needs two repository secrets: `SUPABASE_ACCESS_TOKEN` (a personal access
+token from supabase.com/dashboard/account/tokens) and `SUPABASE_PROJECT_REF`. Without them the job
+skips. Function secrets (`supabase secrets set ...`) are still set by hand.
+
 ## Deploy (Phase 2, needs Zach)
 
 ```bash
