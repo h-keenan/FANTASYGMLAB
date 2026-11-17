@@ -1,8 +1,14 @@
 "use client";
 
 import { HelpLink } from "@/components/HelpLink";
-import { supportMailto } from "@/lib/support";
 import { planOf, type Plan } from "@/lib/plan";
+import {
+  APP_STORE_SUBSCRIPTIONS_URL,
+  DELETE_ACCOUNT_APP_STORE_NOTE,
+  DELETE_ACCOUNT_FAILED,
+  DELETE_ACCOUNT_STRIPE_NOTE,
+  DELETE_ACCOUNT_SUMMARY,
+} from "@/lib/accountDeletionCopy";
 import { PageTitle } from "@/components/PageTitle";
 import { useState } from "react";
 
@@ -406,9 +412,11 @@ function AccountActionsSection({
   );
 }
 
-// TEMPORARY: self-service deletion is disabled (delete-account edge function
-// reverted); point users at support instead of a button that cannot work.
-function DeleteAccountSection() {
+function DeleteAccountSection({ onDeleteAccount }: { onDeleteAccount: () => Promise<void> }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   return (
     <section
       className="p-4 flex flex-col gap-3"
@@ -419,12 +427,47 @@ function DeleteAccountSection() {
         {ACCOUNT_SECTION_TITLE.danger}
       </SectionHeading>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-        Self-service account deletion is temporarily unavailable. Contact support and we will permanently delete
-        your account and all data, and cancel any subscription.
+        {DELETE_ACCOUNT_SUMMARY}
       </p>
-      <ButtonLink variant="danger" href={supportMailto({ topic: "delete_account" })}>
-        Contact support to delete your account
-      </ButtonLink>
+      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        {DELETE_ACCOUNT_STRIPE_NOTE}
+      </p>
+      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        {DELETE_ACCOUNT_APP_STORE_NOTE}{" "}
+        <a href={APP_STORE_SUBSCRIPTIONS_URL} target="_blank" rel="noopener noreferrer" className="underline">
+          Open Subscriptions
+        </a>
+      </p>
+      {error ? (
+        <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
+          {error}
+        </p>
+      ) : null}
+      {!confirming ? (
+        <Button variant="danger" onClick={() => setConfirming(true)}>
+          Delete account
+        </Button>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="danger"
+            loading={busy}
+            onClick={() => {
+              setBusy(true);
+              setError(null);
+              onDeleteAccount().catch((err) => {
+                setError(err instanceof Error && err.message ? err.message : DELETE_ACCOUNT_FAILED);
+                setBusy(false);
+              });
+            }}
+          >
+            {busy ? "Deleting…" : "Confirm delete"}
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>
+            Cancel
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
@@ -440,6 +483,7 @@ export function AccountContent({
   onRetryReferral,
   onOpenBillingPortal,
   onExportData,
+  onDeleteAccount,
   onSignOut,
 }: {
   user: MeResponse["user"];
@@ -452,6 +496,7 @@ export function AccountContent({
   onRetryReferral: () => void;
   onOpenBillingPortal: () => Promise<void>;
   onExportData: () => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
   onSignOut: () => void;
 }) {
   return (
@@ -471,7 +516,7 @@ export function AccountContent({
         onTogglePushCategory={onTogglePushCategory}
       />
       <AccountActionsSection onExportData={onExportData} onSignOut={onSignOut} />
-      <DeleteAccountSection />
+      <DeleteAccountSection onDeleteAccount={onDeleteAccount} />
     </main>
   );
 }
