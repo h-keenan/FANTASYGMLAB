@@ -30,6 +30,7 @@ import { SkeletonRows, SkeletonList } from '../components/Skeleton';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import FilterSheet from '../components/FilterSheet';
 import FilterDropdownButton from '../components/FilterDropdownButton';
+import { ViewTabs } from '../components/PageControlRow';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from '../lib/filterSheet';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -476,12 +477,11 @@ export default function WaiversScreen({ route, navigation }: Props) {
           that belong to that view (web twin: the waiver-controls row). */}
       <PageFamilyTabs family="team" active="waivers" leagueId={leagueId} leagueName={leagueName} />
       <View style={styles.controlRow} testID="waiver-controls">
-        <FilterDropdownButton<string>
-          label="View"
+        <ViewTabs<string>
           options={TAB_OPTIONS.map((o) => o.label)}
           value={TAB_OPTIONS.find((o) => o.key === tab)?.label ?? 'Recommended'}
-          allValue="Recommended"
           onChange={(label) => setTab(TAB_OPTIONS.find((o) => o.label === label)?.key ?? 'recommended')}
+          testID="waivers-view-select"
         />
         {tab === 'recommended' && secondaryPriority.length > 0 ? (
           <FilterDropdownButton<string>
