@@ -3,10 +3,8 @@ name: Deploy Supabase Edge Functions
 # Deploys the billing Edge Functions in supabase/functions/ to the production
 # Supabase project, so nobody has to run `supabase functions deploy` by hand.
 #
-# - On a push to main that touches supabase/functions/**, deploys only the
-#   functions whose folder changed. A change under _shared/ (code every
-#   function imports) or to supabase/config.toml deploys all of them.
-# - workflow_dispatch: deploy one named function, or all of them.
+# - workflow_dispatch only: deploy one named function, or all of them.
+#   (The changed-files logic below is kept for a future push trigger.)
 # - verify_jwt comes from supabase/config.toml per function. Functions set to
 #   `verify_jwt = false` there (the provider webhooks and the public plans
 #   endpoint) are deployed with --no-verify-jwt.
@@ -22,12 +20,11 @@ name: Deploy Supabase Edge Functions
 # Function secrets (STRIPE_*, REVENUECAT_*, ...) are NOT touched here; they
 # stay in Supabase (`supabase secrets set`), set by hand.
 
+# MANUAL ONLY. Production deploys go through Supabase's GitHub deployment
+# integration; an automatic push trigger here could race it. Use this as a
+# fallback from the Actions tab. Do not add a `push` trigger without first
+# confirming the integration does not also deploy on merge.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "supabase/functions/**"
-      - "supabase/config.toml"
   workflow_dispatch:
     inputs:
       function:
