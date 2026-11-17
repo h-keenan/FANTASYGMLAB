@@ -51,16 +51,43 @@ LIST_COLUMNS = (
 CHECKPOINTS_KEPT = 2
 EVENT_PAGE = 1000
 _SNAPSHOT_CACHE_SIZE = 24
-# sim_games_status_check only allows these (docs/supabase_sim_game.sql). The fold's
-# own status ("offseason" between dynasty seasons) is richer; the column is only a
-# list-view cache, so anything else is stored as the closest allowed value.
-DB_STATUSES = frozenset({"drafting", "in_season", "playoffs", "complete"})
+# sim_games_status_check originally allowed only the first four (docs/supabase_sim_game.sql);
+# docs/supabase_sim_game_offseason_status.sql adds "offseason". The migration is applied by hand, so the
+# store tries the richer value first and falls back to the closest legacy one when the constraint rejects it.
+LEGACY_DB_STATUSES = frozenset({"drafting", "in_season", "playoffs", "complete"})
+DB_STATUSES = LEGACY_DB_STATUSES | {"offseason"}
 _log = logging.getLogger(__name__)
 RETRY_DELAY = 0.3
+_offseason_status_rejected = False  # process-wide: the DB still has the old CHECK (logged once)
 
 
 def db_status(status: str) -> str:
+    """The value to store: ``offseason`` passes through unless the DB has rejected it before."""
+
+    if status == "offseason":
+        return "in_season" if _offseason_status_rejected else "offseason"
     return status if status in DB_STATUSES else "in_season"
+
+
+def _is_status_check_error(error: str) -> bool:
+    text = str(error or "").lower()
+    return "sim_games_status_check" in text or ("23514" in text and "status" in text)
+
+
+def effective_status(row: Mapping[str, Any]) -> str:
+    """The list-view status. While the DB cannot store ``offseason`` a dynasty's off-season reads ``in_season``
+    with a week past the regular season (playoffs are stored as ``playoffs``), so derive it from that."""
+
+    status = str(row.get("status") or "")
+    settings = row.get("settings") or {}
+    if status != "in_season" or not isinstance(settings, Mapping) or settings.get("mode") != "dynasty":
+        return status
+    try:
+        regular = int(settings.get("regular_weeks") or 0)
+        week = int(row.get("current_week") or 0)
+    except (TypeError, ValueError):
+        return status
+    return "offseason" if regular > 0 and week > regular else status
 
 
 class GameLimitReached(Exception):
@@ -419,10 +446,19 @@ class GameStore:
         """Denormalized list-view fields (and the cache's version token); events remain the source of
         truth. Returns the ``updated_at`` stamp written."""
 
+        global _offseason_status_rejected
         stamp = updated_at or _now()
-        self._update(GAMES, user_id, {"id": game_id}, {
-            "status": db_status(status), "current_week": week, "event_count": event_count, "updated_at": stamp,
-        })
+        values = {"status": db_status(status), "current_week": week, "event_count": event_count, "updated_at": stamp}
+        try:
+            self._update(GAMES, user_id, {"id": game_id}, values)
+        except SimStoreError as exc:
+            if values["status"] != "offseason" or not _is_status_check_error(str(exc)):
+                raise
+            if not _offseason_status_rejected:
+                _offseason_status_rejected = True
+                _log.warning("sim_games_status_check rejects 'offseason'; storing in_season until "
+                             "docs/supabase_sim_game_offseason_status.sql is applied")
+            self._update(GAMES, user_id, {"id": game_id}, {**values, "status": "in_season"})
         return stamp
 
     def delete_game(self, user_id: str, game_id: str) -> None:
@@ -621,7 +657,9 @@ def public_game_row(row: Mapping[str, Any]) -> dict[str, Any]:
         "id", "seed", "engine_version", "scoring_model", "settings", "status", "current_week",
         "difficulty", "grade_letter", "created_at", "updated_at",
     )
-    return {k: row.get(k) for k in keys}
+    out = {k: row.get(k) for k in keys}
+    out["status"] = effective_status(row)
+    return out
 
 
 __all__ = [

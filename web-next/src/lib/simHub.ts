@@ -44,7 +44,9 @@ export function simHubRow(game: SimGameLite, now: number = Date.now()): SimHubRo
         ? { label: "Draft", tone: "warning" }
         : game.status === "playoffs"
           ? { label: "Playoffs", tone: "warning" }
-          : { label: "In season", tone: "accent" };
+          : game.status === "offseason"
+            ? { label: "Offseason", tone: "warning" }
+            : { label: "In season", tone: "accent" };
   const scoring = SIM_SCORING_LABELS[(game.settings.scoring ?? "ppr") as SimScoring] ?? game.settings.scoring ?? "PPR";
   const meta = [`${game.settings.teams ?? 12} teams`, scoring, SIM_DIFFICULTY_COPY[game.difficulty]?.label ?? game.difficulty].filter(Boolean).join(" · ");
   const ago = simHubAgo(game.updated_at, now);
