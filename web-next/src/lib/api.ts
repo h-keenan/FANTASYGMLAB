@@ -1,4 +1,5 @@
 import type { DraftSignalRow } from "./draftSignals";
+import { friendlyStatusMessage, OFFLINE_ERROR_MESSAGE } from "./badDayCopy";
 import { normalizeProspectProfile, type ProspectProfileResponse } from "./prospectProfile";
 import { normalizeCollegeProspects, normalizeLeagueRankings, normalizeMe, normalizeCommissionerIntegrity, normalizeCommunityTrades, normalizeLeagueRosters, normalizeLeagueTeamProfiles, normalizeSharedCommunityTrades } from "./apiDefaults";
 import type { SimNotificationsResponse } from "@/lib/simNotifications";
@@ -114,7 +115,7 @@ async function performRequestOnce<T>(
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new ApiError(0, "The request timed out. Check your connection and try again.");
     }
-    throw new ApiError(0, "Could not reach the server. Check your connection and try again.");
+    throw new ApiError(0, OFFLINE_ERROR_MESSAGE);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -136,7 +137,7 @@ async function performRequestOnce<T>(
         ? (body as { code: string }).code
         : undefined;
     const retryAfter = parseRetryAfterSeconds(response.headers.get("Retry-After"));
-    const apiError = new ApiError(response.status, detail || `Request failed with status ${response.status}.`, code, retryAfter);
+    const apiError = new ApiError(response.status, friendlyStatusMessage(response.status, detail), code, retryAfter);
     if (!isServerBusyError(apiError)) reportApiFailure(response.status);
     throw apiError;
   }
@@ -222,7 +223,7 @@ async function authorizedBinaryRequest(
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new ApiError(0, "The request timed out. Check your connection and try again.");
     }
-    throw new ApiError(0, "Could not reach the server. Check your connection and try again.");
+    throw new ApiError(0, OFFLINE_ERROR_MESSAGE);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -238,7 +239,7 @@ async function authorizedBinaryRequest(
     } catch {
       detail = "";
     }
-    throw new ApiError(response.status, detail || `Request failed with status ${response.status}.`);
+    throw new ApiError(response.status, friendlyStatusMessage(response.status, detail));
   }
 
   return response.blob();
@@ -3362,7 +3363,7 @@ export interface StorylinesResponse {
 }
 
 // Draft Center (Revision 14) — GET .../draft-center's Overview pane only
-// (your own draft posture + league-wide decision/partner cards); see that
+// (your own draft stance + league-wide decision/partner cards); see that
 // endpoint's own docstring for why Current Draft/History (live draft board)
 // and Scouting are real, separate surfaces not covered here or by mobile's
 // DraftCenterScreen.tsx, which this page mirrors exactly.

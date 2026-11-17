@@ -38,6 +38,14 @@ Ground rules for every pattern here:
 - **Guard**: `scripts/check_copy_casing.mjs` fails when the same heading appears in web and app differing only by case. It also runs in the
   mobile test job (`mobile/src/lib/copyCasing.test.ts`). Add a lowercased name to its `ALLOW` set only for a named surface.
 
+## Bad days (web + app, 2026-11-17)
+
+- **Shared copy and logic**: `lib/badDayCopy.ts` (identical twin): offline, slow-load, session-ended, league-gone and 5xx sentences, `classifyErrorMessage`, `friendlyStatusMessage`, `staleNote`. Never show a bare status code.
+- **One offline banner**: web `OfflineBanner` (navigator.onLine), app `OfflineBanner` (`lib/connectivity.ts`, request-inferred until NetInfo is installed). Content underneath stays usable.
+- **No frozen skeleton**: `SlowLoadNote` sits inside `SkeletonRegion`: note at 8s, retry at 15s, request gives up at 30s into the shared `ErrorState`.
+- **Shared ErrorState** also owns "Your session ended / Sign in again" and "This league is not available / Choose another league".
+- **Stale content**: app `StaleNote` ("As of 3:42 PM") from the query cache. **No em-dashes** in UI copy (`copyDashes.test.ts`). Audit: `docs/audits/2026-11-bad-day-and-words.md`.
+
 ## Loading identity
 
 Every loading state is a content-shaped skeleton from ONE set, never a splash, a spinner on an empty screen or a "Loading..." line.

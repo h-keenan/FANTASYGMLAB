@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import { SlowLoadNote } from "@/components/SlowLoadNote";
 import { pageTabFamily, type PageTabFamilyKey } from "@/lib/pageFamilies";
 import { avatarSize, type AvatarTier } from "@/lib/playerAnatomy";
 
@@ -203,6 +204,7 @@ export function SkeletonRegion({ label, children, className = "" }: { label: str
   return (
     <div role="status" aria-busy="true" aria-label={`Loading ${label}`} className={className}>
       {children}
+      <SlowLoadNote />
     </div>
   );
 }

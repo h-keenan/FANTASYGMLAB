@@ -47,3 +47,25 @@ test('ErrorState keeps a single retry label', () => {
   const source = readFileSync(join(import.meta.dirname, '..', 'components', 'ErrorState.tsx'), 'utf8');
   assert.match(source, /retryLabel = 'Try again'/);
 });
+
+// Bad-day guards (docs/audits/2026-11-bad-day-and-words.md): the pieces that keep a bad day from being a blank page or a spinner.
+test('mounts the one offline banner at the app root', () => {
+  assert.match(readFileSync(join(import.meta.dirname, '..', '..', 'App.tsx'), 'utf8'), /<OfflineBanner \/>/);
+});
+
+test('every page skeleton carries the slow-load note (no silent spinner)', () => {
+  assert.match(readFileSync(join(import.meta.dirname, '..', 'components', 'Skeleton.tsx'), 'utf8'), /<SlowLoadNote /);
+});
+
+test('the shared ErrorState gives an ended session and a gone league their own next step', () => {
+  const source = readFileSync(join(import.meta.dirname, '..', 'components', 'ErrorState.tsx'), 'utf8');
+  assert.match(source, /classifyErrorMessage/);
+  assert.match(source, /SESSION_EXPIRED_ACTION/);
+  assert.match(source, /LEAGUE_GONE_ACTION/);
+});
+
+test('the API client never shows a bare status code to a user', () => {
+  const source = readFileSync(join(import.meta.dirname, 'api.ts'), 'utf8');
+  assert.match(source, /friendlyStatusMessage\(/);
+  assert.match(source, /reportRequestOutcome/);
+});

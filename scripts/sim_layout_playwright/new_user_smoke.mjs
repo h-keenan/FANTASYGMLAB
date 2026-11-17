@@ -7,6 +7,7 @@
 //   2b signed-in (stubbed session) with no league: onboarding intro, then the connect step, then Today
 //   3  free account, no league: "No saved league yet" with Connect + Sample actions
 //   4  bare /dashboard: signed out -> /, no league -> /connect-league, one league -> its Today
+//   7  bad days (docs/audits/2026-11-bad-day-and-words.md): 5xx then retry, expired session, deleted league, slow API (8s note), partial data, offline banner
 //   6  Pro vs Free (planOf, web-next/src/lib/plan.ts): Pro sees the GM Plan module + "Pro" plan, Free sees the paywall + "Free"
 // Every step also asserts (5): no console errors / page errors, no "Something went wrong" boundary, no horizontal overflow, and (app pages) the first
 // module within the 110px budget (module_scan.mjs TOP_BUDGET).
@@ -64,6 +65,12 @@ async function newPage(browser, w) {
     }
     if (u.hostname === "localhost" && u.port === "8000") {
       const p = u.pathname;
+      // Bad-day mock (scenario 7): w.fail = { match: RegExp, status, body, delayMs } until the scenario clears it.
+      if (w.fail && w.fail.match.test(p)) {
+        if (w.fail.delayMs) await new Promise((r) => setTimeout(r, w.fail.delayMs));
+        if (w.fail.status) return json(route, w.fail.body ?? {}, w.fail.status);
+        if (w.fail.override) return json(route, w.fail.override);
+      }
       if (p === "/v1/e") return route.fulfill({ status: 204, headers: cors });
       if (p === "/v1/preferences") return json(route, { ok: true, ui_density: "guided", theme_mode: "dark", theme_mode_set: true, experience_level: "advanced", experience_goal: "win_now", last_league: null });
       if (p === "/v1/trade-outcomes/pending") return json(route, { ok: true, items: [] });
@@ -95,7 +102,8 @@ async function newPage(browser, w) {
 
 const results = [];
 // Common per-step assertions (5). `app` pages (nav shell) also get the first-module budget; landing / onboarding / sample are exempt like module_scan's TOP_EXEMPT.
-async function check(env, name, { app = false, expectText = [], expectSel = [] } = {}) {
+// `allow`: RegExp of expected problems (a mocked 5xx and the browser's matching console line); `errorState`: the shared ErrorState is the expected screen.
+async function check(env, name, { app = false, expectText = [], expectSel = [], allow = null, errorState = false } = {}) {
   const { page, problems } = env;
   const fails = [];
   try {
@@ -103,9 +111,9 @@ async function check(env, name, { app = false, expectText = [], expectSel = [] }
     for (const text of expectText) await page.getByText(text, { exact: false }).filter({ visible: true }).first().waitFor({ state: "visible", timeout: T });
     await page.evaluate(() => document.fonts && document.fonts.ready);
     await page.addStyleTag({ content: ".app-shell,.sim-root{overflow-x:visible!important}" }); // measure without the clip backstop so a real overflow is caught
-    const res = await page.evaluate(() => ({ w: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, crashed: /Something went wrong/i.test(document.body.innerText), empty: document.body.innerText.trim().length < 40 }));
+    const res = await page.evaluate(() => ({ w: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, crashed: /Something went wrong/i.test(document.body.innerText) && !document.querySelector('[data-testid^="error-state"]'), empty: document.body.innerText.trim().length < 40 }));
     if (res.w > res.cw + 1) fails.push(`horizontal overflow ${res.w}>${res.cw}: ${(await page.evaluate(OFFENDERS)).join(" || ")}`);
-    if (res.crashed) fails.push('"Something went wrong" error boundary rendered');
+    if (res.crashed && !errorState) fails.push('"Something went wrong" error boundary rendered');
     if (res.empty) fails.push("page is blank");
     const fm = await page.evaluate(FIRST_MODULE);
     const offset = fm ? (fm.cardGap ?? fm.gap) : null;
@@ -113,7 +121,7 @@ async function check(env, name, { app = false, expectText = [], expectSel = [] }
     await page.screenshot({ path: `${OUT}/${name.replace(/\W+/g, "-")}.png` });
     // Console errors can land a beat after the content is visible: one more settle on the network, then read them.
     await page.waitForLoadState("networkidle", { timeout: T }).catch(() => {});
-    fails.push(...problems.splice(0));
+    fails.push(...problems.splice(0).filter((x) => !(allow && allow.test(x))));
     if (env.w.unmocked.length) { console.log(`     unmocked API paths: ${[...new Set(env.w.unmocked.splice(0))].join(", ")}`); }
     console.log(`${fails.length ? "FAIL" : "ok  "} ${name}${offset != null ? `  (first module ${offset}px)` : ""}${fails.length ? "  " + fails.join("; ") : ""}`);
   } catch (e) {
@@ -210,6 +218,63 @@ for (const [plan, entitlement] of [["Pro", "premium"], ["Free", "free"]]) {
   }
   await goto(env, "/account");
   await check(env, `6c Account plan label (${plan})`, { expectText: ["smoke@example.com"], expectSel: [`dd:text-is("${plan}")`] });
+  await env.ctx.close();
+}
+
+// 7. Bad days on Today: every one ends on a named state with a next step, never a blank page or a frozen skeleton.
+const DASH = /\/v1\/leagues\/[^/]+\/dashboard$/;
+const bd = () => world({ signedIn: true, saved: [{ league_id: LID, league_name: LEAGUE_NAME }] });
+const EXPECTED_HTTP = /HTTP (401|404|500)|Failed to load resource/;
+{
+  const env = await newPage(browser, bd());
+  env.w.fail = { match: DASH, status: 500, body: {} };
+  await goto(env, "/dashboard");
+  await check(env, "7a 5xx: shared error state", { errorState: true, allow: EXPECTED_HTTP, expectSel: ['[data-testid="error-state"]'] });
+  await env.page.getByText("Our servers hit a snag", { exact: false }).first().waitFor({ state: "visible", timeout: T });
+  env.w.fail = null;
+  await env.page.getByRole("button", { name: "Try again" }).first().click();
+  await check(env, "7a 5xx: retry recovers", { app: true, expectText: [TODAY_HEADLINE], allow: EXPECTED_HTTP });
+  await env.ctx.close();
+}
+{
+  const env = await newPage(browser, bd());
+  env.w.fail = { match: DASH, status: 401, body: { detail: "" } };
+  await goto(env, "/dashboard");
+  await check(env, "7b expired session: clean re-login", { errorState: true, allow: EXPECTED_HTTP, expectSel: ['[data-testid="error-state-session"]'], expectText: ["Sign in again"] });
+  await env.ctx.close();
+}
+{
+  const env = await newPage(browser, bd());
+  env.w.fail = { match: DASH, status: 404, body: { detail: "League not found." } };
+  await goto(env, "/dashboard");
+  await check(env, "7c deleted league: choose another", { errorState: true, allow: EXPECTED_HTTP, expectSel: ['[data-testid="error-state-league-gone"]'], expectText: ["Choose another league"] });
+  await env.ctx.close();
+}
+{
+  const env = await newPage(browser, bd());
+  env.w.fail = { match: DASH, delayMs: 10000, override: FIX.dashboard };
+  await goto(env, "/dashboard");
+  await check(env, "7d slow API: skeleton says so", { expectSel: ['[data-testid="slow-load-note"]'], expectText: ["Still loading"] });
+  await check(env, "7d slow API: content lands", { app: true, expectText: [TODAY_HEADLINE] });
+  await env.ctx.close();
+}
+{
+  const env = await newPage(browser, bd());
+  env.w.fail = { match: DASH, override: { ...FIX.dashboard, items: [], quiet: false, this_week: undefined } };
+  await goto(env, "/dashboard");
+  await check(env, "7e partial data: page still renders", { app: true, expectText: ["Position rooms"] });
+  await env.ctx.close();
+}
+{
+  const env = await newPage(browser, bd());
+  await goto(env, "/dashboard");
+  await check(env, "7f loaded Today", { app: true, expectText: [TODAY_HEADLINE] });
+  await env.ctx.setOffline(true);
+  await env.page.evaluate(() => window.dispatchEvent(new Event("offline")));
+  await check(env, "7f offline: one banner, content stays", { app: true, expectSel: ['[data-testid="offline-banner"]'], expectText: ["You are offline", TODAY_HEADLINE], allow: /Failed to load resource|net::ERR/ });
+  await env.ctx.setOffline(false);
+  await env.page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await env.page.getByText("Back online").first().waitFor({ state: "visible", timeout: T });
   await env.ctx.close();
 }
 

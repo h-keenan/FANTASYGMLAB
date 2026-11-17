@@ -14,6 +14,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 
 import { AuthProvider } from './src/context/AuthContext';
+import OfflineBanner from './src/components/OfflineBanner';
 import { NoticeProvider } from './src/components/NoticeToast';
 import { useLiveActivitySync } from './src/lib/useLiveActivitySync';
 import { CollegeInterestProvider } from './src/context/CollegeInterestContext';
@@ -130,6 +131,7 @@ function AppContent() {
                           <LiveActivitySync />
                           <NoticeProvider>
                             <RootNavigator />
+                            <OfflineBanner />
                           </NoticeProvider>
                         </AuthProvider>
                       </CollegeInterestProvider>

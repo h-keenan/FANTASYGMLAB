@@ -17,6 +17,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import Button from '../components/Button';
 import SkeletonBlock, { SkeletonCard } from '../components/Skeleton';
 import ErrorState from '../components/ErrorState';
+import StaleNote from '../components/StaleNote';
 import PushPermissionPrompt from '../components/PushPermissionPrompt';
 import CollegeFootballInterestPrompt from '../components/CollegeFootballInterestPrompt';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -510,6 +511,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
         />
       ) : null}
 
+      {dashboardData ? <StaleNote updatedAt={dashboardQuery.dataUpdatedAt} refreshFailed={dashboardQuery.isRefetchError} /> : null}
+
       {dashboardData?.platform_notice ? (
         <AppText style={{ color: colors.textSecondary, fontSize: 13.5 }}>{dashboardData.platform_notice}</AppText>
       ) : null}
@@ -708,7 +711,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
 const NOT_READY_MESSAGES: Record<string, string> = {
   no_sleeper_username_linked:
-    "Link your Sleeper username on the web app first — Today needs to know which roster is yours.",
+    "Link your Sleeper username on the web app first. Today needs to know which roster is yours.",
   sleeper_user_not_found: "Couldn't find that Sleeper account. Double-check the linked username on the web app.",
   not_a_member_of_league: "You don't appear to own a team in this league.",
   empty_roster: "This roster doesn't have any players yet.",

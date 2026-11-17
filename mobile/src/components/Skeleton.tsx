@@ -7,6 +7,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useShimmerClock } from '../lib/shimmerClock';
 import { pageTabFamily, type PageTabFamilyKey } from '../lib/pageFamilies';
+import SlowLoadNote from './SlowLoadNote';
 import { avatarSize, type AvatarTier } from '../lib/playerAnatomy';
 
 /**
@@ -298,10 +299,11 @@ export function SkeletonStatusHeader({ rows = 3 }: { rows?: number }) {
 }
 
 /** One named loading region: the single screen-reader name ("Loading Players"). */
-export function SkeletonRegion({ label, children, style }: { label: string; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+export function SkeletonRegion({ label, children, style, onRetry }: { label: string; children: React.ReactNode; style?: StyleProp<ViewStyle>; onRetry?: () => void }) {
   return (
     <View accessible accessibilityRole="progressbar" accessibilityLabel={`Loading ${label}`} accessibilityState={{ busy: true }} style={style}>
       {children}
+      <SlowLoadNote onRetry={onRetry} />
     </View>
   );
 }
@@ -333,11 +335,11 @@ export type SkeletonLayout = 'dashboard' | 'list' | 'detail' | 'cards';
  * web twin for the layout meanings). What every route shows while auth or its first fetch resolves (LoadingScreen and
  * the per-screen loading states), instead of a spinner. `topInset` clears the navigation header.
  */
-export function SkeletonPage({ label, layout = 'dashboard', family, topInset = 0, style }: { label: string; layout?: SkeletonLayout; family?: PageTabFamilyKey; topInset?: number; style?: StyleProp<ViewStyle> }) {
+export function SkeletonPage({ label, layout = 'dashboard', family, topInset = 0, style, onRetry }: { label: string; layout?: SkeletonLayout; family?: PageTabFamilyKey; topInset?: number; style?: StyleProp<ViewStyle>; onRetry?: () => void }) {
   const tabs = family ? pageTabFamily(family).tabs.length : 0;
   const { colors } = useThemeMode();
   return (
-    <SkeletonRegion label={label} style={[{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: topInset + spacing.md, gap: spacing.lg }, style]}>
+    <SkeletonRegion label={label} onRetry={onRetry} style={[{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: topInset + spacing.md, gap: spacing.lg }, style]}>
       <SkeletonHeader />
       {tabs > 0 ? <SkeletonTabs count={tabs} /> : null}
       {layout === 'dashboard' ? (

@@ -1,3 +1,5 @@
+import { friendlyStatusMessage } from './badDayCopy';
+import { reportRequestOutcome } from './connectivity';
 import { normalizeProspectProfile, type ProspectProfileResponse } from './prospectProfile';
 import type { DraftSignalRow } from './draftSignals';
 import { normalizeCollegeProspects, normalizeLeagueRankings, normalizeMe, normalizeCommissionerIntegrity, normalizeLeagueRosters, normalizeLeagueTeamProfiles, normalizeSharedCommunityTrades } from './apiDefaults';
@@ -119,6 +121,10 @@ async function performRequest<T>(
       ...(init?.jsonBody !== undefined ? { body: JSON.stringify(unmaskShowcaseFields(init.jsonBody)) } : {}),
       signal: controller.signal,
     });
+    reportRequestOutcome({ responded: true });
+  } catch (error) {
+    reportRequestOutcome({ error });
+    throw error;
   } finally {
     clearTimeout(timeoutId);
   }
@@ -131,10 +137,12 @@ async function performRequest<T>(
   }
 
   if (!response.ok) {
-    const message =
-      body && typeof body === 'object' && 'error' in body
-        ? String((body as { error: unknown }).error)
-        : `Request failed (${response.status}).`;
+    const friendly = friendlyStatusMessage(
+      response.status,
+      body && typeof body === 'object' && 'error' in body ? String((body as { error: unknown }).error) : '',
+    );
+    // 4xx keeps this client's generic "Request failed (N)." fallback, which Sim call sites detect to substitute their own sentence.
+    const message = /^Request failed with status/.test(friendly) ? `Request failed (${response.status}).` : friendly;
     const code =
       body && typeof body === 'object' && typeof (body as { code?: unknown }).code === 'string'
         ? (body as { code: string }).code

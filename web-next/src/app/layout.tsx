@@ -10,6 +10,7 @@ import { PlayerQuickViewProvider } from "@/context/PlayerQuickViewContext";
 import { ValuationLensProvider } from "@/context/ValuationLensContext";
 import { AppContentShell } from "@/components/AppContentShell";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { GmOrb } from "@/components/GmOrb";
 import { PasswordRecoveryGate } from "@/components/PasswordRecoveryGate";
 import { PrivacyPill } from "@/components/PrivacyMode";
@@ -22,7 +23,7 @@ import { OG_IMAGE } from "@/lib/seo/site";
 
 // Share previews (Discord, X, iMessage): a static 1200x630 branded card
 // (public/og-image.png) with the large-image Twitter card; see OG_IMAGE.
-const DESCRIPTION = "Dynasty fantasy football GM assistant. Real recommendations across your Trade Hub, Waivers, and Today — not raw data you have to interpret yourself.";
+const DESCRIPTION = "Dynasty fantasy football GM assistant. Real recommendations across your Trade Hub, Waivers, and Today. Not raw data you have to interpret yourself.";
 
 export const metadata: Metadata = {
   title: BRAND_NAME,
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div className="app-background-field" aria-hidden="true" />
         <div className="app-background-sweep" aria-hidden="true" />
         <RouteAnalytics />
+        <OfflineBanner />
         <AuthProvider>
           <ExperienceLevelProvider>
             <DisplayPreferencesProvider>

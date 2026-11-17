@@ -9,6 +9,16 @@ import { EmptyStateGlyph, StateIconRing } from "@/components/EmptyState";
 import { trackClientError } from "@/lib/analytics";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { FREE_LEAGUE_CAP_MESSAGE } from "@/lib/freeLeagueCap";
+import { supabase } from "@/lib/supabase";
+import {
+  LEAGUE_GONE_ACTION,
+  LEAGUE_GONE_BODY,
+  LEAGUE_GONE_TITLE,
+  SESSION_EXPIRED_ACTION,
+  SESSION_EXPIRED_BODY,
+  SESSION_EXPIRED_TITLE,
+  classifyErrorMessage,
+} from "@/lib/badDayCopy";
 
 /** True for a raw exception string (not a sentence written for the user). */
 export function looksTechnical(message: string): boolean {
@@ -52,6 +62,7 @@ export function ErrorState({
   compact?: boolean;
 }) {
   const leagueLocked = message === FREE_LEAGUE_CAP_MESSAGE;
+  const kind = classifyErrorMessage(message);
   const technical = looksTechnical(message);
   const Wrapper = bare ? "section" : "main";
   // Team-visible error signal (route_error): only a coarse class derived from
@@ -67,6 +78,39 @@ export function ErrorState({
         fallbackTitle="Your Free plan includes one league"
         fallbackBody={message}
       />
+    );
+  }
+  // Bad days with a better next step than "Try again": the session ended (clean re-login) or the league is gone (pick another).
+  if ((kind === "session" || kind === "league_gone") && !compact) {
+    const session = kind === "session";
+    const goBack = () => {
+      if (session) {
+        void supabase.auth.signOut().finally(() => window.location.assign("/"));
+      } else {
+        window.location.assign("/leagues");
+      }
+    };
+    return (
+      <Wrapper className={bare ? "flex flex-col" : "flex-1 flex flex-col justify-center px-4 py-8 max-w-3xl w-full mx-auto"}>
+        <AccentCard accent="var(--color-warning)" as="div">
+          <div className="flex items-start gap-3" data-testid={session ? "error-state-session" : "error-state-league-gone"}>
+            <StateIconRing accent="var(--color-warning)">
+              <EmptyStateGlyph name="alert" />
+            </StateIconRing>
+            <div className="flex min-w-0 flex-1 flex-col gap-1 items-start">
+              <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+                {session ? SESSION_EXPIRED_TITLE : LEAGUE_GONE_TITLE}
+              </p>
+              <p role="alert" className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                {session ? SESSION_EXPIRED_BODY : LEAGUE_GONE_BODY}
+              </p>
+              <Button size="sm" onClick={goBack} className="mt-2">
+                {session ? SESSION_EXPIRED_ACTION : LEAGUE_GONE_ACTION}
+              </Button>
+            </div>
+          </div>
+        </AccentCard>
+      </Wrapper>
     );
   }
   if (compact) {
