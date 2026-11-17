@@ -96,7 +96,7 @@ export default function BottomPill({ children, segment: rawContext, orb, style, 
                     onLayout={(e) => { tabX.current[tab.key] = { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width }; }}
                     style={[styles.tab, segW > 0 && { minWidth: Math.floor((segW - Math.max(0, context.tabs.length - 1)) / context.tabs.length) }, on && styles.tabOn]}
                   >
-                    <AppText style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1}>
+                    <AppText style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={1.25}>
                       {pillTabText(tab)}
                     </AppText>
                     {tabShowsPro(tab, showPro) ? <ToneBadge label="Pro" color={colors.premium} size="xs" style={styles.tabPro} /> : null}
@@ -114,7 +114,7 @@ export default function BottomPill({ children, segment: rawContext, orb, style, 
               </PressableScale>
             ) : (
               <PressableScale accessibilityRole="button" accessibilityLabel={context.primary.label} disabled={context.primary.disabled || context.primary.busy} onPress={context.primary.onPress} style={[styles.primary, (context.primary.disabled || context.primary.busy) && { opacity: 0.5 }]} testID="pill-primary">
-                <AppText style={styles.primaryText} numberOfLines={1}>
+                <AppText style={styles.primaryText} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={1.25}>
                   {context.primary.label}
                 </AppText>
               </PressableScale>
