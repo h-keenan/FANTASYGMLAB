@@ -16,7 +16,8 @@ detectors (push_triggers)  ->  candidate items per user/league
    dedupe vs push_notification_log            [1 read per user]
 -> decider (modules/notification_decider.py)  [pure, no I/O]
    stale -> roster relevance -> per-league mute/critical
-   -> digest -> quiet hours -> weekly cap (reserved critical slot)
+   -> digest -> quiet hours -> daily cap (2 per 24h, env PUSH_DAILY_CAP)
+   -> weekly cap (reserved critical slot)
 -> deliverer (one batched Expo push per user, lead item + "+N more")
    -> push_notification_log (dedupe + cap)   [always]
    -> notification_events (audit/receipts)   [opt-in, see below]
@@ -65,7 +66,7 @@ ids; the app routes with `mobile/src/lib/pushRouting.ts`.
 | trade_deadline | `/trade-hub/{league}` |
 | waiver_reminder | `/waivers/{league}` |
 | weekly_roundup | `/league-recaps/{league}?tab=roundup&week=N` |
-| recap | `/league-recaps/{league}` |
+| recap | `/news?tab=league&league={league}` (app: News > My League, Recap tab) |
 | injury (player) | `/players/{league}/{player}` |
 | trade_followup | `/alerts` |
 | other | `/dashboard/{league}` |

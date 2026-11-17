@@ -1,8 +1,8 @@
 """One-shot entrypoint for the automated push-trigger sweep.
 
 Run by Render's fantasygm-lab-push-trigger-sweep cron job (see render.yaml)
-on a schedule. Exits non-zero only when Supabase service-role isn't
-configured at all — per-account/per-league failures are logged and skipped
+on a schedule. Exits non-zero when Supabase service-role isn't
+configured or the sweep failed closed (opt-outs unreadable) — per-account/per-league failures are logged and skipped
 inside modules.push_triggers.run_push_trigger_sweep so a single bad league
 can't fail the whole sweep (and the cron job) for everyone else.
 """
@@ -31,7 +31,10 @@ def main() -> int:
             indent=2,
         )
     )
-    return 0 if stats.get("configured") else 1
+    # A red run is the freshness signal: the ops health check watches the age
+    # of the last SUCCESSFUL "Push Trigger Sweep" run, so a sweep that could not
+    # read opt-outs (and therefore sent nothing) must not look like a success.
+    return 0 if stats.get("configured") and stats.get("ok", True) else 1
 
 
 if __name__ == "__main__":

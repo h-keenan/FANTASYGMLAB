@@ -18,7 +18,10 @@ item it drops so the decision is auditable:
 5. quiet hours      - user-editable window in the user's timezone. The whole
                       batch is held, except critical items when the user
                       opted into ``critical_breaks_quiet``.
-6. weekly cap       - rolling-7-day cap with one slot reserved for critical
+6. daily cap        - at most ``DEFAULT_DAILY_CAP`` pushes in the last 24h,
+                      one slot reserved for critical categories, so a busy
+                      day can never turn into a burst of pushes.
+7. weekly cap       - rolling-7-day cap with one slot reserved for critical
                       categories (same rule as before, now user-configurable).
 
 Dedupe against already-sent items is done by the sweep *before* this runs (it
@@ -39,6 +42,12 @@ CRITICAL = notification_prefs.CRITICAL_CATEGORIES
 # Categories that are only ever about a player on YOUR roster: dropped when
 # the player is not on the user's roster in that league.
 ROSTER_SCOPED_CATEGORIES = frozenset({"injury"})
+# Pushes per rolling 24h (one more slot is reserved for critical categories).
+DEFAULT_DAILY_CAP = 2
+# When the user's timezone is unknown the sweep reads the clock in US Eastern.
+# A Pacific user is then up to 3 hours behind, so the morning end of quiet
+# hours is pushed out by this many hours to keep 3am-local pushes impossible.
+UNKNOWN_TZ_QUIET_PADDING_HOURS = 3
 
 
 @dataclass
@@ -93,6 +102,9 @@ def decide(
     sent_this_week_fn: Callable[[], int | None],
     default_cap: int,
     roster_ids_by_league: Mapping[str, set[str]] | None = None,
+    sent_today_fn: Callable[[], int | None] | None = None,
+    daily_cap: int = DEFAULT_DAILY_CAP,
+    tz_known: bool = True,
 ) -> Decision:
     decision = Decision()
     live: list[dict[str, Any]] = []
@@ -132,8 +144,11 @@ def decide(
         decision.held = "digest" if digest_held else "nothing_left"
         return decision
 
+    quiet_end = int(prefs.get("quiet_end", 8))
+    if not tz_known:
+        quiet_end = (quiet_end + UNKNOWN_TZ_QUIET_PADDING_HOURS) % 24
     quiet = bool(prefs.get("quiet_hours_enabled", True)) and in_quiet_hours(
-        local_hour, int(prefs.get("quiet_start", 22)), int(prefs.get("quiet_end", 8))
+        local_hour, int(prefs.get("quiet_start", 22)), quiet_end
     )
     if quiet:
         if prefs.get("critical_breaks_quiet"):
@@ -142,6 +157,20 @@ def decide(
             ready = []
         if not ready:
             decision.held = "quiet_hours"
+            return decision
+
+    if sent_today_fn is not None:
+        today = sent_today_fn()
+        if today is None:
+            decision.held = "count_unavailable"
+            return decision
+        daily_ok = cap_filter(ready, sent_this_week=today, cap=daily_cap)
+        for item in ready:
+            if item not in daily_ok:
+                decision.suppressed.append((item, "daily_capped"))
+        ready = daily_ok
+        if not ready:
+            decision.held = "capped"
             return decision
 
     sent = sent_this_week_fn()

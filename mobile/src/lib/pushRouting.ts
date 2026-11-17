@@ -30,7 +30,7 @@ export type PushTapTarget =
   | { screen: 'Matchup'; leagueId: string; leagueName: string }
   | { screen: 'Waivers'; leagueId: string; leagueName: string }
   | { screen: 'Trades'; leagueId: string; leagueName: string }
-  | { screen: 'News'; initialTab: 'league'; leagueId: string; leagueName: string; recapsTab: 'roundup'; week?: number }
+  | { screen: 'News'; initialTab: 'league'; leagueId: string; leagueName: string; recapsTab: 'roundup' | 'recap'; week?: number }
   | { screen: 'TradeHistory' }
   | null;
 
@@ -70,6 +70,8 @@ export function resolvePushTapTarget(data: unknown): PushTapTarget {
     };
   }
   if (category === 'waiver_reminder') return { screen: 'Waivers', leagueId, leagueName };
+  // "Week N recap is ready" opens the recap itself (News > My League), same screen the web link lands on.
+  if (category === 'recap') return { screen: 'News', initialTab: 'league', leagueId, leagueName, recapsTab: 'recap' };
 
   const playerId = str(payload.player_id);
   if (playerId) {

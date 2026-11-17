@@ -30,6 +30,7 @@ def _daytime_no_history(monkeypatch):
 
     monkeypatch.setattr(push_triggers, "fetch_push_timezones", lambda config: {})
     monkeypatch.setattr(push_triggers, "count_recent_pushes", lambda config, user_id, now=None: 0)
+    monkeypatch.setattr(push_triggers, "count_pushes_today", lambda config, user_id, now=None: 0)
     monkeypatch.setattr(
         push_triggers, "_utcnow", lambda: datetime(2026, 10, 21, 17, 0, tzinfo=timezone.utc)
     )
