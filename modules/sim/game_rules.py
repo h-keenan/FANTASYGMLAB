@@ -46,6 +46,7 @@ from modules.sim.game_types import (
     POS_VERSION,
     INJURY_VERSION,
     ROOKIE_VERSION,
+    WIRE_VERSION,
     HINT_VERSION,
     KD_VERSION,
     LIMIT_VERSION,
@@ -73,6 +74,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "pos_v": (POS_VERSION, NOW),
     "injury_v": (INJURY_VERSION, WEEK),
     "rookie_v": (ROOKIE_VERSION, SEASON),
+    "wire_v": (WIRE_VERSION, WEEK),
 }
 
 # What the UI shows for each flag: a short label, one sentence of what changes, and whether it needs a dynasty with offseasons.
@@ -146,6 +148,11 @@ FLAGS: dict[str, dict[str, Any]] = {
         "label": "Realistic rookie classes",
         "body": "A new rookie class is sized like a real one: a few rookies a year break into a position's top 12 and the rest develop, instead of three or four running ahead of the veterans. Your league still refills the depth that retirements take.",
         "dynasty_only": True,
+    },
+    "wire_v": {
+        "label": 'A waiver wire that is contested',
+        "body": 'AI managers now put in their own claims on the free agents they want, even ones you also claimed, and every claim is settled in waiver-priority order (worst record first), so a team with a better priority can beat you to a player.',
+        "dynasty_only": False,
     },
     "names_v": {
         "label": "Fresh rookie names",
