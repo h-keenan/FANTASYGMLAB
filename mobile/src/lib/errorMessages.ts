@@ -19,7 +19,7 @@ export function toUserErrorMessage(err: unknown, fallback: string): string {
     return err.message || fallback;
   }
   if (isTransportError(err)) {
-    return "Couldn't connect — check your connection and try again.";
+    return "Couldn't connect. Check your connection and try again.";
   }
   return fallback;
 }

@@ -135,6 +135,7 @@ export const IDENTICAL = [
   "presence.ts",
   "accountSections.ts",
   "simErrorCopy.ts",
+  "badDayCopy.ts",
 ];
 
 // Same code, differing only in comments / import specifiers / quote style.

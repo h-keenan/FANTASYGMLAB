@@ -12,12 +12,12 @@ import type { PageTabFamilyKey } from '../lib/pageFamilies';
  * screen's name and becomes the one screen-reader status ("Loading your leagues"). Web twin:
  * web-next/src/components/LoadingScreen.tsx; the pieces live in components/Skeleton.tsx.
  */
-export default function LoadingScreen({ label = 'your leagues', layout = 'dashboard', family }: { label?: string; layout?: SkeletonLayout; family?: PageTabFamilyKey }) {
+export default function LoadingScreen({ label = 'your leagues', layout = 'dashboard', family, onRetry }: { label?: string; layout?: SkeletonLayout; family?: PageTabFamilyKey; onRetry?: () => void }) {
   const { colors } = useThemeMode();
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SkeletonPage label={label} layout={layout} family={family} topInset={insets.top} />
+      <SkeletonPage label={label} layout={layout} family={family} topInset={insets.top} onRetry={onRetry} />
     </View>
   );
 }

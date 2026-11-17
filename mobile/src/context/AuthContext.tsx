@@ -289,3 +289,8 @@ export function useAuth(): AuthContextValue {
   }
   return context;
 }
+
+/** Like useAuth, but undefined outside a provider (shared states that must also render in isolation, e.g. ErrorState). */
+export function useOptionalAuth(): AuthContextValue | undefined {
+  return useContext(AuthContext);
+}

@@ -33,4 +33,26 @@ describe("ErrorState guard", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  // Bad-day guards (docs/audits/2026-11-bad-day-and-words.md): the pieces that keep a bad day from being a blank page or a spinner.
+  it("mounts the one offline banner at the root", () => {
+    expect(readFileSync(join(__dirname, "../app/layout.tsx"), "utf8")).toMatch(/<OfflineBanner \/>/);
+  });
+
+  it("every page skeleton carries the slow-load note (no silent spinner)", () => {
+    expect(readFileSync(join(__dirname, "Skeleton.tsx"), "utf8")).toMatch(/<SlowLoadNote \/>/);
+  });
+
+  it("the shared ErrorState gives an ended session and a gone league their own next step", () => {
+    const source = readFileSync(join(__dirname, "ErrorState.tsx"), "utf8");
+    expect(source).toMatch(/classifyErrorMessage/);
+    expect(source).toMatch(/SESSION_EXPIRED_ACTION/);
+    expect(source).toMatch(/LEAGUE_GONE_ACTION/);
+  });
+
+  it("the API client never shows a bare status code to a user", () => {
+    const source = readFileSync(join(__dirname, "../lib/api.ts"), "utf8");
+    expect(source).not.toMatch(/detail \|\| `Request failed with status/);
+    expect(source).toMatch(/friendlyStatusMessage\(response\.status/);
+  });
 });
