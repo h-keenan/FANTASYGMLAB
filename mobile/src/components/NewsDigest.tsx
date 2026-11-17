@@ -6,12 +6,10 @@ import CompactModule from './CompactModule';
 import PlayerAvatar from './PlayerAvatar';
 import PlayerAccordionRow, { usePlayerAccordion } from './PlayerAccordionRow';
 import PlayerName from './PlayerName';
-import SegmentedTabBar from './SegmentedTabBar';
 import ToneBadge from './ToneBadge';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
-  NEWS_FILTERS,
   buildNewsDigest,
   newsHeadlineChip,
   newsLeaguePreview,
@@ -52,8 +50,7 @@ function RosterStrip({ players, active, onPick }: { players: NewsStripPlayer[]; 
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.tight} testID="news-strip">
-      <AppText style={styles.kicker}>{`Your roster · ${players.length} with news`}</AppText>
+    <CompactModule id="news.roster" title={`Your roster · ${players.length} with news`} label="Your roster" defaultOpen={active != null} testID="news-strip">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stripRow}>
         {players.map((p) => {
           const on = p.key === active;
@@ -75,7 +72,7 @@ function RosterStrip({ players, active, onPick }: { players: NewsStripPlayer[]; 
           );
         })}
       </ScrollView>
-    </View>
+    </CompactModule>
   );
 }
 
@@ -126,6 +123,7 @@ export default function NewsDigest({
   general,
   reasonNote,
   feed,
+  filter,
 }: {
   alerts: readonly DigestItem[];
   general: readonly DigestItem[];
@@ -133,10 +131,11 @@ export default function NewsDigest({
   reasonNote?: string | null;
   /** The league-wide feed body for the given (filtered) items. */
   feed: (items: DigestItem[]) => ReactNode;
+  /** The News type filter, picked in the page's one control row. */
+  filter: NewsFilterKey;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [filter, setFilter] = useState<NewsFilterKey>('all');
   const [playerKey, setPlayerKey] = useState<string | null>(null);
   const acc = usePlayerAccordion();
   const digest = useMemo(() => buildNewsDigest({ alerts, general, filter, playerKey }), [alerts, general, filter, playerKey]);
@@ -146,12 +145,13 @@ export default function NewsDigest({
   const picked = digest.strip.find((p) => p.key === playerKey);
   return (
     <View style={styles.stack} testID="news-digest">
-      <SegmentedTabBar<NewsFilterKey> options={NEWS_FILTERS.map((f) => ({ key: f.key, label: f.label }))} active={filter} onChange={setFilter} />
       {digest.strip.length > 0 ? <RosterStrip players={digest.strip} active={playerKey} onPick={setPlayerKey} /> : null}
-      <View style={styles.between}>
-        <AppText style={styles.kicker}>{picked ? `${picked.name} · ${digest.rows.length} ${digest.rows.length === 1 ? 'item' : 'items'}` : `Your players · ${digest.rows.length}`}</AppText>
-        {chip ? <ToneBadge label={chip} color={colors.accent} size="xs" /> : null}
-      </View>
+      {digest.rows.length > 0 ? (
+        <View style={styles.between}>
+          <AppText style={styles.kicker}>{picked ? `${picked.name} · ${digest.rows.length} ${digest.rows.length === 1 ? 'item' : 'items'}` : `Your players · ${digest.rows.length}`}</AppText>
+          {chip ? <ToneBadge label={chip} color={colors.accent} size="xs" /> : null}
+        </View>
+      ) : null}
       {digest.rows.length > 0 ? (
         <View>{digest.rows.map((row) => <DigestRow key={row.key} row={row} acc={acc} />)}</View>
       ) : (

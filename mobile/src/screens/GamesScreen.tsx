@@ -17,7 +17,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import PageFamilyTabs from '../components/PageFamilyTabs';
-import FilterDropdownButton from '../components/FilterDropdownButton';
+import PageControlRow, { ViewSelect } from '../components/PageControlRow';
 import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -49,7 +49,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { percentileColor } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { PAGE_TOP_GAP, radii, spacing, type ThemeColors } from '../theme';
 import GlassCard from '../components/GlassCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Games'>;
@@ -82,15 +82,14 @@ export default function GamesScreen({ route, navigation }: Props) {
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         <PageFamilyTabs family="league" active="games" leagueId={leagueId} leagueName={leagueName} padded={false} />
-        <View style={{ flexDirection: 'row' }}>
-          <FilterDropdownButton<string>
-            label="View"
+        <PageControlRow testID="games-controls">
+          <ViewSelect<string>
             options={['Season Outlook', "Pick'em"]}
             value={tab === 'pickem' ? "Pick'em" : 'Season Outlook'}
-            allValue="Season Outlook"
             onChange={(label) => setTab(label === "Pick'em" ? 'pickem' : 'sim')}
+            testID="games-view-select"
           />
-        </View>
+        </PageControlRow>
         {tab === 'sim' ? (
           <SeasonSim leagueId={leagueId} colors={colors} styles={styles} navigation={navigation} />
         ) : (
@@ -148,14 +147,6 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
   const titleAvailable = data.title_odds?.available === true && mine.title_probability != null;
   return (
     <View style={styles.section}>
-      <SectionHeading
-        title="Your odds"
-        caption={
-          data.weeks_remaining === 0
-            ? 'No games left. These are final results.'
-            : `${data.weeks_remaining ?? ''} weeks left, your real schedule and Roster Power.`
-        }
-      />
       <GlassCard radius="md" style={styles.card}>
         <View>
           <AppText style={[styles.bigOdds, { color: percentColor(colors, mine.playoff_probability) }]}>
@@ -179,9 +170,12 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
           {status ? <ToneBadge label={status} color={mine.clinched ? colors.success : colors.danger} /> : null}
         </View>
       </GlassCard>
-      {!titleAvailable ? (
-        <AppText style={styles.muted}>{titleOddsUnavailableMessage(data.title_odds?.reason)}</AppText>
-      ) : null}
+      <AppText style={styles.note} testID="games-odds-note">
+        {data.weeks_remaining === 0
+          ? 'No games left. These are final results.'
+          : `${data.weeks_remaining ?? ''} weeks left, your real schedule and Roster Power.`}
+        {!titleAvailable ? ` ${titleOddsUnavailableMessage(data.title_odds?.reason)}` : ''}
+      </AppText>
 
       <WhatIf leagueId={leagueId} data={data} colors={colors} styles={styles} navigation={navigation} />
 
@@ -519,7 +513,8 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },
-    content: { padding: spacing.lg, gap: spacing.md },
+    content: { paddingHorizontal: spacing.lg, paddingTop: PAGE_TOP_GAP, paddingBottom: spacing.lg },
+    note: { fontSize: 12.5, color: colors.textTertiary },
     section: { gap: spacing.md },
     flex: { flex: 1 },
     card: {

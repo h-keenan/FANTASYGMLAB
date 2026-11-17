@@ -30,6 +30,8 @@ export default function FilterDropdownButton<T extends string>({
   value,
   onChange,
   allValue = 'ALL' as T,
+  select = false,
+  testID,
 }: {
   label: string;
   options: readonly T[];
@@ -40,11 +42,14 @@ export default function FilterDropdownButton<T extends string>({
    * Defaults to the literal string 'ALL', which every existing filter
    * dimension on Players/Waivers already uses as its "no filter" option. */
   allValue?: T;
+  /** A view/section select (PageControlRow): the button always reads the current value, in the quiet style; the label is the sheet title. */
+  select?: boolean;
+  testID?: string;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
-  const isActive = value !== allValue;
+  const isActive = !select && value !== allValue;
 
   return (
     <>
@@ -52,10 +57,11 @@ export default function FilterDropdownButton<T extends string>({
         style={[styles.button, isActive && styles.buttonActive]}
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={`${label} filter${isActive ? `, ${value}` : ', all'}`}
+        testID={testID}
+        accessibilityLabel={select ? `${label}, ${value}` : `${label} filter${isActive ? `, ${value}` : ', all'}`}
       >
         <AppText style={[styles.buttonText, isActive && styles.buttonTextActive]} numberOfLines={1}>
-          {isActive ? `${label}: ${value}` : label}
+          {select ? value : isActive ? `${label}: ${value}` : label}
         </AppText>
         <Ionicons name="chevron-down" size={12} color={isActive ? colors.accentOnTint : colors.textTertiary} />
       </PressableScale>
@@ -98,6 +104,7 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.cardBorder,
       paddingHorizontal: spacing.sm,
       minHeight: 44,
+      flexShrink: 1,
     },
     buttonActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent, borderWidth: 1.5 },
     buttonText: { fontSize: 13.5, fontWeight: '600', letterSpacing: -0.2, color: colors.textSecondary, flexShrink: 1 },

@@ -16,7 +16,8 @@ import SectionHeading from '../components/SectionHeading';
 import NewsDigest from '../components/NewsDigest';
 import { NOT_READY_MESSAGES } from '../components/AlertsSection';
 import LeagueRecapPanel from '../components/LeagueRecapPanel';
-import SegmentedTabBar from '../components/SegmentedTabBar';
+import FilterDropdownButton from '../components/FilterDropdownButton';
+import PageControlRow, { ViewSelect } from '../components/PageControlRow';
 import { getLastLeague, type LastLeague } from '../lib/lastLeague';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -30,7 +31,8 @@ import NextSteps from '../components/NextSteps';
 import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { spacing, type ThemeColors } from '../theme';
+import { PAGE_TOP_GAP, spacing, type ThemeColors } from '../theme';
+import { NEWS_FILTERS, type NewsFilterKey } from '../lib/newsDigest';
 import ErrorState from '../components/ErrorState';
 
 // Semantic mapping matches AlertsScreen's (adjacent, roster-tied feed) exactly:
@@ -131,6 +133,8 @@ function groupByDate(items: NewsItem[]): Array<{ title: string; data: NewsGroup[
 }
 
 type NewsTab = 'nfl' | 'league';
+type NewsSection = 'NFL' | 'My League';
+const NEWS_SECTIONS: readonly NewsSection[] = ['NFL', 'My League'];
 type NewsParams = RootStackParamList['News'];
 
 /**
@@ -149,32 +153,33 @@ export default function NewsScreen({ route }: { route?: { params?: NewsParams } 
   }, [requestedTab]);
   if (!playerId && tab === 'league') {
     return (
-      <NewsShell tab={tab} onTab={setTab} showTabs>
-        <MyLeagueNews params={params} />
+      <NewsShell>
+        <MyLeagueNews params={params} section={<SectionSelect tab={tab} onTab={setTab} />} />
       </NewsShell>
     );
   }
   return <NflNews route={route} tab={tab} onTab={setTab} />;
 }
 
-function NewsShell({ tab, onTab, showTabs, children }: { tab: NewsTab; onTab: (tab: NewsTab) => void; showTabs: boolean; children: React.ReactNode }) {
+/** The News section select (NFL / My League): first control in the page's one control row. */
+function SectionSelect({ tab, onTab }: { tab: NewsTab; onTab: (tab: NewsTab) => void }) {
+  return (
+    <ViewSelect<NewsSection>
+      label="Section"
+      options={NEWS_SECTIONS}
+      value={tab === 'league' ? 'My League' : 'NFL'}
+      onChange={(label) => onTab(label === 'My League' ? 'league' : 'nfl')}
+      testID="news-section-select"
+    />
+  );
+}
+
+function NewsShell({ children }: { children: React.ReactNode }) {
   const headerHeight = useHeaderHeight();
   const styles = useMemo(() => createShellStyles(), []);
   return (
-    <View style={[styles.container, { paddingTop: headerHeight }]}>
+    <View style={[styles.container, { paddingTop: headerHeight + PAGE_TOP_GAP }]}>
       <GridBackground />
-      {showTabs ? (
-        <View style={styles.tabRow}>
-          <SegmentedTabBar<NewsTab>
-            options={[
-              { key: 'nfl', label: 'NFL', glyph: 'news' },
-              { key: 'league', label: 'My League', glyph: 'recaps' },
-            ]}
-            active={tab}
-            onChange={onTab}
-          />
-        </View>
-      ) : null}
       {children}
     </View>
   );
@@ -182,15 +187,15 @@ function NewsShell({ tab, onTab, showTabs, children }: { tab: NewsTab; onTab: (t
 
 function createShellStyles() {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
-    tabRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xs },
+    container: { flex: 1, backgroundColor: 'transparent' },
+    controls: { paddingHorizontal: spacing.lg },
     body: { flex: 1, paddingHorizontal: spacing.lg },
     prompt: { paddingHorizontal: spacing.lg },
   });
 }
 
 /** My League: the route's league, else the last-opened one, else a prompt to pick a league. */
-function MyLeagueNews({ params }: { params: NewsParams }) {
+function MyLeagueNews({ params, section }: { params: NewsParams; section: React.ReactNode }) {
   const navigation = useNavigation<{ navigate: (name: keyof RootStackParamList, params?: object) => void }>();
   const styles = useMemo(() => createShellStyles(), []);
   const [last, setLast] = useState<LastLeague | null | undefined>(undefined);
@@ -205,10 +210,19 @@ function MyLeagueNews({ params }: { params: NewsParams }) {
     };
   }, [params?.leagueId]);
   const league = params?.leagueId ? { leagueId: params.leagueId, leagueName: params.leagueName ?? 'League' } : last;
-  if (league === undefined) return <SkeletonPage label="League recap" layout="detail" style={{ paddingHorizontal: 0 }} />;
+  const sectionRow = <PageControlRow>{section}</PageControlRow>;
+  if (league === undefined) {
+    return (
+      <View style={styles.body}>
+        {sectionRow}
+        <SkeletonPage label="League recap" layout="detail" style={{ paddingHorizontal: 0 }} />
+      </View>
+    );
+  }
   if (!league) {
     return (
       <View style={styles.prompt}>
+        {sectionRow}
         <EmptyState
           icon="newspaper-outline"
           title="Pick a league"
@@ -226,6 +240,7 @@ function MyLeagueNews({ params }: { params: NewsParams }) {
         leagueName={league.leagueName}
         initialTab={params?.recapsTab}
         week={params?.week}
+        leading={section}
       />
     </View>
   );
@@ -242,6 +257,7 @@ function NflNews({ route, tab, onTab }: { route?: { params?: NewsParams }; tab: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedStatus, setFeedStatus] = useState<NewsResponse['status']>(undefined);
+  const [newsFilter, setNewsFilter] = useState<NewsFilterKey>('all');
 
   const load = useCallback(async () => {
     setError(null);
@@ -309,20 +325,27 @@ function NflNews({ route, tab, onTab }: { route?: { params?: NewsParams }; tab: 
   };
 
   return (
-    <NewsShell tab={tab} onTab={onTab} showTabs={!playerId}>
-      <SectionHeading
-        title={playerId ? 'Player news' : 'NFL news'}
-        info={
-          <InfoMark
-            label={playerId ? 'player news' : 'NFL news'}
-            lines={[
-              playerId
-                ? `Recent injury, role, transaction, and off-field items that mention ${playerName || 'this player'}.`
-                : 'General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your specific rosters yet.',
-            ]}
-          />
-        }
-      />
+    <NewsShell>
+      {playerId ? (
+        <SectionHeading
+          title="Player news"
+          info={<InfoMark label="player news" lines={[`Recent injury, role, transaction, and off-field items that mention ${playerName || 'this player'}.`]} />}
+        />
+      ) : (
+        <View style={styles.controls}>
+          <PageControlRow testID="news-controls">
+            <SectionSelect tab={tab} onTab={onTab} />
+            <FilterDropdownButton<string>
+              select
+              label="News type"
+              options={NEWS_FILTERS.map((f) => f.label)}
+              value={NEWS_FILTERS.find((f) => f.key === newsFilter)?.label ?? 'Roster first'}
+              onChange={(label) => setNewsFilter(NEWS_FILTERS.find((f) => f.label === label)?.key ?? 'all')}
+              testID="news-type-select"
+            />
+          </PageControlRow>
+        </View>
+      )}
 
       {error ? <ErrorState compact title="Couldn't load news" message={error} onRetry={() => void load()} /> : null}
 
@@ -397,6 +420,7 @@ function NflNews({ route, tab, onTab }: { route?: { params?: NewsParams }; tab: 
           refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         >
           <NewsDigest
+            filter={newsFilter}
             alerts={alerts?.items ?? []}
             general={items}
             reasonNote={alerts && alerts.items.length === 0 && alerts.reason ? NOT_READY_MESSAGES[alerts.reason] ?? null : null}
@@ -529,7 +553,8 @@ function createRowStyles(colors: ThemeColors) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
+    container: { flex: 1, backgroundColor: 'transparent' },
+    controls: { paddingHorizontal: spacing.lg },
     listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3 },
     sectionHeader: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
     sectionHeaderText: {

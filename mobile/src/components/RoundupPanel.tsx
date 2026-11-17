@@ -8,7 +8,7 @@ import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import PremiumLock from './PremiumLock';
-import SegmentedTabBar from './SegmentedTabBar';
+import PageControlRow, { WeekSelect } from './PageControlRow';
 import SkeletonBlock from './Skeleton';
 import { api, type RoundupResponse, type RoundupSwap, type WeeklyRoundup } from '../lib/api';
 import { accentTokenColor } from '../lib/destinationAccent';
@@ -41,11 +41,14 @@ export default function RoundupPanel({
   leagueName,
   initialWeek,
   bottomInset,
+  leading = null,
 }: {
   leagueId: string;
   leagueName: string;
   initialWeek?: number;
   bottomInset: number;
+  /** The page's section and recap-view selects: first in the one control row. */
+  leading?: React.ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -85,15 +88,20 @@ export default function RoundupPanel({
         data={data}
         roundup={data.roundup}
         leagueName={leagueName}
-        selectedWeek={data.week}
-        onSelectWeek={setWeek}
         dim={query.isFetching}
       />
     );
   }
 
+  const weeks = data ? roundupWeeks(data.max_completed_week) : [];
   return (
-    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}>{body}</ScrollView>
+    <View style={styles.flex}>
+      <PageControlRow testID="roundup-controls">
+        {leading}
+        <WeekSelect weeks={weeks} value={data?.week ?? weeks[0] ?? 0} onChange={setWeek} />
+      </PageControlRow>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}>{body}</ScrollView>
+    </View>
   );
 }
 
@@ -101,34 +109,20 @@ function RoundupBody({
   data,
   roundup,
   leagueName,
-  selectedWeek,
-  onSelectWeek,
   dim,
 }: {
   data: RoundupResponse;
   roundup: WeeklyRoundup;
   leagueName: string;
-  selectedWeek: number;
-  onSelectWeek: (week: number) => void;
   dim: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const weeks = roundupWeeks(data.max_completed_week);
   const benchTone = roundup.left_on_bench >= 3 ? colors.danger : colors.success;
   const hidden = Math.max(0, (roundup.swaps_total ?? roundup.swaps.length) - roundup.swaps.length);
 
   return (
     <View style={[styles.stack, dim && { opacity: 0.6 }]}>
-      {weeks.length > 1 ? (
-        <SegmentedTabBar
-          scrollable
-          options={weeks.map((w) => ({ key: String(w), label: `Wk ${w}` }))}
-          active={String(selectedWeek)}
-          onChange={(key) => onSelectWeek(Number(key))}
-        />
-      ) : null}
-
       <AccentCard accent={colors.accent}>
         <AppText style={styles.kicker}>WEEKLY ROUNDUP</AppText>
         <AppText style={styles.heading}>Week {roundup.week}</AppText>
@@ -275,7 +269,8 @@ function SwapCard({ swap }: { swap: RoundupSwap }) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    content: { padding: spacing.lg, gap: spacing.md },
+    flex: { flex: 1 },
+    content: { paddingVertical: 0, gap: spacing.md },
     stack: { gap: spacing.md },
     kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
     heading: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },

@@ -10,11 +10,9 @@ import EmptyState from './EmptyState';
 import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import PremiumLock from './PremiumLock';
-import InfoMark from './InfoMark';
-import SectionHeading from './SectionHeading';
-import SegmentedTabBar from './SegmentedTabBar';
+import FilterDropdownButton from './FilterDropdownButton';
+import PageControlRow from './PageControlRow';
 import ToneBadge from './ToneBadge';
-import ViewModeToggle from './ViewModeToggle';
 import { api, type CollegeProspect } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { prospectFit, rankByFit, type ProspectFit, type ScoutingLens } from '../lib/scoutingLens';
@@ -25,6 +23,10 @@ import ErrorState from './ErrorState';
 
 type FilterKey = 'all' | 'watchlist';
 type ScoutView = 'base' | 'league';
+type ShowOption = 'All prospects' | 'My watchlist';
+type ScoutOption = 'Best available' | 'For my league';
+const SHOW_OPTIONS: readonly ShowOption[] = ['All prospects', 'My watchlist'];
+const SCOUT_OPTIONS: readonly ScoutOption[] = ['Best available', 'For my league'];
 
 function aggregateLabel(prospect: CollegeProspect): string {
   const { avg_grade: avgGrade, scout_count: scoutCount } = prospect.aggregate;
@@ -155,9 +157,12 @@ function ProspectRow({
 export default function CollegeScoutingPanel({
   onOpenProspect,
   lens = null,
+  leading = null,
 }: {
   onOpenProspect: (prospect: CollegeProspect) => void;
   lens?: ScoutingLens | null;
+  /** The page's view select (Players / Prospects), first in the one control row; none on the standalone route. */
+  leading?: React.ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -167,7 +172,7 @@ export default function CollegeScoutingPanel({
   const [locked, setLocked] = useState<{ title: string; body: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { viewMode, setViewMode } = usePlayerListViewMode('college-prospects');
+  const { viewMode } = usePlayerListViewMode('college-prospects');
 
   const load = useCallback(async () => {
     setError(null);
@@ -214,10 +219,21 @@ export default function CollegeScoutingPanel({
     return lens && leagueView ? rankByFit(scoped, lens) : scoped;
   }, [prospects, filter, lens, leagueView]);
 
-  if (loading) return <SkeletonList label="prospects" count={6} />;
+  const controls = (extra: React.ReactNode = null) => (leading || extra ? <PageControlRow testID="prospects-controls">{leading}{extra}</PageControlRow> : null);
+
+  if (loading) {
+    return (
+      <View style={styles.panel}>
+        {controls()}
+        <SkeletonList label="prospects" count={6} />
+      </View>
+    );
+  }
 
   if (locked) {
     return (
+      <View style={styles.panel}>
+        {controls()}
       <PremiumLock
         feature="college_scouting"
         title={locked.title || 'Scout the next rookie class'}
@@ -226,6 +242,7 @@ export default function CollegeScoutingPanel({
           'College Scouting is a Pro feature: the shared prospect board, community grades, your own scouting reports and watchlist. Start your free trial to unlock it.'
         }
       />
+      </View>
     );
   }
 
@@ -245,45 +262,31 @@ export default function CollegeScoutingPanel({
 
   return (
     <View style={styles.panel}>
-      <SectionHeading
-        title="Rookie prospects"
-        info={
-          <InfoMark
-            label="rookie prospects"
-            lines={[
-              "Every signed-in user's grade on a prospect pools into one shared signal — that shared aggregate, not any single grade, can influence rookie draft-class strength. Your own grade and watchlist stay yours to edit any time.",
-            ]}
+      {controls(
+        <>
+          <FilterDropdownButton<ShowOption>
+            select
+            label="Show"
+            options={SHOW_OPTIONS}
+            value={filter === 'watchlist' ? 'My watchlist' : 'All prospects'}
+            onChange={(next) => setFilter(next === 'My watchlist' ? 'watchlist' : 'all')}
+            testID="prospects-show-select"
           />
-        }
-      />
-      {lens ? (
-        <View style={styles.lensBlock}>
-          <SegmentedTabBar<ScoutView>
-            options={[
-              { key: 'base', label: 'Best available', glyph: 'prospects' },
-              { key: 'league', label: 'For my league', glyph: 'league' },
-            ]}
-            active={view}
-            onChange={setView}
-          />
-          <AppText style={styles.lensNote}>
-            {leagueView
-              ? 'Prospects that fit a position you need or a round you hold are listed first and tagged. Same prospects and grades as Best available.'
-              : 'The shared board, no league applied. Switch to For my league to see fits to your needs and picks.'}
-          </AppText>
-        </View>
+          {lens ? (
+            <FilterDropdownButton<ScoutOption>
+              select
+              label="Scouting view"
+              options={SCOUT_OPTIONS}
+              value={leagueView ? 'For my league' : 'Best available'}
+              onChange={(next) => setView(next === 'For my league' ? 'league' : 'base')}
+              testID="prospects-scouting-select"
+            />
+          ) : null}
+        </>,
+      )}
+      {leagueView ? (
+        <AppText style={styles.lensNote}>Prospects that fit a position you need or a round you hold are listed first and tagged. Same prospects and grades as Best available.</AppText>
       ) : null}
-      <View style={styles.tabRow}>
-        <SegmentedTabBar
-          options={[
-            { key: 'all', label: 'All Prospects' },
-            { key: 'watchlist', label: 'My Watchlist' },
-          ]}
-          active={filter}
-          onChange={setFilter}
-        />
-        <ViewModeToggle value={viewMode} onChange={setViewMode} />
-      </View>
       {error ? <ErrorState compact title="Couldn't load prospects" message={error} onRetry={() => void load()} /> : null}
       {visible.length === 0 ? (
         <EmptyState

@@ -7,7 +7,7 @@ import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import PageFamilyTabs from '../components/PageFamilyTabs';
-import SegmentedTabBar from '../components/SegmentedTabBar';
+import PageControlRow, { ViewSelect } from '../components/PageControlRow';
 import CollegeScoutingPanel from '../components/CollegeScoutingPanel';
 import { needPositionsFrom, type ScoutingLens } from '../lib/scoutingLens';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -27,10 +27,8 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAccordionRow';
 import type { PlayerFact } from '../lib/playerAnatomy';
 import { badgeFromInjury } from '../lib/playerBadges';
-import InfoMark from '../components/InfoMark';
 import UsageTrendPill from '../components/UsageTrendPill';
 import ValuesCredit from '../components/ValuesCredit';
-import ViewModeToggle from '../components/ViewModeToggle';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { mergeSearchMatches, useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
 import { api, type DraftPickAsset, type LeagueIdpValuesResponse, type RankedPlayer, type ValuationLens } from '../lib/api';
@@ -56,6 +54,7 @@ import ErrorState from '../components/ErrorState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Players'>;
 type PlayersTab = 'players' | 'prospects';
+const PLAYERS_VIEWS = ['Players', 'Prospects'] as const;
 
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
 const AGE_FILTERS = ['ALL', 'Under 25', '25-28', '29+'] as const;
@@ -401,16 +400,17 @@ export default function PlayersScreen({ route, navigation }: Props) {
   // One Filters button instead of four dropdown pills (FilterSheet, same groups as web).
   const filterGroups = useMemo<FilterGroup[]>(
     () => [
-      { id: 'position', label: 'Position', anyValue: 'ALL', hidden: true, options: positionOptions.map((pos) => ({ value: pos, label: pos === 'ALL' ? 'Any' : pos })) },
+      { id: 'position', label: 'Position', anyValue: 'ALL', options: positionOptions.map((pos) => ({ value: pos, label: pos === 'ALL' ? 'Any' : pos })) },
       { id: 'age', label: 'Age', anyValue: 'ALL', options: AGE_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any age' : option })) },
       { id: 'status', label: 'Status', anyValue: 'ALL', options: STATUS_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any status' : option })) },
       { id: 'health', label: 'Health', anyValue: 'ALL', options: AVAILABILITY_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any health' : option })) },
+      { id: 'layout', label: 'Layout', anyValue: 'list', options: [{ value: 'list', label: 'List' }, { value: 'grid', label: 'Grid' }] },
     ],
     [positionOptions],
   );
   const filterValues = useMemo(
-    () => valuesFromSingles(filterGroups, { position, age: ageFilter, status: statusFilter, health: availabilityFilter }),
-    [filterGroups, position, ageFilter, statusFilter, availabilityFilter],
+    () => valuesFromSingles(filterGroups, { position, age: ageFilter, status: statusFilter, health: availabilityFilter, layout: viewMode }),
+    [filterGroups, position, ageFilter, statusFilter, availabilityFilter, viewMode],
   );
   // How many players a draft selection would show, so Apply can say "Show 24 results".
   const filterResultCount = (draft: FilterValues): number | null => {
@@ -427,72 +427,46 @@ export default function PlayersScreen({ route, navigation }: Props) {
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query)).length;
   };
 
+  const viewSelect = (
+    <ViewSelect<(typeof PLAYERS_VIEWS)[number]>
+      options={PLAYERS_VIEWS}
+      value={tab === 'prospects' ? 'Prospects' : 'Players'}
+      onChange={(label) => setTab(label === 'Prospects' ? 'prospects' : 'players')}
+      testID="players-view-select"
+    />
+  );
+
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <PageFamilyTabs family="team" active="players" leagueId={leagueId} leagueName={leagueName} />
-      <View style={styles.tabRow}>
-        <SegmentedTabBar<PlayersTab>
-          options={[
-            { key: 'players', label: 'Players', glyph: 'players' },
-            { key: 'prospects', label: 'Prospects', glyph: 'prospects' },
-          ]}
-          active={tab}
-          onChange={setTab}
-        />
-      </View>
       {tab === 'prospects' ? (
         <ScrollView contentContainerStyle={[styles.prospectsContent, { paddingBottom: orbClearance }]}>
-          <CollegeScoutingPanel onOpenProspect={(prospect) => navigation.navigate('CollegeProspectDetail', { prospect })} lens={scoutingLens} />
+          <CollegeScoutingPanel leading={viewSelect} onOpenProspect={(prospect) => navigation.navigate('CollegeProspectDetail', { prospect })} lens={scoutingLens} />
         </ScrollView>
       ) : (
       <>
-      {error ? <ErrorState compact title="Couldn't load players" message={error} onRetry={() => setReloadToken((n) => n + 1)} /> : null}
-
-      <GlassCard style={styles.discoveryCard}>
-        <Input
-          placeholder="Search players"
-          value={search}
-          onChangeText={setSearch}
-          autoCapitalize="none"
-        />
-        {/* Position is the most-used filter, so it stays one tap: pills that apply at once. */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.positionRow} accessibilityRole="tablist">
-          {positionOptions.map((pos) => (
-            <PressableScale
-              key={pos}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: position === pos }}
-              onPress={() => setPosition(pos)}
-              style={[styles.positionPill, position === pos && styles.positionPillOn]}
-            >
-              <AppText style={[styles.positionPillText, position === pos && { color: colors.accent }]}>{pos === 'ALL' ? 'All' : pos}</AppText>
-            </PressableScale>
-          ))}
-        </ScrollView>
-        <View style={styles.filterRow}>
+      <View style={styles.controls}>
+        <PageControlRow testID="players-controls">
+          {viewSelect}
+          <Input style={styles.search} placeholder="Search players" value={search} onChangeText={setSearch} autoCapitalize="none" accessibilityLabel="Search players" />
           <FilterSheet
             groups={filterGroups}
             values={filterValues}
+            showChips={false}
             resultCount={filterResultCount}
             onApply={(next) => {
               setPosition(singleValue(filterGroups[0], next));
               setAgeFilter(singleValue(filterGroups[1], next) as AgeFilter);
               setStatusFilter(singleValue(filterGroups[2], next) as StatusFilter);
               setAvailabilityFilter(singleValue(filterGroups[3], next) as AvailabilityFilter);
+              setViewMode(singleValue(filterGroups[4], next) as 'list' | 'grid');
             }}
           />
-          <ViewModeToggle value={viewMode} onChange={setViewMode} />
-          <View style={styles.rankingsLabel}>
-            <AppText style={styles.rankingsLabelText}>Rankings</AppText>
-            <InfoMark
-              label="player rankings"
-              lines={["Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap any player for the full breakdown."]}
-            />
-          </View>
-        </View>
-      </GlassCard>
+        </PageControlRow>
+      </View>
+      {error ? <ErrorState compact title="Couldn't load players" message={error} onRetry={() => setReloadToken((n) => n + 1)} /> : null}
 
       {loading ? (
         <SkeletonList label="players" count={7} />
@@ -518,6 +492,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
             filtered.length > 0 ? (
               <>
                 {idpSelected ? <AppText style={styles.idpNote}>{idpMethodNote(idp)}</AppText> : null}
+                <AppText style={styles.idpNote}>{"Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position; tap any player for the full breakdown."}</AppText>
                 <ValuesCredit />
               </>
             ) : null
@@ -584,7 +559,8 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: 'transparent' },
-  tabRow: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  controls: { paddingHorizontal: spacing.lg },
+  search: { flex: 1, minWidth: 0, fontSize: 15 },
   prospectsContent: { paddingHorizontal: spacing.lg },
   discoveryCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
   // Position/Age/Status/Availability now render as one wrapping row of

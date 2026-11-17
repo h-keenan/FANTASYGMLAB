@@ -10,7 +10,7 @@ import GridBackground from '../components/GridBackground';
 import { getLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { spacing } from '../theme';
+import { PAGE_TOP_GAP, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CollegeProspects'>;
@@ -47,9 +47,9 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
   if (!resolved) return <SkeletonPage label="Prospects" layout="list" topInset={headerHeight} />;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         <BrandHeaderBar />
         <CollegeScoutingPanel onOpenProspect={(prospect) => navigation.navigate('CollegeProspectDetail', { prospect })} />
       </ScrollView>
@@ -61,6 +61,6 @@ function createStyles() {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    content: { paddingHorizontal: spacing.lg },
+    content: { paddingHorizontal: spacing.lg, paddingTop: PAGE_TOP_GAP },
   });
 }
