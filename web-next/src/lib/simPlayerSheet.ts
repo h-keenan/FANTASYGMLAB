@@ -59,6 +59,28 @@ export function simOutlookBand(detail: Pick<SimPlayerDetailResponse, "weeks">): 
   return pts.length > 0 ? pts : null;
 }
 
+/**
+ * The Sim player's weekly series in the ONE shape the shared `WeeklyPointsPanel` / `WeeklyPointsChart` take (the same shape the Desk
+ * PQV feeds it): actual weeks, the projection band, and the gap kinds (bye, injured) so the chart draws the same honest dashed
+ * gaps and break markers as the Desk chart. There is no Sim-specific chart component.
+ */
+export function simWeeklySeries(detail: Pick<SimPlayerDetailResponse, "history" | "weeks" | "ros">): {
+  weeks: { week: number; fantasy_points_ppr: number | null; snap_share: null }[];
+  projection: WeeklyProjectionPoint[] | null;
+  byeWeeks: number[];
+  injuredWeeks: number[];
+} {
+  const future = detail.weeks ?? [];
+  const bye = new Set<number>(future.filter((w) => w.bye).map((w) => w.week));
+  if (detail.ros?.bye_week) bye.add(detail.ros.bye_week);
+  return {
+    weeks: simActualPoints(detail).map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null })),
+    projection: simOutlookBand(detail),
+    byeWeeks: [...bye],
+    injuredWeeks: future.filter((w) => w.out && !w.bye).map((w) => w.week),
+  };
+}
+
 export interface SimHeaderTag {
   key: string;
   label: string;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SimPlayerWeek } from "./simGame";
-import { simActualPoints, simAvailabilityLine, simHeroGrade, simProjectionBand, simProjectionIsFlat, simRosLine } from "./simPlayerSheet";
+import { simActualPoints, simAvailabilityLine, simHeroGrade, simProjectionBand, simProjectionIsFlat, simRosLine, simWeeklySeries } from "./simPlayerSheet";
 
 const wk = (week: number, projection: number, extra: Partial<SimPlayerWeek> = {}): SimPlayerWeek => ({ week, projection, floor: projection * 0.3, ceiling: projection * 1.7, bye: false, out: false, ...extra });
 
@@ -38,5 +38,23 @@ describe("hero grade (the PQV adapter)", () => {
   it("hands the hero a letter grade and nothing numeric", () => {
     expect(simHeroGrade({ grade: "A-", grade_range: ["B+", "A"], grade_uncertain: true })).toEqual({ grade: "A-", grade_range: ["B+", "A"], grade_uncertain: true });
     expect(simHeroGrade({ grade: null })).toBeNull();
+  });
+});
+
+describe("simWeeklySeries", () => {
+  it("feeds the shared chart: actual, band, bye and injured gap kinds", () => {
+    const series = simWeeklySeries({
+      history: [{ week: 1, points: 10 }, { week: 2, points: 14 }],
+      weeks: [
+        { week: 3, projection: 12, floor: 6, ceiling: 20, bye: false, out: false },
+        { week: 4, projection: 0, floor: 0, ceiling: 0, bye: true, out: false },
+        { week: 5, projection: 0, floor: 0, ceiling: 0, bye: false, out: true },
+      ],
+      ros: null,
+    });
+    expect(series.weeks.map((w) => w.fantasy_points_ppr)).toEqual([10, 14]);
+    expect(series.projection?.map((p) => p.week)).toEqual([3]);
+    expect(series.byeWeeks).toEqual([4]);
+    expect(series.injuredWeeks).toEqual([5]);
   });
 });
