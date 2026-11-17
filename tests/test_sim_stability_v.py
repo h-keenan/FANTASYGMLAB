@@ -38,15 +38,15 @@ def old():
 def test_gate_and_serialization():
     for raw in ({}, {"mode": "dynasty", "seasons": 3}):
         s = GameSettings.parse(raw)
-        assert STABILITY_VERSION == 3 and s.stability_v == 3 and s.stable and s.stable2 and s.stable3 and s.to_dict()["stability_v"] == 3
-        assert GameSettings.from_dict(s.to_dict()).stability_v == 3
+        assert STABILITY_VERSION == 4 and s.stability_v == 4 and s.stable and s.stable2 and s.stable3 and s.stable4 and s.to_dict()["stability_v"] == 4
+        assert GameSettings.from_dict(s.to_dict()).stability_v == 4
     d = GameSettings.parse({}).to_dict()
     mid = GameSettings.from_dict({**d, "stability_v": 1})  # a save made while stability_v 1 was current: the first generation of the rules, not the second
-    assert mid.stability_v == 1 and mid.stable and not mid.stable2 and not mid.stable3 and mid.to_dict()["stability_v"] == 1
+    assert mid.stability_v == 1 and mid.stable and not mid.stable2 and not mid.stable3 and not mid.stable4 and mid.to_dict()["stability_v"] == 1
     d.pop("stability_v")
     old = GameSettings.from_dict(d)
     assert old.stability_v == 0 and not old.stable and not old.stable2 and "stability_v" not in old.to_dict()
-    assert rules.UPGRADABLE_FLAGS["stability_v"] == (3, rules.SEASON) and "stability_v" in rules.FLAGS
+    assert rules.UPGRADABLE_FLAGS["stability_v"] == (4, rules.SEASON) and "stability_v" in rules.FLAGS
 
 
 def test_old_curves_and_progress_unchanged_by_default():
@@ -188,21 +188,21 @@ def test_ten_seasons_stay_stationary_under_v2(new2):
 
 
 def test_a_stability_1_dynasty_upgrades_to_2_at_the_next_offseason_and_replays():
-    """A save made on stability_v 1 (everything else current) is offered exactly stability_v 3; seasons already built stay as they were, the next ones age under the
+    """A save made on stability_v 1 (everything else current) is offered exactly stability_v 4; seasons already built stay as they were, the next ones age under the
     flatter curves, and the log replays to the same digest."""
 
     from tests import test_sim_realism_update as ru
 
     mid = replace(GameSettings.parse({"mode": "dynasty", "seasons": 4, "start_year": 2026, "rookie_rounds": 2, "scoring": "ppr", "user_slot": 4}), stability_v=1)
-    assert rules.pending_flags(mid, []) == {"stability_v": 3}
+    assert rules.pending_flags(mid, []) == {"stability_v": 4}
     snap, state, em = ru._dynasty((1, "offseason"), 4, ru.MODEL, mid)
     plain = ru._dynasty(None, 4, ru.MODEL, mid)[0]
     (entry,) = state.rules
-    assert entry["flags"] == {"stability_v": 3} and entry["bounds"] == {"stability_v": "season"} and entry["view_from"] == 3
+    assert entry["flags"] == {"stability_v": 4} and entry["bounds"] == {"stability_v": "season"} and entry["view_from"] == 3
     view = snap.under(state.rules)
     for season in (1, 2):
         assert dict(view.season_view(season).players) == dict(plain.season_view(season).players)
-    assert view.season_view(2).settings.stability_v == 1 and view.season_view(3).settings.stability_v == 3
+    assert view.season_view(2).settings.stability_v == 1 and view.season_view(3).settings.stability_v == 4
     assert dict(view.season_view(3).players) != dict(plain.season_view(3).players)
     assert ru._replay(snap, em) == state.digest()
 

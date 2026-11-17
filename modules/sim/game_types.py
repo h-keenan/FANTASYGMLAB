@@ -48,7 +48,7 @@ AGING_VERSION = 1  # 1 = position hazard curves x role/production retirement, fl
 LIMIT_VERSION = 1  # 1 = a roster over the limit never blocks advancing, only acquiring players (0 = a save from before it: over the limit blocks Advance and Start season)
 WORLD_VERSION = 1  # 1 = the simulated NFL world conserves usage: a backup QB sits unless the starter is out, a team's RB/WR/TE group cannot run far past its baseline, dynasty depth charts follow the players and rookies go where there is need (0 = a save from before it: none of that, replays exactly as it did)
 ECON_VERSION = 1  # 1 = the league economy follows consensus value: AI managers will not sell below the market for a user deal, pick values follow the rookies they become, an injury discounts a player by the share of the season he misses (0 = a save from before it: none of that, replays exactly as it did)
-STABILITY_VERSION = 3  # 3 = WR / TE persistence (a lighter pull to the typical starter for WR / TE, see aging.REVERSION_V3); 2 = late-career aging that holds the panel's year-over-year ratios (flatter knots from 25, a lighter pull to the typical starter) and a last-season carry fitted per position to the panel's persistence; 1 = long-run stability: season outcomes feed back into next year's projection, early-career growth in the age curves, a self-correcting rookie supply, AI-AI trades held to consensus value and without picks, a middle-tier supply controller that keeps depth from thinning (0 = a save from before it: none of that, replays exactly as it did)
+STABILITY_VERSION = 4  # 4 = the 30-season soak fixes (docs/audits/2026-11-sim-longrun.md): a veteran's market carries a year's production change at the pool's own price elasticity (it flattened and deflated the top of the market), and a quarterback class's depth response may reach 1.2 x the 12th veteran (the QB12-32 depth thinned 15-20 percent); 3 = WR / TE persistence (a lighter pull to the typical starter for WR / TE, see aging.REVERSION_V3); 2 = late-career aging that holds the panel's year-over-year ratios (flatter knots from 25, a lighter pull to the typical starter) and a last-season carry fitted per position to the panel's persistence; 1 = long-run stability: season outcomes feed back into next year's projection, early-career growth in the age curves, a self-correcting rookie supply, AI-AI trades held to consensus value and without picks, a middle-tier supply controller that keeps depth from thinning (0 = a save from before it: none of that, replays exactly as it did)
 VORP_VERSION = 1  # 1 = trades value a player by production over the league's starter line (not just the free-agent wire), so a backup QB in a one-QB league is no asset, and a counter asks for the smallest fair add (0 = a save from before it: replays exactly as it did)
 POS_VERSION = 1  # 1 = a kicker / defense trades like any position: the AI values one by the upgrade over its own starter, resolves a second one by cutting the worse, its NEEDS tag and its valuation share one source, and a K/DEF can go on the trade block (0 = a save from before it: a team keeps just one, so a trade that gives it a second is refused)
 ADVICE_VERSION = 1  # 1 = the draft hint / auto-pick weigh value (ADP), need against starting slots, positional scarcity and runs, byes and injury, and say why (0 = a save from before it: the hint_v 1 ADP-plus-need rule, replays exactly as it did)
@@ -301,6 +301,11 @@ class GameSettings:
     def rookie_sized(self) -> bool:
         """rookie_v 1+ (on top of the stability rules and the league-anchored class): the scarcity controllers size a rookie class like for like with the league's level."""
         return self.rookie_v >= 1 and self.stable and self.league_anchor
+
+    @property
+    def stable4(self) -> bool:
+        """stability_v 4+: the long-run soak fixes (market follows production, quarterback class depth)."""
+        return self.stability_v >= 4
 
     @property
     def stable3(self) -> bool:

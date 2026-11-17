@@ -131,20 +131,20 @@ def test_pending_flags_for_old_new_and_non_dynasty_saves():
 
 
 def test_a_flag_that_gets_a_newer_generation_is_offered_again():
-    """stability_v 3 follows 2 and 1: a save on 1 (made while 1 was current) is offered 2, and so is one an earlier update took 0 -> 1; a flag is never offered twice at one value."""
+    """stability_v 4 follows 3, 2 and 1: a save on 1 (made while 1 was current) is offered 2, and so is one an earlier update took 0 -> 1; a flag is never offered twice at one value."""
 
     new = GameSettings.parse({"mode": "dynasty", "seasons": 3, "start_year": 2026, "rookie_rounds": 2})
     mid = dataclasses.replace(new, stability_v=1)
-    assert rules.pending_flags(mid, []) == {"stability_v": rules.UPGRADABLE_FLAGS["stability_v"][0]} and rules.UPGRADABLE_FLAGS["stability_v"][0] == 3
+    assert rules.pending_flags(mid, []) == {"stability_v": rules.UPGRADABLE_FLAGS["stability_v"][0]} and rules.UPGRADABLE_FLAGS["stability_v"][0] == 4
     old = _old_settings(mode="dynasty", seasons=3, start_year=2026, rookie_rounds=2)
     first = rules.make_entry({"stability_v": 1}, seq=5, week=2, season_no=1, status="in_season", view_no=1)
-    assert rules.pending_flags(old, [first])["stability_v"] == 3
-    second = rules.make_entry({"stability_v": 3}, seq=9, week=4, season_no=2, status="in_season", view_no=2)
+    assert rules.pending_flags(old, [first])["stability_v"] == 4
+    second = rules.make_entry({"stability_v": 4}, seq=9, week=4, season_no=2, status="in_season", view_no=2)
     assert "stability_v" not in rules.pending_flags(old, [first, second]) and "stability_v" not in rules.pending_flags(old, [second])
-    assert rules.scheduled_values([first, second]) == {"stability_v": 3}
+    assert rules.scheduled_values([first, second]) == {"stability_v": 4}
     # the later entry wins for the seasons it governs
     assert first["view_from"] == 2 and second["view_from"] == 3
-    assert rules.generation_settings(old, [first, second], 2).stability_v == 1 and rules.generation_settings(old, [first, second], 3).stability_v == 3
+    assert rules.generation_settings(old, [first, second], 2).stability_v == 1 and rules.generation_settings(old, [first, second], 3).stability_v == 4
 
 
 def test_decision_and_generation_settings_follow_the_boundary():

@@ -10,17 +10,32 @@ from modules.sim.game_setup import build_snapshot
 from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_types import GameSettings
 from modules.sim.game_actions import cut_player
+from modules.sim.game_mode import SEASON_CHOICES
 from modules.sim.game_eval import Evaluator, USER_PARAMS
 
 
-def run(seed, n_seasons, teams=12, flags=None, profiles=False):
+def _market_by_mean(snap):
+    """Mean market value of the players at each position's projection rank 1-6 / 7-12 / 13-24 / 25+ (is the price of a level of production drifting?)."""
+    out = {}
+    for pos in ("QB", "RB", "WR", "TE"):
+        ps = sorted((q for q in snap.players.values() if q.pos == pos), key=lambda q: -q.mean)
+        for name, lo, hi in (("1-6", 0, 6), ("7-12", 6, 12), ("13-24", 12, 24), ("25+", 24, 999)):
+            g = ps[lo:hi]
+            if g:
+                out[f"{pos}{name}"] = sum(q.market for q in g) / len(g)
+    return out
+
+
+def run(seed, n_seasons, teams=12, flags=None, profiles=False, superflex=False):
     """``flags``: GameSettings overrides, e.g. ``{"incumbent_v": 0, "defense_v": 0}`` for a before/after run. ``profiles``: also record each skill
     player's hidden season profile (``prof``: projection, season multiplier, archetype, rookie flag) for the season-variance reports."""
     model_id = game_scoring.default_model().model_id
     pool, byes = tail_report.pool_from_panel(dataset.load_panel())
-    base = GameSettings.parse({"mode": "dynasty", "teams": teams, "user_slot": 3, "start_year": 2026, "seasons": n_seasons, "rookie_rounds": 3, "scoring": "ppr"})
+    base = GameSettings.parse({"mode": "dynasty", "teams": teams, "user_slot": 3, "start_year": 2026, "seasons": n_seasons if n_seasons in SEASON_CHOICES else 20, "rookie_rounds": 3, "scoring": "ppr", **({"superflex": True} if superflex else {})})
+    from dataclasses import replace
+    if n_seasons not in SEASON_CHOICES:  # a soak plays past the product cap of 20 (or an odd length)
+        base = replace(base, seasons=n_seasons)
     if flags:
-        from dataclasses import replace
         base = replace(base, **flags)
     root = build_snapshot(pool, byes, base, seed, scoring_model=model_id)
     state = GameState(root)
@@ -28,6 +43,7 @@ def run(seed, n_seasons, teams=12, flags=None, profiles=False):
     auto_for_user(DraftContext(root, state), em, seed)
     finish_draft(em, root, state, seed)
     out = []
+    seen = dict(tx=0, ev=0, ret=0)
     while True:
         snap = root.season_view(state.view_no)
         sd = dyn.season_seed(seed, state.view_no)
@@ -71,7 +87,20 @@ def run(seed, n_seasons, teams=12, flags=None, profiles=False):
         wins = {t: (state.stand[t]["w"] + 0.5 * state.stand[t]["t"]) / S.regular_weeks for t in snap.tids}
         pfs = {t: state.stand[t]["pf"] for t in snap.tids}
         comp = {t: dict(Counter(snap.players[p].pos for p in state.rosters[t] if p in snap.players)) for t in snap.tids}
-        out.append(dict(prof=prof, season=state.season_no, champ=state.champion, user=snap.user_team.tid, weekly=weekly, margins=margins,
+        mk = lambda p_: snap.players[p_].market if p_ in snap.players else None
+        evs = (em.events if hasattr(em, "events") else [])[seen["ev"]:]
+        seen.update(ev=len(getattr(em, "events", [])))
+        evc = Counter(e["type"] for e in evs)
+        soak = dict(ev_counts=dict(evc), trades=[(sum(mk(x) or 0 for x in e["payload"].get("give", [])), sum(mk(x) or 0 for x in e["payload"].get("get", []))) for e in evs if e["type"] == "trade"],
+                    n_waiver=evc.get("waiver_result", 0), n_drop=evc.get("drop", 0),
+                    n_injuries=sum(len(e["payload"].get("items") or []) for e in evs if e.get("type") == "injury"),
+                    retired_total=len(state.retired), starters_age=[snap.players[pid].age for t in snap.tids for _, pid in state.lineups[t] if pid in snap.players and snap.players[pid].pos in ("QB", "RB", "WR", "TE")],
+                    roster_ages=[snap.players[pid].age for t in snap.tids for pid in state.rosters[t] if pid in snap.players],
+                    pick_owner_n=len(state.pick_owner), pool_by_pos=dict(Counter(p_.pos for p_ in snap.players.values())),
+                    mm_rows=[(q.pos, q.mean, q.market, q.age) for q in snap.players.values()],
+                    mkt_by_mean=_market_by_mean(snap),
+                    rookie_mkts=sorted((p_.market for pid, p_ in snap.players.items() if pid.startswith("R")), reverse=True)[:36])
+        out.append(dict(soak=soak, prof=prof, season=state.season_no, champ=state.champion, user=snap.user_team.tid, weekly=weekly, margins=margins,
                         slot_pts={k: list(v) for k, v in slot_pts.items()}, pl=pl, team_val=team_val, team_age=team_age, wins=wins,
                         pfs=pfs, comp=comp, nplayers=len(snap.players),
                         nfl={pid: p.nfl_team for pid, p in snap.players.items()}, depth={pid: p.extra.get("depth_chart_order") for pid, p in snap.players.items()},
