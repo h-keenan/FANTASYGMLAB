@@ -6,7 +6,6 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import ErrorState from '../components/ErrorState';
 import SectionHeading from '../components/SectionHeading';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -200,7 +199,6 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
       <View style={styles.root}>
         <GridBackground />
         <View style={{ paddingTop: headerHeight, paddingHorizontal: spacing.lg }}>
-          <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
           <PremiumLock
             feature="draft_center"
             leagueName={leagueName}
@@ -227,7 +225,6 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <View style={styles.scopeRow}>
           <SegmentedTabBar<DraftTab>
             options={[

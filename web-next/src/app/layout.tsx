@@ -13,7 +13,7 @@ import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { GmOrb } from "@/components/GmOrb";
 import { PasswordRecoveryGate } from "@/components/PasswordRecoveryGate";
 import { PrivacyPill } from "@/components/PrivacyMode";
-import { Header } from "@/components/Header";
+import { AppHeader } from "@/components/AppHeader";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { DeferredTradeOutcomePrompt } from "@/components/DeferredTradeOutcomePrompt";
 import { BRAND_NAME } from "@/lib/brand";
@@ -93,7 +93,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                       (/, /news, /portfolio, ...) would otherwise fail to
                       prerender — but a floating button popping in a beat after
                       first paint is far less noticeable than a missing header. */}
-                  <Header />
+                  <AppHeader />
                   {children}
                 </AppContentShell>
                 <Suspense fallback={null}>

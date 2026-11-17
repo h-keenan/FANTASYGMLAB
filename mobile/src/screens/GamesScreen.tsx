@@ -7,7 +7,6 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AppText from '../components/AppText';
 import { SkeletonPage } from '../components/Skeleton';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
@@ -79,7 +78,6 @@ export default function GamesScreen({ route, navigation }: Props) {
   return (
     <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         <PageFamilyTabs family="league" active="games" leagueId={leagueId} leagueName={leagueName} padded={false} />
         <PageControlRow testID="games-controls">

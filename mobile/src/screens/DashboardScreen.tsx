@@ -69,12 +69,10 @@ import TodayHero from '../components/TodayHero';
 import StartHereCard from '../components/StartHereCard';
 import NextSteps from '../components/NextSteps';
 import { useAuth } from '../context/AuthContext';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
 import ToneBadge from '../components/ToneBadge';
 import { trackUse } from '../lib/analytics';
-import { requestOrbSearch } from '../lib/orbEvents';
 import { WATCH_TAG_LABEL, watchSummary, watchTagKind, watchTitle, watchTrendDirection } from '../lib/dashboardWatch';
 import BrandMark from '../components/BrandMark';
 import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
@@ -368,13 +366,16 @@ export default function DashboardScreen({ route, navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerButtonRow}>
+          <PressableScale hitSlop={8} onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName, focus: 'alerts' })} accessibilityRole="button" accessibilityLabel="Alerts">
+            <Ionicons name="notifications-outline" size={20} color={colors.textPrimary} />
+          </PressableScale>
           <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
           <EvaluationLensHeaderButton leagueId={leagueId} />
           <GmStanceHeaderButton leagueId={leagueId} />
         </View>
       ),
     });
-  }, [navigation, leagueId, styles]);
+  }, [navigation, leagueId, leagueName, colors, styles]);
 
   // Matches the previous useFocusEffect's cadence (always re-check on
   // regaining focus) but through React Query: invalidating marks each query
@@ -498,7 +499,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} title="Dashboard" onSearch={requestOrbSearch} />
       {/* Module order: lib/dashboardLayout.ts DASHBOARD_MODULE_ORDER (same on web). */}
       {session?.user?.id ? (
         <StartHereCard

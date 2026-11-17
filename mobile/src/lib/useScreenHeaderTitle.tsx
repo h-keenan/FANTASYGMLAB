@@ -5,7 +5,8 @@ import ScreenHeaderTitle from '../components/ScreenHeaderTitle';
 import { headerTitleFor } from './appHeader';
 
 /**
- * Sets the two-line (screen + league) native-stack header title. See ScreenHeaderTitle.
+ * THE app header title: the two-line (screen + league) native-stack header title. See ScreenHeaderTitle. The in-content BrandHeaderBar
+ * that used to stack a second header under it is gone (header rewrite phase 7); a screen's header actions go in its own `headerRight`.
  * Rule 1 (lib/appHeader.ts `headerTitleFor`): a tab page's name is the bottom pill's job, so its header shows the league only.
  */
 export function useScreenHeaderTitle(

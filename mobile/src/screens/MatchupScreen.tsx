@@ -19,7 +19,6 @@ import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import { SkeletonPage } from '../components/Skeleton';
 import { PlannerBar, SwapSheet, useLineupPlanner } from '../components/MatchupPlanner';
@@ -264,7 +263,6 @@ export default function MatchupScreen({ route, navigation }: Props) {
           style={styles.container}
           contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
         >
-          <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <PageFamilyTabs family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} padded={false} />
           <PageStatusLine context={guillotine.week != null ? <AppText style={styles.weekLabel}>Week {guillotine.week}</AppText> : null} testID="matchup-status-line" />
           <GuillotineCard data={guillotine} />
@@ -321,7 +319,6 @@ export default function MatchupScreen({ route, navigation }: Props) {
           <RefreshControl refreshing={matchupQuery.isRefetching} onRefresh={() => void matchupQuery.refetch()} />
         }
       >
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <PageFamilyTabs family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} padded={false} />
         <PageStatusLine
           context={

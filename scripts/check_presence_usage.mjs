@@ -31,7 +31,6 @@ const PATTERNS = [
 export const ALLOWED = {
   // Popovers / dropdowns anchored to a trigger (they position against it; the wrapper transform would re-anchor them).
   "web-next/src/components/AlertsDropdown.tsx": "dropdown with its own overlay shell",
-  "web-next/src/components/Header.tsx": "menus with their own overlay shells",
   "web-next/src/components/GmOrb.tsx": "orb sheet with its own shell",
   "web-next/src/components/TrialAccountGate.tsx": "swaps between two forms (not an expander)",
   // Modal / sheet mounts: the shell animates itself (Sheet / SheetModal), the flag only mounts it.

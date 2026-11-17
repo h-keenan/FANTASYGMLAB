@@ -5,7 +5,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -95,7 +94,6 @@ export default function TradesScreen({ route, navigation }: Props) {
   return (
     <View style={styles.root}>
       <View style={[styles.topSection, { paddingTop: headerHeight }]}>
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <PageFamilyTabs
           family="trades"
           active={TRADES_FAMILY_KEY[activeTab]}

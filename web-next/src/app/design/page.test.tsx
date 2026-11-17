@@ -11,6 +11,11 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+vi.mock("@/context/ValuationLensContext", async () => {
+  const actual = await vi.importActual<typeof import("@/context/ValuationLensContext")>("@/context/ValuationLensContext");
+  return { ...actual, useValuationLens: () => ({ lens: "Dynasty", setLens: vi.fn() }) };
+});
+
 describe("/design reference page", () => {
   it("is noindex and excluded from the sitemap", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));

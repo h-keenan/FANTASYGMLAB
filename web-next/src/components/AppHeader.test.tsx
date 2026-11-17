@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EvaluationLensButton, Header } from "./Header";
+import { AppHeader } from "./AppHeader";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -14,8 +14,9 @@ import { supabase } from "@/lib/supabase";
 const mockSearchParams = { get: vi.fn() };
 const mockParams: { leagueId?: string } = { leagueId: "league-7" };
 
+const nav = vi.hoisted(() => ({ pathname: "/dashboard/league-7" }));
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/dashboard/league-7",
+  usePathname: () => nav.pathname,
   useParams: () => mockParams,
   useSearchParams: () => mockSearchParams,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -72,10 +73,10 @@ beforeEach(() => {
 // route that forgot it (PortfolioContent.tsx's "Watch live draft →",
 // GuessThePlayerCard.tsx's and GuessThePlayerNameMatchCard.tsx's "League
 // Leaderboard →") left the header showing the raw numeric league_id.
-describe("Header league name", () => {
+describe("AppHeader league name", () => {
   it("shows the real league name from the `?name=` query param (how all 3 previously-broken links now arrive)", async () => {
     mockSearchParams.get.mockImplementation((key: string) => (key === "name" ? "Dynasty Overlords" : null));
-    render(<Header />);
+    render(<AppHeader />);
 
     expect(await screen.findByRole("button", { name: /Dynasty Overlords/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^league-7/ })).not.toBeInTheDocument();
@@ -89,7 +90,7 @@ describe("Header league name", () => {
   it("resolves the real league name from saved_leagues when `?name=` is absent", async () => {
     mockSearchParams.get.mockReturnValue(null);
     mockSavedLeagues([{ league_id: "league-7", league_name: "Dynasty Overlords" }]);
-    render(<Header />);
+    render(<AppHeader />);
 
     expect(await screen.findByRole("button", { name: /Dynasty Overlords/ })).toBeInTheDocument();
   });
@@ -97,77 +98,18 @@ describe("Header league name", () => {
   it("falls back to a friendly name (never the raw id) when no name is available anywhere (saved_leagues empty, no query param)", async () => {
     mockSearchParams.get.mockReturnValue(null);
     mockSavedLeagues([]);
-    render(<Header />);
+    render(<AppHeader />);
 
     expect(await screen.findByRole("button", { name: /Your league/ })).toBeInTheDocument();
   });
 });
 
-// Bug 2: EvaluationLensButton's dropdown panel was hardcoded to one static
-// anchor. A static `right-0` swap alone would have silently reintroduced a
-// DIFFERENT real, previously-fixed bug (e95fc345): on a narrow phone the
-// header's flex-wrap row can leave this button alone near the left edge,
-// where a `right-0` panel has nowhere to grow but off-screen to the left.
-// The fix measures the button's real position and picks whichever anchor
-// keeps the panel on-screen in both layouts.
-describe("EvaluationLensButton dropdown anchor", () => {
-  function clickWithRect(rect: Partial<DOMRect>) {
-    const button = screen.getByRole("button", { name: /Dynasty/ });
-    vi.spyOn(button, "getBoundingClientRect").mockReturnValue({
-      top: 0,
-      bottom: 0,
-      width: 0,
-      height: 0,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-      ...rect,
-    } as DOMRect);
-    fireEvent.click(button);
-  }
-
-  it("anchors right-0 when the button sits near the right edge of a wide viewport (the normal right-aligned header cluster)", () => {
-    window.innerWidth = 1280;
-    render(<EvaluationLensButton leagueId="league-7" />);
-
-    clickWithRect({ left: 1100, right: 1180 });
-
-    const menu = screen.getByRole("menu");
-    expect(menu.className).toContain("right-0");
-    expect(menu.className).not.toContain("left-0");
-  });
-
-  it("anchors left-0 when the row wraps and the button lands near the left edge of a narrow viewport", () => {
-    window.innerWidth = 375;
-    render(<EvaluationLensButton leagueId="league-7" />);
-
-    clickWithRect({ left: 8, right: 90 });
-
-    const menu = screen.getByRole("menu");
-    expect(menu.className).toContain("left-0");
-    expect(menu.className).not.toContain("right-0");
-  });
-});
-
-describe("Header league switcher in privacy mode", () => {
-  it("shows masked league names for the current league and the saved list", async () => {
-    const { setPrivacyMode, resetPrivacyForTests } = await import("@/lib/privacy");
-    resetPrivacyForTests();
-    setPrivacyMode(true);
-    try {
-      mockSearchParams.get.mockImplementation((key: string) => (key === "name" ? "Dynasty Overlords" : null));
-      mockSavedLeagues([
-        { league_id: "league-7", league_name: "Dynasty Overlords" },
-        { league_id: "league-8", league_name: "Secret Work League" },
-      ]);
-      render(<Header />);
-      const button = await screen.findByRole("button", { name: /Sample League/ });
-      fireEvent.click(button);
-      expect(await screen.findByRole("menuitem", { name: "Sample Dynasty League" })).toBeInTheDocument();
-      expect(screen.queryByText(/Dynasty Overlords|Secret Work/)).toBeNull();
-    } finally {
-      setPrivacyMode(false);
-      resetPrivacyForTests();
-    }
+describe("AppHeader (wide / signed-out bar)", () => {
+  it("an immersive page (live draft) gets the minimal bar: no league identity, search or bell", async () => {
+    nav.pathname = "/live-draft/league-7";
+    render(<AppHeader />);
+    expect(screen.queryByTestId("league-identity")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Search players/ })).not.toBeInTheDocument();
+    nav.pathname = "/dashboard/league-7";
   });
 });

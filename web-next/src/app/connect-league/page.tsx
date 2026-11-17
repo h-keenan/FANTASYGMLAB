@@ -14,7 +14,7 @@ import { storeCurrentPathForReturnAfterSignIn } from "@/lib/protectedRouteReturn
 // SleeperImportForm (the real "load my Sleeper leagues, pick one, save it"
 // flow) already existed and already supports adding a league on top of
 // ones a signed-in user already has (api.saveLeague is additive, not a
-// replace — Header.tsx's LeagueSwitcherButton lists every saved_leagues
+// replace — AppHeader.tsx's league switcher lists every saved_leagues
 // row). It just had no route of its own once a user was already past
 // onboarding: "/" auto-redirects anyone with 1+ saved leagues straight to
 // their Dashboard/Portfolio before this form ever renders again. This page

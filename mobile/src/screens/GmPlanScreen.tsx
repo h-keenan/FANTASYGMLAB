@@ -20,7 +20,6 @@ import { abbreviatePlayerName } from '../lib/formatPlayerName';
 import { tradeIdeaSummaryParts } from '../lib/tradeIdeaSummary';
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
@@ -404,7 +403,6 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
 
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: orbClearance }]}

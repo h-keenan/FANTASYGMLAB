@@ -24,7 +24,7 @@ describe("ui pass 5 picks", () => {
   });
 
   it("D5: gold stays off non-premium surfaces (lens name, rank tiles, posture/stance, waiver tones, Draft Capital)", () => {
-    const header = read(WEB, "components/Header.tsx");
+    const header = read(WEB, "components/AppHeader.tsx");
     expect(header).not.toMatch(/color-premium[^\n]*\n[^\n]*\{leagueName/);
     for (const rel of [
       "components/SnapshotTile.tsx",

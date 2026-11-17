@@ -5,7 +5,6 @@ import PressableScale from '../components/PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import Input from '../components/Input';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
@@ -115,7 +114,6 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
 
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
-      <BrandHeaderBar />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         <AnimatedCard style={styles.headerCard}>
           <View style={styles.headerRow}>

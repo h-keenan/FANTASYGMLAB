@@ -15,9 +15,9 @@ import { captureAttribution } from "@/lib/attribution";
  *
  * A tiny dedicated component (not inlined in RootLayout) so the rest of the
  * shell doesn't need to re-render on every pathname change just for this —
- * same reasoning as Header.tsx's HeaderLeagueControls split. usePathname
+ * same reasoning as AppHeader.tsx's WideLeagueControls split. usePathname
  * alone (unlike useSearchParams) doesn't force this subtree dynamic, so no
- * Suspense wrapper is needed here (Header.tsx's own HeaderPageTitle already
+ * Suspense wrapper is needed here (AppHeader.tsx's own HeaderPageTitle already
  * uses usePathname directly, unwrapped, for the same reason).
  */
 export function RouteAnalytics() {

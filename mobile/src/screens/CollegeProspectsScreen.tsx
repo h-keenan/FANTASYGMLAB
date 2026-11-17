@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
@@ -50,7 +49,6 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-        <BrandHeaderBar />
         <CollegeScoutingPanel onOpenProspect={(prospect) => navigation.navigate('CollegeProspectDetail', { prospect })} />
       </ScrollView>
     </View>

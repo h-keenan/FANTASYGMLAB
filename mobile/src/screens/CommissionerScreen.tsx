@@ -8,7 +8,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
 import { SkeletonList } from '../components/Skeleton';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
@@ -123,7 +122,6 @@ export default function CommissionerScreen({ route, navigation }: Props) {
   return (
     <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         {body}
         {data && !query.isLoading && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}

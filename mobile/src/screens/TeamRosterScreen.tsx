@@ -11,7 +11,6 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnalyticsSection from '../components/AnalyticsSection';
 import AnimatedCard from '../components/AnimatedCard';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import { SkeletonPage } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -216,7 +215,6 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
         style={styles.container}
         contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
       >
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <SectionHeading
           title={`${ownerName}'s roster`}
           info={<InfoMark label="this roster" lines={[`${ownerName}'s full roster in ${leagueName} — real value, rank, and role data for every player they own, grouped by position.`]} />}

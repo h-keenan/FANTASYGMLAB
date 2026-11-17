@@ -7,7 +7,7 @@ import { InfoMark } from "@/components/ui/InfoMark";
 
 const noopSubscribe = () => () => {};
 
-/** DOM id of the slot Header.tsx renders next to the page name. */
+/** DOM id of the slot AppHeader.tsx renders next to the page name. */
 export const PAGE_INFO_SLOT_ID = "page-info-slot";
 /** Same slot in the phone shell header (ShellHeader.tsx); the visible one wins. */
 export const SHELL_PAGE_INFO_SLOT_ID = "shell-page-info-slot";
@@ -19,7 +19,7 @@ function visibleInfoSlot(): HTMLElement | null {
 
 /**
  * The one page heading for league pages. The persistent top bar
- * (Header.tsx HeaderPageTitle) already shows the page name and the league
+ * (AppHeader.tsx HeaderPageTitle) already shows the page name and the league
  * picker already shows the league, so repeating a big visible title pushed
  * the real content down the phone viewport (coridian_, 2026-11-06). The
  * <h1> stays in the DOM, visually hidden, so screen readers and the document

@@ -11,7 +11,7 @@ import { Input, Select } from "@/components/Input";
 import { SkeletonBlock, SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { Toggle } from "@/components/Toggle";
 import { ErrorState } from "@/components/ErrorState";
-import { LeagueSwitcherButton } from "@/components/Header";
+import { LeagueIdentity } from "@/components/ShellHeader";
 import { InfoMark } from "@/components/ui/InfoMark";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -879,7 +879,7 @@ export function DesignSystemContent() {
             Watchlist
           </SectionHeading>
         </Spec>
-        <Spec name="Page header" path="web-next/src/components/Header.tsx (+ page-level h1 using --font-page-title)" note="App header is global; shown here is the page-title treatment pages use.">
+        <Spec name="Page header" path="web-next/src/components/AppHeader.tsx (+ page-level h1 using --font-page-title)" note="App header is global; shown here is the page-title treatment pages use.">
           <div className="flex flex-col gap-1">
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               Sample League
@@ -887,17 +887,9 @@ export function DesignSystemContent() {
             <h1 style={{ font: "var(--font-page-title)" }}>Page title</h1>
           </div>
         </Spec>
-        <Spec name="LeagueSwitcherButton" path="web-next/src/components/Header.tsx" note="League switcher chip (tap to open the menu).">
+        <Spec name="LeagueIdentity" path="web-next/src/components/ShellHeader.tsx" note="League identity button (crest, name, lens); tap opens the league switcher sheet.">
           <div className="flex gap-2 flex-wrap">
-            <LeagueSwitcherButton
-              leagueId="a"
-              leagueName="Sample Dynasty League"
-              leagues={[
-                { league_id: "a", league_name: "Sample Dynasty League" },
-                { league_id: "b", league_name: "Second League" },
-              ]}
-            />
-            <LeagueSwitcherButton leagueId="" leagueName={null} leagues={[]} />
+            <LeagueIdentity leagueId="a" name="Sample Dynasty League" onOpen={() => {}} />
           </div>
         </Spec>
       </Family>
