@@ -141,3 +141,86 @@ opened) re-renders. Verified statically (tsc clean, 979 lib tests pass); no devi
 /trade-analyzer 191 -> 197. `check_perf_budget.mjs` passes on all routes (no regression over budget). Dashboard growth is the Today
 rebuild's page code (about 62 KB gz of route-only chunks, no heavy shared dependency). Trial: lazy-loading the two mini-game cards in
 "More" saved only 1 KB gz, so it was not kept. No budget change.
+
+## Round 3 (2026-11-17, after the UI batches #2031-#2045)
+
+Method: same `scripts/bench_endpoints.py` harness, same machine and load; "base" is a clean `git archive` of the Round 2 commit
+(8f1cf007) run on the same box, so regressions from the UI batches are real, not noise. Volatile-stripped response bodies for all 19 endpoints are
+byte-identical before/after every backend change (`diff -rq`). Web numbers come from a production `next build` at 390px; the Today harness is new
+(`scripts/perf/desk_cold.mjs`: 4x CPU, 4G or fast3g profile, API mocked from the bench bodies and delayed by each endpoint's measured cold/warm server time).
+
+### Regressions found and fixed (PR #2046, merged 7b76d6b9)
+
+| Endpoint | Round 2 base | main before | After | Cause |
+|---|---:|---:|---:|---|
+| my-team warm p50 | 22.6 ms | 49.6 ms | 25.4 ms | handcuff role (`_role_adjustment`) scanned the whole player pool per projected player; now a (team, position) index built once per lookup dict |
+| matchup warm p50 | 50.4 ms | 78.5 ms | 38.1 ms | same |
+| team sheet warm p50 | 60.0 ms | 72.1 ms | 60.7 ms | same |
+| waivers warm p50 | 98.2 ms | 128.6 ms | 101.8 ms | shared waiver source built a `positive.loc[idx]` Series up to 3x per candidate; one `to_dict("records")` pass |
+| dashboard cold (first league) | 3.65 s | 6.5 s | 4.2 s | waiver-alternative guardrail built the need model for all 12 rosters (480 uncached swaps) to read one; `league_needs(only_roster_ids=...)` |
+| dashboard `defer_trade_ideas` cold | 1.0 s | 2.4 s | 1.2 s | same (the Today tile's waiver pick) |
+| trade hub cold | 1.4 s | 2.6 s | 1.3 s | same |
+| leagues-glance cold | 2.2 s | 4.4 s | 1.9 s | same |
+
+Trade-idea search (the 2.5 s cold in `build_trade_ideas`): profile shows 2.0 s of it was `_waiver_alternative_for_need -> select_top_waiver_opportunity ->
+shared_waiver_adds -> league_needs` (12 rosters x ~40 `evaluate_swap`), not the swap/overflow engine. League-wide calibration is unchanged; only the assessed
+roster set shrinks, so the entry is identical (`tests/test_perf_round3.py`: subset equals the full table's entry, a cached full table serves a subset, and
+`select_top_waiver_opportunity` returns identical rows). `build_trade_ideas` 2.5 s -> about 0.7 s. The `ranked.sort()` TypeError in
+`_iter_blockbuster_send_packages` was already fixed on main (8386dc77, total-order key, `test_elite_acquisition_blockbuster.py`).
+
+### Cold Today at 390px (PR #2050)
+
+Cold waterfall (4G, 4x CPU): HTML + 22 scripts (335 KB gz) -> hydrate -> first API request at 0.87 s -> `GET /v1/leagues/{id}` (lens detection) -> only then the
+four above-the-fold requests (team-rankings, matchup, needs, dashboard), +0.14 s later on the fixture and about +0.8 s with a realistic cold Sleeper league fetch.
+Fix: those requests no longer wait for lens detection (Dynasty, the common case, keeps the lens; a redraft league remounts on the right lens on its first visit only, and the skeleton
+holds until detection settles).
+
+| Today, useful content, fast3g, median of 3 | main | #2050 |
+|---|---:|---:|
+| cold, league fetch 800 ms | 4685 ms | 3998 ms |
+| cold, league fetch 150 ms | 4024 ms | 3972 ms |
+| 4G, league fetch 150 ms | 2.28 s | 2.23 s |
+
+Breakdown of the remaining fast3g cold (about 4.0 s): 2.6 s before the first API request (script download of 335 KB gz at 1.6 Mbps plus parse and hydrate), 1.2 s server time
+of the deferred dashboard, the rest render. The 2.5 s target holds on 4G; on fast3g the JS download is the floor.
+
+### Server verdict: latency/waterfall, not capacity
+
+Local container (bench harness, stub Sleeper/Supabase at 30 ms nominal, 1 process, 431 MB max RSS for the whole run):
+
+| Endpoint | cold ms (cpu ms) | warm p50 / p95 ms | cold upstream calls (Sleeper / Supabase REST) |
+|---|---:|---:|---:|
+| dashboard `defer_trade_ideas` | 1230 (982) | 31.4 / 69.1 | 8 / 3 |
+| team rankings | 555 (428) | 21.0 / 24.4 | 18 / 1 |
+| matchup | 417 (142) | 38.1 / 38.8 | 8 / 2 |
+| my team | 438 (250) | 25.4 / 29.9 | 6 / 2 |
+| trade hub | 1294 (1026) | 5.3 / 6.5 | 15 / 4 |
+| waivers | 1081 (793) | 101.8 / 103.7 | 9 / 4 |
+| leagues-glance | 1854 (1583) | 1.7 / 2.3 | 8 / 4 |
+
+Warm is 20-100 ms and cold is 75-85% CPU (the Python is computing, not waiting on Sleeper or Supabase: even 8 serial 30 ms upstream calls are at most 240 ms of a 1.2 s cold).
+With 4 workers and a quiet box (the owner's under 10% RAM / low CPU) there is spare capacity; what a user feels is that every visit is cold: the valued-frame and derived
+caches expire after 120 s (`VALUED_PLAYERS_FRAME_TTL_SECONDS`, `derived_cache` TTL), so low traffic means nearly every visit recomputes (1.2 s deferred dashboard, 3.4 s for a worker's very
+first request), then waits behind JS download and the fetch chain. Lead for a next pass: stale-while-revalidate plus a background precompute on league open, keyed on the players fingerprint instead of a 120 s bucket.
+
+### Web bundles (`next build`, first-load JS raw KB; budget from `perf-budget.json`)
+
+UI batches added about 10 KB raw (3 KB gz) to the shared chunks of every route (e.g. `/_not-found` 889 -> 900, `/dashboard` 1089 -> 1092); `/news` grew 982 -> 998 and was
+over its 989 budget (CI red). PR #2047: the News League tab (pulls in all of Recaps) is a `next/dynamic` chunk: `/news` 998 -> 957, budget ratcheted 989 -> 985.
+Checked statically (no regression found): `PageStatusLine` (65 lines, no state), `CompactModule` (two window listeners per module via `useSyncExternalStore`, cheap),
+`PlayerAvatar` fallback (`pickAvatarSource`, per-id failure state), `verdictTone` (pure table lookups).
+
+### App (static; no device build per the TestFlight limit) (PR #2051)
+
+Eager import closure of `index.ts`: 263 project files, 1.6 MB source. `api.ts` pulled the 155 KB `simGame.ts` (221 runtime exports) onto the launch path through one helper
+(`simDynastyPaths`); it moved to `simPaths.ts`. `App.tsx` imported the Inter barrel so Metro bundled all 18 weights (exported assets 10 MB -> 6.1 MB with the five used).
+Already good: screens are lazy `require()`s, ads is a no-op shim. Remaining startup candidates (not changed, need a device to verify): `PlayerQuickViewSheet` (32 KB),
+`PercentileExplorerSheet` (29 KB) and `PortfolioStanding` (31 KB) are eager though only mounted on tap; `configureRevenueCat()` runs in the first effect before fonts finish.
+Mobile list re-render counts were not re-measured (no device); the Round 2 memoization is unchanged.
+
+### Still slow
+
+- Cold per-league CPU: `plan_trade_overflow` (about 31 `evaluate_swap` per idea, 24 ideas in leagues-glance cold = 3 s profiled) needs a candidate bound, not a cache.
+- 120 s cache TTLs make every low-traffic visit cold (above).
+- First-load JS 335 KB gz on Today; on fast3g the download alone is about 2 s.
+- Web per-page cold/warm for Matchup, Team, League, Players, Waivers, Trades, Sim Home were not browser-measured (only Today has a harness); their API and bundle numbers are above.
