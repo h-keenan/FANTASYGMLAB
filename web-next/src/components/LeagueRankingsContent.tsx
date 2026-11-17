@@ -21,12 +21,12 @@ import {
   playoffOddsReasonMessage,
   RANK_BOARD_CONFIG,
   sortByBoard,
-  sortByStanding,
   teamBadgeTone,
   teamRankingsReasonMessage,
   type RankBoardKey,
   boardScoreText,
 } from "@/lib/leagueRankingsPresentation";
+import { STANDINGS_EMPTY, STANDINGS_KICKER, STANDINGS_NOTE, sortByStanding, standingsSummaryParts, standingsTitle } from "@/lib/leagueStandings";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { TeamAvatar } from "@/components/TeamAvatar";
@@ -243,37 +243,30 @@ function YourStandingCard({ teams, myRosterId }: { teams: TeamRanking[]; myRoste
 type OpenManager = (rosterId: string, teamName: string, ownerName: string | null, avatarUrl: string | null) => void;
 
 function StandingsSection({ data, myRosterId, onOpenManager }: { data: LeagueTeamRankingsResponse; myRosterId: string; onOpenManager: OpenManager }) {
-  const title = data.season ? `${data.season} Standings` : "Standings";
+  const title = standingsTitle(data.season);
 
   if (!data.standings_available) {
     return (
       <section className="flex flex-col gap-3">
         <SectionHeading
-          kicker="Where you stand"
-          note="Actual results from league matchups — separate from Roster Power strength."
+          kicker={STANDINGS_KICKER}
+          note={STANDINGS_NOTE}
         >
           {title}
         </SectionHeading>
-        <EmptyState title={data.standings_message || "Standings will populate once regular-season results are available."} />
+        <EmptyState title={data.standings_message || STANDINGS_EMPTY} />
       </section>
     );
   }
 
   const ordered = sortByStanding(data.teams);
-  const first = ordered[0];
-  const me = ordered.find((team) => team.roster_id === myRosterId);
-  const recordOf = (team: TeamRanking) => `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ""}`;
-  const standingParts = [
-    first ? { key: "first", text: `1. ${first.team_name || "Team"} ${recordOf(first)}`, strong: true } : null,
-    me && me.standing_rank != null ? { key: "you", text: `You ${formatRank(me.standing_rank, false)} · ${recordOf(me)}`, tone: "accent" as const } : null,
-    { key: "n", text: `${ordered.length} teams` },
-  ];
+  const standingParts = standingsSummaryParts(ordered, myRosterId);
 
   return (
     <section>
       <CompactModule id="league.standings" title={title} parts={standingParts}>
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {`${data.week_label ? `${data.week_label} — ` : ""}Actual results from league matchups — separate from Roster Power strength.`}
+        {`${data.week_label ? `${data.week_label} — ` : ""}${STANDINGS_NOTE}`}
       </p>
       <div className="glass-surface flex flex-col">
         {ordered.map((team) => {

@@ -365,6 +365,10 @@ export interface TeamRanking {
   /** Standings place and playoff-line label; null/absent until the league has standings. */
   standing_rank?: number | null;
   playoff_status?: string | null;
+  win_pct_label?: string | null;
+  points_for_label?: string | null;
+  points_against_label?: string | null;
+  on_playoff_line?: boolean;
   power_rank: number | null;
   power_rank_tied: boolean;
   franchise_rank: number | null;
@@ -420,6 +424,9 @@ export interface LeagueTeamRankingsResponse {
   teams: TeamRanking[];
   reason: string;
   standings_available?: boolean;
+  standings_message?: string;
+  season?: string;
+  week_label?: string;
 }
 
 // Real Monte-Carlo rest-of-season simulation result for one team — see

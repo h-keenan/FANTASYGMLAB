@@ -25,6 +25,7 @@ import FilterDropdownButton from '../components/FilterDropdownButton';
 import { ViewTabs } from '../components/PageControlRow';
 import TeamAvatar from '../components/TeamAvatar';
 import PlayoffOddsPanel from './PlayoffOddsPanel';
+import LeagueStandingsModule from '../components/LeagueStandingsModule';
 import { ReSettle } from '../components/Motion';
 import NextSteps from '../components/NextSteps';
 import ValuesCredit from '../components/ValuesCredit';
@@ -461,6 +462,23 @@ function RankingsPanel({
       }),
     [navigation, leagueId, leagueName],
   );
+  const avatarIdByRoster = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const row of baseRows) map[String(row.rosterId)] = row.avatarId;
+    return map;
+  }, [baseRows]);
+  const openStandingsTeam = useCallback(
+    (team: TeamRanking) => {
+      const base = baseRows.find((row) => String(row.rosterId) === team.roster_id);
+      setProfileTeam({
+        rosterId: team.roster_id,
+        teamName: team.team_name || base?.teamName || 'Team',
+        ownerName: team.owner_name || base?.ownerName || '',
+        avatarId: base?.avatarId ?? '',
+      });
+    },
+    [baseRows],
+  );
   const lastTeamIndex = teams.length - 1;
   const renderTeamItem = useCallback(
     ({ item, index }: { item: TeamRow; index: number }) => (
@@ -526,6 +544,14 @@ function RankingsPanel({
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
             {myRanking ? <YourStandingCard me={myRanking} total={teamRankingsQuery.data?.teams.length ?? 0} colors={colors} styles={styles} /> : null}
+            {teamRankingsQuery.data ? (
+              <LeagueStandingsModule
+                data={teamRankingsQuery.data}
+                myRosterId={String(baseRows.find((row) => row.isMine)?.rosterId ?? '')}
+                avatarIdByRoster={avatarIdByRoster}
+                onOpenTeam={openStandingsTeam}
+              />
+            ) : null}
             <SectionHeading title={config.title} info={<InfoMark label={config.infoLabel} lines={[config.infoText]} />} />
           </View>
         }
