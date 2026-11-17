@@ -1272,6 +1272,15 @@ export interface PlayersResponse {
   players: Record<string, PlayerSummary>;
 }
 
+/** One position-relevant raw stat plus its position-group percentile (Players' stat sort). Mirrors web-next. */
+export interface RankedPlayerStat {
+  key: string;
+  label: string;
+  value: number;
+  format: 'count' | 'yards' | 'td' | 'points' | 'ppg' | 'share' | 'rate';
+  percentile: number | null;
+}
+
 export interface RankedPlayer {
   player_id: string;
   name: string | null;
@@ -1297,6 +1306,8 @@ export interface RankedPlayer {
    * that position's pool was too thin to rank against. Optional for the
    * same hand-built-row reason as `usage_trend` above. */
   overall_rating?: number | null;
+  /** Position-relevant stats from GET .../rankings (Players stat sort); absent on hand-built rows. */
+  stats?: RankedPlayerStat[];
 }
 
 export interface LeagueRankingsResponse {
