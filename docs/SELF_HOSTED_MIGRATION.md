@@ -585,6 +585,26 @@ point `REDIS_URL` at a Redis instance shared with something else, keep
 that "disposable, no data of record" assumption true for whatever else
 shares it, or give this stack its own instance/database index instead.
 
+### 7.6. Weekly-stats cache volume and boot-time self-heal
+
+The Sleeper weekly-stats season caches (`sleeper_player_stats_<season>.json` plus the
+`.weeks.json` completeness manifests) live on the named volume `stats_cache`, mounted at
+`/app/cache/stats` in `mobile-api` (`DYNASTYGM_STATS_CACHE_DIR`; unset means `data/`, the
+dev default). The directory is created and chowned to `appuser` in the image, so a new empty
+volume is writable on first start. Recreating the container (every autopull deploy) keeps it.
+No `compose down -v` / `docker volume rm fantasygmlab_stats_cache` unless you mean to lose it.
+
+On boot, each `mobile-api` worker starts a background thread (30 s delay, never blocks
+readiness). The worker that wins a non-blocking file lock (`self_heal.lock` in the volume)
+checks the current and previous season; any that is absent, partial, truncated or from before
+manifests is rebuilt via `modules/stats_self_heal.backfill_season` (the same function
+`scripts/backfill_weekly_stats.py` uses), with 5 s pacing between seasons and 30 s / 2 min /
+10 min back-off if Sleeper fails. The outcome is logged (`stats self-heal: ...`), written to
+`self_heal_status.json` in the volume, and shown as `self_heal` on the `weekly_stats` row of
+`/v1/public/data-freshness` (so `ops_health_check` sees it). Disable with
+`DYNASTYGM_STATS_SELF_HEAL=0`. Manual backfill is still
+`docker compose exec mobile-api python scripts/backfill_weekly_stats.py 2025 2026`.
+
 ## 8. Logging and monitoring on the self-hosted box
 
 Render aggregates logs per-service in its dashboard; a self-hosted box

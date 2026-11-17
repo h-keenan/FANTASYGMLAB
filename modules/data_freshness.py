@@ -110,7 +110,20 @@ def weekly_stats_row(now: float, in_season: bool) -> dict[str, Any]:
         base.update(status="fail", detail=f"{age / 3600.0:.1f}h old (limit 30h in season)")
     else:
         base.update(status="ok", detail=f"all weeks 1..{report['expected_through']} present")
+    heal = _self_heal_summary()
+    if heal:
+        base["self_heal"] = heal
+        base["detail"] = f"{base['detail']}; self-heal {heal['state']}"
     return base
+
+
+def _self_heal_summary() -> dict[str, Any] | None:
+    from modules import stats_self_heal
+
+    status = stats_self_heal.read_status()
+    if not status:
+        return None
+    return {k: status.get(k) for k in ("state", "started_at", "finished_at", "seasons") if k in status}
 
 
 def build_report(now: float | None = None, data_dir: str = "data") -> dict[str, Any]:

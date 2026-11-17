@@ -146,8 +146,13 @@ services:
       # customer-unsafe debug/premium-override switches by default. See
       # docs/SELF_HOSTED_MIGRATION.md.
       DYNASTYGM_SELF_HOSTED: "1"
+      # Weekly-stats cache + completeness manifests live on the named volume below so a
+      # container recreate (every autopull deploy) keeps them; the app self-heals gaps at boot.
+      DYNASTYGM_STATS_CACHE_DIR: "/app/cache/stats"
     env_file:
       - .env
+    volumes:
+      - stats_cache:/app/cache/stats
     # See this file's top-of-file resource-limit comment for the full
     # reasoning: scaled up from the old single-worker 4g/2.0 to cover N
     # worker processes, each with its own copy of the warmed player-table
@@ -296,5 +301,6 @@ networks:
     driver: bridge
 
 volumes:
+  stats_cache:
   caddy_data:
   caddy_config:

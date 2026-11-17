@@ -275,6 +275,7 @@ from modules import (
 from modules import derived_cache
 from modules import swr_cache
 from modules import league_prewarm
+from modules import stats_self_heal
 from modules import prefetch
 from modules.frame_records import frame_records
 from modules import player_search
@@ -602,6 +603,7 @@ def _enable_background_sleeper_players_refresh() -> None:
 async def _lifespan(_app: FastAPI):
     _enable_background_sleeper_players_refresh()
     _warm_players_cache_at_startup()
+    stats_self_heal.start_background()  # background; never blocks startup/readiness
     league_prewarm.start_background(PLAYERS_DB_PATH)  # Round 4: re-warm recently active leagues at boot and on a schedule
     yield
 

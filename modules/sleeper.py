@@ -27,7 +27,10 @@ PLAYERS_CACHE_PATH = "data/sleeper_players.json"
 # already prevents this from hammering Sleeper, so shortening the interval
 # doesn't add stampede risk, just a few more cheap background refreshes/hour.
 PLAYERS_CACHE_TTL_SECONDS = 5 * 60
-PLAYER_STATS_CACHE_TEMPLATE = "data/sleeper_player_stats_{season}.json"
+# Directory for the season weekly-stats aggregates + completeness manifests. In production it is a
+# named docker volume (DYNASTYGM_STATS_CACHE_DIR=/app/cache/stats) so a container recreate keeps it.
+STATS_CACHE_DIR = os.environ.get("DYNASTYGM_STATS_CACHE_DIR", "").strip() or "data"
+PLAYER_STATS_CACHE_TEMPLATE = os.path.join(STATS_CACHE_DIR, "sleeper_player_stats_{season}.json")
 PLAYER_STATS_CACHE_TTL_SECONDS = 12 * 60 * 60
 COMPLETED_PLAYER_STATS_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
 # Completed prior seasons are effectively immutable — keep them warm for months.
@@ -1131,6 +1134,9 @@ def normalize_username(username: str) -> str:
 def _ensure_data_dir():
     # exist_ok: several worker processes can get here at the same moment.
     os.makedirs("data", exist_ok=True)
+    stats_dir = os.path.dirname(PLAYER_STATS_CACHE_TEMPLATE)
+    if stats_dir:
+        os.makedirs(stats_dir, exist_ok=True)
 
 
 def _provider_category(label: str) -> str:
