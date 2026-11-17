@@ -44,6 +44,7 @@ export const IDENTICAL = [
   "playerMetaFit.ts",
   "moduleTemplates.ts",
   "tradeIdeaSummary.ts",
+  "trackRecordView.ts",
   "teamStatusModules.ts",
   "chartSeries.ts",
   "verdictTone.ts",

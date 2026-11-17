@@ -159,8 +159,13 @@ const cAsset = (name, position) => ({ name, position, player_id: name.replace(/\
 const COMMUNITY = { ok: true, reaction_emoji: ["\u{1F525}", "\u{1F440}"], trades: [1, 2].map((n) => ({ id: `ct${n}`, send: [cAsset("Test Running Back", "RB")], receive: [cAsset("Opponent Wide Receiver", "WR"), cAsset("Test Tight End", "TE")], verdict: n === 1 ? "worked_out" : "didnt_pan_out", verdict_label: n === 1 ? "Worked out" : "Didn't pan out", confidence: "high", production: { net_points_ppr: 42.5, avg_net_per_week: 4.7, weeks_counted: 9 }, value: { sent_delta_pct: -4, received_delta_pct: 12, net_delta_pct: 8 }, occurred_at: "2026-10-01T12:00:00Z", reactions: { "\u{1F525}": 3 }, my_reactions: [] })) };
 const SHARED = { ok: true, available: true, trades: [] };
 const ME = { ok: true, user: { id: "u1", email: "t@example.com", entitlement: "premium", sleeper_username: "donk", profile_status: "ready", league_cap: 5, trial_ends_at: "" }, premium_benefits: ["Unlimited leagues"], premium_comparison: [{ key: "leagues", label: "Leagues", free: "1", pro: "Unlimited" }] };
+const hAsset = (name, position) => ({ name, position, player_id: name.replace(/\s/g, ""), value_score: 1500 });
+const tOut = (id, outcome, partner, net, source) => ({ id, league_id: LID, partner_team_name: partner, trade_summary: { partner_team_name: partner, send: [hAsset("Test Running Back", "RB")], receive: [hAsset("Opponent Wide Receiver", "WR")], value_edge_label: "Fair", source }, outcome, shared_at: "2026-09-20T12:00:00Z", outcome_recorded_at: "2026-09-21T12:00:00Z", result_summary: net === null ? null : { status: "ready", reason: "", verdict: net > 0 ? "worked_out" : "didnt_pan_out", verdict_label: net > 0 ? "This trade has worked out" : "This trade hasn't paid off yet", confidence: "medium", days_since_trade: 40, production: { net_points_ppr: net, avg_net_per_week: net / 5, weeks_counted: 5 }, value: { sent_delta_pct: -4, received_delta_pct: 6, net_delta_pct: 10 } }, result_computed_at: "2026-10-25T12:00:00Z" });
+const TRADE_HISTORY = { ok: true, outcomes: [tOut("th1", "yes", "Team 2", 34, "advice"), tOut("th2", "yes", "Team 3", -12, "own"), tOut("th3", "no", "Team 4", null, "own")] };
+const hit = (n, right, wrong, rate) => ({ n, right, wrong, even: n - right - wrong, hit_rate: rate, mean_edge_pts: 11.2, reliability: n >= 10 ? "solid" : "early" });
+const TRACK = { ok: true, is_pro: true, basic: { trades_confirmed: 2, trades_graded: 2, worked_out: 1, didnt_pan_out: 1, even: 0, net_points_total: 22, reliability: "too_early" }, advanced: { advice: hit(12, 9, 3, 0.75), own_calls: hit(6, 3, 3, 0.5), followed: hit(8, 6, 2, 0.75), skipped: hit(4, 3, 1, 0.75), compare: { verdict: "within_noise", diff_pts: 4 }, calibration: { high: { ...hit(12, 9, 3, 0.75), supported: true }, medium: { ...hit(3, 2, 1, null), supported: false }, low: { ...hit(0, 0, 0, null), supported: false } }, by_kind: {}, caveat: "Only trades you made can be graded, so trade advice is judged on executed trades." } };
 // path -> fixture for the non-league endpoints; league endpoints nested under /v1/leagues/<id>/ are keyed by their tail.
-const GLOBAL_FIX = { "/v1/scouting/prospects": PROSPECTS, "/v1/community/trades": COMMUNITY, "/v1/community/shared-trades": SHARED, "/v1/community/preferences": { ok: true, opted_out: false }, "/v1/me": ME };
+const GLOBAL_FIX = { "/v1/scouting/prospects": PROSPECTS, "/v1/community/trades": COMMUNITY, "/v1/community/shared-trades": SHARED, "/v1/community/preferences": { ok: true, opted_out: false }, "/v1/me": ME, "/v1/trade-outcomes/history": TRADE_HISTORY, "/v1/decisions/track-record": TRACK };
 // "-missing" routes: the same endpoints answer {} (fixtures off).
 let MISSING = false;
 
@@ -174,6 +179,7 @@ const ROUTES = [
   { name: "players", path: `/players/${LID}?name=Donk`, family: "team", noModules: true },
   { name: "trade-finder", path: `/trade-finder/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true },
   { name: "trade-analyzer", path: `/trade-analyzer/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true, expectText: "The tickle monster" },
+  { name: "trade-history", path: `/trade-history?league=${LID}&name=Donk`, family: "trades", maxTablists: 2, expectText: "+34 pts" },
   { name: "gm-plan", path: `/gm-plan/${LID}?name=Donk`, family: "none", maxTablists: 2 },
   { name: "games", path: `/games/${LID}?name=Donk`, family: "league" },
   { name: "recaps", path: `/league-recaps/${LID}?name=Donk`, family: "league", maxTablists: 3, expandAll: true, noTruncate: true },

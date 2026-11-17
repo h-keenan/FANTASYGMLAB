@@ -262,6 +262,8 @@ describe("ShareTradeButton", () => {
     receive: [{ name: "Opp Wide Receiver", position: "WR", player_id: "opp-wr", value_score: 2000 }],
     valueEdgeLabel: "Realistic",
     valuationLens: "Rebuild",
+    source: "advice",
+    confidence: "High",
   };
 
   it("records the trade after a successful image share", async () => {
@@ -315,6 +317,8 @@ describe("ShareTradeButton", () => {
       receive: [],
       valueEdgeLabel: "Trade Hub idea",
       valuationLens: "Dynasty",
+      source: "advice",
+      confidence: "High",
     });
   });
 

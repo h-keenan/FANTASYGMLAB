@@ -3848,6 +3848,60 @@ export interface RecordTradeShareBody {
   receive: RecordTradeShareAsset[];
   valueEdgeLabel?: string;
   valuationLens?: string;
+  /** "advice" = a recommended Trade Hub idea; "own" = the user's own Analyzer call. Feeds the track record. */
+  source?: "advice" | "own";
+  /** The confidence we showed (High / Medium / Low), used to calibrate advice wording later. */
+  confidence?: string;
+}
+
+/** Decision Memory depth: mirrors modules/decision_log.py build_track_record. */
+export type TrackReliability = "too_early" | "early" | "solid";
+
+export interface TrackHitSummary {
+  n: number;
+  right: number;
+  wrong: number;
+  even: number;
+  hit_rate: number | null;
+  mean_edge_pts: number | null;
+  reliability: TrackReliability;
+}
+
+export interface TrackRecordResponse {
+  ok: boolean;
+  is_pro: boolean;
+  basic: {
+    trades_confirmed: number;
+    trades_graded: number;
+    worked_out: number;
+    didnt_pan_out: number;
+    even: number;
+    net_points_total: number;
+    reliability: TrackReliability;
+  };
+  advanced: null | {
+    advice: TrackHitSummary;
+    own_calls: TrackHitSummary;
+    followed: TrackHitSummary;
+    skipped: TrackHitSummary;
+    compare: { verdict: "too_early" | "within_noise" | "advice_ahead" | "own_ahead"; diff_pts?: number };
+    calibration: Record<"low" | "medium" | "high", TrackHitSummary & { supported: boolean }>;
+    by_kind: Record<string, TrackHitSummary>;
+    caveat: string;
+  };
+}
+
+export interface RecordDecisionBody {
+  kind: "trade_idea" | "waiver_add" | "start_sit" | "stance";
+  rec_key: string;
+  league_id?: string;
+  /** Omit for a "shown" ping; it never downgrades a row already acted on. */
+  action?: "accepted" | "ignored" | "opposite";
+  confidence?: string;
+  recommended_ids?: string[];
+  alternative_ids?: string[];
+  label?: string;
+  names?: string[];
 }
 
 export interface TradeOutcomeHistoryResponse {
@@ -5044,6 +5098,11 @@ export const api = {
   // League-independent like getPortfolio/getNews above: no leagueId param.
   getTradeOutcomeHistory: () =>
     authorizedRequest<TradeOutcomeHistoryResponse>("/v1/trade-outcomes/history"),
+  // Decision Memory: "Your track record" (basic free, advanced Pro) and the
+  // decision log write (fails soft server-side before the SQL is applied).
+  getTrackRecord: () => authorizedRequest<TrackRecordResponse>("/v1/decisions/track-record"),
+  recordDecision: (body: RecordDecisionBody) =>
+    authorizedRequest<{ ok: boolean; reason: string }>("/v1/decisions", { method: "POST", jsonBody: body }),
   // POST /v1/leagues/{id}/trade-outcomes: records a shared trade so the
   // "Did this trade happen?" prompt can ask about it ~a day later. Same
   // body as mobile's api.recordTradeShare.
@@ -5058,6 +5117,8 @@ export const api = {
           receive: body.receive,
           value_edge_label: body.valueEdgeLabel ?? "",
           valuation_lens: body.valuationLens ?? "",
+          source: body.source ?? "own",
+          confidence: body.confidence ?? "",
         },
       },
     ),

@@ -273,6 +273,7 @@ from modules import (
     weekly_box_scores,
     weekly_roundup,
 )
+from modules import decision_log
 from modules import derived_cache
 from modules import swr_cache
 from modules import league_prewarm
@@ -8822,6 +8823,11 @@ class RecordTradeShareRequest(BaseModel):
     # arbitrary default, an apples-to-apples comparison. Missing/unknown
     # values fall back to modules.trade_outcome_results.DEFAULT_LENS.
     valuation_lens: str = ""
+    # Decision Memory: "advice" when this came from a recommended trade idea,
+    # "own" for the user's own Trade Analyzer call; confidence is the label we
+    # showed. Both feed modules.decision_log's track record + calibration.
+    source: str = ""
+    confidence: str = ""
 
 
 @app.post("/v1/leagues/{league_id}/trade-outcomes")
@@ -8867,6 +8873,10 @@ def record_trade_share(
         "value_edge_label": body.value_edge_label.strip()[:40],
         "valuation_lens": body.valuation_lens.strip()[:20],
     }
+    if body.source.strip().lower() in {"advice", "own"}:
+        trade_summary["source"] = body.source.strip().lower()
+    if body.confidence.strip().lower() in decision_log.CONFIDENCES:
+        trade_summary["confidence"] = body.confidence.strip().lower()
     url = auth_supabase.rest_api_url(config, TRADE_OUTCOMES_TABLE)
     headers = auth_supabase.auth_headers(config, str(user.get("_access_token") or ""))
     headers["Prefer"] = "return=minimal"
@@ -9116,6 +9126,88 @@ def get_trade_outcome_history(user: dict[str, Any] = Depends(require_user)) -> d
     if not isinstance(rows, list):
         return {"ok": True, "outcomes": []}
     return {"ok": True, "outcomes": [_project_trade_outcome_history(row) for row in rows if isinstance(row, dict)]}
+
+
+class RecordDecisionRequest(BaseModel):
+    kind: str
+    rec_key: str
+    league_id: str = ""
+    # None = "shown" ping; accepted / ignored / opposite = what the user did.
+    action: str | None = None
+    confidence: str = ""
+    recommended_ids: list[str] = Field(default_factory=list)
+    alternative_ids: list[str] = Field(default_factory=list)
+    label: str = ""
+    names: list[str] = Field(default_factory=list)
+
+
+@app.post("/v1/decisions")
+def record_decision(body: RecordDecisionRequest, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Upsert one decision_log row for the caller (RLS-scoped, own token).
+
+    Fails soft (ok: False) before docs/supabase_decision_log.sql is applied."""
+
+    user_id = str(user.get("id") or "")
+    row = decision_log.normalize_decision(**body.model_dump())
+    if row is None:
+        raise HTTPException(status_code=422, detail="Unrecognised decision.")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+    config = auth_supabase.get_supabase_config()
+    headers = auth_supabase.auth_headers(config, str(user.get("_access_token") or ""))
+    headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
+    url = auth_supabase.rest_api_url(config, decision_log.DECISION_LOG_TABLE, "on_conflict=user_id,rec_key")
+    try:
+        response = requests.post(url, headers=headers, json={**row, "user_id": user_id}, timeout=15)
+    except Exception:
+        return {"ok": False, "reason": "not_available"}
+    if response.status_code >= 400:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+def _rest_rows(config: dict, table: str, query: str, access_token: str) -> list[dict[str, Any]]:
+    try:
+        response = requests.get(
+            auth_supabase.rest_api_url(config, table, query),
+            headers=auth_supabase.auth_headers(config, access_token),
+            timeout=15,
+        )
+        rows = response.json() if response.status_code < 400 else []
+    except Exception:
+        return []
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+@app.get("/v1/decisions/track-record")
+def get_track_record(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Your track record: basic trade outcome history is free; the advanced
+    analytics (advice vs your own calls, calibration) are Pro. Fails soft."""
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    token = str(user.get("_access_token") or "")
+    if not user_id:
+        return decision_log.build_track_record([], [], is_pro=False)
+    profile = _fetch_profile_fields(config, user_id, token)
+    is_pro = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+    trades = _rest_rows(
+        config,
+        TRADE_OUTCOMES_TABLE,
+        f"user_id=eq.{user_id}&outcome=eq.yes&select=outcome,trade_summary,result_summary&limit=200",
+        token,
+    )
+    decisions = (
+        _rest_rows(
+            config,
+            decision_log.DECISION_LOG_TABLE,
+            f"user_id=eq.{user_id}&graded_at=not.is.null&select=kind,action,confidence,result&limit=500",
+            token,
+        )
+        if is_pro
+        else []
+    )
+    return decision_log.build_track_record(trades, decisions, is_pro=is_pro)
 
 
 # ---------------------------------------------------------------------------
