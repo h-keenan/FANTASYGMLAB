@@ -19,7 +19,8 @@ Severity: P0 = wrong or unsafe answer, broken state or exploit. P1 = clearly unr
 | Trade reason names a position the Needs tag and the offer do not support (the "They need a RB" case) | #2021 | merged, `eb0ad6e5` |
 | Desk P0 batch: IR on roster status for pushes and team sheet, FAAB lineup-displacement, backup QB behind a Doubtful starter | #2023 | open at time of writing, merge SHA in the delivery report |
 | `player-model-8`: shallower, rarer busts for top-tier players (the season low tail) | #2027 | open at time of writing, merge SHA in the delivery report |
-| `stability_v 2`: flatter late-career knots, per-position outcome carry and pull (late-career decline, persistence) | see the delivery report | upgradable, season boundary |
+| `stability_v 2`: flatter late-career knots, per-position outcome carry and pull (late-career decline, persistence) | #2029 | merged, `df4dd57e`, upgradable, season boundary |
+| `rookie_v 1`: rookie classes sized like real ones (controllers read the league with the class in it, tapered scarcity, solved and capped depth response) | see the delivery report | upgradable, season boundary, dynasty only |
 
 ### The trade reason that named the wrong position (reported)
 Partner tags NEEDS WR, NEEDS K, DEEP RB, DEEP TE; the user sends a WR and receives an RB; the verdict reason read "They need a RB and this fills it. NEEDS RB".
@@ -77,7 +78,7 @@ star. Experiment (8 seeds, not shipped): flatter knots for ages 25 and up (RB 27
 `stability_v 2` (season boundary, upgradable). The real projection-to-last-year-result correlation is 0.66-0.77 and the sim's is 0.40-0.50, so outcome carry (`OUTCOME_WEIGHT`
 0.5) is probably also low; tune together.
 
-**3. Rookie classes are about three times too strong after the first offseason (P1, proposal, new finding).** Rookies per class inside a position's top-12 by
+**3. Rookie classes are about three times too strong after the first offseason (P1, `rookie_v 1`, cause isolated in the section below).** Rookies per class inside a position's top-12 by
 projection: RB 3.2, WR 2.7, QB 0.9, TE 0.5 (real: RB 0.8, WR 0.0, QB 0.4, TE 0.4 per season; the generated-class audit measured 1.6 in total before `stability_v`).
 The best rookie RB projects at 1.34 times the 12th-best veteran (real 0.88), the top three rookie RBs at 20.0 / 18.4 / 17.1 ppg (real 13.9 / 12.1 / 9.3), WRs
 17.6 / 16.4 / 15.1 (real 12.6 / 11.6 / 10.9). Rookies with a projection of 7+ average 12.7 (RB) and 13.2 (WR) ppg against 10.3 and 9.4 real. In later seasons a quarter of the
@@ -151,6 +152,72 @@ Still open (not reachable by the age curve and carry, and not changed here):
 
 Tests: `tests/test_sim_stability_v.py` (gate and serialization for 0 / 1 / 2, the v3 knots against v2 and earlier, the per-position carry, a digest pin that a `stability_v 1` pool is unchanged, the persistence band, late-career ratios against `stability_v 1`, ten-season
 stationarity under v2, and an end-to-end 1 -> 2 offseason upgrade that replays to the same digest), `tests/test_sim_realism_update.py` (a flag that gets a newer generation is offered again and never twice at one value).
+
+## Sim: rookie class strength (`rookie_v 1`, delivered)
+
+Item 3 of the variance section above, implemented and the cause isolated. Season-boundary flag, dynasty only (`UPGRADABLE_FLAGS["rookie_v"] = (1, "season")`; new dynasties carry `rookie_v 1`, older saves and non-dynasty games 0
+and replay exactly as before: 80 seasons (8 seeds x 10) of `dynasty_run` with `rookie_v 0` compared with the build before this change: projections, weekly team points, champions and every player's games identical;
+digest pin in `tests/test_sim_rookie_v.py`). It sits on the stability rules (`rookie_sized` needs `stability_v 1+` and the league-anchored class) and is measured on top of `stability_v 2`.
+
+### Cause (isolated)
+
+Ablation on `origin/main` before `stability_v 2` (8 seeds x 5 seasons, `SUPPLY_BAND` / `MID_BAND` pinned to (1, 1) through the harness; rookies per position top 12 after the first offseason, best rookie RB against the 12th veteran):
+
+| Variant | RB | WR | QB | TE | best RB / 12th veteran |
+| --- | --- | --- | --- | --- | --- |
+| Real panel 2021-25 | 0.8 | 0.0 | 0.4 | 0.4 | 0.91 |
+| As shipped (both controllers) | 3.59 | 2.59 | 0.64 | 0.62 | 1.37 |
+| `_supply_response` off | 2.88 | 1.97 | 0.56 | 0.41 | 1.28 |
+| `_supply_mid` off | 2.53 | 1.56 | 0.41 | 0.50 | 1.37 |
+| Both off (the slot curve alone) | 1.16 | 1.00 | 0.19 | 0.19 | 1.10 |
+
+The slot curve itself is calibrated (`rookie_audit`: 1.6 rookies per class in a position's top 12 against 1.6 real, class rank 1-6 median 0.87 against 0.88). The excess is the two scarcity controllers, and they are wrong by construction, not just
+strong: they compare the veterans AFTER aging and retirement but BEFORE the class arrives with the season-1 pool, and the season-1 pool is a finished league that already contains its rookies. A position's pre-class pool therefore always reads "short"
+(seed 3, ten seasons: the veterans' top 36 RB average 12.1 / 13.9 / 13.2 / 13.6 / 12.9 / 12.5 against the season-1 pool's 14.6 every offseason, `_supply_response` RB 1.36 / 1.08 / 1.18 / 1.12 / 1.23 / 1.29,
+`_supply_mid` RB 2.2 / 1.13 / 1.59 / 1.42 / 1.64 / 1.78), and the class is asked to refill that gap on top of the class the slot curve already writes. `stability_v` amplified it twice: the middle-tier controller was added with it, and the steep late-career decline plus
+the 0.40 pull kept the veterans' level low, so the controllers never saw the gap close (the stable level they held was an inflated class, not a stable league). `stability_v 2` (previous section) removes much of the second part on its own: RB top 12 3.15 -> 1.64, WR 2.58 -> 0.62, QB 1.72 -> 1.56.
+Taking the controllers' reading alone (like for like, nothing else) only moved RB 3.59 -> 2.56: with the old decline the league was genuinely short, so the depth had to be answered separately (point 4 below). The final flag also stands on its own on a `stability_v 1` save (hold-out seeds 9-16: rookies in a position's top 12 0.74 RB / 0.68 WR / 0.49 QB / 0.24 TE, best rookie RB 1.01, team points 99.4 -> 98.2 over ten seasons, RB 12th 16.2 -> 14.7), so the two upgrades can be taken in either order.
+
+### What `rookie_v 1` does (`game_dynasty.py`)
+
+1. **The controllers read the league with the class in it** (`_class_aware_supply`): the veterans plus the class at neutral strength (slot curve x class factor) against the season-1 pool, so a full league draws no extra and a thin one does.
+2. **The class is sized against this year's 12th veteran** at each position (the yardstick the real classes were measured against), not the season-1 pool's.
+3. **Scarcity does not make the best rookies better than a real class's best** (`_scarcity`): the top-level response tapers from none at slot 1 to full at slot 24 (quarterbacks, whose class is one to three players, are exempt).
+4. **The depth response is solved, not nudged, and capped** (`_depth_response`): the smallest multiplier on the class's middle slots (none through slot 10, full from slot 20) that brings the ranks a roster keeps under its starters back to the season-1 level, within `MID_BAND`, and never lifting a rookie past 0.8 x the 12th veteran:
+   depth comes from usable players drawn out of the middle of the class, not from stars. A proportional step for this tier left RB 24th about 10 percent short in every ten-season run; the solve closes it.
+
+Measured with `python -m modules.sim.calibration.dynasty_tables --seeds 8 --seasons 10 --seed0 8` (hold-out seeds 9-16; design seeds 1-8 and a third set 17-24 give the same picture). Rookies after the first offseason, per season, `stability_v 2` on both sides:
+
+| | Real 2021-25 | stability_v 1 (before both) | stability_v 2, rookie_v 0 (#2029) | rookie_v 1 |
+| --- | --- | --- | --- | --- |
+| QB in position top 12 / top 24 | 0.4 / 1.0 | 1.72 / 2.57 | 1.56 / 2.48 | 0.31 / 2.63 |
+| RB in position top 12 / top 24 | 0.8 / 1.4 | 3.15 / 5.07 | 1.64 / 3.78 | 0.60 / 3.96 |
+| WR in position top 12 / top 24 | 0.0 / 0.4 | 2.58 / 4.56 | 0.62 / 1.62 | 0.47 / 1.79 |
+| TE in position top 12 / top 24 | 0.4 / 1.4 | 0.58 / 2.03 | 0.22 / 0.97 | 0.22 / 1.50 |
+| Best rookie / 12th veteran, QB / RB / WR / TE | 0.97 / 0.91 / 0.82 / 0.99 | 1.18 / 1.38 / 1.23 / 0.93 | 1.13 / 1.10 / 0.94 / 0.74 | 0.93 / 1.00 / 0.97 / 0.82 |
+| Top three projected rookies, RB (ppg) | 13.9 / 12.1 / 9.3 | 20.3 / 18.2 / 16.4 | 17.6 / 15.9 / 14.5 | 16.2 / 13.8 / 12.1 |
+| Top three projected rookies, WR (ppg) | 12.6 / 11.6 / 10.9 | 18.5 / 16.9 / 15.4 | 15.0 / 13.2 / 11.9 | 15.9 / 13.8 / 12.5 |
+| Class rank 1-12 busts (under 0.6 of the projection) | 16% | | 22% | 21% |
+
+Top-12 intrusion is now at the real rate (1.6 rookies per class in all, 1.6 real; it was 8.0 before `stability_v 2`) and the best rookie is about the 12th veteran. The top-24 count is not moved by this flag (RB 3.96, QB 2.63 against 1.4 / 1.0 real): the depth response deliberately puts
+usable players in ranks 13-24 (that is what holds the league's depth), capped at a solid starter. The owner's top-12 bust rate stays about one in five (21-23 percent in every set, 14-26 asserted in the test).
+
+Balance over ten seasons (hold-out seeds 9-16, team points per week and projections at rank 12 / 24). Year 10 is as strong as year 1 (99.4 -> 100.5) and no position's top 12 drifts out of the range the real years span (RB 12th 13.8-17.1, WR 14.2-17.1, QB 19.7-21.9, TE 7.8-10.8, 2021-25):
+
+| Season | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Team points per week, stability_v 1 | 99.4 | 100.5 | 99.6 | 97.3 | 95.7 | 96.9 | 96.7 | 98.4 | 99.7 | 98.1 |
+| Team points per week, stability_v 2 | 99.4 | 102.4 | 101.9 | 101.5 | 100.6 | 100.2 | 98.3 | 99.3 | 101.2 | 100.0 |
+| Team points per week, + rookie_v 1 | 99.4 | 101.4 | 105.1 | 102.5 | 101.7 | 103.7 | 100.8 | 101.0 | 100.0 | 100.5 |
+
+Projections at rank 12 (QB / RB / WR / TE), season 1 -> season 10 with `rookie_v 1`: 20.3 / 16.2 / 15.3 / 9.2 -> 18.7 / 16.6 / 16.5 / 10.2; at rank 24 (RB / WR / TE): 12.7 / 13.7 / 7.3 -> 13.0 / 13.9 / 7.3.
+
+The third set (seeds 17-24) reads the same (team points 101.3 -> 100.6; top-12 rookies 0.42 QB / 0.50 RB / 0.43 WR / 0.29 TE; best rookie 0.99 / 0.96 / 0.96 / 0.85; bust 21 percent), and the design set 100.2 -> 101.4.
+
+Still open: QB 12th is the one level that sits lower (20.3 -> 18.7, real years 19.7-21.9): the 33-QB harness pool has no depth to draw replacement quarterbacks from, so this is partly a harness artefact, and quarterback retirement is an `aging_v` topic. The late-career and persistence tables of the `stability_v 2` section are unchanged by this flag.
+
+Tests: `tests/test_sim_rookie_v.py` (gate, serialization and the stability dependency, the scarcity taper and the capped depth response, a digest pin that a `rookie_v 0` pool is unchanged, class sizing against `rookie_v 0`, the bust rate, ten-season stationarity, and an end-to-end offseason upgrade that replays to the same digest);
+`tests/test_sim_realism_update.py` (`rookie_v` in the old-save flag list and the dynasty-only exclusions).
 
 ## Fantasy Desk findings (trace of every advice surface; repros on fixtures)
 
@@ -250,7 +317,7 @@ TE12 10 percent low. Kicker spread is too steep (K1 +1.4, K12 -0.8; K1 to K12 5.
 
 ## Decisions needed (product)
 1. Ship the late-career age curve and a lower `REVERSION` (`stability_v 2`)? Done as an upgradable offseason change (it changes dynasty values for 27+ players, so it is not silent); the owner may still veto the Realism update copy.
-2. Cap rookie class strength (`rookie_v 1`)? It lowers rookie pick values and the top of the draft board; real classes are far less top-heavy.
+2. Cap rookie class strength (`rookie_v 1`)? Done as an upgradable offseason change (it lowers rookie pick values and the top of the draft board; real classes are far less top-heavy); the owner may still veto the Realism update copy.
 3. Should the AI's posture follow standing (`posture_v`)? It makes the league feel more alive and removes the persona-decides-the-decade effect, at the cost of more volatile AI behaviour.
 4. Should the user's waiver claims be contested by AIs in priority order (`wire_v`)? This ends the "queue the best FA every week" edge.
 5. Desk: should the Today tile and push reminder use the same needs model and posture as the Waivers page (one answer), even if it costs a heavier computation on Today?
@@ -259,7 +326,7 @@ TE12 10 percent low. Kicker spread is too steep (K1 +1.4, K12 -0.8; K1 to K12 5.
 - No live screen was opened; Desk findings come from code and fixtures, Sim findings from headless runs.
 - Real next / this cohorts are 35-40 per position; their p10 intervals are wide and the WR and TE targets are uncertain.
 - The harness pool has 33 QBs, no defense by default and synthetic byes, so QB scarcity and bye clustering are lower bounds. No real team-week baseline exists in the panel.
-- Rookie class strength cause (supply multipliers) is a hypothesis, not isolated. Age knots v3 was tried on 8 seeds only and was not validated on hold-out seeds.
+- (Resolved) Rookie class strength cause and age knots v3 were isolated and validated on hold-out seeds in the `rookie_v 1` and `stability_v 2` sections above.
 - The Desk P1s were reproduced on fixtures, not on a connected league.
 
 ## Reproducing
@@ -268,5 +335,6 @@ PYTHONPATH=. python -m modules.sim.calibration.season_variance_report --seeds 8 
 PYTHONPATH=. python -m modules.sim.calibration.season_variance_report --seeds 8 --seasons 5 --seed0 8 --off    # model-7 behaviour
 PYTHONPATH=. python -m modules.sim.calibration.dynasty_tables --seeds 8 --seasons 10 --seed0 8                                         # stability_v 2 (balance, late career, persistence, rookies)
 PYTHONPATH=. python -m modules.sim.calibration.dynasty_tables --seeds 8 --seasons 10 --seed0 8 --flags '{"stability_v": 1}'            # before
+PYTHONPATH=. python -m modules.sim.calibration.dynasty_tables --seeds 8 --seasons 10 --seed0 8 --flags '{"rookie_v": 0}'              # stability_v 2 without rookie_v (rookie_v 1 is the default)
 pytest tests/test_sim_verdict_reason.py tests/test_faab.py tests/test_push_triggers.py tests/test_team_sheet.py tests/test_projections_v2.py
 ```

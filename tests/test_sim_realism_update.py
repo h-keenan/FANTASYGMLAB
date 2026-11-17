@@ -34,7 +34,7 @@ GOLDEN_OLD = {
     "redraft": "1c4fc89f0f26d9a75c02265a03c0b7252ab92a0a511ead91893a2e0110471fec",
     "dynasty3": "67fa6cb0ebeb536b641b15bbe3b898a30771b8169a3fa8c0d1b634db3822fd84",
 }
-OLD_FLAGS = ("hint_v", "limit_v", "kd_v", "world_v", "aging_v", "names_v", "econ_v", "stability_v", "vorp_v", "advice_v", "incumbent_v", "defense_v", "pos_v", "injury_v")
+OLD_FLAGS = ("hint_v", "limit_v", "kd_v", "world_v", "aging_v", "names_v", "econ_v", "stability_v", "vorp_v", "advice_v", "incumbent_v", "defense_v", "pos_v", "injury_v", "rookie_v")
 
 
 def _old_settings(**extra) -> GameSettings:
@@ -119,7 +119,7 @@ def test_registry_is_well_formed():
 def test_pending_flags_for_old_new_and_non_dynasty_saves():
     old_dyn = _old_settings(mode="dynasty", seasons=3, start_year=2026, rookie_rounds=2)
     assert set(rules.pending_flags(old_dyn, [])) == set(rules.UPGRADABLE_FLAGS)
-    assert set(rules.pending_flags(_old_settings(), [])) == set(rules.UPGRADABLE_FLAGS) - {"aging_v", "names_v", "incumbent_v"}  # redraft has no offseasons
+    assert set(rules.pending_flags(_old_settings(), [])) == set(rules.UPGRADABLE_FLAGS) - {"aging_v", "names_v", "incumbent_v", "rookie_v"}  # redraft has no offseasons
     new = GameSettings.parse({"mode": "dynasty", "seasons": 3, "start_year": 2026, "rookie_rounds": 2})
     assert rules.pending_flags(new, []) == {}
     # a flag an earlier update already covers is never offered twice
@@ -188,7 +188,7 @@ def test_old_logs_without_the_event_are_byte_identical():
 def test_fold_records_the_settings_history_and_the_feed_row():
     snap, state, em = _redraft(upgrade_after=3)
     ev = next(e for e in em.events if e["type"] == "realism_upgrade")
-    assert ev["actor"] == "user" and ev["week"] == 4 and set(ev["payload"]["flags"]) == set(rules.UPGRADABLE_FLAGS) - {"aging_v", "names_v", "incumbent_v"}
+    assert ev["actor"] == "user" and ev["week"] == 4 and set(ev["payload"]["flags"]) == set(rules.UPGRADABLE_FLAGS) - {"aging_v", "names_v", "incumbent_v", "rookie_v"}
     assert len(state.rules) == 1 and state.rules[0]["seq"] == ev["seq"] and state.rules[0]["view_from"] == 2
     assert state.transactions[-1]["type"] == "rules" if False else any(t["type"] == "rules" for t in state.transactions)
     assert "rules" in json.dumps(state.to_dict()) and state.digest() != _redraft(upgrade_after=None)[1].digest()
@@ -279,7 +279,7 @@ def test_an_offseason_update_waits_one_more_season():
         assert dict(root.under(state.rules).season_view(season).players) == dict(plain_root.season_view(season).players)
     assert _replay(root, em) == state.digest()
     rows = rules.rules_info(root.settings, root.under(state.rules).season_view(2).settings, state.rules, "offseason", 2)
-    assert [s["flag"] for s in rows["scheduled"]] == ["aging_v", "names_v", "stability_v", "incumbent_v"] and rows["rules_version"] == 1 and not rows["eligible"]
+    assert [s["flag"] for s in rows["scheduled"]] == ["aging_v", "names_v", "stability_v", "incumbent_v", "rookie_v"] and rows["rules_version"] == 1 and not rows["eligible"]
 
 
 def test_new_rookie_names_do_not_repeat_after_a_names_update():
@@ -334,7 +334,7 @@ def test_endpoint_updates_an_old_save_once_and_exposes_settings_and_rules_versio
     api_advance(client, gid)
     g = _get(client, gid)
     assert g["rules"]["rules_version"] == 0 and g["rules"]["eligible"] and "hint_v" not in g["settings"]
-    assert {r["flag"] for r in g["rules"]["pending"]} == set(rules.UPGRADABLE_FLAGS) - {"aging_v", "names_v", "incumbent_v"}
+    assert {r["flag"] for r in g["rules"]["pending"]} == set(rules.UPGRADABLE_FLAGS) - {"aging_v", "names_v", "incumbent_v", "rookie_v"}
     assert all(r["label"] and r["body"] and r["when"] for r in g["rules"]["pending"]) and g["rules"]["note"]
     res = client.post(f"/v1/sim/games/{gid}/realism-upgrade", headers=hdr()).json()
     assert res["reason"] == "" and res["upgraded"] is True and "world_v" in res["flags"]

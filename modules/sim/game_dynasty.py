@@ -122,6 +122,7 @@ def _anchor_top(root: GameSnapshot) -> dict[str, float]:
 LEVEL_RANKS = {"QB": 24, "RB": 36, "WR": 36, "TE": 24, "K": 18}
 SUPPLY_BAND = (0.85, 1.5)
 SUPPLY_GAIN = 1.6  # class strength follows (league level / current level) ** SUPPLY_GAIN
+SUPPLY_FULL_SLOT = 24  # rookie_v 1: the scarcity response is none at class slot 1 and full from this slot down (see rookie_class)
 
 
 def _level(rows, pos: str) -> float:
@@ -155,6 +156,9 @@ MID_RANKS = {"QB": (13, 24), "RB": (13, 36), "WR": (13, 40), "TE": (7, 18)}
 MID_BAND = (0.9, 4.0)
 MID_GAIN = 3.0
 MID_SLOT_LO, MID_SLOT_HI = 3, 12  # class slots: no effect on the first three, full effect from the twelfth
+ROOKIE_MID_SLOTS = (10, 20)  # rookie_v 1: no effect through slot 10 (those can be a position's top 12), full effect from the twentieth
+SCARCITY_UNTAPERED = ("QB",)  # rookie_v 1: positions whose class is too small to taper the scarcity response over
+DEPTH_CAP = 0.8  # rookie_v 1: the depth response lifts a middle-of-the-class rookie to a solid starter (0.8 x the 12th veteran), never to a star
 
 
 def _mid_level(rows, pos: str) -> float:
@@ -171,6 +175,87 @@ def _supply_mid(base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]]) -> di
         if a > 0 and c > 0:
             out[pos] = min(MID_BAND[1], max(MID_BAND[0], (a / c) ** MID_GAIN))
     return out
+
+
+def _slot_curve(j: int) -> float:
+    """The class slot curve: slot ``j`` (1 = the best rookie) as a share of the position's 12th-best projection."""
+
+    return SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER)
+
+
+def _scarcity(response: float, slot: int, pos: str = "") -> float:
+    """rookie_v 1: the class-wide scarcity response as it reaches class slot ``slot``: none at slot 1 (the best rookie is as good as a real class's
+    best however thin the league is), the full response from ``SUPPLY_FULL_SLOT`` down. A quarterback class is one to three players, so the response
+    reaches all of them (a thin quarterback position draws its replacements from the top of the draft, as real teams reach for one)."""
+
+    if pos in SCARCITY_UNTAPERED:
+        return response
+    return 1.0 + (response - 1.0) * min(1.0, (slot - 1) / (SUPPLY_FULL_SLOT - 1))
+
+
+def _depth_response(mean: float, slot: int, mid: float, ref: float) -> float:
+    """rookie_v 1: the middle-tier response (``mid``, from ``_class_aware_supply``) as it reaches class slot ``slot``: none through ``ROOKIE_MID_SLOTS[0]``,
+    full from ``ROOKIE_MID_SLOTS[1]`` down, and never past ``DEPTH_CAP`` x the position's 12th veteran ``ref`` (depth comes from usable players being drawn
+    out of the middle of the class and the undrafted, not from stars)."""
+
+    lo, hi = ROOKIE_MID_SLOTS
+    deep = 1.0 + (mid - 1.0) * min(1.0, max(0.0, (slot - lo) / (hi - lo)))
+    return min(mean * deep, max(mean, DEPTH_CAP * ref))
+
+
+def _class_aware_supply(
+    base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]], plan: Sequence[str], ref12: Mapping[str, float], factor: float,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """rookie_v 1: the two scarcity controllers, read like for like. ``_supply_response`` and ``_supply_mid`` compare the veterans (aged, retirees
+    gone, the class not yet added) with the season-1 pool, but the season-1 pool is a finished league: it already holds its rookies. A position's
+    pre-class pool therefore always reads "short" by about the share of the league a class makes up, and the controllers asked every class to refill
+    that gap on top of the class the slot curve already writes, which is how a class arrived about three times too strong (best rookie RB 1.3x the
+    12th veteran against 0.9 in the 2021-25 panel, three rookie RBs and WRs in a position's top 12 against under one). Here each controller watches
+    the level of the pool WITH the class: the veterans plus the class at neutral strength (the slot curve x the class factor; the jitter averages
+    out), so a league whose depth is genuinely thin still draws a stronger class and one that is full does not.
+
+    The top-tier response (``supply``) is read first and tapers to nothing at the best slots (see ``_scarcity``). The middle-tier response is then
+    SOLVED, not nudged: the smallest multiplier on the class's middle slots (``_depth_response``) that brings the ranks a roster keeps below its
+    starters back to the season-1 league's level, within ``MID_BAND``. A proportional step left that tier 5-10 percent short in every long dynasty."""
+
+    anchor = _anchor(base)
+    slots: dict[str, list[tuple[int, float]]] = {}
+    for j, pos in enumerate(plan, 1):
+        if pos in ref12 and pos != "K":
+            slots.setdefault(pos, []).append((j, ref12[pos] * _slot_curve(j) * factor))
+    held = {pos: [r["mean"] for r in vets.values() if r["pos"] == pos] for pos in MID_RANKS}
+
+    supply: dict[str, float] = {}
+    for pos in LEVEL_RANKS:
+        if pos == "K":
+            continue
+        a = _level(anchor.values(), pos)
+        means = sorted(held.get(pos, []) + [m for _, m in slots.get(pos, ())], reverse=True)[: LEVEL_RANKS[pos]]
+        c = sum(means) / len(means) if means else 0.0
+        if a > 0 and c > 0:
+            supply[pos] = min(SUPPLY_BAND[1], max(SUPPLY_BAND[0], (a / c) ** SUPPLY_GAIN))
+
+    mid: dict[str, float] = {}
+    for pos, (lo, hi) in MID_RANKS.items():
+        a = _mid_level(anchor.values(), pos)
+        if a <= 0 or pos not in ref12:
+            continue
+
+        def level(m: float, pos: str = pos, lo: int = lo, hi: int = hi) -> float:
+            means = sorted(held[pos] + [_depth_response(v * _scarcity(supply.get(pos, 1.0), j, pos), j, m, ref12[pos]) for j, v in slots.get(pos, ())], reverse=True)[lo - 1: hi]
+            return sum(means) / len(means) if means else 0.0
+
+        m_lo, m_hi = MID_BAND
+        if level(m_lo) >= a:
+            mid[pos] = m_lo
+        elif level(m_hi) <= a:
+            mid[pos] = m_hi
+        else:
+            for _ in range(24):
+                m = 0.5 * (m_lo + m_hi)
+                m_lo, m_hi = (m, m_hi) if level(m) < a else (m_lo, m)
+            mid[pos] = 0.5 * (m_lo + m_hi)
+    return supply, mid
 
 
 def _equilibrium_plan(base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]], by_pos, gen, n: int) -> list[str]:
@@ -243,9 +328,17 @@ def rookie_class(
         by_pos[pos].sort(key=lambda r: (-r["mean"], r["pid"]))
     positions = [p for p in POS_SHARE if p in by_pos]
     ref12 = {p: by_pos[p][min(11, len(by_pos[p]) - 1)]["mean"] for p in positions}
+    if s.rookie_sized:  # rookie_v 1+: a class is sized against THIS year's 12th-best veteran at each position, the yardstick the real classes were measured against
+        for p in positions:
+            now = sorted((r["mean"] for r in vets.values() if r["pos"] == p), reverse=True)
+            if p != "K" and now:
+                ref12[p] = now[min(11, len(now) - 1)]
     plan = _equilibrium_plan(base, vets, by_pos, gen, n) if s.league_anchor else None
-    supply = _supply_response(base, vets) if s.league_anchor else {}
-    supply_mid = _supply_mid(base, vets) if s.league_anchor and s.stable else {}
+    if s.rookie_sized and plan is not None:  # rookie_v 1+: the controllers read the league's level with the class in it (see _class_aware_supply)
+        supply, supply_mid = _class_aware_supply(base, vets, plan, ref12, factor)
+    else:
+        supply = _supply_response(base, vets) if s.league_anchor else {}
+        supply_mid = _supply_mid(base, vets) if s.league_anchor and s.stable else {}
     if plan is not None:
         n = len(plan)
         if "K" in by_pos:
@@ -275,8 +368,11 @@ def rookie_class(
             mean = max(1.5, ks[int(gen.integers(0, len(ks)))]["mean"] * factor ** 0.5 * jitter)
             boost = 1.0
         else:
-            deep = 1.0 + (supply_mid.get(pos, 1.0) - 1.0) * min(1.0, max(0.0, (j - MID_SLOT_LO) / (MID_SLOT_HI - MID_SLOT_LO)))
-            mean = max(1.5, ref12[pos] * SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER) * factor * jitter * supply.get(pos, 1.0) * deep)
+            if s.rookie_sized:  # rookie_v 1+: scarcity draws more usable players out of the middle of the class; it does not make the best rookies better than a real class's best
+                mean = max(1.5, _depth_response(ref12[pos] * _slot_curve(j) * factor * jitter * _scarcity(supply.get(pos, 1.0), j, pos), j, supply_mid.get(pos, 1.0), ref12[pos]))
+            else:
+                deep = 1.0 + (supply_mid.get(pos, 1.0) - 1.0) * min(1.0, max(0.0, (j - MID_SLOT_LO) / (MID_SLOT_HI - MID_SLOT_LO)))
+                mean = max(1.5, ref12[pos] * SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER) * factor * jitter * supply.get(pos, 1.0) * deep)
             if s.stable:  # a class cannot beat the best the league has ever had either: the class strength x scarcity x jitter product reached 3x a starter
                 top = _anchor_top(base).get(pos)
                 if top and mean > top:

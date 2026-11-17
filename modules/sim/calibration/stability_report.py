@@ -35,7 +35,7 @@ BANDS = {"21-22": (21, 22), "23-24": (23, 24), "25-26": (25, 26), "27-28": (27, 
 OLD_MODEL = "player_model-player-model-6"  # the player model of every game made before stability_v
 
 
-def pool_stats(seeds: int = 8, seasons: int = 10, *, stability_v: int = 1, model_id: str | None = None, teams: int = 12) -> dict[str, Any]:
+def pool_stats(seeds: int = 8, seasons: int = 10, *, stability_v: int = 1, model_id: str | None = None, teams: int = 12, rookie_v: int = 0) -> dict[str, Any]:
     rows, byes = tail_report.pool_from_panel(dataset.load_panel())
     if model_id is None:
         from modules.sim import game_scoring
@@ -46,7 +46,7 @@ def pool_stats(seeds: int = 8, seasons: int = 10, *, stability_v: int = 1, model
     rookies: list[tuple[float, float, float]] = []  # (class rank, realized / projection, realized ppg)
     for seed in range(1, seeds + 1):
         base = GameSettings.parse({"mode": "dynasty", "teams": teams, "user_slot": 3, "start_year": 2026, "seasons": seasons, "rookie_rounds": 3, "scoring": "ppr"})
-        root = build_snapshot(rows, byes, replace(base, stability_v=stability_v), seed, scoring_model=model_id)
+        root = build_snapshot(rows, byes, replace(base, stability_v=stability_v, rookie_v=rookie_v), seed, scoring_model=model_id)
         prev: dict[str, tuple[str, float, float]] = {}
         for n in range(1, seasons + 1):
             snap = root.season_view(n)
