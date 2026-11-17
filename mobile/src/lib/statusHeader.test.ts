@@ -119,7 +119,7 @@ describe("FantasyDesk adapters", () => {
     expect(buildTodayStatusHeader({ matchup: null, hero: null, lineup: null, standing: null, attention: [], tradeCount: 0, hrefs })).toBeNull();
   });
   it("Team: holes are the headline; a clean roster leads with Team Value and has no action", () => {
-    const base = { teamValue: "8,000", valuePercentile: 62, leagueSize: 12, context: "62nd percentile", record: "3-5", openSlots: 0, flaggedStarters: 0, injuredStarters: 0, attention: [], hrefs: { lineup: "/l" } };
+    const base = { teamValue: "8,000", valuePercentile: 62, leagueSize: 12, context: "62nd percentile", openSlots: 0, flaggedStarters: 0, injuredStarters: 0, attention: [], hrefs: { lineup: "/l" } };
     const clean = buildTeamStatusHeader(base);
     expect(clean.headline).toBe("Team Value 8,000");
     expect(clean.primary).toBeNull();

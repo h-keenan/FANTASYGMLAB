@@ -342,7 +342,6 @@ export interface TeamStatusInput {
   valuePercentile: number | null;
   leagueSize: number | null;
   context: string | null;
-  record: string | null;
   openSlots: number;
   flaggedStarters: number;
   injuredStarters: number;
@@ -350,13 +349,15 @@ export interface TeamStatusInput {
   hrefs: { lineup: string };
 }
 
-/** My Team: ring = value percentile; headline = Team Value (or the roster hole); stats = record / holes / injured. */
+/**
+ * My Team: ring = value percentile; headline = Team Value (or the roster hole); stats = holes / injured. The record is
+ * NOT here: Team Snapshot owns it (see PAGE_FACT_OWNERS), so the hero never restates it.
+ */
 export function buildTeamStatusHeader(input: TeamStatusInput): StatusHeaderModel {
   const holes = input.openSlots + input.flaggedStarters;
   const pct = input.valuePercentile;
   const ring = pct != null ? statusRing(pct, `${Math.round(pct)}`, `Team value percentile ${Math.round(pct)}${input.leagueSize ? ` of ${input.leagueSize} teams` : ""}`, "accent") : null;
   const stats: StatusMiniStat[] = [];
-  if (input.record) stats.push({ key: "record", label: "Record", value: input.record });
   stats.push({ key: "holes", label: "Holes", value: String(holes), tone: holes > 0 ? "danger" : "success", href: holes > 0 ? input.hrefs.lineup : undefined });
   stats.push({ key: "injured", label: "Injured", value: String(input.injuredStarters), tone: input.injuredStarters > 0 ? "warning" : "success" });
   return statusHeaderModel({
@@ -368,6 +369,64 @@ export function buildTeamStatusHeader(input: TeamStatusInput): StatusHeaderModel
     attention: input.attention,
     primary: holes > 0 ? { label: "Fix lineup", href: input.hrefs.lineup } : null,
   });
+}
+
+/**
+ * One owner module per fact (docs/ui-patterns.md, "One owner per fact"). A page lists each fact once, under the module
+ * that shows it; every other module on that page drops it or links to the owner. `duplicatedFacts` is the guard the
+ * page-model tests run over what each module actually emits.
+ */
+export const PAGE_FACT_OWNERS = {
+  myTeam: {
+    value: "hero",
+    holes: "hero",
+    injured: "hero",
+    record: "snapshot",
+    power: "snapshot",
+    franchise: "snapshot",
+    starter: "snapshot",
+    bench: "snapshot",
+    age: "snapshot",
+    need: "analysis",
+    composition: "composition",
+  },
+  today: {
+    matchup: "matchup",
+    score: "matchup",
+    winChance: "matchup",
+    standing: "tiles",
+    playoffs: "tiles",
+    trades: "tiles",
+    power: "team",
+    franchise: "team",
+    starter: "team",
+    bench: "team",
+    age: "team",
+  },
+} as const;
+
+/** Fact keys that show up in more than one module: `{ fact, modules }[]`. Values are compared case-insensitively. */
+export function duplicatedFacts(modules: Record<string, ReadonlyArray<string>>): { fact: string; modules: string[] }[] {
+  const seen = new Map<string, Set<string>>();
+  for (const [module, facts] of Object.entries(modules)) {
+    for (const fact of facts) {
+      const key = fact.trim().toLowerCase();
+      if (!key) continue;
+      if (!seen.has(key)) seen.set(key, new Set());
+      seen.get(key)!.add(module);
+    }
+  }
+  return [...seen].filter(([, m]) => m.size > 1).map(([fact, m]) => ({ fact, modules: [...m] }));
+}
+
+/** The fact keys a status header model states (its mini stats). */
+export function statusHeaderFacts(model: StatusHeaderModel): string[] {
+  return model.stats.map((s) => s.key);
+}
+
+/** The facts one module of a page owns, from PAGE_FACT_OWNERS. */
+export function factsOwnedBy(page: keyof typeof PAGE_FACT_OWNERS, owner: string): string[] {
+  return Object.entries(PAGE_FACT_OWNERS[page]).filter(([, o]) => o === owner).map(([k]) => k);
 }
 
 export interface SimStatusInput {

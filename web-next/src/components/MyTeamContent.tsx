@@ -248,7 +248,6 @@ export function MyTeamContent({
         : !bestBall && starters.length > 0
           ? `Starters ${formatScore(startersTotalValue)}`
           : null,
-    record: teamRanking ? record : null,
     openSlots: bestBall ? 0 : (myTeam.open_slots ?? []).length,
     flaggedStarters,
     injuredStarters: bestBall ? 0 : starters.filter((p) => p.injury_label && p.injury_label.trim()).length,
