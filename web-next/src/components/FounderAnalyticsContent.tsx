@@ -125,7 +125,7 @@ export function FounderAnalyticsContent({
           className="text-xs font-bold uppercase"
           style={{ color: isDurable ? "var(--color-success)" : "var(--color-warning)", letterSpacing: "0.03em" }}
         >
-          {isDurable ? "Durable — Supabase" : "Host-local only"}
+          {isDurable ? "Durable: Supabase" : "Host-local only"}
         </span>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
           {storage.scope_label}

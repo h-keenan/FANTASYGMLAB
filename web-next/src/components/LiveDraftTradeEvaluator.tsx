@@ -213,7 +213,7 @@ export function LiveDraftTradeEvaluator({
       } else if (response.reason === "assets_not_found") {
         setEvalError("One of the selected assets could not be resolved. Remove it and try again.");
       } else if (response.reason === "no_player_data") {
-        setEvalError("Player data isn't available right now — try again in a bit.");
+        setEvalError("Player data isn't available right now. Try again in a bit.");
       } else {
         setResult({
           send_assets: (response.send_assets ?? []).map(liveDraftAssetToTradeAsset),

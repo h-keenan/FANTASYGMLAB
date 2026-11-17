@@ -91,9 +91,9 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
       { label: "Watchlist", subtitle: "Players you are targeting", keywords: ["watching", "targets", "gm targets"] },
       { label: "Season Outlook", subtitle: "GM Plan forecast: playoff odds and projected finish", keywords: ["forecast", "playoff odds", "championship odds", "title odds", "projection", "projected record", "simulation", "fantasy sim", "rest of season"], pro: true },
     ] },
-  { key: "draft-center", label: "Draft", subtitle: "Your picks, draft posture, and the live draft room", group: "tools", leagueScoped: true, pro: true,
+  { key: "draft-center", label: "Draft", subtitle: "Your picks, draft stance, and the live draft room", group: "tools", leagueScoped: true, pro: true,
     tabs: [
-      { label: "Overview", subtitle: "Draft posture and pick decisions", keywords: ["posture", "capital", "draft center"] },
+      { label: "Overview", subtitle: "Draft stance and pick decisions", keywords: ["posture", "capital", "draft center"] },
       { label: "Picks", subtitle: "Every pick you own", keywords: ["draft picks", "order"] },
       { label: "Live room", subtitle: "Real-time draft room (appears while a draft is live)", keywords: ["live draft", "draft room", "on the clock", "mock"] },
     ] },

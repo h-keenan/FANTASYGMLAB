@@ -29,7 +29,7 @@ export function notReadyReasonMessage(
   if (LEAGUE_LINK_REASONS.has(reason)) return copy.linkAccount;
   if (reason === "empty_roster" && copy.emptyRoster) return copy.emptyRoster;
   if (reason === "no_player_data") {
-    return "Player data isn't available right now — try again in a bit.";
+    return "Player data isn't available right now. Try again in a bit.";
   }
   return null;
 }

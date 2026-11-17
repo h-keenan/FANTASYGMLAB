@@ -1,4 +1,5 @@
 import { BEGINNER_HELP } from "./experienceCopy";
+import { EST_SF_NOTE } from "./adpPresentation";
 import { TERMS } from "./terms";
 
 /**
@@ -30,6 +31,7 @@ import { TERMS } from "./terms";
  */
 
 export const GLOSSARY = {
+  // "Power" / "Power Rank" is the older name for This season; metric ids and API fields keep it.
   powerRank: { label: TERMS.thisSeason, definition: BEGINNER_HELP.powerRank },
   rosterPower: {
     label: "Roster Power",
@@ -65,6 +67,24 @@ export const GLOSSARY = {
     definition:
       "A scoring format that gives tight ends bonus points per reception, raising their dynasty value relative to other positions.",
   },
+  teamStance: { label: "Team stance", definition: BEGINNER_HELP.tradeHubPosture },
+  evaluationLens: {
+    label: "Evaluation lens",
+    definition:
+      "How players are valued across the app. Dynasty weighs future upside alongside this year, Rebuild weights youth and draft picks most, and Redraft counts this season only. Change it from the league menu in the header.",
+  },
+  value: {
+    label: "Value",
+    definition:
+      "A player's worth under this league's settings and your evaluation lens, on one scale used across the app. Higher is better.",
+  },
+  marketAdp: {
+    label: "Market ADP",
+    definition:
+      "Average draft position: where a player is actually being picked in public drafts. Next to it, our rank is where FantasyDesk values the same player, so a gap shows who the market may be missing.",
+  },
+  estSf: { label: "Est. SF", definition: EST_SF_NOTE },
+  faab: { label: "FAAB", definition: BEGINNER_HELP.faab },
 } as const;
 
 export type GlossaryKey = keyof typeof GLOSSARY;

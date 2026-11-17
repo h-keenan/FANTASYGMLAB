@@ -34,7 +34,7 @@ export function tierOpportunityMismatchCaption(
 ): string | null {
   if (!tier || !opportunityLabel) return null;
   if (!LOW_PLAYER_TIERS.has(tier) || !HIGH_OPPORTUNITY_LABELS.has(opportunityLabel)) return null;
-  return `${tier} reflects value over the full season — this role read (${opportunityLabel}) is about right now, and can jump ahead of it fast (e.g. an injury-driven promotion).`;
+  return `${tier} reflects value over the full season. This role read (${opportunityLabel}) is about right now, and can jump ahead of it fast (e.g. an injury-driven promotion).`;
 }
 
 /** "Overall #12 · WR #4" under the header; null when neither rank is known. */

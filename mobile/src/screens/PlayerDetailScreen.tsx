@@ -240,7 +240,7 @@ function rosterRecommendationDetail(rec: RosterRecommendation, tierId: string): 
     return `Suggested starter${slot} on your roster${why ? ` — ${why}` : ''}`;
   }
   return `Not in your suggested starting lineup this week${
-    rec.player.injury_label ? ` — ${rec.player.injury_label}` : ''
+    rec.player.injury_label ? `: ${rec.player.injury_label}` : ''
   }`;
 }
 

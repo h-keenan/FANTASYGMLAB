@@ -410,7 +410,7 @@ describe("MatchupContent", () => {
     render(<MatchupContent leagueName="My League" matchup={byeWeek} />);
 
     expect(screen.getByText("Week 7")).toBeInTheDocument();
-    expect(screen.getByText(/enjoy the bye/)).toBeInTheDocument();
+    expect(screen.getByText(/enjoy the bye/i)).toBeInTheDocument();
   });
 
   it("offseason: no current week", () => {

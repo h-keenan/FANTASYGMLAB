@@ -40,8 +40,8 @@ const MATCHUP_REASON_MESSAGES: Record<string, string> = {
   no_current_week: "This league hasn't started a week yet.",
   no_matchup_data: "Sleeper doesn't have matchups posted for this week yet.",
   roster_not_in_matchups: "Your roster isn't in this week's matchup list.",
-  bye_week: "You're not paired against anyone this week — enjoy the bye.",
-  opponent_roster_missing: "Couldn't load your opponent's roster right now — try again in a bit.",
+  bye_week: "You're not paired against anyone this week. Enjoy the bye.",
+  opponent_roster_missing: "Couldn't load your opponent's roster right now. Try again in a bit.",
 };
 
 const DEFAULT_MATCHUP_MESSAGE = "Couldn't build this week's matchup for this league yet.";

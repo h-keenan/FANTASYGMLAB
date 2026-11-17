@@ -217,7 +217,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
       >
         <SectionHeading
           title={`${ownerName}'s roster`}
-          info={<InfoMark label="this roster" lines={[`${ownerName}'s full roster in ${leagueName} — real value, rank, and role data for every player they own, grouped by position.`]} />}
+          info={<InfoMark label="this roster" lines={[`${ownerName}'s full roster in ${leagueName}. Real value, rank, and role data for every player they own, grouped by position.`]} />}
         />
 
         {ranking ? (

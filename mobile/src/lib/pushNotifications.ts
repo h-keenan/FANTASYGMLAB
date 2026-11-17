@@ -41,7 +41,7 @@ async function getExpoPushToken(): Promise<string | null> {
   const id = projectId();
   if (!id) {
     console.warn(
-      '[push] No EAS project ID configured (app.json extra.eas.projectId) — skipping push token registration.',
+      '[push] No EAS project ID configured (app.json extra.eas.projectId). Skipping push token registration.',
     );
     return null;
   }

@@ -79,7 +79,7 @@ const METRIC_CONFIG: Record<
     pillLabel: 'ROSTER POWER',
     infoLabel: 'How Roster Power works',
     infoText:
-      'Teams are ordered by Roster Power — roster strength (starters + bench), not record — so you can see exactly where every team in the league stacks up. Your team is marked You and highlighted below.',
+      'Teams are ordered by Roster Power: roster strength (starters + bench), not record, so you can see exactly where every team in the league stacks up. Your team is marked You and highlighted below.',
     rank: (team) => team.power_rank,
     tied: (team) => team.power_rank_tied,
   },
@@ -88,7 +88,7 @@ const METRIC_CONFIG: Record<
     pillLabel: 'FRANCHISE',
     infoLabel: 'How the Long term rank works',
     infoText:
-      'Teams are ordered by Long term rank — long-term roster value (youth, talent, draft capital), not just this season’s record. Your team is marked You and highlighted below.',
+      'Teams are ordered by Long term rank: long-term roster value (youth, talent, draft capital), not just this season’s record. Your team is marked You and highlighted below.',
     rank: (team) => team.franchise_rank,
     tied: (team) => team.franchise_rank_tied,
   },
@@ -97,7 +97,7 @@ const METRIC_CONFIG: Record<
     pillLabel: 'DRAFT',
     infoLabel: 'How Draft Capital Rank works',
     infoText:
-      'Teams are ordered by Draft Capital Rank — the value of upcoming draft picks each team holds. Your team is marked You and highlighted below.',
+      'Teams are ordered by Draft Capital Rank: the value of upcoming draft picks each team holds. Your team is marked You and highlighted below.',
     rank: (team) => team.draft_capital_rank,
     tied: (team) => team.draft_capital_rank_tied,
   },
@@ -106,7 +106,7 @@ const METRIC_CONFIG: Record<
     pillLabel: 'STARTERS',
     infoLabel: 'How Starter Rank works',
     infoText:
-      'Teams are ordered by Starter Rank — the combined strength of each team’s starting lineup. Your team is marked You and highlighted below.',
+      'Teams are ordered by Starter Rank: the combined strength of each team’s starting lineup. Your team is marked You and highlighted below.',
     rank: (team) => team.starter_rank,
     tied: (team) => team.starter_rank_tied,
   },
@@ -115,7 +115,7 @@ const METRIC_CONFIG: Record<
     pillLabel: 'BENCH',
     infoLabel: 'How Bench Rank works',
     infoText:
-      'Teams are ordered by Bench Rank — the depth and value of each team’s bench. Your team is marked You and highlighted below.',
+      'Teams are ordered by Bench Rank: the depth and value of each team’s bench. Your team is marked You and highlighted below.',
     rank: (team) => team.bench_rank,
     tied: (team) => team.bench_rank_tied,
   },
@@ -124,7 +124,7 @@ const METRIC_CONFIG: Record<
     pillLabel: 'AGE',
     infoLabel: 'How Age Rank works',
     infoText:
-      'Teams are ordered by Age Rank — average age of starters, youngest roster ranked #1 — so you can see exactly how your team’s timeline compares across the league. Your team is marked You and highlighted below.',
+      'Teams are ordered by Age Rank: average age of starters, youngest roster ranked #1, so you can see exactly how your team’s timeline compares across the league. Your team is marked You and highlighted below.',
     rank: (team) => team.age_rank,
     tied: (team) => team.age_rank_tied,
     detail: (team) => (team.average_age != null ? `${team.average_age.toFixed(1)} yrs avg` : null),

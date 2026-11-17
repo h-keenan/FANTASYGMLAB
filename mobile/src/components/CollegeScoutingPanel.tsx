@@ -200,7 +200,7 @@ export default function CollegeScoutingPanel({
       const result = await api.submitScoutingReport(prospect.id, { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim() });
       if (result.ok) {
         setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, my_report: { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim() } } : row)));
-        setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'success', message: 'Saved — thanks for scouting.' } }));
+        setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'success', message: 'Saved: thanks for scouting.' } }));
       } else {
         setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'error', message: 'Could not save your grade. Try again in a moment.' } }));
       }
@@ -363,7 +363,7 @@ export default function CollegeScoutingPanel({
           subtitle={
             filter === 'watchlist'
               ? 'Tap the star on any prospect to follow them here.'
-              : 'Check back soon — the prospect pool is still growing.'
+              : 'Check back soon: the prospect pool is still growing.'
           }
         />
       ) : grid ? (

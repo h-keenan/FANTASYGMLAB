@@ -23,7 +23,7 @@ export function paidPreview(key: string, leagueName?: string): PaidPreview | nul
     case "draft_center":
       return {
         bullets: [
-          `Your draft posture, from your roster and where you stand in ${league}`,
+          `Your draft stance, from your roster and where you stand in ${league}`,
           `Pick decision signals across every team in ${league}`,
           "The best trade partners for your picks",
         ],

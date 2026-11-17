@@ -67,7 +67,7 @@ function reasonMessage(reason: string): string | null {
     return "Your roster in this league looks empty.";
   }
   if (reason === 'no_player_data') {
-    return "Player data isn't available right now — try again in a bit.";
+    return "Player data isn't available right now. Try again in a bit.";
   }
   return null;
 }

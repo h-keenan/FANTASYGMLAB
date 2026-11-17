@@ -77,7 +77,7 @@ import { Collapse } from "@/components/ui/Presence";
  */
 
 const DISCLOSURE_TEXT =
-  "FantasyDesk does not submit waiver claims for you — place the claim in your Sleeper league once you've decided.";
+  "FantasyDesk does not submit waiver claims for you. Place the claim in your Sleeper league once you've decided.";
 
 
 
@@ -418,7 +418,7 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
         <ValueStat value={formatWaiverScore(player.score)} align="left" />
         <OvrGauge rating={player.overall_rating} size="sm" />
         {player.position_rank ? (
-          <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just free agents.`} />
+          <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s. Overall, not just free agents.`} />
         ) : null}
       </div>
     </div>

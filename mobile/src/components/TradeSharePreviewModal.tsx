@@ -150,7 +150,7 @@ export default function TradeSharePreviewModal({
     const sendNames = sendPlayers.map((p) => p.name ?? 'Unknown').join(', ') || 'Nothing';
     const receiveNames = receivePlayers.map((p) => p.name ?? 'Unknown').join(', ') || 'Nothing';
     const lines = [
-      `${leagueName} trade — ${verdict.band} (${verdict.confidence})`,
+      `${leagueName} trade: ${verdict.band} (${verdict.confidence})`,
       '',
       `You send: ${sendNames}`,
       `You receive: ${receiveNames}`,

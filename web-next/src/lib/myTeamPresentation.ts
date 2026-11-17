@@ -90,13 +90,13 @@ export function buildConstructionObservations({
       titlePrefix: "Address ",
       rooms,
       titleSuffix: " next",
-      body: `Coverage is thin at ${roomsText}. Treat this as the next waiver add or trade-in posture before it becomes a weekly starter problem.`,
+      body: `Coverage is thin at ${roomsText}. Treat this as the next waiver add or trade-in target before it becomes a weekly starter problem.`,
       tone: "need",
     });
   } else if (normalizedHealth && !["stable", "healthy"].includes(normalizedHealth)) {
     observations.push({
       label: "Pressure point",
-      titlePrefix: "Injury context is changing posture",
+      titlePrefix: "Injury context is changing your plan",
       rooms: [],
       titleSuffix: "",
       body: `${healthFlag} Prefer short-term replacements over selling the depth that currently covers this risk.`,

@@ -40,6 +40,15 @@ describe("GLOSSARY", () => {
     expect(GLOSSARY.tep.label).toMatch(/TEP/);
   });
 
+  it("defines the product terms users meet without an explanation (bad-day and words audit)", () => {
+    for (const key of ["teamStance", "evaluationLens", "value", "marketAdp", "estSf", "faab"] as const) {
+      expect(GLOSSARY[key].label.length).toBeGreaterThan(0);
+      expect(GLOSSARY[key].definition.trim().endsWith(".")).toBe(true);
+      expect(GLOSSARY[key].definition).not.toContain("—");
+    }
+    expect(GLOSSARY.teamStance.definition).toBe(BEGINNER_HELP.tradeHubPosture);
+  });
+
   it("stays identical to mobile's copy apart from the import line", () => {
     const body = (source: string) => source.split("\n").filter((line) => !line.startsWith("import ")).join("\n");
     const web = readFileSync(path.resolve(__dirname, "glossary.ts"), "utf8");

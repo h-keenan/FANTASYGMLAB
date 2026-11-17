@@ -94,7 +94,7 @@ interface Props {
 
 const NOT_READY_MESSAGES: Record<string, string> = {
   no_sleeper_username_linked:
-    "Link your Sleeper username on the web app first — Trade Hub needs to know which roster is yours.",
+    "Link your Sleeper username on the web app first. Trade Hub needs to know which roster is yours.",
   sleeper_user_not_found: "Couldn't find that Sleeper account. Double-check the linked username on the web app.",
   not_a_member_of_league: "You don't appear to own a team in this league.",
   empty_roster: "This roster doesn't have any players yet.",
@@ -407,8 +407,8 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               title="No trades yet"
               subtitle={
                 isForYou
-                  ? 'No trade idea clears the bar for this strategy right now — check back after rosters move.'
-                  : 'No trade idea cleared the bar for any team yet — check back after rosters move.'
+                  ? 'No trade idea clears the bar for this strategy right now. Check back after rosters move.'
+                  : 'No trade idea cleared the bar for any team yet. Check back after rosters move.'
               }
             />
           )

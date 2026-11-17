@@ -10,7 +10,7 @@ const FACTOR_LABELS: Record<string, string> = {
   context: "Context",
   ideas: "Ideas",
   competition: "Competition",
-  posture: "Posture",
+  posture: "Team stance",
 };
 
 /** One semantic color + glyph per factor so each reason scans on its own. */

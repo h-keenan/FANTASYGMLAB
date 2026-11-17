@@ -54,7 +54,7 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
 
   const onShareText = () => {
     const lines = [
-      `${leagueName} — ${recap.headline}`,
+      `${leagueName}: ${recap.headline}`,
       '',
       ...recap.stories.map((story) => `${story.title}: ${story.summary}`),
       '',

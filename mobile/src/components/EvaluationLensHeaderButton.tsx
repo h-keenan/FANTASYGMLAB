@@ -13,7 +13,7 @@ import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 const LENS_OPTIONS: { value: ValuationLens; label: string; hint: string }[] = [
   { value: 'Dynasty', label: 'Dynasty', hint: 'Values future upside alongside this year.' },
   { value: 'Rebuild', label: 'Rebuild', hint: 'Weights youth and draft capital most heavily.' },
-  { value: 'Non-Dynasty', label: 'Redraft', hint: 'Values this season only — future picks discounted.' },
+  { value: 'Non-Dynasty', label: 'Redraft', hint: 'Values this season only: future picks discounted.' },
 ];
 
 /**

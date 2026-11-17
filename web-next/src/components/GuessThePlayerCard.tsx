@@ -114,7 +114,7 @@ export function GuessThePlayerCard({
       if (caught instanceof ApiError && caught.status === 409) {
         // Today's pick rotated out from under this page view — refetch
         // rather than show a guess against stale data.
-        setError("This round just ended — refreshing.");
+        setError("This round just ended: refreshing.");
         try {
           const refreshed = await api.getGuessThePlayer();
           setData(refreshed);
@@ -224,7 +224,7 @@ export function GuessThePlayerCard({
 
       {reveal ? (
         <p className="text-sm font-bold" style={{ color: reveal.correct ? "var(--color-success)" : "var(--color-danger)" }}>
-          {reveal.correct ? "Correct!" : `Not quite — it was ${reveal.correctPlayer.name}.`}
+          {reveal.correct ? "Correct!" : `Not quite: it was ${reveal.correctPlayer.name}.`}
         </p>
       ) : null}
 

@@ -6,7 +6,7 @@
 export const VALUATION_LENS_OPTIONS = [
   { value: "Dynasty", label: "Dynasty", hint: "Values future upside alongside this year." },
   { value: "Rebuild", label: "Rebuild", hint: "Weights youth and draft capital most heavily." },
-  { value: "Non-Dynasty", label: "Redraft", hint: "Values this season only — future picks discounted." },
+  { value: "Non-Dynasty", label: "Redraft", hint: "Values this season only: future picks discounted." },
 ] as const;
 
 export type ValuationLens = (typeof VALUATION_LENS_OPTIONS)[number]["value"];

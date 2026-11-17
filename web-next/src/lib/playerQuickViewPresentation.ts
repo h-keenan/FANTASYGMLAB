@@ -99,7 +99,7 @@ const HIGH_OPPORTUNITY_LABELS = new Set(["Elite Opportunity", "Strong Opportunit
 export function tierOpportunityMismatchCaption(tier: string | null | undefined, opportunityLabel: string | null | undefined): string | null {
   if (!tier || !opportunityLabel) return null;
   if (!LOW_PLAYER_TIERS.has(tier) || !HIGH_OPPORTUNITY_LABELS.has(opportunityLabel)) return null;
-  return `${tier} reflects value over the full season — this role read (${opportunityLabel}) is about right now, and can jump ahead of it fast (e.g. an injury-driven promotion).`;
+  return `${tier} reflects value over the full season. This role read (${opportunityLabel}) is about right now, and can jump ahead of it fast (e.g. an injury-driven promotion).`;
 }
 
 /** The opportunity chip is a depth-chart role read (modules/rankings

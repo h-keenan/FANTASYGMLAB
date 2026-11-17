@@ -115,7 +115,7 @@ export function GuessThePlayerNameMatchCard({
       if (caught instanceof ApiError && caught.status === 409) {
         // Today's pairing rotated out from under this page view —
         // refetch rather than show a guess against stale data.
-        setError("This round just ended — refreshing.");
+        setError("This round just ended: refreshing.");
         try {
           const refreshed = await api.getGuessThePlayerNameMatch();
           setData(refreshed);

@@ -24,7 +24,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
 // GmPlanScreen/MatchupScreen use for their own `reason` fields.
 const REASON_MESSAGES: Record<string, string> = {
   offseason: 'Playoff odds will be available once the regular season begins.',
-  no_playoff_format: "This league's playoff format isn't set yet — odds need a real playoff-team count from league settings.",
+  no_playoff_format: "This league's playoff format isn't set yet. Odds need a real playoff-team count from league settings.",
   no_rankings_data: "We don't have enough roster data to compute Roster Power for this league yet.",
   unavailable: "Playoff odds aren't available for this league right now.",
 };

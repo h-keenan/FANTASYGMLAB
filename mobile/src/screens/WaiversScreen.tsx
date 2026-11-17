@@ -116,7 +116,7 @@ function reasonMessage(reason: string): string | null {
     return "Your roster in this league looks empty, so there's nothing to weigh adds against yet.";
   }
   if (reason === 'no_player_data') {
-    return "Player data isn't available right now — try again in a bit.";
+    return "Player data isn't available right now. Try again in a bit.";
   }
   return null;
 }
@@ -702,7 +702,7 @@ function SecondaryWaiverBoard({
       <View style={styles.secondaryLockWrap}>
         <PremiumLock
           title="Full waiver board and FAAB shortlist"
-          description={"Priority Adds stay free — Pro adds stash candidates, watchlist depth, and a FAAB shortlist so you don't miss the next claim." + (usageGated ? ' Pro also adds usage trends and role flags to each pickup.' : '')}
+          description={"Priority Adds stay free: Pro adds stash candidates, watchlist depth, and a FAAB shortlist so you don't miss the next claim." + (usageGated ? ' Pro also adds usage trends and role flags to each pickup.' : '')}
         />
       </View>
     );

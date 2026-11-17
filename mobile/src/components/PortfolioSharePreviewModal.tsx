@@ -70,11 +70,11 @@ export default function PortfolioSharePreviewModal({ visible, onClose, leagues }
   const onShareText = () => {
     const headline = portfolioHeadlineStat(leagues);
     const lines = [
-      `My FantasyDesk Portfolio — ${headline}`,
+      `My FantasyDesk Portfolio: ${headline}`,
       '',
       ...leagues.map((league) => {
         const record = league.wins == null && league.losses == null ? '' : ` (${league.wins ?? 0}-${league.losses ?? 0})`;
-        const rank = league.power_rank != null ? ` — ${league.power_rank_tied ? 'T-' : '#'}${league.power_rank}` : '';
+        const rank = league.power_rank != null ? `: ${league.power_rank_tied ? 'T-' : '#'}${league.power_rank}` : '';
         return `${league.league_name}${record}${rank}`;
       }),
       '',
