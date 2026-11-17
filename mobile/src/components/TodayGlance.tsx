@@ -147,7 +147,7 @@ export function TodayTradeIdeaCard({ idea, deadline, onOpen, info }: { idea: Tod
       <View style={styles.tradeHead}>
         <AppText style={[styles.kicker, { color: colors.accent }]}>{`TRADE IDEA${deadline ? ` · DEADLINE ${deadline.toUpperCase()}` : ''}`}</AppText>
         {info}
-        {gain ? <AppText style={[styles.gain, styles.gainEnd, { color: (idea.gain ?? 0) > 0 ? colors.success : colors.danger }]}>{gain} value</AppText> : null}
+        {gain ? <AppText style={[styles.gain, styles.gainEnd, { color: (idea.gain ?? 0) > 0 ? colors.success : colors.textSecondary }]}>{gain} value</AppText> : null}
       </View>
       <View testID="today-trade-idea" accessible accessibilityRole="button" accessibilityLabel={`Trade idea: ${idea.title}. Open in Trade Hub`} style={styles.tradeBody}>
         <AppText style={styles.tradeTitle}>{idea.title}</AppText>

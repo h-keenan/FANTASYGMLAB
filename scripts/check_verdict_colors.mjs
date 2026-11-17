@@ -8,6 +8,8 @@
 //      line as winPercent / winChance / odds / probability / verdict / favored words;
 //   2. a raw red hex (#ef4444, #dc2626, #f87171, #b91c1c, ...) on such a line;
 //   3. an inline win-percent threshold ladder (winPercent >= 55 ? "success" ...) instead of percentBand;
+//   4. a value delta (gain / balance / edge / net value / margin) coloured danger or tone "danger" (a negative delta is muted);
+//   5. a card accent stripe chosen with a ternary that can turn red;
 //
 // A line that already goes through the map (probabilityBand, percentBand, verdictBand, bandColor, bandColorVar,
 // probabilityColor*, percentColor*, verdictColor*, bandSimTone, bandCompactTone) is fine. Use `// verdict-color-ok: reason`
@@ -28,6 +30,14 @@ const RED_HEX = /#(ef4444|dc2626|f87171|b91c1c|ff3b30|e11d48|f43f5e|ff4d4f)\b/i;
 const LADDER = /(winPercent|winPct|\bpct|\bwp|probability)\s*(>=|<=|>|<)\s*[\d.]+\s*\?\s*["'](success|danger|warning)["']/;
 const MAPPED = /(probabilityBand|percentBand|verdictBand|deltaBand|bandColor|bandColorVar|probabilityColor|percentColor|verdictColor|probabilityColorVar|percentColorVar|verdictColorVar|bandSimTone|bandCompactTone)/;
 const OK = /verdict-color-ok/;
+// A value DELTA (trade gain / balance / edge / net value / margin) is not a verdict: a negative one is muted with an arrow
+// ("You give up 747"), never red. The 2026-11 GM Plan "-747" in red slipped past rules 1-3 because that line said "gain" and
+// tone "danger" (a compact-tone string literal, not a var(--color-*) token) and never used a verdict / odds word.
+const DELTA_WORDS = /\b(gain|gainColor|balanceColor|tradeGain|trade_gain|netValue|net_value)\b/i;
+const DANGER_TONE = /(["'])danger\1|var\(--color-danger\)|\bcolors\.danger\b/;
+// A card / module accent stripe chosen with a ternary that can turn it red (accent = x ? danger : accent): one calm stripe;
+// the reason (an injury) is said in the text or a small chip.
+const STRIPE_DANGER = /\baccent\s*=\s*\{?[^;]*injur[^;]*\?[^;]*(var\(--color-danger\)|colors\.danger|["']danger["'])/i;
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -46,6 +56,14 @@ export function scanText(rel, text) {
     if (OK.test(line) || (i > 0 && OK.test(lines[i - 1]))) return;
     if (LADDER.test(line)) {
       problems.push(`${rel}:${i + 1}: inline probability threshold ladder; use percentBand / probabilityBand from verdictTone.ts`);
+      return;
+    }
+    if (STRIPE_DANGER.test(line)) {
+      problems.push(`${rel}:${i + 1}: card accent stripe can turn red (${line.trim().slice(0, 80)}); one calm stripe, say the reason in text or a chip`);
+      return;
+    }
+    if (DELTA_WORDS.test(line) && DANGER_TONE.test(line) && !/deltaBand|bandCompactTone/.test(line)) {
+      problems.push(`${rel}:${i + 1}: a value delta is coloured red (${line.trim().slice(0, 80)}); use deltaBand (green up, muted down) from verdictTone.ts`);
       return;
     }
     if (MAPPED.test(line)) return;

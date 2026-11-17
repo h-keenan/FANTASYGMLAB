@@ -224,7 +224,7 @@ describe("GmPlanContent", () => {
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
     expect(screen.getByText("My Running Back")).toBeInTheDocument();
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
-    expect(screen.getByText("+237")).toBeInTheDocument();
+    expect(screen.getByText("You gain +237")).toBeInTheDocument();
     expect(screen.getAllByText("88").length).toBeGreaterThan(0);
   });
 
