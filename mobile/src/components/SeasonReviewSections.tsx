@@ -26,6 +26,7 @@ import type {
 } from '../lib/simReview';
 import { reviewSectionParts } from '../lib/simReview';
 import { radii, spacing } from '../theme';
+import { swipeLockProps } from './swipeLock';
 
 /**
  * The data-driven Season in Review body (twin of web's SeasonReviewSections):
@@ -236,6 +237,7 @@ function Carousel({ children, label }: { children: React.ReactNode[]; label: str
   return (
     <ScrollView
       horizontal
+      {...swipeLockProps}
       showsHorizontalScrollIndicator={false}
       snapToInterval={itemWidth + gap}
       decelerationRate="fast"

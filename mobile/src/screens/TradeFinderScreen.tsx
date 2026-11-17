@@ -42,6 +42,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import SelectionActionBar from '../components/SelectionActionBar';
 import { TRADE_FINDER_MAX_PICKS, ownedPicksForRoster, toggleCappedSelection } from '../lib/tradeFinderPicks';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -652,16 +653,8 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
         )}
       />
 
-      {/* Sticky CTA bar (coridian_, 2026-10-24: the floating button covered
-          roster rows). It is a normal flex sibling BELOW the list, not an
-          absolute overlay, so the list simply ends above it and no row can
-          be hidden. Hidden at zero selected (nothing to search). Bottom
-          padding keeps the button clear of the GM Orb zone. */}
-      {selectionCount > 0 ? (
-        <View style={[styles.ctaBar, { paddingBottom: orbClearance + spacing.sm }]}>
-          <Button label={`Find Trades (${selectionCount})`} loading={searching} onPress={() => search()} />
-        </View>
-      ) : null}
+      {/* Selection mode: ONE sticky submit below the list ("3 selected · Find trades"), clear of the orb. */}
+      <SelectionActionBar count={selectionCount} verb="Find trades" busy={searching} onPress={() => search()} />
     </View>
   );
 }
@@ -799,13 +792,6 @@ function createStyles(colors: ThemeColors) {
     meterSegments: { flexDirection: 'row', gap: 3 },
     meterSegment: { width: 14, height: 4, borderRadius: 2 },
     meterValue: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },
-    ctaBar: {
-      backgroundColor: colors.glass,
-      borderTopWidth: StyleSheet.hairlineWidth * 1.5,
-      borderTopColor: colors.glassBorder,
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.sm,
-    },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   });
 }

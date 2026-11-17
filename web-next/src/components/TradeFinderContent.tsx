@@ -24,6 +24,8 @@ import {
 } from "@/components/TradeFinderNoResults";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
+import { selectionPrimary } from "@/lib/bottomNav";
+import { usePillState } from "@/lib/useBottomPillContext";
 import { PickGroupList } from "@/components/PickGroupList";
 import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { TRADE_DEADLINE_PASSED_MESSAGE, tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
@@ -300,6 +302,9 @@ export function TradeFinderContent({
   }, [leagueId, lens, myTeam.roster_id]);
 
   const selectionCount = selectedIds.size + selectedPickIds.size;
+  // Selection mode: with a selection the footer's primary IS the submit ("3 selected · Find trades"), so no second sticky bar.
+  const footerPrimary = selectionPrimary({ count: selectionCount, verb: "Find trades", glyph: "finder", busy: searching, onPress: () => search() });
+  const { barPresent } = usePillState();
 
   function togglePick(pickId: string) {
     setSelectedPickIds((prev) => {
@@ -353,7 +358,7 @@ export function TradeFinderContent({
 
   return (
     <main className="page-shell">
-      <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_finder" />
+      <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_finder" primary={footerPrimary} />
       <header className="flex flex-col gap-1">
         <PageTitle page="Trade Finder" leagueName={leagueName} />
       </header>
@@ -441,9 +446,12 @@ export function TradeFinderContent({
             />
           </CompactModule>
 
-          <Button onClick={search} disabled={selectionCount === 0} loading={searching}>
-            {searching ? "Searching…" : `Find Realistic Trades${selectionCount > 0 ? ` (${selectionCount})` : ""}`}
-          </Button>
+          {/* The footer carries the submit on phones (selection mode); this button stays for desktop and when no footer is on screen. */}
+          {barPresent ? null : (
+            <Button onClick={search} disabled={selectionCount === 0} loading={searching}>
+              {searching ? "Searching…" : `Find Realistic Trades${selectionCount > 0 ? ` (${selectionCount})` : ""}`}
+            </Button>
+          )}
 
           {selectionCount === 0 ? (
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>

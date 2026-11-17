@@ -75,6 +75,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import Money from '../components/Money';
+import { swipeLockProps } from '../components/swipeLock';
 import { formatMoney } from '../lib/money';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Waivers'>;
@@ -601,7 +602,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 {bestAvailable.length > 0 ? (
                   <View style={styles.sectionBlock}>
                     <SectionHeading title="Position Snapshot" />
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow} {...swipeLockProps}>
                       {bestAvailable.map(({ position: pos, player, count }) => (
                         <BestAvailableCard
                           key={pos}
@@ -733,7 +734,7 @@ function SecondaryWaiverBoard({
               ) : undefined
             }
           />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow} {...swipeLockProps}>
             {group.players.map((player) => (
               <HighlightFrame key={player.player_id} active={player.player_id === highlightId} onReveal={onReveal}>
                 <BestAvailableCard

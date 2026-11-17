@@ -13,6 +13,7 @@ import { BAR_METRICS } from '../lib/bottomBarMetrics';
 import { EASE, MOTION_MS } from '../lib/motion';
 import { radii, type ThemeColors } from '../theme';
 import { usePresence } from '../lib/usePresence';
+import { selectionHaptic, tabChangeHaptic } from '../lib/footerHaptics';
 
 /**
  * The app's floating glass pill (twin of web-next components/ui/PillMorph.tsx, approved option B + the V2 smart pill).
@@ -86,7 +87,12 @@ export default function BottomPill({ children, segment: rawContext, orb, style, 
                     accessibilityRole="tab"
                     accessibilityLabel={tabShowsPro(tab, showPro) ? `${tab.label}, Pro feature` : tab.label}
                     accessibilityState={{ selected: on }}
-                    onPress={() => context.onSelect(tab.key)}
+                    onPress={() => {
+                      if (!on) tabChangeHaptic();
+                      context.onSelect(tab.key);
+                    }}
+                    onLongPress={tab.shortcut ? () => { selectionHaptic(); tab.shortcut?.onPress(); } : undefined}
+                    accessibilityHint={tab.shortcut ? `Long press for ${tab.shortcut.label}` : undefined}
                     onLayout={(e) => { tabX.current[tab.key] = { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width }; }}
                     style={[styles.tab, segW > 0 && { minWidth: Math.floor((segW - Math.max(0, context.tabs.length - 1)) / context.tabs.length) }, on && styles.tabOn]}
                   >
