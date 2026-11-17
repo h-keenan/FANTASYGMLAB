@@ -615,7 +615,7 @@ Layout rule (immune to iOS Safari fixed-position drift): nothing here is `positi
 
 Below 768px, for signed-in users with the flag on, the floating GM orb and the crowded header are replaced by:
 
-- `AppShellBar` (`components/AppShellBar.tsx`): in-flow sticky `.bottom-stack` at the end of the app column (no `position: fixed`, no JS placement, `env(safe-area-inset-bottom)`). Inside a league: Today / Team / Trades / League / More. Outside: Home / Portfolio / Fantasy Sim / News / More. More opens the full grouped menu from the shared `navCatalog.ts` (groups, glyphs, Pro markers).
+- `AppShellBar` (`components/AppShellBar.tsx`): in-flow sticky `.bottom-stack` at the end of the app column (no `position: fixed`, no JS placement, `env(safe-area-inset-bottom)`). Inside a league: Today / Team / Trades / League / More. Outside: Home / Portfolio / Fantasy Sim / News / More. More opens the one shared navigation sheet (see "Navigation sheet" below).
 - `ShellActionSlot` (`<ShellAction>`): a page renders its primary action into the slot above the tab bar (page-aware action strip). Renders nothing where the slot is absent.
 - `ShellHeader`: one standard header: back labelled with the parent page ("< Players"), title, league chip, search, alerts bell (only exists inside a league). Search stays the orb sheet's search.
 - Fantasy Sim keeps its own header and game orb (`pathOwnsPhoneChrome`); the sign-in/onboarding root `/` keeps the orb where no bar can render.
@@ -623,6 +623,14 @@ Below 768px, for signed-in users with the flag on, the floating GM orb and the c
 
 Flag (`lib/shellNav.ts`, `lib/useShellNav.ts`): `NEXT_PUBLIC_BOTTOM_NAV` = `on` (default since 2026-11-14, UI pass 5 D4: every signed-in phone user gets the shell header + pill), `founder` (the old staged rollout: founder/owner account only), `off` (kill switch for everyone, nothing overrides it). `?nav=bottom` turns it on and `?nav=off` turns it off for that browser (remembered in localStorage `fgl:nav`). Naming: "Dashboard" is **Today** everywhere user-facing (route and code names keep `dashboard`); **Fantasy Sim** is the game; **Season Outlook** is the forecast (GM Plan and Games tab; "Season Sim" is a retired term).
 
+## Navigation sheet ("Where to go": More, Search and the GM orb are one sheet)
+
+Owner, 2026-11-17: "the search menu looks different than the More menu... I don't understand why there isn't a consistency." They were two lists built separately. Now:
+
+- **One registry**: `lib/navCatalog.ts` (pages, order, labels, subtitles, Pro flags, tabs) plus `lib/navSheet.ts` (groups and copy), both byte-identical web/app twins. Rows add the platform's own path/route, glyph and accent.
+- **One grouping**: `<league name>` (Today, My Team, Matchup, Waivers, League Rankings, Players; league only) / `GM Tools` (Trade Hub, GM Plan, Draft, Commissioner; league only) / `General` (Your leagues, Fantasy Sim, News, Community) / `Account` (Pro or Manage subscription, Account, Founder Analytics for founders). The bar's own tabs are not split out into a "Sections" group: More and Search show the same full list.
+- **One component per platform**: web `components/NavSheet.tsx` (built on the shared `Sheet` glass variant with `eyebrow`; dialog role, focus trap, Escape, labelled search field), app: the GM orb sheet in `GmOrb.tsx`. The bar's More button opens it without focus; the header Search icon opens it with the search field focused; the orb opens it without focus.
+- **Guard**: `scripts/check_nav_sheet.mjs` (CI + `lib/navSheetScan.test.ts`) fails when a destination list is built or rendered outside the shared sheet. The desktop sidebar is the one allowlisted other reader of the registry.
 
 ## Overlays (one pop-up at a time)
 

@@ -59,6 +59,14 @@
   line-height: 1.25;
   color: var(--color-text-primary);
 }
+.ui-sheet-eyebrow {
+  margin: 0 0 2px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-accent);
+}
 .ui-sheet-desc {
   margin: 2px 0 0;
   font-size: 0.8rem;

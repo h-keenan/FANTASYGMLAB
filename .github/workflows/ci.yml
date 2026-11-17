@@ -94,6 +94,8 @@ jobs:
         run: node scripts/check_app_a11y_labels.mjs
       - name: Reduce Motion is honored by every animation
         run: node scripts/check_motion_usage.mjs
+      - name: One navigation sheet (More and Search share the registry and component)
+        run: node scripts/check_nav_sheet.mjs
 
   mobile-app:
     needs: [classify]

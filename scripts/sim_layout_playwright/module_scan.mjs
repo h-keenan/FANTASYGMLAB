@@ -41,6 +41,8 @@ const TOP_EXEMPT = new Set(["sample-league", "landing", "commissioner", "commiss
 // OVERFLOW=1: every route (incl. the overflow-only ones), failing ONLY on a sideways-scrolling document and naming the elements that cause it.
 const OVERFLOW_MODE = process.env.OVERFLOW === "1";
 const FULL = process.env.FULL === "1";
+// SHEET=more|search: after each page loads, open the navigation sheet from the bottom bar's More button or the header Search icon and screenshot it as <route>-<sheet>-<width>.png (use with NAV=bottom, ONLY=today).
+const SHEET = process.env.SHEET || "";
 const METRICS = process.env.METRICS === "1";
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -448,7 +450,15 @@ for (const w of WIDTHS) {
       delete res.bodyText;
       results.push({ page: r.name, width: w, maxTablists: r.maxTablists ?? 1, noModules: Boolean(r.noModules), expect: r.expect ? await page.locator(`[data-testid="${r.expect}"]`).count() : null, ...res });
       if (r.expect === "waiver-rec-row") await page.locator(`[data-testid="${r.expect}"]`).first().scrollIntoViewIfNeeded().catch(() => {});
-      await page.screenshot({ path: `${OUT}/${r.name}-${w}.png`, fullPage: FULL });
+      if (SHEET && w < 768) {
+        await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+        await sleep(700);
+        const opener = SHEET === "search" ? page.getByRole("button", { name: "Search players and pages" }).first() : page.locator('[data-testid="shell-tab-bar"]').getByRole("button", { name: /^More/ }).first();
+        // The footer hides on scroll down and sits at the end of the column; dispatch the click so a hidden/offscreen bar still opens the sheet.
+        await opener.dispatchEvent("click", undefined, { timeout: 8000 }).catch((e) => console.log(`sheet opener (${SHEET}) not found: ${String(e).slice(0, 80)}`));
+        await sleep(900);
+        await page.screenshot({ path: `${OUT}/${r.name}-${SHEET}-${w}.png`, fullPage: false });
+      } else await page.screenshot({ path: `${OUT}/${r.name}-${w}.png`, fullPage: FULL });
     } catch (e) {
       results.push({ page: r.name, width: w, error: String(e).slice(0, 160) });
     }
