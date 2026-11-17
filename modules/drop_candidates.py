@@ -464,11 +464,14 @@ def drops_for_overflow(
         )
         if not ids:
             break
-        best_id, best = None, None
+        # Rank the candidate cuts on the score alone (``swap_score``: the identical ``trade_score``, without the future-year
+        # lineups / confidence / per-position story that never feed it), then build the full verdict for the winner only.
+        best_id, best_score = None, None
         for pid in sorted(ids, key=lambda p: (rvc.healthy_value.get(p, 0.0), p))[: CANDIDATES_PER_ADD * 2]:
-            res = rvm.evaluate_swap(rvc, [*dropped, pid], ())
-            if best is None or res["trade_score"] > best["trade_score"]:
-                best_id, best = pid, res
+            score = rvm.swap_score(rvc, [*dropped, pid])
+            if best_score is None or score > best_score:
+                best_id, best_score = pid, score
+        best = rvm.evaluate_swap(rvc, [*dropped, best_id], ())
         stand = _score(rvc, best_id)
         cumulative = _effect(best)
         # Each cut shows its OWN cost (the step from the previous cumulative

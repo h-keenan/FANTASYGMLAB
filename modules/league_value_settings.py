@@ -30,7 +30,7 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
-from modules import derived_cache, player_eligibility, rankings, redis_cache, sleeper
+from modules import derived_cache, player_eligibility, rankings, redis_cache, sleeper, swr_cache
 from modules.player_tiers import assign_player_tiers
 from modules.rankings import current_availability_multiplier
 
@@ -906,8 +906,33 @@ def apply_valuation_lens(
 VALUED_PLAYERS_FRAME_TTL_SECONDS = 120
 
 
+# How long an aged (same-fingerprint) valued frame may still be served while a background recompute runs. A changed input
+# changes the key, so this only bounds clock-dependent drift (week roll, risk-by-date) inside an unchanged data set.
+VALUED_PLAYERS_FRAME_STALE_TTL_SECONDS = 3600
+
+
 def _valued_players_frame_cache_bucket() -> int:
     return int(time.time() // VALUED_PLAYERS_FRAME_TTL_SECONDS)
+
+
+def _valued_players_inputs_fingerprint(league_id: str, players_db_path: str) -> str:
+    """Content fingerprint of everything the valued frame is a function of: the league payload (scoring/roster settings) and the
+    versions of the players db, Sleeper metadata, FantasyCalc values, season stats and reconciled-valuation disk caches."""
+
+    try:
+        league = sleeper.get_league(league_id) or {}
+    except Exception:
+        league = {}
+    try:
+        return derived_cache.fingerprint(
+            "valued_players_inputs",
+            league,
+            rankings.public_player_source_fingerprint(players_db_path),
+            rankings.reconciled_valuation_cache_versions(),
+        )
+    except Exception:  # Unfingerprintable input, or an unreadable file/season probe
+        # An input with no stable content identity: fall back to the old clock bucket (fresh window only, never stale).
+        return f"bucket:{_valued_players_frame_cache_bucket()}"
 
 
 _VALUED_PLAYERS_FRAME_LOCK_TIMEOUT_SECONDS = 15.0
@@ -943,6 +968,21 @@ def _build_valued_players_frame_cached(
     return apply_valuation_lens(players_df, lens, settings)
 
 
+def league_state_fingerprint(league_id: str, players_db_path: str) -> str:
+    """``_valued_players_inputs_fingerprint`` plus the league's rosters and traded picks: the content key for league-level derived
+    results (rankings, draft capital, trade ideas, needs) that the stale-while-revalidate caches key on instead of a clock bucket.
+    Any roster move, pick trade, setting change or players/values file refresh is a different fingerprint."""
+
+    base = _valued_players_inputs_fingerprint(league_id, players_db_path)
+    try:
+        rosters = sleeper.get_rosters(league_id) or []
+        picks = sleeper.get_traded_picks(league_id) or []
+        return derived_cache.fingerprint("league_state", base, rosters, picks)
+    except Exception:
+        # Anything unreadable or without a stable identity: clock bucket (fresh window only, never stale).
+        return f"bucket:{_valued_players_frame_cache_bucket()}"
+
+
 def build_valued_players_frame_cached(
     *,
     league_id: str,
@@ -967,12 +1007,16 @@ def build_valued_players_frame_cached(
     see modules.redis_cache.redis_single_flight_cache and this module's own
     comment above `_build_valued_players_frame_cached`."""
 
-    key = (league_id, lens, players_db_path, _valued_players_frame_cache_bucket())
+    # Round 4: keyed on the inputs (league payload + players/values file versions), not a clock bucket, and served
+    # stale-while-revalidate: an entry older than the fresh window is returned at once while one worker recomputes it. A changed
+    # league setting or players/values file is a different key, so stale data is never served across a changed fingerprint.
+    key = (league_id, lens, players_db_path, _valued_players_inputs_fingerprint(league_id, players_db_path))
     cache_key = redis_cache.build_cache_key("valued_players_frame", *key)
-    valued = redis_cache.redis_single_flight_cache(
+    valued = swr_cache.redis_swr_cache(
         cache_key=cache_key,
-        ttl_seconds=VALUED_PLAYERS_FRAME_TTL_SECONDS,
-        compute=lambda: _build_valued_players_frame_cached(*key),
+        fresh_ttl_seconds=VALUED_PLAYERS_FRAME_TTL_SECONDS,
+        stale_ttl_seconds=VALUED_PLAYERS_FRAME_STALE_TTL_SECONDS,
+        compute=lambda: _build_valued_players_frame_cached(league_id, lens, players_db_path, 0),
         lock_timeout_seconds=_VALUED_PLAYERS_FRAME_LOCK_TIMEOUT_SECONDS,
     )
     returned = valued.copy()

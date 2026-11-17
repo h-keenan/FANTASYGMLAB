@@ -143,7 +143,11 @@ def test_rate_limiter_and_single_flight_caches_are_redis_backed_not_in_memory():
         "modules/playoff_simulator.py",
     ):
         source = (ROOT / relative_path).read_text(encoding="utf-8")
-        assert "redis_cache.redis_single_flight_cache(" in source, f"{relative_path} should use the shared Redis cache helper"
+        # Round 4: trade_hub_engine / league_rankings use the stale-while-revalidate wrapper (modules.swr_cache), which is the
+        # same Redis single-flight underneath plus a stale-serve path.
+        assert (
+            "redis_cache.redis_single_flight_cache(" in source or "swr_cache.redis_swr_cache(" in source
+        ), f"{relative_path} should use the shared Redis cache helper"
         # The old per-process pair is still named in explanatory comments
         # (documenting what this replaced) -- what must actually be gone is
         # the decorator usage and the import that enables it.

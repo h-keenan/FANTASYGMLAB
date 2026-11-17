@@ -20,7 +20,7 @@ from typing import Any
 import pandas as pd
 from modules import prefetch
 
-from modules import league_value_settings, rankings, redis_cache, sleeper, trade_ideas
+from modules import league_value_settings, rankings, redis_cache, sleeper, swr_cache, trade_ideas
 from modules.league_value_settings import _safe_float, _safe_positive_int
 from modules.rank_tie_metadata import add_rank_tie_metadata
 from modules.team_eval import (
@@ -324,6 +324,8 @@ def build_league_rankings_frame(
 # waivers/drops happen a handful of times a week), so 30s was paying for
 # far more recomputation than the data's real freshness ever needed.
 LEAGUE_RANKINGS_FRAME_TTL_SECONDS = 120
+# Round 4: an aged entry for an UNCHANGED league-state fingerprint is served while one worker recomputes it (see modules.swr_cache).
+LEAGUE_RANKINGS_FRAME_STALE_TTL_SECONDS = 1800
 
 
 def _league_rankings_frame_cache_bucket() -> int:
@@ -424,11 +426,12 @@ def build_league_summary_and_draft_capital_cached(
     Redis: see modules.redis_cache.redis_single_flight_cache and this
     module's own comment above `_build_league_summary_and_draft_capital_cached`."""
 
-    key = (league_id, lens, players_db_path, _league_rankings_frame_cache_bucket())
+    key = (league_id, lens, players_db_path, league_value_settings.league_state_fingerprint(league_id, players_db_path))
     cache_key = redis_cache.build_cache_key("league_summary_and_draft_capital", *key)
-    df_summary, draft_capital_summary = redis_cache.redis_single_flight_cache(
+    df_summary, draft_capital_summary = swr_cache.redis_swr_cache(
         cache_key=cache_key,
-        ttl_seconds=LEAGUE_RANKINGS_FRAME_TTL_SECONDS,
+        fresh_ttl_seconds=LEAGUE_RANKINGS_FRAME_TTL_SECONDS,
+        stale_ttl_seconds=LEAGUE_RANKINGS_FRAME_STALE_TTL_SECONDS,
         compute=lambda: _build_league_summary_and_draft_capital_cached(*key),
         lock_timeout_seconds=_LEAGUE_RANKINGS_LOCK_TIMEOUT_SECONDS,
     )
@@ -500,11 +503,12 @@ def build_league_rankings_frame_cached(
     Redis: see modules.redis_cache.redis_single_flight_cache and this
     module's own comment above `_build_league_summary_and_draft_capital_cached`."""
 
-    key = (league_id, lens, players_db_path, _league_rankings_frame_cache_bucket())
+    key = (league_id, lens, players_db_path, league_value_settings.league_state_fingerprint(league_id, players_db_path))
     cache_key = redis_cache.build_cache_key("league_rankings_frame", *key)
-    frame = redis_cache.redis_single_flight_cache(
+    frame = swr_cache.redis_swr_cache(
         cache_key=cache_key,
-        ttl_seconds=LEAGUE_RANKINGS_FRAME_TTL_SECONDS,
+        fresh_ttl_seconds=LEAGUE_RANKINGS_FRAME_TTL_SECONDS,
+        stale_ttl_seconds=LEAGUE_RANKINGS_FRAME_STALE_TTL_SECONDS,
         compute=lambda: _build_league_rankings_frame_cached(*key),
         lock_timeout_seconds=_LEAGUE_RANKINGS_LOCK_TIMEOUT_SECONDS,
     )
@@ -816,11 +820,12 @@ def build_roster_health_metrics_frame_cached(
     instead of each re-running it. Returns a copy so a caller mutating the
     frame never corrupts the cached entry."""
 
-    key = (league_id, lens, players_db_path, _league_rankings_frame_cache_bucket())
+    key = (league_id, lens, players_db_path, league_value_settings.league_state_fingerprint(league_id, players_db_path))
     cache_key = redis_cache.build_cache_key("roster_health_metrics_frame", *key)
-    frame = redis_cache.redis_single_flight_cache(
+    frame = swr_cache.redis_swr_cache(
         cache_key=cache_key,
-        ttl_seconds=LEAGUE_RANKINGS_FRAME_TTL_SECONDS,
+        fresh_ttl_seconds=LEAGUE_RANKINGS_FRAME_TTL_SECONDS,
+        stale_ttl_seconds=LEAGUE_RANKINGS_FRAME_STALE_TTL_SECONDS,
         compute=lambda: _build_roster_health_metrics_frame_cached(*key),
         lock_timeout_seconds=_LEAGUE_RANKINGS_LOCK_TIMEOUT_SECONDS,
     )

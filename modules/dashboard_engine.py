@@ -50,6 +50,7 @@ from modules import (
     rankings,
     record_signal,
     redis_cache,
+    swr_cache,
     sleeper,
     sleeper_leagues,
     team_stance,
@@ -545,6 +546,7 @@ def build_trade_tile(
 # valued frame is not one handed out by build_valued_players_frame_cached
 # (so its version is unknown) nothing is shared.
 TRADE_INDEPENDENT_TILES_TTL_SECONDS = 90
+TRADE_INDEPENDENT_TILES_STALE_TTL_SECONDS = 900
 _TRADE_INDEPENDENT_TILES_LOCK_TIMEOUT_SECONDS = 20.0
 
 
@@ -582,9 +584,10 @@ def _shared_trade_independent_tiles(
         )
     except Exception:
         return compute()
-    return redis_cache.redis_single_flight_cache(
+    return swr_cache.redis_swr_cache(
         cache_key=redis_cache.build_cache_key("dashboard_trade_independent_tiles", *digest_parts),
-        ttl_seconds=TRADE_INDEPENDENT_TILES_TTL_SECONDS,
+        fresh_ttl_seconds=TRADE_INDEPENDENT_TILES_TTL_SECONDS,
+        stale_ttl_seconds=TRADE_INDEPENDENT_TILES_STALE_TTL_SECONDS,
         compute=compute,
         lock_timeout_seconds=_TRADE_INDEPENDENT_TILES_LOCK_TIMEOUT_SECONDS,
     )

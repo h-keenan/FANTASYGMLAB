@@ -273,6 +273,8 @@ from modules import (
     weekly_roundup,
 )
 from modules import derived_cache
+from modules import swr_cache
+from modules import league_prewarm
 from modules import prefetch
 from modules.frame_records import frame_records
 from modules import player_search
@@ -600,6 +602,7 @@ def _enable_background_sleeper_players_refresh() -> None:
 async def _lifespan(_app: FastAPI):
     _enable_background_sleeper_players_refresh()
     _warm_players_cache_at_startup()
+    league_prewarm.start_background(PLAYERS_DB_PATH)  # Round 4: re-warm recently active leagues at boot and on a schedule
     yield
 
 
@@ -2705,7 +2708,11 @@ def get_league(league_id: str = Depends(resolve_league_path_id), _user: dict[str
         raise HTTPException(status_code=404, detail="League not found.")
     # `default_lens` is the one server-side format decision (redraft ->
     # Non-Dynasty); both clients open on it instead of detecting it themselves.
-    return {"ok": True, "league": league, "default_lens": league_value_settings.default_lens_for_league(league)}
+    default_lens = league_value_settings.default_lens_for_league(league)
+    # League open: warm the shared derived frames in the background so the Dashboard fetch that follows finds them.
+    if not external_leagues.is_external_league_key(league_id):
+        league_prewarm.touch(league_id, default_lens, PLAYERS_DB_PATH)
+    return {"ok": True, "league": league, "default_lens": default_lens}
 
 
 @app.get("/v1/leagues/{league_id}/users")
@@ -6269,7 +6276,7 @@ def _attach_projection_ppg_memoized(
     return _ATTACH_MEMO.get_or_compute(key, build)
 
 
-_LEAGUE_NEEDS_MEMO = derived_cache.Memo("league_needs", max_entries=16)
+_LEAGUE_NEEDS_MEMO = derived_cache.Memo("league_needs", max_entries=16, stale_ttl_seconds=1800)
 
 
 def _league_needs_memoized(
@@ -12595,6 +12602,9 @@ def get_league_dashboard(
             detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
         )
 
+    if not external_leagues.is_external_league_key(league_id):
+        league_prewarm.touch(league_id, lens, PLAYERS_DB_PATH)  # remembers the league for the scheduled re-warm
+
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
@@ -13782,6 +13792,7 @@ def _get_portfolio_impl(lens: str, user: dict[str, Any]) -> dict[str, Any]:
 # Pull-to-refresh on the client re-reads within the same window; the full
 # single-league screens each card links into are always live.
 LEAGUE_GLANCE_TTL_SECONDS = 180
+LEAGUE_GLANCE_STALE_TTL_SECONDS = 900
 
 # Same bug class as _PORTFOLIO_FANOUT_TIMEOUT_SECONDS above, found during a
 # 2026-10-19 performance audit: this endpoint's fan-out used a bare
@@ -13862,9 +13873,16 @@ def _build_league_glance_row(
         )
 
     try:
-        glance = redis_cache.redis_single_flight_cache(
-            cache_key=_league_glance_cache_key(user_id, league_id, lens),
-            ttl_seconds=LEAGUE_GLANCE_TTL_SECONDS,
+        # Round 4: stale-while-revalidate keyed on the league-state fingerprint (a roster move, pick trade, setting change or
+        # players/values refresh is a different key); an aged entry for the same state is served while it recomputes.
+        glance = swr_cache.redis_swr_cache(
+            cache_key=redis_cache.build_cache_key(
+                "league_glance_swr",
+                _league_glance_cache_key(user_id, league_id, lens),
+                league_value_settings.league_state_fingerprint(league_id, PLAYERS_DB_PATH),
+            ),
+            fresh_ttl_seconds=LEAGUE_GLANCE_TTL_SECONDS,
+            stale_ttl_seconds=LEAGUE_GLANCE_STALE_TTL_SECONDS,
             compute=_compute,
         )
     except Exception:
