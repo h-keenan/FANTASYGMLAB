@@ -6,7 +6,7 @@
  * - The one-time coachmark names what the orb opens. It reuses the `fd-help-seen:` seen-once storage prefix
  *   that BeginnerHelp uses, so "seen" is one convention everywhere.
  */
-export const ORB_COACHMARK_TEXT = "Tap for Today, Team, Trades, League, More";
+export const ORB_COACHMARK_TEXT = "Your GM menu: tap to jump to Today, Team, Trades, League, More";
 export const ORB_COACHMARK_DISMISS = "Got it";
 export const ORB_MENU_CUE_LABEL = "Menu";
 export const ORB_COACHMARK_SEEN_KEY = "fd-help-seen:orb-menu";
