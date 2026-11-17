@@ -1176,6 +1176,30 @@ def _depth_order(player: Dict[str, Any]) -> Optional[int]:
         return None
 
 
+_TEAM_POSITION_INDEX: Optional[tuple] = None  # (players dict, its length, index): one entry, replaced whole (thread-safe)
+
+
+def _team_position_index(players: Dict[str, Any]) -> Dict[tuple, List[tuple]]:
+    """``(team, POSITION) -> [(player_id, row), ...]`` in the lookup's own order.
+
+    ``_role_adjustment`` asks "who is ahead of him at his position on his team" once per
+    projected player; scanning the whole player pool each time made a lineup build O(players x
+    roster). The lookup dict is built once per request and not mutated while projecting, so the
+    index is kept by identity and size (a different or resized dict rebuilds it)."""
+
+    global _TEAM_POSITION_INDEX
+    held = _TEAM_POSITION_INDEX
+    if held is not None and held[0] is players and held[1] == len(players):
+        return held[2]
+    index: Dict[tuple, List[tuple]] = {}
+    for pid, other in players.items():
+        index.setdefault((str(other.get("team") or ""), str(other.get("position") or "").upper()), []).append(
+            (pid, other)
+        )
+    _TEAM_POSITION_INDEX = (players, len(players), index)
+    return index
+
+
 def _role_adjustment(player: Dict[str, Any], players: Dict[str, Any]) -> Dict[str, Any]:
     """Role layer, from the depth chart and the teammate ahead of him.
 
@@ -1198,10 +1222,8 @@ def _role_adjustment(player: Dict[str, Any], players: Dict[str, Any]) -> Dict[st
     if order is None or order < 2 or not team:
         return none
     ahead: List[tuple] = []
-    for pid, other in players.items():
-        if other is player or str(other.get("team") or "") != str(team):
-            continue
-        if str(other.get("position") or "").upper() != position:
+    for pid, other in _team_position_index(players).get((str(team), position), ()):
+        if other is player:
             continue
         other_order = _depth_order(other)
         if other_order is None or other_order >= order:
