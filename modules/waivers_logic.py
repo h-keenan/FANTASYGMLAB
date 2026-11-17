@@ -510,6 +510,7 @@ def shared_waiver_adds(
         needs_model = roster_value_model.league_needs(
             valued=valued, rosters=rosters, league=league, settings=settings,
             score_field=score_field, strategy=strategy, pool=free_agents,
+            only_roster_ids=[roster_id],  # only this roster's model is read
         ).for_roster(roster_id)
         # A model that priced no free agent at all (no per-game data behind
         # the frame) says nothing about needs; fall back to the position list.
@@ -873,7 +874,11 @@ def rank_priority_add_candidates(
     value_opportunity = []
     actionable = []
     skill_needs = (set(need_rank) if use_model else needed) - {"QB", "TE", "K"}
-    for idx in positive.index:
+    # One records pass instead of a per-candidate ``.loc[idx]`` Series build (up to three per row:
+    # each is a mixed-dtype row copy that dominated this loop).
+    records = positive.to_dict("records")
+    for row_number, idx in enumerate(positive.index):
+        row = records[row_number]
         position = str(positive.at[idx, "position"] or "").upper()
         score = float(pos_scores.at[idx])
         injured = bool(injury_fit.at[idx] if idx in injury_fit.index else False)
@@ -889,7 +894,7 @@ def rank_priority_add_candidates(
             is_need = bool(kicker_required and not has_viable_kicker)
         is_elite_value = bool(
             (overall_rank.at[idx] <= 2 or score >= top_cutoff)
-            and _clear_elite_bar(positive.loc[idx], score)
+            and _clear_elite_bar(row, score)
         )
         if position in {"QB", "TE"} and position not in (need_rank if use_model else needed) and not injured:
             is_need = False
@@ -901,12 +906,12 @@ def rank_priority_add_candidates(
                 is_elite_value = False
             elif position == "TE":
                 is_elite_value = bool(
-                    overall_rank.at[idx] <= 1 and score >= top_cutoff and _clear_elite_bar(positive.loc[idx], score)
+                    overall_rank.at[idx] <= 1 and score >= top_cutoff and _clear_elite_bar(row, score)
                 )
             else:
                 # Superflex without a true QB need: only exceptional wire QB value.
                 is_elite_value = bool(
-                    overall_rank.at[idx] <= 2 and score >= top_cutoff and _clear_elite_bar(positive.loc[idx], score)
+                    overall_rank.at[idx] <= 2 and score >= top_cutoff and _clear_elite_bar(row, score)
                 )
         if position == "K" and suppress_kickers:
             is_need = False
@@ -915,7 +920,7 @@ def rank_priority_add_candidates(
         # The shared model's "bigger upgrade than your need" (roster_value_model.
         # outsized_adds): always actionable and ranked first, whatever its tag.
         is_bigger = bool(use_model and pid in bigger_ids)
-        if candidate_availability(positive.loc[idx])[0]:
+        if candidate_availability(row)[0]:
             # He is out himself: he cannot fill a hole this week. Only a
             # long-term format keeps him on the board, as a value stash.
             is_need = is_bigger = is_stash = False
