@@ -50,7 +50,7 @@ function RosterStrip({ players, active, onPick }: { players: NewsStripPlayer[]; 
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <CompactModule id="news.roster" title={`Your roster · ${players.length} with news`} label="Your roster" summary="Tap a player to filter the digest" defaultOpen={active != null} testID="news-strip">
+    <CompactModule id="news.roster" title={`Your roster · ${players.length} with news`} label="Your roster" parts={[{ key: 'count', text: `${players.length} with news`, tone: 'muted' }]} defaultOpen={active != null} testID="news-strip">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stripRow}>
         {players.map((p) => {
           const on = p.key === active;
