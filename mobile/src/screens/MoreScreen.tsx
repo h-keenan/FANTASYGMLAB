@@ -414,7 +414,7 @@ export default function MoreScreen({ navigation }: Props) {
             const { error } = await deleteAccount();
             setDeleting(false);
             if (error) {
-              Alert.alert('Could not delete account', error || DELETE_ACCOUNT_FAILED);
+              notify.alert('Could not delete account', error || DELETE_ACCOUNT_FAILED);
             }
             // On success there's nothing else to do here - clearing the
             // session flips RootNavigator back to the Auth stack on its own.
