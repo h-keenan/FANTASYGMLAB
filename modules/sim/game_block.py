@@ -92,7 +92,7 @@ def ai_block(desk: TradeDesk, tid: str, seed: int) -> dict[str, Any] | None:
     snap, state, ev = desk.snap, desk.state, desk.ev
     if not trading(snap, state) or tid == snap.user_team.tid:
         return None
-    params = team_params(snap, tid)
+    params = team_params(snap, tid, state)
     if params.activity <= 0 or state.trades_made[tid] >= params.max_trades:
         return None
     if _draw(snap, state, seed, tid) > AI_BLOCK_CHANCE * params.activity:

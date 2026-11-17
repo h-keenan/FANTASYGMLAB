@@ -140,7 +140,7 @@ def ai_waiver_claims(
     """The claims one AI team makes this week (usually none, up to three when several holes open at once)."""
 
     snap, state = ev.snap, ev.state
-    params = team_params(snap, tid)
+    params = team_params(snap, tid, state)
     r = WorldRng(seed).stream(week, "gwaiver", _idx(snap, tid))
     roll = r.random()
     limit = snap.settings.roster_limit

@@ -21,6 +21,10 @@ Severity: P0 = wrong or unsafe answer, broken state or exploit. P1 = clearly unr
 | `player-model-8`: shallower, rarer busts for top-tier players (the season low tail) | #2027 | open at time of writing, merge SHA in the delivery report |
 | `stability_v 2`: flatter late-career knots, per-position outcome carry and pull (late-career decline, persistence) | #2029 | merged, `df4dd57e`, upgradable, season boundary |
 | `rookie_v 1`: rookie classes sized like real ones (controllers read the league with the class in it, tapered scarcity, solved and capped depth response) | see the delivery report | upgradable, season boundary, dynasty only |
+| `wire_v 1`: contested waiver wire (the AI claims what it wants, claims settle in waiver order) | #2033 | merged, `52269f00`, upgradable, week boundary |
+| `need_v 1`: Needs / Strength tags from real roster holes (strict slots, superflex QB, no flex, wire-adjusted shortfall) | #2037 | merged, `f998eb84`, upgradable, immediate |
+| `cap_v 1`: one shared position limit for auto-pick, the AI draft and the AI waiver planner | #2039 | merged, `ae917826`, upgradable, immediate |
+| `posture_v 1`: AI buy / sell posture follows standing and playoff odds, with hysteresis | this PR | upgradable, week boundary |
 
 ### The trade reason that named the wrong position (reported)
 Partner tags NEEDS WR, NEEDS K, DEEP RB, DEEP TE; the user sends a WR and receives an RB; the verdict reason read "They need a RB and this fills it. NEEDS RB".
@@ -408,6 +412,41 @@ Residual: AI teams still reach three QBs in a third of seasons through genuine h
 with the deferred AI backup-QB planning (`ai_v 2`).
 
 Tests: `tests/test_sim_cap_v.py` (gate, the limit formula, planner and draft read one number, no third QB in a one-QB draft, a digest pin that `cap_v 0` drafts are unchanged).
+
+### `posture_v 1`: AI posture that follows the standings (delivered, upgradable, week boundary)
+
+An AI team's horizon was `GameTeam.horizon`, a persona constant for the whole game (`game_setup`), so a "contender" at 2-6 still bought and a "rebuilder" in first place still sold. `game_posture` re-reads each AI team's
+posture at the start of every regular-season week from week 5 (4 games played) and emits one `posture` event carrying only the changes (event-sourced: replays are exact, the field is out of the digest while empty, cleared each
+season). Factors: the record (shrunk toward .500), the lineup it can field (`ev.lineup_total` against the league mean, so a hot start on a thin roster is not believed blindly), games left, and the playoff line (expected wins of the
+last team in and first team out, normal approximation of the remaining schedules) -> `playoff_odds`. Rule with hysteresis: enter `buy` at 65% odds and leave below 45%; enter `sell` at 12% and leave above 30%; buy and sell never swap
+directly; every change is held at least two weeks. `team_params(snap, tid, state)` then shifts the horizon (buy +0.25, sell -0.30) and the shopping rate (x1.25) for everything the AI decides: AI-AI trades, offers to the user, waiver
+claims (the `(0.4 + horizon)` lineup weight and the value blend), the block and its stance label.
+
+Same AI managers, week 8 of a dynasty (value paid per market point, mean over 150 top-market players and every AI team, 6 seeds):
+
+| Posture | Veteran (28+) | Prime (25-27) | Young (24-) | Veteran / young |
+| --- | --- | --- | --- | --- |
+| Buy | 0.84 | 0.75 | 0.70 | 1.20 |
+| Hold (old behaviour) | 0.82 | 0.78 | 0.76 | 1.08 |
+| Sell | 0.80 | 0.81 | 0.82 | 0.98 |
+
+Redraft harness, 16 seeds (AI team-weeks from week 5; tiers by playoff odds at the start of the week: in >= 65%, mid, out <= 15%):
+
+| | `posture_v 0` | `posture_v 1` |
+| --- | --- | --- |
+| Stance of teams that made the playoffs (buy / hold / sell) | n/a (a constant) | 65% / 32% / 3% |
+| Stance of teams that missed (buy / hold / sell) | n/a | 25% / 44% / 32% |
+| Posture changes per team-season (max) | 0 | 1.25 (4) |
+| Changes a threshold-only rule (no hysteresis, no tenure) makes on the same odds | 2.14 | 2.15 (hysteresis applied: 1.25) |
+| AI-AI trades per 100 team-weeks, in / mid / out | 1.6 / 4.3 / 5.0 | 2.4 / 4.1 / 7.7 |
+
+Residuals, stated plainly: (1) AI-AI trades are rare (about 1 per 100 team-weeks in the dynasty harness, 3-5 in redraft), so the realized production / age of executed trades by tier is noise at 16 seeds and its sign did not move
+reliably (n = 45 trades); the valuation table above is the evidence for direction. A multi-season run is needed to measure realized trade composition. (2) In a one-season redraft the horizon only blends current form with market value (age
+does not enter), so the buy / sell shift is a weaker lever than in a dynasty. (3) The persona still decides more than it should of the standings (average wins, horizon >= 0.6 personas 6.6 against 7.4 for the rest, unchanged by
+the posture): the personas' roster-building (draft, weights) is a separate constant. (4) Odds are an approximation, not a simulation.
+
+Tests: `tests/test_sim_posture_v.py` (gate, hysteresis table, odds, the params shift and its gates, a pinned old-save digest, a replay-exact season with tenure respected). Reproducing:
+`realism_p1_report posture --seeds 16 [--flags '{"posture_v": 0}']`, `realism_p1_report values --seeds 6`, `realism_p1_report posture --dynasty --seeds 6`.
 
 ## Decisions needed (product)
 1. Ship the late-career age curve and a lower `REVERSION` (`stability_v 2`)? Done as an upgradable offseason change (it changes dynasty values for 27+ players, so it is not silent); the owner may still veto the Realism update copy.

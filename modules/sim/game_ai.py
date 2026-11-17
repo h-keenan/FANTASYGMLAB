@@ -93,7 +93,7 @@ def ai_waiver_claim(
     lineup gain and value gain, if it clears the persona's bar."""
 
     snap, state = ev.snap, ev.state
-    params = team_params(snap, tid)
+    params = team_params(snap, tid, state)
     r = WorldRng(seed).stream(week, "gwaiver", _idx(snap, tid))
     roster = state.rosters[tid]
     # A starting slot nobody healthy can fill (injuries, a bye, a lone kicker) is an
@@ -204,7 +204,7 @@ class TradeDesk:
 
     def params(self, tid: str) -> TeamParams:
         if tid not in self._params:
-            self._params[tid] = team_params(self.snap, tid)
+            self._params[tid] = team_params(self.snap, tid, self.state)
         return self._params[tid]
 
     def cover(self) -> list[str]:
