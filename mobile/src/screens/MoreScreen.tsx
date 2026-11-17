@@ -364,7 +364,8 @@ export default function MoreScreen({ navigation }: Props) {
   // settings, not a custom in-app flow (Apple/Google require this) — this
   // just saves the "your device's account settings" instruction on the
   // Paywall from being a manual hunt.
-  const onManageSubscription = openStoreSubscriptionSettings;
+  // Free accounts get the upgrade path (web: "You're on the Free plan" + Upgrade to Pro); Pro goes to the store's settings.
+  const onManageSubscription = () => (planOf(me) === 'free' ? navigation.navigate('Paywall') : openStoreSubscriptionSettings());
 
   const onOpenTeamStance = () => {
     const league = currentLeagueContext();
@@ -739,7 +740,7 @@ export default function MoreScreen({ navigation }: Props) {
           <SettingsRow
             icon="card-outline"
             iconColor={colors.textSecondary}
-            label="Manage Subscription"
+            label={planOf(me) === 'free' ? 'Upgrade to Pro' : 'Manage Subscription'}
             description={trialEndLabel(trialEnd) || undefined}
             onPress={onManageSubscription}
             showDivider

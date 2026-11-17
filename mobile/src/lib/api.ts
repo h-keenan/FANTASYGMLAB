@@ -3736,6 +3736,9 @@ export interface TradeFinderResponse extends Omit<TradeHubResponse, 'ideas'> {
    * Older servers omit it. */
   closest?: TradeFinderClosestIdea[];
   search?: TradeFinderSearch;
+  /** Pro-only feature: false (with `upsell`) when the server withheld the ideas. */
+  is_premium?: boolean;
+  upsell?: { title: string; body: string } | null;
 }
 
 export interface AllTradesEntitlement {
