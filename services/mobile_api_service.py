@@ -9698,6 +9698,17 @@ def _quick_view_identity(player_id: str, row: pd.Series | None) -> dict[str, Any
 MAX_WEEKLY_STATS_SEASONS_BACK = 7
 
 
+@app.get("/v1/public/data-freshness")
+def get_public_data_freshness() -> dict[str, Any]:
+    """Per-dataset freshness + completeness for the external watchdog
+    (scripts/ops_health_check.py). Unauthenticated, never fetches from a provider,
+    exposes only dataset names, ages and missing week numbers."""
+
+    from modules import data_freshness
+
+    return {"ok": True, **data_freshness.build_report()}
+
+
 @app.get("/v1/players/{player_id}/weekly-stats")
 def get_player_weekly_stats(
     player_id: str,
