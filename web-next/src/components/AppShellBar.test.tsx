@@ -45,12 +45,12 @@ describe("AppShellBar", () => {
     render(<AppShellBar />);
     fireEvent.click(screen.getByRole("button", { name: "More" }));
     const menu = screen.getByRole("navigation", { name: "All pages" });
-    // Pages the bar does not show lead; the ones it does fold into one "Sections" group (derived from pageFamilies).
-    const lead = within(menu).getByRole("region", { name: "League tools" });
-    expect(within(lead).getByRole("link", { name: /GM Plan/ })).toBeInTheDocument();
-    expect(within(lead).queryByRole("link", { name: /Waivers/ })).toBeNull();
-    const sections = within(menu).getByRole("region", { name: "Sections" });
-    expect(within(sections).getByRole("link", { name: /Waivers/ })).toBeInTheDocument();
+    // The one shared sheet (lib/navSheet.ts): league pages under the league name, then GM Tools, General, Account.
+    const league = within(menu).getAllByRole("region").find((r) => r.querySelector('a[href^="/waivers"]'));
+    expect(league).toBeTruthy();
+    expect(within(league as HTMLElement).queryByRole("link", { name: /GM Plan/ })).toBeNull();
+    const tools = within(menu).getByRole("region", { name: "GM Tools" });
+    expect(within(tools).getByRole("link", { name: /GM Plan/ })).toBeInTheDocument();
     expect(within(menu).getByRole("link", { name: /Today/ })).toBeInTheDocument();
     expect(within(menu).getByRole("link", { name: /Fantasy Sim/ })).toBeInTheDocument();
     expect(within(menu).getAllByTestId("nav-pro-marker").length).toBeGreaterThan(0);

@@ -37,6 +37,10 @@ export type SheetProps = {
   footer?: ReactNode;
   /** "sm" is a compact popover-sized card on desktop; "md" (default) a 560px dialog; "lg" 720px. */
   size?: "sm" | "md" | "lg";
+  /** Small accent line above the title. */
+  eyebrow?: string;
+  /** Liquid-glass surface with the drifting field-line texture (the navigation sheet's look; globals.css `.gm-orb-sheet`). */
+  glass?: boolean;
   /** Hide the visible heading (the title still names the dialog). */
   hideTitle?: boolean;
   /** Element to focus on open instead of the dialog's close button. */
@@ -64,6 +68,8 @@ export function Sheet({
   onClose,
   title,
   description,
+  eyebrow,
+  glass = false,
   children,
   footer,
   size = "md",
@@ -157,14 +163,20 @@ export function Sheet({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
-        className={`ui-sheet ui-sheet-${size} ${className}`.trim()}
+        className={`ui-sheet ui-sheet-${size}${glass ? " gm-orb-sheet" : ""} ${className}`.trim()}
         style={sheetStyle}
         onKeyDown={onKeyDown}
         data-testid={testId}
       >
+        {glass ? (
+          <>
+            <div className="gm-orb-sheet-field" aria-hidden="true" />
+            <div className="gm-orb-sheet-sweep" aria-hidden="true" />
+          </>
+        ) : null}
         <SheetHandle />
         <OverlayBack overlay={overlay} />
-        <SheetHeader titleId={titleId} title={title} subtitle={description} subtitleId={descId} hideTitle={hideTitle} onClose={overlay.closeAll} closeRef={closeRef} />
+        <SheetHeader titleId={titleId} title={title} subtitle={description} eyebrow={eyebrow} subtitleId={descId} hideTitle={hideTitle} onClose={overlay.closeAll} closeRef={closeRef} />
         <div className="ui-sheet-body">{children}</div>
         {footer ? <div className="ui-sheet-footer">{footer}</div> : null}
       </div>

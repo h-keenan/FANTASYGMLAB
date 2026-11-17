@@ -1,22 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
-import { NavProMarker } from "@/components/NavProMarker";
+import { NavSheet } from "@/components/NavSheet";
 import { BottomDock } from "@/components/ui/BottomDock";
 import { BottomTabBar } from "@/components/ui/BottomTabBar";
 import { isSelectionAction, moreBadgeSummary, moreBadgeTotal } from "@/lib/bottomNav";
 import { useShellBadges } from "@/lib/shellBadgeStore";
 import { useFooterHideOnScroll } from "@/lib/useFooterHideOnScroll";
-import { Sheet } from "@/components/ui/Sheet";
-import { useAuth } from "@/context/AuthContext";
-import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
-import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { getPillState, getServerPillState, setPillBarPresent, subscribePill } from "@/lib/bottomPillStore";
-import { moreLeagueGroups } from "@/lib/moreSheet";
 import { routeFamilyPillContext } from "@/lib/pageFamilyPill";
 import { shellActiveTab, shellLeagueContext, shellTabs, SHELL_ACTION_SLOT_ID } from "@/lib/shellNav";
 import { useSearchParams } from "@/lib/useSearchParams";
@@ -27,9 +20,8 @@ import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 /**
  * Phase B phone shell: the site-wide bottom bar. League-aware: inside a league
  * Today / Team / Trades / League / More, outside it Home / Portfolio /
- * Fantasy Sim / News / More. More opens the full menu, grouped, from the one
- * shared catalog (lib/navCatalog.ts via useNavDestinations): same groups,
- * glyphs and Pro markers as the orb and the desktop sidebar.
+ * Fantasy Sim / News / More. More opens the one shared navigation sheet
+ * (components/NavSheet.tsx), the same sheet the header Search icon and the GM orb open.
  *
  * Layout: an in-flow `.bottom-stack` (position: sticky; bottom: 0 at the end
  * of the app column, safe-area padding), never position:fixed or JS-placed, so
@@ -85,49 +77,7 @@ function ShellBarInner() {
           }}
         />
       </BottomDock>
-      <ShellMoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} leagueId={leagueId} leagueName={leagueName} />
+      <NavSheet open={moreOpen} onClose={() => setMoreOpen(false)} leagueId={leagueId} leagueName={leagueName} />
     </>
-  );
-}
-
-function ShellMoreSheet({ open, onClose, leagueId, leagueName }: { open: boolean; onClose: () => void; leagueId: string | null; leagueName: string }) {
-  const { session } = useAuth();
-  const { collegeInterest } = useDisplayPreferences();
-  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName, collegeInterest);
-  const showPro = useIsPro() === false;
-  const founder = isFounderSession(session);
-  // Lead with the pages the bar does NOT show; the ones it does fold into one "Sections" group (derived from pageFamilies).
-  const leagueGroups = moreLeagueGroups([...coreLeagueDestinations, ...gmToolsDestinations]);
-  const groups: { title: string; rows: NavDestination[] }[] = [
-    ...(leagueId ? leagueGroups : []),
-    { title: "General", rows: generalDestinations },
-    { title: "Account", rows: [...accountDestinations, ...(founder ? [FOUNDER_DESTINATION] : [])] },
-  ];
-  return (
-    <Sheet open={open} onClose={onClose} title="More" description={leagueId ? leagueName : "Everything in FantasyDesk"}>
-      <nav aria-label="All pages" className="flex flex-col gap-4" data-testid="shell-more-menu">
-        {groups.map((group) => (
-          <section key={group.title} aria-label={group.title} className="flex flex-col">
-            <h3 className="px-2 pb-1 text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.04em" }}>
-              {group.title}
-            </h3>
-            {group.rows.map((row) => (
-              <Link key={row.path} href={row.path} onClick={onClose} className="game-nav-row" data-testid="shell-more-row">
-                <span className="shrink-0" style={{ color: row.color }}>
-                  <NavDestinationGlyph name={row.glyph} size={22} />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="flex items-center gap-2 text-sm font-bold">
-                    {row.label}
-                    {row.pro && showPro ? <NavProMarker /> : null}
-                  </span>
-                  <span className="truncate text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>{row.subtitle}</span>
-                </span>
-              </Link>
-            ))}
-          </section>
-        ))}
-      </nav>
-    </Sheet>
   );
 }

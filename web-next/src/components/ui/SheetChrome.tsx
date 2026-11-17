@@ -35,6 +35,8 @@ export type SheetHeaderProps = {
   title: string;
   /** One line under the title. */
   subtitle?: string | null;
+  /** Small uppercase accent line above the title (the nav sheet's "FANTASYDESK"). */
+  eyebrow?: string;
   subtitleId?: string;
   /** Keep the title for assistive tech but hide it visually. */
   hideTitle?: boolean;
@@ -48,11 +50,12 @@ export type SheetHeaderProps = {
 };
 
 /** Title, subtitle, actions and the close button on one row. */
-export function SheetHeader({ titleId, title, subtitle, subtitleId, hideTitle = false, leading, actions, onClose, closeLabel, closeRef }: SheetHeaderProps) {
+export function SheetHeader({ titleId, title, subtitle, eyebrow, subtitleId, hideTitle = false, leading, actions, onClose, closeLabel, closeRef }: SheetHeaderProps) {
   return (
     <header className="ui-sheet-header" data-sheet-header="">
       {leading}
       <div className="min-w-0 flex-1">
+        {eyebrow && !hideTitle ? <p className="ui-sheet-eyebrow">{eyebrow}</p> : null}
         <h2 id={titleId} className={hideTitle ? "sr-only" : "ui-sheet-title"}>
           {title}
         </h2>

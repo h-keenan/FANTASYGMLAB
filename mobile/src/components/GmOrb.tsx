@@ -43,7 +43,7 @@ import { accentColor } from '../lib/destinationAccent';
 import { ACCENT_BY_DESTINATION } from '../lib/destinationAccents.generated';
 import { queryKeys } from '../lib/queryKeys';
 import { TERMS } from '../lib/terms';
-import { splitMoreByBar } from '../lib/pageFamilies';
+import { NAV_SHEET_NO_LEAGUE_NOTE, NAV_SHEET_TITLE, navSheetGroups, navSheetNoMatch, navSheetSearchCopy } from '../lib/navSheet';
 import { HOME_SUBTITLE, navPage, navPagesIn, type NavCatalogPage } from '../lib/navCatalog';
 import { ORB_COACHMARK_SEEN_KEY, ORB_COACHMARK_TEXT } from '../lib/orbCoachmark';
 import { ROUTE_BY_PAGE, searchOrbDestinations, type OrbSearchHit } from '../lib/orbTabs';
@@ -136,42 +136,23 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
   return navPagesIn('tools').map((page) => destinationFor(colors, page));
 }
 
-/** The league part of the menu: pages the bar/orb families do NOT show first, then every page that is a tab of a family as one "Sections" group (derived from lib/pageFamilies.ts, so it cannot drift). */
-function leagueMoreGroups(colors: ThemeColors): { title: string; rows: Destination[] }[] {
-  const { lead, sections } = splitMoreByBar([...coreLeagueDestinations(colors), ...gmToolsDestinations(colors)].map((d) => ({ d, key: d.pageKey ?? '' })));
-  return [
-    { title: 'League tools', rows: lead.map((x) => x.d) },
-    { title: 'Sections', rows: sections.map((x) => x.d) },
-  ].filter((g) => g.rows.length > 0);
-}
-
 // Not a stack route: the Premium row's subscriber variant opens the store's
 // subscription settings instead (see `go`).
 const MANAGE_SUBSCRIPTION_ROUTE = '__manage_subscription__';
 
-/** `storeSubscriber`: an active App Store / Play subscription per RevenueCat
- * (tap-depth audit #10). Those users get "Manage subscription" -> the same
- * store settings More's row opens, instead of a Paywall they've already
- * bought through. A web (Stripe) or unknown subscriber stays on Premium ->
- * Paywall, unchanged, since the store page wouldn't show their plan. */
-function generalDestinations(colors: ThemeColors, storeSubscriber = false, founder = false): Destination[] {
+function generalDestinations(colors: ThemeColors): Destination[] {
   return [
     // The league switcher; Account (below) owns settings.
     { label: TERMS.yourLeagues, route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: HOME_SUBTITLE },
     destinationFor(colors, navPage('gm-game')),
-    ...(founder
-      ? [
-          {
-            label: 'Founder Analytics',
-            route: 'FounderAnalytics',
-            icon: 'stats-chart-outline' as IconName,
-            color: colors.violet,
-            subtitle: 'Internal product usage (founder accounts only)',
-          },
-        ]
-      : []),
     destinationFor(colors, navPage('news')),
     destinationFor(colors, navPage('community')),
+  ];
+}
+
+/** The Account group (lib/navSheet.ts): Pro / Manage subscription, Account, and (founder sessions only) Founder Analytics. */
+function accountDestinations(colors: ThemeColors, storeSubscriber = false, founder = false): Destination[] {
+  return [
     storeSubscriber
       ? {
           label: 'Manage subscription',
@@ -194,7 +175,29 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
       color: colors.textSecondary,
       subtitle: 'Settings, legal, and support',
     },
+    ...(founder
+      ? [
+          {
+            label: 'Founder Analytics',
+            route: 'FounderAnalytics',
+            icon: 'stats-chart-outline' as IconName,
+            color: colors.violet,
+            subtitle: 'Internal product usage (founder accounts only)',
+          },
+        ]
+      : []),
   ];
+}
+
+/** `storeSubscriber`: an active App Store / Play subscription per RevenueCat (tap-depth audit #10) gets "Manage subscription" -> the store settings instead of a Paywall they've already bought through. */
+function navGroups(colors: ThemeColors, leagueName: string | null, storeSubscriber: boolean, founder: boolean) {
+  return navSheetGroups<Destination>({
+    leagueName,
+    core: coreLeagueDestinations(colors),
+    tools: gmToolsDestinations(colors),
+    general: generalDestinations(colors),
+    account: accountDestinations(colors, storeSubscriber, founder),
+  });
 }
 
 interface SavedLeagueRow {
@@ -494,11 +497,7 @@ export default function GmOrb() {
   // gated destination would otherwise appear in results but silently no-op
   // on tap (see `go()`).
   const searchableDestinations = useMemo(
-    () => [
-      ...(league ? coreLeagueDestinations(colors) : []),
-      ...(league ? gmToolsDestinations(colors) : []),
-      ...generalDestinations(colors, storeSubscriber, founder),
-    ],
+    () => navGroups(colors, league ? league.leagueName || '' : null, storeSubscriber, founder).flatMap((group) => group.rows),
     [colors, league, storeSubscriber, founder],
   );
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -850,18 +849,18 @@ export default function GmOrb() {
             <View style={styles.sheetHandle} />
           </Pressable>
           <AppText style={styles.sheetKicker}>FantasyDesk</AppText>
-          <AppText style={styles.sheetTitle}>Where to go</AppText>
+          <AppText style={styles.sheetTitle}>{NAV_SHEET_TITLE}</AppText>
 
           <TextInput
             ref={searchInputRef}
             style={styles.searchInput}
-            placeholder={league ? 'Search where to go or a player' : 'Search where to go'}
+            placeholder={navSheetSearchCopy(Boolean(league)).placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
             autoCorrect={false}
             placeholderTextColor={colors.textTertiary}
-            accessibilityLabel={league ? 'Search destinations and players' : 'Search destinations'}
+            accessibilityLabel={navSheetSearchCopy(Boolean(league)).label}
           />
 
           <SheetScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
@@ -912,69 +911,33 @@ export default function GmOrb() {
                 <SkeletonText label="players" lines={2} />
               ) : (
                 <AppText style={styles.sectionNote}>
-                  {league ? 'No destinations or players match' : 'No destinations match'} "{searchQuery.trim()}".
+                  {navSheetNoMatch(Boolean(league), searchQuery)}
                 </AppText>
               )
             ) : (
               <>
-                {league ? (
-                  <>
-                    {/* Concept sheet labels this section with the actual league
-                        name ("KEEPER LEAGUE"), not a generic "League" literal —
-                        matches the screen's own title bar right behind the
-                        sheet, which already shows the same name as its
-                        subtitle. Falls back to the generic label only in the
-                        (practically unreachable, since this whole branch is
-                        gated on `league`) case of a blank name. This also
-                        satisfies the brief's "surface current league context
-                        near the top" ask (§3) without a separate chip: the very
-                        first thing in the list is already labeled with the
-                        active league's name. */}
-                    {leagueMoreGroups(colors).map((group) => (
-                      <NavSection key={group.title} label={group.title === 'League tools' ? league.leagueName || group.title : group.title}>
-                        {group.rows.map((destination) => (
-                          <NavRow
-                            key={destination.route}
-                            destination={destination}
-                            isCurrent={destination.route === currentRouteName}
-                            unreadCount={destination.route === 'Dashboard' ? unreadAlertCount : undefined}
-                            hasNew={destination.route === 'Trades' ? tradeHubHasNew : false}
-                            showPro={showProTags}
-                            onPress={() => go(destination)}
-                          />
-                        ))}
-                      </NavSection>
-                    ))}
-                  </>
-                ) : (
-                  <AppText style={styles.sectionNote}>
-                    Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
-                  </AppText>
-                )}
-
-                {/* Switch League moved here — trailing GM Tools, ahead of General
-                    — to match the structural order shown in all three concept
-                    screenshots (League destinations -> GM Tools ending in Recap
-                    -> SWITCH LEAGUE -> GENERAL). Previously this rendered first,
-                    above every destination, which none of the concept images
-                    actually show; re-inspecting them directly during the V2
-                    restructure pass caught the mismatch. Purely a position
-                    change — same component, same props, same switching logic. */}
-                {league || savedLeagues.length > 1 ? (
-                  <LeagueSwitcher league={league} savedLeagues={savedLeagues} onSwitch={switchToLeague} />
-                ) : null}
-
-                <NavSection label="General">
-                  {generalDestinations(colors, storeSubscriber, founder).map((destination) => (
-                    <NavRow
-                      key={destination.route}
-                      destination={destination}
-                      isCurrent={destination.route === currentRouteName}
-                      showPro={showProTags}
-                      onPress={() => go(destination)}
-                    />
-                  ))}
-                </NavSection>
+                {!league ? <AppText style={styles.sectionNote}>{NAV_SHEET_NO_LEAGUE_NOTE}</AppText> : null}
+                {navGroups(colors, league ? league.leagueName || '' : null, storeSubscriber, founder).map((group) => (
+                  <React.Fragment key={group.id}>
+                    {/* Switch League trails GM Tools, ahead of General (concept sheet order). */}
+                    {group.id === 'general' && (league || savedLeagues.length > 1) ? (
+                      <LeagueSwitcher league={league} savedLeagues={savedLeagues} onSwitch={switchToLeague} />
+                    ) : null}
+                    <NavSection label={group.title}>
+                      {group.rows.map((destination) => (
+                        <NavRow
+                          key={destination.route}
+                          destination={destination}
+                          isCurrent={destination.route === currentRouteName}
+                          unreadCount={destination.route === 'Dashboard' ? unreadAlertCount : undefined}
+                          hasNew={destination.route === 'Trades' ? tradeHubHasNew : false}
+                          showPro={showProTags}
+                          onPress={() => go(destination)}
+                        />
+                      ))}
+                    </NavSection>
+                  </React.Fragment>
+                ))}
               </>
             )}
           </SheetScrollView>
