@@ -173,11 +173,18 @@ export function PlayerProfileContent({
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([api.getPlayerQuickView(player.player_id), api.getPlayerAwards(player.player_id)])
-      .then(([quickView, awardsResponse]) => {
+    // Awards are best-effort: a failed request is an empty strip, never the profile's error state.
+    api
+      .getPlayerAwards(player.player_id)
+      .then((awardsResponse) => {
+        if (!cancelled) setAwards(awardsResponse.ok ? awardsResponse.awards : []);
+      })
+      .catch(() => {});
+    api
+      .getPlayerQuickView(player.player_id)
+      .then((quickView) => {
         if (cancelled) return;
         setDetail(quickView);
-        setAwards(awardsResponse.ok ? awardsResponse.awards : []);
         setLoadError(false);
       })
       .catch(() => {

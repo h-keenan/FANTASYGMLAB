@@ -8,6 +8,7 @@ import { PulseOnIncrease } from './Motion';
 import TabIcon from './TabIcon';
 import ToneBadge from './ToneBadge';
 import { SkeletonTabs } from './Skeleton';
+import { slimTabInset } from '../lib/sheetTabs';
 import { pageTabFamily, type PageTabFamilyKey } from '../lib/pageFamilies';
 import type { TabIconName } from '../lib/tabIcons';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -81,9 +82,18 @@ export default function SegmentedTabBar<T extends string>({
   }, [target, reduceMotion, slideX, slideW]);
   const scrollRef = useRef<ScrollView>(null);
   const [viewport, setViewport] = useState(0);
+  const scrollX = useRef(0);
   useEffect(() => {
-    if (!snap || !scrollable || !target || !viewport) return;
-    scrollRef.current?.scrollTo({ x: Math.max(0, target.x - (viewport - target.width) / 2), animated: !reduceMotion });
+    if (!scrollable || !target || !viewport) return;
+    if (snap) {
+      scrollRef.current?.scrollTo({ x: Math.max(0, target.x - (viewport - target.width) / 2), animated: !reduceMotion });
+      return;
+    }
+    // Not centred: scroll the minimum that brings the active tab fully into view (a tab at the right edge is never left clipped).
+    const left = target.x;
+    const right = target.x + target.width;
+    if (left < scrollX.current) scrollRef.current?.scrollTo({ x: left, animated: !reduceMotion });
+    else if (right > scrollX.current + viewport) scrollRef.current?.scrollTo({ x: right - viewport, animated: !reduceMotion });
   }, [snap, scrollable, target, viewport, reduceMotion]);
   const onSegmentLayout = (key: string) => (event: LayoutChangeEvent) => {
     const { x, width } = event.nativeEvent.layout;
@@ -101,7 +111,7 @@ export default function SegmentedTabBar<T extends string>({
         return (
           <PressableScale
             key={option.key}
-            style={[styles.segment, scrollable && styles.segmentScroll, dense && styles.segmentDense, isActive && !target && (slim ? styles.segmentActiveSlim : styles.segmentActive)]}
+            style={[styles.segment, scrollable && styles.segmentScroll, dense && styles.segmentDense, slim && scrollable && options.length >= 5 && { paddingHorizontal: slimTabInset(options.length) }, isActive && !target && (slim ? styles.segmentActiveSlim : styles.segmentActive)]}
             onPress={() => onChange(option.key)}
             onLayout={onSegmentLayout(option.key)}
             accessibilityRole="tab"
@@ -138,7 +148,9 @@ export default function SegmentedTabBar<T extends string>({
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ flexGrow: 1 }}
       decelerationRate={snap ? 'fast' : undefined}
-      onLayout={snap ? (event) => setViewport(event.nativeEvent.layout.width) : undefined}
+      onLayout={(event) => setViewport(event.nativeEvent.layout.width)}
+      onScroll={(event) => { scrollX.current = event.nativeEvent.contentOffset.x; }}
+      scrollEventThrottle={32}
     >
       {body}
     </ScrollView>

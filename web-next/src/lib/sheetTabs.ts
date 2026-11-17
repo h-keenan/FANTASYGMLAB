@@ -73,3 +73,12 @@ export function chromeDock(chromeBottom: number, scrollTop: number, gap = 4): nu
   const reach = chromeBottom - scrollTop;
   return Number.isFinite(reach) && reach > 0 ? Math.ceil(reach + gap) : 0;
 }
+
+/**
+ * Horizontal padding (px) of one tab in the slim in-sheet strip. Five or more tabs (the player sheet: Overview, Stats,
+ * Outlook, History, Profile) take the tight inset so the last label is not cut at 390px; fewer tabs keep the roomy one.
+ * Narrower phones still scroll, with the edge fade. Same helper in web PillRow and the app's SegmentedTabBar.
+ */
+export function slimTabInset(count: number): number {
+  return count >= 5 ? 4 : 8;
+}
