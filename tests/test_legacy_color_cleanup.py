@@ -58,7 +58,7 @@ def test_intentional_brand_cyan_and_light_mark_contrast_are_retained():
     # Founder Beta badge (removed with that positioning) was the last
     # BRAND_IDENTITY_CSS consumer of --color-brand-accent; the token itself
     # remains defined and used elsewhere via DESIGN_TOKEN_CSS.
-    assert "--color-success: #22c55e;" in DESIGN_TOKEN_CSS
+    assert "--color-success: #25cc61;" in DESIGN_TOKEN_CSS
     assert "--color-warning: #f59e0b;" in DESIGN_TOKEN_CSS
-    assert "--color-danger: #ef4444;" in DESIGN_TOKEN_CSS
+    assert "--color-danger: #ff9090;" in DESIGN_TOKEN_CSS
     assert "--color-diagnostic: #8b93ff;" in DESIGN_TOKEN_CSS
