@@ -40,6 +40,7 @@ def _settings(econ: bool, **extra) -> GameSettings:
     d = GameSettings.parse({"user_slot": 4, "superflex": True, **extra}).to_dict()
     d.pop("advice_v", None)  # these economy tests predate the multi-factor draft advice (tests/test_sim_advice_v.py covers it)
     d.pop("pos_v", None)  # ... and kickers trading like any position (tests/test_sim_pos_v.py)
+    d.pop("cap_v", None)  # ... and the shared position limit (tests/test_sim_cap_v.py)
     if not econ:
         d.pop("econ_v", None)  # a save from before econ_v
         d.pop("aging_v", None)  # ... which also predates aging_v (the goldens were captured before both)
