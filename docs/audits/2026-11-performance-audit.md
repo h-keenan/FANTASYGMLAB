@@ -224,3 +224,115 @@ Mobile list re-render counts were not re-measured (no device); the Round 2 memoi
 - 120 s cache TTLs make every low-traffic visit cold (above).
 - First-load JS 335 KB gz on Today; on fast3g the download alone is about 2 s.
 - Web per-page cold/warm for Matchup, Team, League, Players, Waivers, Trades, Sim Home were not browser-measured (only Today has a harness); their API and bundle numbers are above.
+
+## Round 4 (2026-11-17, after Round 3; the owner's first dashboard load on his phone took over 7 s)
+
+Method: same `scripts/bench_endpoints.py` harness (quiet box, stub Sleeper/Supabase, redis-server), "base" is a clean `git archive` of `origin/main` before these PRs run
+on the same box; web numbers from a production `next build` at 390px with `scripts/perf/desk_cold.mjs` (4x CPU, 4G, API mocked from the bench bodies and delayed by
+the measured cold/warm server time). Volatile-stripped response bodies for all 8 endpoints below are byte-identical base vs new (`diff -rq`, no output).
+
+### 1. Stale-while-revalidate for the expensive derived data (backend)
+
+Why every visit was cold: the valued frame, league rankings, trade ideas, dashboard tiles and glance rows were cached under a clock bucket (`time // 120`). A bucket
+is a staleness bound, not a fingerprint, so on low traffic nearly every visit found an expired entry and recomputed (3.4 s for a worker's first request, 4.2 s dashboard).
+
+What changed:
+
+- `modules/swr_cache.py`: `redis_swr_cache(cache_key, fresh_ttl, stale_ttl, compute)`. Fresh entry: served. Entry older than the fresh window but inside the stale window:
+  served at once and one background thread (cluster-wide, Redis lock) recomputes and overwrites it. Miss: the same single-flight compute as before. Fail-open on any
+  Redis error; a failing refresh keeps the stale entry and backs off 30 s. `SWR_CACHE=0` restores the plain TTL behaviour.
+- The key now names the inputs: `league_value_settings.league_state_fingerprint` = league payload + rosters + traded picks + the versions of the players db, Sleeper
+  metadata, FantasyCalc values, season stats and reconciled-valuation caches (`rankings.public_player_source_fingerprint`). A roster move, pick trade, setting change or
+  values refresh is a different key, so it can only miss (synchronous compute); stale data is never served across a changed fingerprint. The stale window only bounds
+  clock-dependent drift (week roll, risk by date) inside an unchanged data set (valued frame 1 h, rankings/trade ideas 30 min, tiles 15 min, glance 15 min).
+- Applied to: the valued frame, the league rankings / summary + draft capital / roster-health frames, trade-hub ideas, the dashboard trade-independent tiles, the
+  leagues-glance rows; the league-needs memo (`derived_cache.Memo(stale_ttl_seconds=...)`) serves stale in-process.
+- `modules/league_prewarm.py`: league open (`GET /v1/leagues/{id}` and the dashboard) records the league in a Redis sorted set and warms its frames in the background; a
+  scheduler re-warms leagues active in the last 24 h every 90 s (one worker per tick, Redis lock); every worker warms the same set at boot after the players load.
+- Tests: `tests/test_swr_cache.py` (fresh hit, stale + one background refresh, changed fingerprint recomputes synchronously, failed refresh keeps stale, single refresher,
+  valued frame identical fresh vs stale vs recomputed, tag still set), `tests/test_league_prewarm.py`.
+
+First visit of a never-seen league (cold) and repeat visit after the fresh window expired ("revisit"; fresh TTLs shortened to 3 s and a 4 s pause in the bench, so the
+expired-entry path is what is timed), ms:
+
+| Endpoint | first visit base | first visit new | revisit base | revisit new |
+|---|---:|---:|---:|---:|
+| dashboard | 4060 | 4515 | 1690 | 948 |
+| dashboard (deferred trade ideas) | 1214 | 773 | 476 | 121 |
+| team rankings | 518 | 596 | 263 | 37 |
+| trade hub | 2382 | 2544 | 2349 | 25 |
+| my team | 515 | 501 | 236 | 159 |
+| matchup | 417 | 359 | 96 | 94 |
+| waivers | 941 | 965 | 548 | 596 |
+| leagues glance | 3488 | 3633 | 3232 | 8.5 |
+
+Warm p50 is unchanged (within 1-2 ms) on every endpoint. A truly first request in a fresh process is +3-6% (the fingerprint reads league/rosters/picks first; those are
+the same Sleeper calls the compute makes and caches for 30 s); re-measured twice for team rankings and my team in isolation: base 2938/2988 and 820/849, new 3083/3047
+and 871/890. Waivers and matchup are not behind these caches (their frames are shared but the per-request work is the 100 ms / 40 ms warm path), so they did not move.
+
+### 2. `plan_trade_overflow`
+
+`drops_for_overflow` evaluated up to 12 candidate cuts per needed cut with the full lineup-model verdict (`evaluate_trade`): the four weekly lineup solves, plus the
+future-year lineups, the confidence model, the per-position story and the waiver pickup, none of which feeds `trade_score`. It now ranks candidates with
+`roster_value_model.swap_score` (the identical `trade_score` expression, `evaluate_trade(score_only=True)` returns right after it) and builds the full verdict for the winner
+only. A candidate-count bound was not used: `trade_score` is not monotone in the dropped asset's value under every posture (`(w_now-1)*k*dPts + k*F`, `w_future`), so a bound
+cannot prove "no change in chosen results"; this one is exact by construction. Proof: `tests/test_overflow_score_only.py` compares the chosen cuts and the plan effect against
+the pre-change selection (a full `evaluate_swap` per candidate) for 3 postures x 4 roster sizes (1-4 cuts), and asserts `swap_score == evaluate_swap(...)["trade_score"]`
+bit for bit. `drops_for_overflow` for a 3-cut plan on the fixture: 37.7 -> 35.7 ms (-5%, median of 5, quiet box; an earlier run on a loaded box read 80 -> 66 ms,
+the ratio is what to trust). That is a small win and the 3 s in leagues-glance cold is NOT fixed by it: profiling shows the time is the weekly lineup solves (`run_weeks`,
+two scenario enumerations per candidate), not the informational work this skips. An exact candidate bound was not found, so none was shipped. Next step: share the
+before-side lineup solve across the candidates of one cut (it is identical for all of them unless the dropped player is one of the uncertain-availability enumerated ones).
+
+### 3. Today first-load JS (web)
+
+`/dashboard/[leagueId]` first-load JS 1055 -> 1004 KB raw, 322 -> 305 KB gzip (-5%); every route shares the layout part: `/` 925 -> 894, `/_not-found` 862 -> 831, `/news` 920 -> 897,
+`/matchup` 991 -> 977, `/my-team` 958 -> 944. What moved out of the first load (each is now its own chunk loaded after hydration): `StartHereCard`, `DirectionCheckinCard`,
+`FirstValueOfferCard`, `DashboardAlerts`, `LeaguePulseCard` and both mini-games (all below the matchup card or conditional), the post-trade check-in sheet (loads only when a
+pending outcome exists), the league-switcher sheet (loads on first tap of the crest) and the alert rows of the header bell (load on first open). Checked and already lean: auth
+is `auth-js` + `postgrest-js` only, recharts is not in the shared chunks, no Stripe/Sentry on the route. What is left is the framework (react-dom 72 + next client 43 KB
+gzip), supabase auth 30 KB, and the app shell/api client.
+`perf-budget.json` ratcheted for 47 routes to the measured build + 3% (Today 1122 -> 1034).
+
+Today on fast3g (4x CPU, median of 3): useful content 3998 -> 3879 ms; first API request at 2.5 s instead of 2.6 s. The deferred chunks still download after
+hydration, so total bytes on the wire are about the same; the win is a smaller critical path, not fewer bytes.
+
+### 4. Browser cold/warm per page (4G, 4x CPU, 390px, median of 3)
+
+`scripts/perf/desk_cold.mjs` now takes any Desk path (`PAGE=/matchup/L1?...`): "useful" is a `<main>` with real text and no skeleton region; the mocked waivers / trade-hub /
+glance endpoints use the bench cold/warm server times.
+
+| Page | cold useful ms | warm useful ms | JS KB (transfer) |
+|---|---:|---:|---:|
+| Today (`/dashboard`) | 2123 | 940 | 329 |
+| Matchup | 1535 | 1043 | 304 |
+| League (`/league-rankings`) | 1567 | 895 | 274 |
+| Players | 1005 | 842 | 287 |
+| Waivers | 1922 | 1014 | 288 |
+| Trades (`/trade-hub`) | 3385 | 970 | 331 |
+| Sim Home (`/fantasy-sim`, shell only: the sim API is not mocked from real bodies) | 947 | 802 | 423 |
+| Team (`/my-team`) | not measured: the page renders no content from the bench body, so the harness never sees "ready" | | 295 |
+
+Worst page: Trades. Its cold time is the server (2.4 s cold `trade-hub`, the largest cold endpoint), and the request chain on the page was serial: the hub request, then
+only after the hub rendered the 3-team ideas and the value-signals request. Fix: the page starts those two beside the hub request (coalesced and reused for 10 s by
+`lib/requestCache.ts`, test in `trade-hub/[leagueId]/page.test.tsx`), so the sections fill about 150 ms earlier on a cold load, and the server side is the SWR above: the next
+visit after the fresh window is served stale in 25 ms instead of 2.35 s. Cold-first Trade Hub is still bound by the 2.4 s of server compute.
+Sim Home carries 423 KB of JS (the sim game bundle), the heaviest route measured; not changed here.
+
+### 5. App (static: tsc, tests, `expo export`; no device build per the TestFlight limit)
+
+- `PlayerQuickViewSheet` (32 KB) is a `React.lazy(require)` in `PlayerQuickViewContext`: evaluated on the first player tap, not at launch.
+- `PercentileExplorerSheet` (29 KB) is lazy in `PlayerDetailScreen`: evaluated when a stat row is tapped.
+- `PortfolioStanding` (31 KB) is lazy in `HomeScreen` and mounted after `InteractionManager.runAfterInteractions` (it sits below the fold; its ref `unlock()` is optional-chained).
+- `configureRevenueCat()` moved after the first frame: `App.tsx` calls `scheduleRevenueCatConfigure()` (runs in `runAfterInteractions`). Every reader in `lib/revenuecat.ts`
+  (`getEntitlementTier`, `getCurrentOffering`, `identifyRevenueCatUser`, `purchasePackage`, ...) now awaits `settled()` instead of reading `configured`, so a call made before
+  the SDK is up waits for it rather than answering "Free" (a paying user's tags would flash) or dropping the `logIn`. Behaviour is unchanged, only later.
+- Verified: `tsc --noEmit` clean, `npm test` 1000/1000, `expo export --platform ios` succeeds. Not verified on a device (startup time is not measured).
+
+### Still slow
+
+- First visit of a league nobody has opened (no prewarm, no stale entry): dashboard 4.5 s, leagues-glance 3.6 s, trade hub 2.5 s: the compute itself. Prewarm covers leagues that were
+  opened before; a brand-new league still pays once. Trade ideas are not prewarmed (they depend on the user's roster, posture and GM targets).
+- Waivers (about 100 ms warm, 0.95 s cold) and my-team/matchup were not behind these caches and did not move.
+- `plan_trade_overflow` (about 3 s of leagues-glance cold): only -5% here; the weekly lineup solves dominate (see section 2). Needs the shared before-side solve, not a cache.
+- Sim Home 423 KB JS; Today's critical path is still the framework + shell (about 250 KB gzip before any Today code).
+- fast3g Today is download-bound (about 2.5 s to the first API request).
