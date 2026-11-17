@@ -7,6 +7,8 @@
  * letter grades only.
  */
 
+import { bandSimTone, percentBand } from "./verdictTone.ts";
+
 export type StatusTone = "success" | "danger" | "warning" | "accent" | "muted";
 
 export const STATUS_STAT_LIMIT = 3;
@@ -80,9 +82,7 @@ export function statusHeaderModel(model: StatusHeaderModel): StatusHeaderModel {
 
 export function statusRingTone(pct: number | null | undefined): StatusTone {
   if (pct == null || Number.isNaN(pct)) return "accent";
-  if (pct >= 55) return "success";
-  if (pct <= 45) return "danger";
-  return "accent";
+  return bandSimTone(percentBand(pct));
 }
 
 /** A 0-100 fill from a win chance given as a whole percent; clamps to the ring's range. */

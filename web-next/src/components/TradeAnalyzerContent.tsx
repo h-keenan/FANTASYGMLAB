@@ -1,3 +1,4 @@
+import { bandColorVar, verdictColorVar } from "@/lib/verdictToneCss";
 import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
 import type { OfferPrefill } from "@/lib/tradeOffer";
 import { bridgeNotice, resolveBridgeTrade, type BridgeTrade } from "@/lib/tradeBridge";
@@ -131,8 +132,8 @@ interface OtherTeam {
 }
 
 const TONE_COLOR: Record<TradeVerdict["tone"], string> = {
-  accept: "var(--color-success)",
-  decline: "var(--color-danger)",
+  accept: verdictColorVar("accept"),
+  decline: verdictColorVar("decline"),
   counter: "var(--color-accent)",
   fair: "var(--color-text-secondary)",
 };
@@ -289,7 +290,7 @@ function VerdictCard({
   );
 
   return (
-    <AccentCard accent={toneColor} as="section">
+    <AccentCard accent="var(--color-accent)" as="section">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="flex items-center">
           <span
@@ -301,7 +302,11 @@ function VerdictCard({
           <InfoMark label="this verdict" lines={[copy.verdictHelp(verdict.ui_verdict), copy.help("analyzerValueBalance")]} beginnerOnly />
         </span>
         <span className="flex items-center gap-2">
-          <span className="text-lg font-black uppercase" style={{ color: toneColor }}>
+          <span
+            className="px-2.5 py-0.5 text-lg font-black uppercase"
+            style={{ color: toneColor, borderRadius: "var(--radius-pill)", background: `color-mix(in srgb, ${toneColor} 14%, transparent)` }}
+            data-testid="verdict-chip"
+          >
             {verdict.ui_verdict}
           </span>
           <ShareVerdictButton
@@ -316,7 +321,7 @@ function VerdictCard({
         </span>
       </div>
       {verdict.band !== verdict.ui_verdict ? (
-        <span className="text-xs font-bold self-start" style={{ color: toneColor }}>
+        <span className="text-xs font-bold self-start" style={{ color: "var(--color-text-secondary)" }}>
           {verdict.band}
         </span>
       ) : null}
@@ -384,7 +389,7 @@ function VerdictCard({
           >
             Value balance
           </span>
-          <span className="text-2xl font-black" style={{ color: toneColor, fontVariantNumeric: "tabular-nums" }}>
+          <span className="text-2xl font-black" style={{ color: "var(--color-text-primary)", fontVariantNumeric: "tabular-nums" }}>
             <TickNumber value={verdict.value_delta} format={(n) => formatTradeGain(n)} />
           </span>
         </div>
@@ -399,7 +404,7 @@ function VerdictCard({
         persist={false}
         parts={[
           verdict.lineup_model
-            ? { key: "pts", text: `${formatLineupPoints(verdict.lineup_model.points.ros_delta)} lineup pts ROS`, strong: true, tone: verdict.posture_assessment?.lineup_costly ? "danger" : undefined }
+            ? { key: "pts", text: `${formatLineupPoints(verdict.lineup_model.points.ros_delta)} lineup pts ROS`, strong: true, tone: verdict.posture_assessment?.lineup_costly ? "warning" : undefined }
             : { key: "pts", text: "Playoff and title odds effect", tone: "muted" },
           verdict.lineup_model ? { key: "wk", text: `${formatLineupPoints(verdict.lineup_model.points.this_week_delta)} this week` } : null,
         ]}
@@ -415,7 +420,7 @@ function VerdictCard({
           <p
             className="text-sm font-bold"
             style={{
-              color: verdict.posture_assessment?.lineup_costly ? "var(--color-danger)" : "var(--color-text-primary)",
+              color: verdict.posture_assessment?.lineup_costly ? bandColorVar("caution") : "var(--color-text-primary)",
               fontVariantNumeric: "tabular-nums",
             }}
           >

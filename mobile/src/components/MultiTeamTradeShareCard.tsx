@@ -139,6 +139,7 @@ const MultiTeamTradeShareCard = forwardRef<View, { model: ShareModel; leagueName
     <ShareCardChrome ref={ref} kind="Trade proposal" height={multiShareCardHeight(model)}>
       <AppText style={styles.title}>{`${model.teams.length}-team trade`}</AppText>
       <AppText style={styles.subtitle}>{`Here is what every team gets and sends${leagueName ? ` in ${leagueName}` : ''}`}</AppText>
+      {/* verdict-color-ok: share card, unchanged by batch C */}
       <AppText style={[styles.verdict, { color: model.verdict.topRosterId ? colors.success : colors.textTertiary }]} numberOfLines={1}>
         {model.verdict.text}
       </AppText>

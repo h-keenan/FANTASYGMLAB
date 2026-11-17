@@ -1,5 +1,6 @@
 "use client";
 
+import { percentColorVar } from "@/lib/verdictToneCss";
 import { PageTabBar } from "@/components/PageTabBar";
 import { PageTitle } from "@/components/PageTitle";
 import { useRouter } from "next/navigation";
@@ -152,7 +153,7 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
         </SectionHeading>
         <div className="glass-surface flex items-center justify-between gap-4 p-4">
           <div className="flex flex-col">
-            <span className="text-4xl font-extrabold" style={{ color: metricToneColor(mine.playoff_probability) }}>
+            <span className="text-4xl font-extrabold" style={{ color: percentColorVar(mine.playoff_probability) }}>
               {formatOdds(mine.playoff_probability)}
             </span>
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -161,7 +162,7 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
           </div>
           {titleAvailable ? (
             <div className="flex flex-col" data-testid="title-odds-mine">
-              <span className="text-2xl font-extrabold" style={{ color: metricToneColor(mine.title_probability!) }}>
+              <span className="text-2xl font-extrabold" style={{ color: percentColorVar(mine.title_probability!) }}>
                 {formatTitleOdds(mine.title_probability)}
               </span>
               <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -209,7 +210,7 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
               ownerName={team.record_label}
               primaryMetric={formatOdds(team.playoff_probability)}
               metricLabel="Playoff odds"
-              toneColor={metricToneColor(team.playoff_probability)}
+              toneColor={percentColorVar(team.playoff_probability)}
               isCurrent={team.mine}
               firstPlace={index === 0}
               secondary={[

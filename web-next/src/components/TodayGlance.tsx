@@ -1,5 +1,6 @@
 "use client";
 
+import { bandColorVar } from "@/lib/verdictToneCss";
 import Link from "next/link";
 import { useId, useState } from "react";
 
@@ -171,7 +172,7 @@ export function TodayTradeIdeaCard({ idea, href, deadline, info }: { idea: Today
               </span>
             )}
             {gain ? (
-              <span className="text-xs font-extrabold tabular-nums" style={{ color: idea.gain != null && idea.gain > 0 ? "var(--color-success)" : "var(--color-danger)" }} data-testid="today-trade-gain">
+              <span className="text-xs font-extrabold tabular-nums" style={{ color: bandColorVar(idea.gain != null && idea.gain > 0 ? "good" : "bad") }} data-testid="today-trade-gain">
                 {gain} value
               </span>
             ) : null}

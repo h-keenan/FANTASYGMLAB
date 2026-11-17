@@ -13,7 +13,7 @@ const base = {
   opponentScore: 0,
   myProjected: 118.3,
   opponentProjected: 109.7,
-  winPercent: 57,
+  winPercent: 63,
   kickedOff: true,
   live: true,
   final: false,
@@ -22,7 +22,7 @@ const base = {
 describe("matchupHeroModel", () => {
   it("leads with the win chance and names both teams, score and projections in the context", () => {
     const hero = matchupHeroModel(base);
-    expect(hero.value).toBe("57%");
+    expect(hero.value).toBe("63%");
     expect(hero.label).toBe("Live · Win chance");
     expect(hero.context).toBe("vs Shiesty · 27.2 - 0.0 · Proj 118.3 - 109.7");
     expect(hero.tone).toBe("success");
@@ -34,7 +34,7 @@ describe("matchupHeroModel", () => {
     expect(pre.context).toBe("vs Shiesty");
   });
   it("calls an underdog danger and a coin flip accent", () => {
-    expect(matchupHeroModel({ ...base, winPercent: 30 }).tone).toBe("danger");
+    expect(matchupHeroModel({ ...base, winPercent: 10 }).tone).toBe("danger");
     expect(matchupHeroModel({ ...base, winPercent: 50 }).tone).toBe("accent");
   });
 });
@@ -47,7 +47,7 @@ describe("collapsed summaries are never empty headers", () => {
     { position: "WR", edge: -4.6 },
   ];
   const cases: Record<string, CompactPart[]> = {
-    insights: insightsParts("You're on track to win.", "success", edges),
+    insights: insightsParts("You're on track to win.", edges),
     teams: teamsValuesParts({ myValue: "45,719", opponentValue: "48,673", valueMargin: "-2,954", edge: "opponent", projectedMargin: 8.6 }),
     lineup: lineupParts({ view: "suggested", mineTotal: 118.3, opponentTotal: 109.7, slotCount: 9 }),
     lineupEmpty: lineupParts({ view: "actual", mineTotal: null, opponentTotal: null, slotCount: 0 }),
@@ -76,7 +76,7 @@ describe("edgeChips", () => {
   it("orders by the biggest swing and tones by sign", () => {
     const chips = edgeChips([{ position: "K", edge: -0.7 }, { position: "RB", edge: 16.7 }, { position: "QB", edge: 0 }]);
     expect(chips.map((c) => c.label)).toEqual(["RB +16.7", "K -0.7", "QB 0.0"]);
-    expect(chips.map((c) => c.tone)).toEqual(["success", "danger", "muted"]);
+    expect(chips.map((c) => c.tone)).toEqual(["success", "muted", "muted"]);
   });
 });
 

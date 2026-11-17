@@ -45,7 +45,7 @@ describe("status ring", () => {
     expect(statusRing(150, "x", "x").pct).toBe(100);
     expect(statusRing(null, "x", "x").pct).toBeNull();
     expect(statusRing(60, "a", "a").tone).toBe("success");
-    expect(statusRing(40, "a", "a").tone).toBe("danger");
+    expect(statusRing(10, "a", "a").tone).toBe("danger");
     expect(statusRing(50, "a", "a").tone).toBe("accent");
   });
   it("turns a rank into a league percentile", () => {

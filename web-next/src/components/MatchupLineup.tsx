@@ -1,5 +1,7 @@
 "use client";
 
+import { probabilityColorVar } from "@/lib/verdictToneCss";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptySlotCard, PlayerCard } from "@/components/PlayerCardKit";
@@ -94,7 +96,7 @@ export function ComparisonHeader({
         </div>
         <div className="flex flex-col items-center gap-1">
           {pct != null ? (
-            <span className="text-xs font-extrabold tabular-nums" style={{ color: pct >= 50 ? "var(--color-success)" : "var(--color-danger)" }} data-testid="header-winprob">
+            <span className="text-xs font-extrabold tabular-nums" style={{ color: probabilityColorVar(pct / 100) }} data-testid="header-winprob">
               {pct}% win
             </span>
           ) : null}

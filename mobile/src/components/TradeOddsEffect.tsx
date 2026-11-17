@@ -1,3 +1,4 @@
+import { bandColor } from '../lib/verdictToneTheme';
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
@@ -82,9 +83,9 @@ export default function TradeOddsEffect({
   const view = tradeOddsView(response.reason ? null : response.results[0]);
   if (!view) return null;
   const toneColor: Record<WhatIfTone, string> = {
-    positive: colors.success,
-    negative: colors.danger,
-    neutral: colors.textSecondary,
+    positive: bandColor(colors, 'good'),
+    negative: bandColor(colors, 'bad'),
+    neutral: bandColor(colors, 'neutral'),
   };
   return (
     <View testID="trade-odds-effect" style={styles.wrap}>

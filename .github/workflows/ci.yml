@@ -82,6 +82,8 @@ jobs:
         run: node scripts/check_player_tap.mjs
       - name: Check the one InfoMark standard
         run: node scripts/check_info_mark_usage.mjs
+      - name: Check verdict and probability colours use the shared map
+        run: node scripts/check_verdict_colors.mjs
 
   mobile-app:
     needs: [classify]

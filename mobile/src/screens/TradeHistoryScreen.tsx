@@ -1,3 +1,4 @@
+import { verdictColor } from '../lib/verdictToneTheme';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -174,14 +175,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
 
   const result = outcome.outcome === 'yes' ? outcome.result_summary : null;
   const verdict = result && result.status === 'ready' ? result.verdict : null;
-  const verdictTone =
-    verdict === 'worked_out'
-      ? colors.success
-      : verdict === 'didnt_pan_out'
-        ? colors.danger
-        : verdict === 'mixed'
-          ? colors.violet
-          : colors.textSecondary;
+  const verdictTone = verdictColor(colors, verdict);
 
   const accent = verdict ? verdictTone : outcomeTone;
   const netPct = result && result.status === 'ready' ? (result.value?.net_delta_pct ?? null) : null;
