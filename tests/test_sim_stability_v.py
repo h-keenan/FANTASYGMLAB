@@ -132,7 +132,7 @@ def _panel_root(seed: int, v: int, seasons: int = 5):
 
     rows, byes = tail_report.pool_from_panel(dataset.load_panel())
     base_settings = GameSettings.parse({"mode": "dynasty", "teams": 12, "user_slot": 3, "start_year": 2026, "seasons": seasons, "rookie_rounds": 3, "scoring": "ppr"})
-    return build_snapshot(rows, byes, replace(base_settings, stability_v=v), seed, scoring_model=game_scoring.default_model().model_id)
+    return build_snapshot(rows, byes, replace(base_settings, stability_v=v, rookie_v=0), seed, scoring_model=game_scoring.default_model().model_id)
 
 
 def test_a_stability_1_save_replays_exactly_as_it_did_and_2_differs():

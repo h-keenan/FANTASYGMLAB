@@ -29,6 +29,7 @@ from modules.sim.game_types import (
     DEFENSE_VERSION,
     POS_VERSION,
     INJURY_VERSION,
+    ROOKIE_VERSION,
     RESERVE_VERSION,
     POOL_CAPS,
     KD_VERSION,
@@ -300,7 +301,7 @@ def league_settings(
     dyn = {}
     if dynasty:
         dyn = dict(
-            mode="dynasty", seasons=seasons, dynasty_v=DYNASTY_VERSION, names_v=NAMES_VERSION, aging_v=AGING_VERSION, pick_years=PICK_YEARS,
+            mode="dynasty", seasons=seasons, dynasty_v=DYNASTY_VERSION, names_v=NAMES_VERSION, aging_v=AGING_VERSION, rookie_v=ROOKIE_VERSION, pick_years=PICK_YEARS,
             start_year=start_year or imported.start_year or imported_year(imported),
             rookie_rounds=max(2, min(5, imported.rookie_rounds or DEFAULT_ROOKIE_ROUNDS)),
         )
