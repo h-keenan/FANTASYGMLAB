@@ -6,7 +6,7 @@ import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
 
 /** Each trade is a CompactModule (partner + a real summary); open them to assert on the package and verdict. */
 function expandAll() {
-  for (const b of document.querySelectorAll('button[aria-expanded="false"][aria-label$=". Expand"]')) fireEvent.click(b);
+  for (const b of document.querySelectorAll('button[aria-expanded="false"]')) fireEvent.click(b);
 }
 
 function outcome(overrides: Partial<PastTradeOutcome>): PastTradeOutcome {
@@ -44,7 +44,7 @@ describe("TradeHistoryContent", () => {
     render(<TradeHistoryContent data={data} />);
     expandAll();
 
-    expect(screen.getByText("The Gridiron Gurus")).toBeInTheDocument();
+    expect(screen.getByText(/The Gridiron Gurus/)).toBeInTheDocument();
     expect(screen.getByText("Made it")).toBeInTheDocument();
     expect(screen.getByText("Test Sender")).toBeInTheDocument();
     expect(screen.getByText("Test Receiver")).toBeInTheDocument();

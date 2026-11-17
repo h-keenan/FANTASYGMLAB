@@ -1,11 +1,9 @@
-import { verdictColor } from '../lib/verdictToneTheme';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-import AccentCard from '../components/AccentCard';
+import TradeSummaryRow from '../components/TradeSummaryRow';
 import AppText from '../components/AppText';
 import { SkeletonPage } from '../components/Skeleton';
 import CompactPlayerModule from '../components/CompactPlayerModule';
@@ -16,9 +14,12 @@ import SectionHeading from '../components/SectionHeading';
 import SharedTradesFeed from '../components/SharedTradesFeed';
 import TrackRecordModule from '../components/TrackRecordModule';
 import ValuesCredit from '../components/ValuesCredit';
-import { NetEdgeBar, TradeSwapGlyph } from '../components/TradeOutcomeHeader';
+import { NetEdgeBar } from '../components/TradeOutcomeHeader';
 import { api, type PastTradeOutcome, type SharedCommunityTrade, type TradeOutcomeAnswer, type TradeOutcomeAssetSummary } from '../lib/api';
 import { tradePointsLine } from '../lib/trackRecordView';
+import { tradeOutcomeChips } from '../lib/tradeOutcomeChips';
+import { tradeIdeaNamesText } from '../lib/tradeIdeaSummary';
+import { abbreviatePlayerName } from '../lib/formatPlayerName';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -35,12 +36,6 @@ const OUTCOME_LABEL: Record<Exclude<TradeOutcomeAnswer, 'still_pending'>, string
   didnt_send: "Didn't send",
 };
 
-const VERDICT_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
-  worked_out: 'trending-up',
-  didnt_pan_out: 'trending-down',
-  mixed: 'swap-vertical',
-  neutral: 'remove',
-};
 
 /**
  * Trade History — the quiet, pull-based home for Trade Outcomes' "did it
@@ -174,54 +169,44 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
   const partner = outcome.partner_team_name || summary.partner_team_name || 'your trade partner';
   const date = formatDate(outcome.shared_at);
 
-  const outcomeTone =
-    outcome.outcome === 'yes' ? colors.success : outcome.outcome === 'no' ? colors.textSecondary : colors.textTertiary;
   const outcomeLabel = OUTCOME_LABEL[outcome.outcome] ?? outcome.outcome;
 
   const result = outcome.outcome === 'yes' ? outcome.result_summary : null;
   const verdict = result && result.status === 'ready' ? result.verdict : null;
-  const verdictTone = verdictColor(colors, verdict);
-
-  const accent = verdict ? verdictTone : outcomeTone;
   const netPct = result && result.status === 'ready' ? (result.value?.net_delta_pct ?? null) : null;
+  const netPts = result && result.status === 'ready' ? (result.production?.net_points_ppr ?? null) : null;
   // Per-trade outcome card: real PPR points for you since the trade (free; the sweep already computed it).
   const pointsLine = outcome.outcome === 'yes' ? tradePointsLine(result) : null;
+  const names = (xs: TradeOutcomeAssetSummary[]) => tradeIdeaNamesText(xs.map((x) => abbreviatePlayerName(x.name)));
+  const people = (xs: TradeOutcomeAssetSummary[], side: string) =>
+    xs.map((x, i) => ({ key: `${side}${i}`, playerId: x.player_id || null, name: x.name, position: x.position }));
+  const sent = names(summary.send);
+  const received = names(summary.receive);
 
   return (
-    <AccentCard accent={accent} compact>
-      <View style={styles.headerRow}>
-        <TradeSwapGlyph color={accent} />
-        <AppText style={styles.partner} numberOfLines={2}>
-          {partner}
-        </AppText>
-        <View style={[styles.outcomeBadge, { backgroundColor: `${outcomeTone}22` }]}>
-          <AppText style={[styles.outcomeBadgeText, { color: outcomeTone }]}>{outcomeLabel}</AppText>
-        </View>
-      </View>
-      {date ? <AppText style={styles.date}>{date}</AppText> : null}
-
-      {/* Primary insight first when there is one — the real "did it work?"
-          read outranks the plain trade summary below it, per the app's
-          hierarchy rule of leading with the conclusion. */}
+    <TradeSummaryRow
+      partner={partner}
+      send={people(summary.send, 's')}
+      receive={people(summary.receive, 'r')}
+      swapText={sent && received ? `${sent} for ${received}` : ''}
+      chips={tradeOutcomeChips({ outcomeLabel, netPts, netPct })}
+      date={date}
+    >
       {pointsLine ? <AppText style={styles.pointsLine}>{pointsLine}</AppText> : null}
       {verdict && result ? (
-        <View style={[styles.verdictRow, { borderColor: `${verdictTone}55`, backgroundColor: `${verdictTone}14` }]}>
-          <Ionicons name={VERDICT_ICON[verdict] ?? 'remove'} size={16} color={verdictTone} />
-          <View style={styles.verdictTextGroup}>
-            <AppText style={[styles.verdictLabel, { color: verdictTone }]}>{result.verdict_label}</AppText>
-            <AppText style={styles.verdictDetail}>{verdictDetailText(result)}</AppText>
-          </View>
+        <View style={styles.verdictTextGroup}>
+          <AppText style={styles.verdictLabel}>{result.verdict_label}</AppText>
+          <AppText style={styles.verdictDetail}>{verdictDetailText(result)}</AppText>
         </View>
       ) : null}
       {netPct !== null ? <NetEdgeBar netPct={netPct} leftLabel="Partner ahead" rightLabel="You ahead" /> : null}
-
       <View style={styles.exchangeGroup}>
         <AppText style={styles.exchangeLabel}>You sent</AppText>
         <AssetList assets={summary.send} />
         <AppText style={styles.exchangeLabel}>You received</AppText>
         <AssetList assets={summary.receive} />
       </View>
-    </AccentCard>
+    </TradeSummaryRow>
   );
 }
 
@@ -306,7 +291,7 @@ function createStyles(colors: ThemeColors) {
       marginTop: spacing.xs,
     },
     verdictTextGroup: { flexShrink: 1, gap: 2 },
-    verdictLabel: { fontSize: 14.5, fontWeight: '700' },
+    verdictLabel: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
     verdictDetail: { fontSize: 13.5, color: colors.textSecondary },
     exchangeGroup: { marginTop: spacing.xs, gap: 2 },
     exchangeLabel: { fontSize: 12.5, fontWeight: '700', color: colors.textTertiary, marginTop: spacing.xs },

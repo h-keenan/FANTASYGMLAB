@@ -33,7 +33,15 @@ const OK = /verdict-color-ok/;
 // A value DELTA (trade gain / balance / edge / net value / margin) is not a verdict: a negative one is muted with an arrow
 // ("You give up 747"), never red. The 2026-11 GM Plan "-747" in red slipped past rules 1-3 because that line said "gain" and
 // tone "danger" (a compact-tone string literal, not a var(--color-*) token) and never used a verdict / odds word.
-const DELTA_WORDS = /\b(gain|gainColor|balanceColor|tradeGain|trade_gain|netValue|net_value)\b/i;
+const DELTA_WORDS = /\b(gain|gainColor|balanceColor|tradeGain|trade_gain|netValue|net_value|netPts|netPoints|net_points\w*|pointsDelta)\b/i;
+// Trade History (2026-11-17) slipped through because its red lived on a tone ternary (netPts < 0 ? "danger") with the delta
+// named netPts (not in DELTA_WORDS) and its stripe came from a mapped helper (verdictToneColorVar). Two general rules:
+//   6. a negative-sign ternary that yields danger (x < 0 ? "danger", delta < 0 ? colors.danger): a loss is muted;
+//   7. an accent stripe fed by a verdict helper (accent = verdictColor(...)): one calm stripe, the verdict lives on a chip.
+// Rule 6 covers the trade / track-record surfaces (other surfaces, e.g. live scoring, have their own meaning for a negative).
+const TRADE_FILE = /(Trade|TrackRecord|trackRecord)/;
+const NEGATIVE_DANGER = /<\s*0\s*\?\s*(["']danger["']|var\(--color-danger\)|colors\.danger)/;
+const STRIPE_VERDICT = /\baccent\s*[=:]\s*\{?[^;]*\bverdict\w*(ColorVar|Color|Tone)\w*\s*\(/i;
 const DANGER_TONE = /(["'])danger\1|var\(--color-danger\)|\bcolors\.danger\b/;
 // A card / module accent stripe chosen with a ternary that can turn it red (accent = x ? danger : accent): one calm stripe;
 // the reason (an injury) is said in the text or a small chip.
@@ -60,6 +68,14 @@ export function scanText(rel, text) {
     }
     if (STRIPE_DANGER.test(line)) {
       problems.push(`${rel}:${i + 1}: card accent stripe can turn red (${line.trim().slice(0, 80)}); one calm stripe, say the reason in text or a chip`);
+      return;
+    }
+    if (TRADE_FILE.test(rel) && NEGATIVE_DANGER.test(line)) {
+      problems.push(`${rel}:${i + 1}: a negative value is coloured red (${line.trim().slice(0, 80)}); a loss is muted ("Down 12" chip), never red`);
+      return;
+    }
+    if (STRIPE_VERDICT.test(line)) {
+      problems.push(`${rel}:${i + 1}: accent stripe fed by a verdict colour (${line.trim().slice(0, 80)}); one calm stripe, put the verdict on a chip`);
       return;
     }
     if (DELTA_WORDS.test(line) && DANGER_TONE.test(line) && !/deltaBand|bandCompactTone/.test(line)) {

@@ -38,9 +38,7 @@ export function TrackRecordView({ record, plan, onUpgrade }: { record: TrackReco
       index > 0 && text.endsWith('net')
         ? basic.net_points_total > 0
           ? ('success' as const)
-          : basic.net_points_total < 0
-            ? ('danger' as const)
-            : undefined
+          : undefined // a net loss is muted, never red
         : undefined,
   }));
   const showLock = !advanced && plan === 'free';

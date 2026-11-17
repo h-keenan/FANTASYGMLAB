@@ -40,7 +40,7 @@ export const PAGE_TAB_FAMILIES: readonly PageTabFamily[] = [
     { key: "trade_hub", label: "Ideas", glyph: "hub", segment: "trade-hub" },
     { key: "trade_finder", label: "Finder", glyph: "finder", segment: "trade-finder", pro: true },
     { key: "trade_analyzer", label: "Grade a trade", short: "Grade", glyph: "analyzer", segment: "trade-analyzer" },
-    { key: "trade_history", label: "History", short: "Hist.", glyph: "history", segment: "trade-history" },
+    { key: "trade_history", label: "History", glyph: "history", segment: "trade-history" },
   ] },
   { key: "team", label: "Team section", shellTab: "team", tabs: [
     { key: "roster", label: "Roster", glyph: "roster", segment: "my-team" },

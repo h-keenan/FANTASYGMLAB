@@ -69,7 +69,7 @@ export function NetEdgeBar({
 }) {
   const { colors } = useThemeMode();
   const clamped = Math.max(-50, Math.min(50, netPct));
-  const fill = netPct > 0 ? colors.success : netPct < 0 ? colors.danger : colors.textTertiary;
+  const fill = netPct > 0 ? colors.success : netPct < 0 ? colors.textSecondary : colors.textTertiary;
   const width = `${Math.abs(clamped)}%` as `${number}%`;
   const left = `${clamped >= 0 ? 50 : 50 - Math.abs(clamped)}%` as `${number}%`;
   return (
