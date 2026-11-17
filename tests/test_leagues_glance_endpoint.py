@@ -259,9 +259,14 @@ def test_cache_entry_uses_the_short_ttl(monkeypatch):
     monkeypatch.setattr(mobile_api_service.league_glance, "build_league_glance", lambda **k: _glance_ok("L1"))
     _glance_request(_client(monkeypatch))
 
-    key = mobile_api_service._league_glance_cache_key("user-123", "L1", "Dynasty")
-    ttl = redis_cache.get_redis_client().ttl(key)
-    assert 0 < ttl <= mobile_api_service.LEAGUE_GLANCE_TTL_SECONDS
+    # Round 4: stale-while-revalidate. The entry is keyed on the league-state fingerprint and lives for the stale window; it is
+    # served as fresh only for LEAGUE_GLANCE_TTL_SECONDS (swr_cache stamps it).
+    client = redis_cache.get_redis_client()
+    keys = [k for k in client.scan_iter("league_glance_swr:*")]
+    assert len(keys) == 1
+    ttl = client.ttl(keys[0])
+    assert 0 < ttl <= mobile_api_service.LEAGUE_GLANCE_STALE_TTL_SECONDS
+    assert mobile_api_service.LEAGUE_GLANCE_STALE_TTL_SECONDS >= mobile_api_service.LEAGUE_GLANCE_TTL_SECONDS
 
 
 def test_never_caches_a_failure(monkeypatch):

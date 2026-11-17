@@ -23,6 +23,7 @@ season window. ``SIM``-style kill switch: ``DERIVED_CACHE=0`` disables every mem
 
 from __future__ import annotations
 
+import contextvars
 import copy
 import hashlib
 import json
@@ -148,10 +149,15 @@ def clear_all_memos() -> None:
 
 class Memo:
     def __init__(self, name: str, *, max_entries: int = 64, ttl_seconds: float = DEFAULT_TTL_SECONDS,
-                 copier: Callable[[Any], Any] = copy.deepcopy, clock: Callable[[], float] = time.monotonic) -> None:
+                 copier: Callable[[Any], Any] = copy.deepcopy, clock: Callable[[], float] = time.monotonic,
+                 stale_ttl_seconds: float = 0.0) -> None:
         self.name = name
         self.max_entries = max_entries
         self.ttl = ttl_seconds
+        # Stale-while-revalidate (Round 4): an entry past ``ttl`` but within ``stale_ttl`` is returned at once while one
+        # background thread recomputes it. Keys are content fingerprints, so a changed input is a different key (a miss),
+        # never a stale hit. 0 disables (the historic fresh-or-recompute behaviour).
+        self.stale_ttl = max(0.0, stale_ttl_seconds)
         self._copier = copier
         self._clock = clock
         self._items: "OrderedDict[str, tuple[float, Any]]" = OrderedDict()
@@ -173,12 +179,22 @@ class Memo:
         if key is None or not ENABLED or self.max_entries <= 0:
             return compute()
         while True:
+            refresh = False
             with self._lock:
                 hit = self._items.get(key)
-                if hit is not None and self._clock() - hit[0] < self.ttl:
+                age = self._clock() - hit[0] if hit is not None else 0.0
+                if hit is not None and age < self.ttl:
                     self._items.move_to_end(key)
                     self.hits += 1
                     value = hit[1]
+                    break
+                if hit is not None and age < self.ttl + self.stale_ttl:
+                    self._items.move_to_end(key)
+                    self.hits += 1
+                    value = hit[1]
+                    if key not in self._flights:
+                        self._flights[key] = threading.Event()
+                        refresh = True
                     break
                 flight = self._flights.get(key)
                 if flight is None:
@@ -188,7 +204,10 @@ class Memo:
                     break
             flight.wait(30.0)  # a leader is computing this key: wait, then look again
         if value is not _LEADER:
-            return self._copier(value)
+            served = self._copier(value)
+            if refresh:
+                self._spawn_refresh(key, compute)
+            return served
         try:
             result = compute()
             stored = self._copier(result)
@@ -199,6 +218,36 @@ class Memo:
                     self._items.popitem(last=False)
             return result
         finally:
+            with self._lock:
+                event = self._flights.pop(key, None)
+            if event is not None:
+                event.set()
+
+
+    def _spawn_refresh(self, key: str, compute: Callable[[], Any]) -> None:
+        """Recompute a stale key off the request path (the caller already holds the key's flight slot)."""
+
+        def _run() -> None:
+            try:
+                result = compute()
+                stored = self._copier(result)
+                with self._lock:
+                    self._items[key] = (self._clock(), stored)
+                    self._items.move_to_end(key)
+                    while len(self._items) > self.max_entries:
+                        self._items.popitem(last=False)
+            except Exception:
+                pass  # the stale entry stays; the next hit past the TTL retries
+            finally:
+                with self._lock:
+                    event = self._flights.pop(key, None)
+                if event is not None:
+                    event.set()
+
+        ctx = contextvars.copy_context()
+        try:
+            threading.Thread(target=lambda: ctx.run(_run), name=f"dgm-memo-refresh-{self.name}", daemon=True).start()
+        except Exception:
             with self._lock:
                 event = self._flights.pop(key, None)
             if event is not None:

@@ -37,6 +37,7 @@ from modules import model_status
 from modules import player_quick_view
 from modules import redis_cache
 from modules import sleeper
+from modules import swr_cache
 from modules import team_stance as team_stance_module
 from modules import trade_hub_presentation
 from modules import trade_posture as trade_posture_module
@@ -738,6 +739,7 @@ def generate_trade_idea_records(
 # modules.league_rankings/modules.waivers_logic — a real league's roster
 # doesn't change faster than every couple minutes in practice.
 TRADE_HUB_IDEAS_TTL_SECONDS = 120
+TRADE_HUB_IDEAS_STALE_TTL_SECONDS = 1800
 
 
 def _trade_hub_ideas_cache_bucket() -> int:
@@ -875,12 +877,15 @@ def generate_trade_idea_records_cached(
         tuple(sorted({str(pid) for pid in untouchable_player_ids if str(pid)})),
         tuple(sorted({str(pid) for pid in gm_target_player_ids if str(pid)})),
         keepers_module.clamp_round_penalty(keeper_round_penalty),
-        _trade_hub_ideas_cache_bucket(),
+        # Round 4: the league-state fingerprint (settings, rosters, traded picks, players/values files) replaces the clock
+        # bucket, so the entry is served stale-while-revalidate and a real change is a different key.
+        league_value_settings.league_state_fingerprint(league_id, players_db_path),
     )
     cache_key = redis_cache.build_cache_key("trade_hub_ideas", *key)
-    records = redis_cache.redis_single_flight_cache(
+    records = swr_cache.redis_swr_cache(
         cache_key=cache_key,
-        ttl_seconds=TRADE_HUB_IDEAS_TTL_SECONDS,
+        fresh_ttl_seconds=TRADE_HUB_IDEAS_TTL_SECONDS,
+        stale_ttl_seconds=TRADE_HUB_IDEAS_STALE_TTL_SECONDS,
         compute=lambda: _generate_trade_idea_records_cached(*key),
         lock_timeout_seconds=_TRADE_HUB_IDEAS_LOCK_TIMEOUT_SECONDS,
     )

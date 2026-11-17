@@ -307,6 +307,8 @@ class RosterValueContext:
     wire_cache: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     # (drop ids, add-row signatures) -> ``evaluate_swap`` result (see there).
     swap_cache: dict[tuple, dict[str, Any]] = field(default_factory=dict, repr=False, compare=False)
+    # drop ids -> ``trade_score`` of that drop-only swap (see ``swap_score``).
+    score_cache: dict[tuple, float] = field(default_factory=dict, repr=False, compare=False)
     # player_id -> first matching row of ``frame`` (built lazily by ``row``).
     _row_index: dict[str, dict[str, Any]] | None = field(default=None, init=False, repr=False, compare=False)
 
@@ -482,10 +484,31 @@ def evaluate_swap(
     return result
 
 
+def swap_score(rvc: RosterValueContext, drop_ids: Sequence[str]) -> float:
+    """``evaluate_swap(rvc, drop_ids, ())["trade_score"]`` without the parts of the verdict that never feed the score (future-year
+    lineups, confidence, per-position story, pickup). Bit-identical to the full verdict's score (same expression, same inputs);
+    used to rank many candidate cuts, after which only the winner needs the full ``evaluate_swap``."""
+
+    key = _swap_key(drop_ids, ())
+    if key is None:
+        return evaluate_swap(rvc, drop_ids, ())["trade_score"]
+    hit = rvc.swap_cache.get(key)
+    if hit is not None:
+        return hit["trade_score"]
+    cached = rvc.score_cache.get(key)
+    if cached is not None:
+        return cached
+    score = _evaluate_swap_uncached(rvc, drop_ids, (), score_only=True)["trade_score"]
+    if len(rvc.score_cache) < _SWAP_CACHE_MAX:
+        rvc.score_cache[key] = score
+    return score
+
+
 def _evaluate_swap_uncached(
     rvc: RosterValueContext,
     drop_ids: Sequence[str],
     add_rows: Sequence[Mapping[str, Any]] = (),
+    score_only: bool = False,
 ) -> dict[str, Any]:
     drop_set = {str(p) for p in drop_ids}
     before = rvc.frame
@@ -518,7 +541,10 @@ def _evaluate_swap_uncached(
         raw_value_delta=raw,
         asset_value=lambda a: float(a.get("score") or 0.0),
         after_profiles=after_profiles,
+        score_only=score_only,
     )
+    if score_only:
+        return result
     result["raw_value_delta"] = round(raw)
     return result
 

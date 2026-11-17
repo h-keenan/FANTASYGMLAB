@@ -918,6 +918,7 @@ def evaluate_trade(
     healthy_restore: float = 0.0,
     asset_value=lambda a: float(a.get("score") or a.get("value_score") or 0),
     after_profiles: Sequence[PlayerPoints] | None = None,
+    score_only: bool = False,
 ) -> dict[str, Any]:
     """Expected lineup points before vs after, and the one combined score.
 
@@ -981,6 +982,15 @@ def evaluate_trade(
     posture_future = (w_fut - 1.0) * d_future
     friction_adj = k * friction_pts
 
+    trade_score = (
+        raw_value_delta + healthy_restore + consolidation_adjustment + posture_now + posture_future + friction_adj
+    )
+
+    if score_only:
+        # The ranking-only view (``trade_score`` is the identical expression above; nothing below feeds it): callers that
+        # only compare many candidate swaps skip the future-year lineups, the confidence model and the per-position story.
+        return {"trade_score": trade_score}
+
     # Next seasons (informational lineup effect, age-curved, healthy, market
     # replacement as fill-in). Not added to the score: future value is the
     # market's own (already age-curved and posture-priced upstream).
@@ -992,10 +1002,6 @@ def evaluate_trade(
         fa = [_aged(p, y) for p in after]
         yb, ya, _ = run_weeks(fb, fa, ctx, fill="market", weeks=[1], ignore_availability=True)
         fut_delta_pts += (params.future_discount ** y) * FANTASY_SEASON_WEEKS * (ya.expected - yb.expected)
-
-    trade_score = (
-        raw_value_delta + healthy_restore + consolidation_adjustment + posture_now + posture_future + friction_adj
-    )
 
     # Uncertainty (value units). Two different questions. The OUTCOME range
     # (what the lineup points could actually be) includes game-to-game noise.
