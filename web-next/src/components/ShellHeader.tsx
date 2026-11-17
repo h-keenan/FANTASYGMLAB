@@ -147,7 +147,7 @@ export function LeagueIdentity({ leagueId, name, onOpen }: { leagueId: string; n
 function Ribbon({ chips }: { chips: HeaderChip[] }) {
   return (
     <div className="shell-header-ribbon" data-testid="header-ribbon" role="group" aria-label="This page at a glance">
-      <div className="shell-header-ribbon-inner">
+      <div className="shell-header-ribbon-inner" tabIndex={0}>
         {chips.map((chip) => (
           <span key={chip.key} className="shell-header-chip" style={{ color: CHIP_COLOR[chip.tone ?? "muted"] }}>
             {chip.text}

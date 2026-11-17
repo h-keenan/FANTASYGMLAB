@@ -4,6 +4,7 @@ import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNo
 import { createPortal } from "react-dom";
 
 import { OverlayBack } from "@/components/OverlayBack";
+import { trapTabKey } from "@/lib/focusTrap";
 import { SheetHandle } from "@/components/SheetHandle";
 import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
@@ -53,6 +54,7 @@ export function PopupShell({
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     event.stopPropagation();
     if (event.key === "Escape") overlay.back();
+    else trapTabKey(event, sheetRef.current);
   };
 
   const shell = (

@@ -117,8 +117,8 @@ export function SimWaiverCard({ ctx, suggestions, onClaim, onTab }: { ctx: SimCt
         <ul className="flex flex-col gap-3" aria-label="Waiver suggestions">
           {shown.map((s) => (
             <li key={s.player.id} className="flex flex-col gap-1" data-testid="waiver-suggestion">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <div className="min-w-[9rem] flex-1">
                   <SimPlayerChip player={s.player} size={32} />
                 </div>
                 <span className="flex shrink-0 flex-col items-end leading-tight">

@@ -1,5 +1,6 @@
 "use client";
 
+import { trapTabKey } from "@/lib/focusTrap";
 import { useCallback, useEffect, useReducer, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -85,6 +86,7 @@ export function StoryCarousel({
   const next = useCallback(() => dispatch({ type: "next" }), []);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    trapTabKey(event, rootRef.current);
     const action = storyKeyAction(event.key);
     if (!action) return;
     event.preventDefault();

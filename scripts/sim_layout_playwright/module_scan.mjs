@@ -18,6 +18,12 @@ const engine = process.env.BROWSER === "chromium" ? pw.chromium : pw.webkit;
 const GUARD_ON = process.env.GUARD === "1";
 const LARGE = process.env.LARGE === "1";
 const guardViolations = [];
+// AXE=1 runs axe-core (WCAG 2.x A/AA) on each route and fails on serious / critical issues (docs/audits/2026-11-accessibility.md).
+// AXE_CORE=path/to/axe.min.js (CI installs axe-core next to playwright-core); AXE_ROUTES overrides the default key-route list.
+const AXE_ON = process.env.AXE === "1";
+const AXE_ROUTES = (process.env.AXE_ROUTES || "today,team,trades,matchup,waivers,gm-plan").split(",");
+const axeViolations = [];
+const axeSource = AXE_ON ? fs.readFileSync(process.env.AXE_CORE || "node_modules/axe-core/axe.min.js", "utf8") : "";
 const BASE = process.env.BASE || "http://localhost:3197";
 const OUT = process.env.OUT || "/private/tmp/claude-501/module-scan";
 const WIDTHS = (process.env.WIDTHS || (process.env.GUARD === "1" ? "320,360,390,430" : "390,1440")).split(",").map(Number);
@@ -398,7 +404,7 @@ for (const w of WIDTHS) {
       }
       // The app shell / Sim root carry an overflow-x: clip backstop; measure without it so a real overflow is still caught (and named).
       if (OVERFLOW_MODE) await page.addStyleTag({ content: ".app-shell,.sim-root{overflow-x:visible!important}" }).catch(() => {});
-      if (LARGE) await page.addStyleTag({ content: "html{font-size:125%!important}" }).catch(() => {});
+      if (LARGE) await page.addStyleTag({ content: `html{font-size:${process.env.LARGE_PCT || 125}%!important}` }).catch(() => {});
       const res = await page.evaluate(PAGE_CHECK);
       res.firstModule = await page.evaluate(FIRST_MODULE);
       if (res.overflow) res.overflow.offenders = await page.evaluate(OFFENDERS);
@@ -425,6 +431,16 @@ for (const w of WIDTHS) {
         await state("");
         const row = page.locator('[data-testid="player-accordion-row"] button[aria-expanded]').first();
         if (await row.count()) { await row.dispatchEvent("click"); await sleep(700); await state(":row-open"); }
+      }
+      if (AXE_ON && AXE_ROUTES.includes(r.name)) {
+        await page.addScriptTag({ content: axeSource });
+        const out = await page.evaluate(async () => {
+          // eslint-disable-next-line no-undef
+          const res = await axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] }, resultTypes: ["violations"] });
+          return res.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.slice(0, 4).map((n) => `${n.target.join(" ")} :: ${(n.failureSummary || "").split("\n").slice(1, 2).join("").trim().slice(0, 140)}`), count: v.nodes.length }));
+        });
+        for (const v of out) axeViolations.push({ page: r.name, width: w, ...v });
+        res.axe = out.length;
       }
       if (METRICS) res.census = await page.evaluate(CENSUS);
       res.expectTextMissing = r.expectText ? !res.bodyText.includes(r.expectText) : false;
@@ -488,6 +504,12 @@ if (GUARD_ON) {
   for (const [k, e] of byKey) console.log(`GUARD ${k}  x${e.n}  e.g. ${[...e.where].slice(0, 3).join(", ")}  ${e.detail}`);
   console.log(`desk layout guard: ${byKey.size} distinct violations (${guardViolations.length} total)`);
   if (guardViolations.length) bad += 1;
+}
+if (AXE_ON) {
+  fs.writeFileSync(`${OUT}/axe-violations.json`, JSON.stringify(axeViolations, null, 1));
+  for (const v of axeViolations) console.log(`AXE ${v.page}@${v.width} [${v.impact}] ${v.id} x${v.count}: ${v.help}\n     ${v.nodes.join("\n     ")}`);
+  console.log(`axe: ${axeViolations.length} serious/critical rule violation(s)`);
+  if (axeViolations.length) bad += 1;
 }
 console.log(bad ? `${bad} page(s) with problems` : "module scan clean");
 process.exit(bad ? 1 : 0);

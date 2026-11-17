@@ -96,7 +96,7 @@ export function ComparisonHeader({
             </span>
           ) : null}
         </div>
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center gap-1" role="status" aria-label="Live matchup status">
           {pct != null ? (
             <span className="text-xs font-extrabold tabular-nums" style={{ color: probabilityColorVar(pct / 100) }} data-testid="header-winprob">
               {pct}% win · {percentWord(pct)}

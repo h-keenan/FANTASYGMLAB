@@ -44,7 +44,7 @@ export function TodayMatchupCard({ line, matchup, href }: { line: TeamStatusMatc
       >
         <StatusRingMark ring={status} size={68} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }} data-testid="today-matchup-kicker">
+          <span className="break-words text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }} data-testid="today-matchup-kicker">
             {ring.kicker}
           </span>
           {ring.scoreLine ? (
@@ -52,7 +52,7 @@ export function TodayMatchupCard({ line, matchup, href }: { line: TeamStatusMatc
               {ring.scoreLine}
             </span>
           ) : null}
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             {ring.chip ? <ToneBadge label={ring.chip.label} color={TONE[ring.chip.tone]} testId="today-matchup-chip" /> : null}
             {ring.scoreCaption ? (
               <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
