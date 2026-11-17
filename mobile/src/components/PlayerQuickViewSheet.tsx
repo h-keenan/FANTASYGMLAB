@@ -1,3 +1,4 @@
+import { AdpCredit } from './AdpLine';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -442,6 +443,16 @@ export default function PlayerQuickViewSheet({
                       <AwardsStrip awards={awards} />
                     </Section>
                   ) : null}
+                  {detail?.adp && detail.adp.adp != null ? (
+                    <Section title="Market ADP">
+                      <AppText style={styles.adpLine}>
+                        {detail.adp.label} {detail.adp.adp.toFixed(1)}
+                        {detail.adp.our_rank != null ? ` · our rank ${detail.adp.our_rank}` : ''}
+                        {detail.adp.verdict && detail.adp.read ? ` · ${detail.adp.read}` : ''}
+                      </AppText>
+                      {detail.adp.source ? <AdpCredit asOf={detail.adp.source.as_of} style={styles.adpLine} /> : null}
+                    </Section>
+                  ) : null}
                   {bioRows.length > 0 ? (
                     <Section title="Bio">
                       <View style={styles.tileGrid}>
@@ -669,6 +680,7 @@ function createStyles(colors: ThemeColors) {
     groupTitle: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary },
     tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     muted: { fontSize: 14.5, color: colors.textSecondary },
+    adpLine: { fontSize: 13.5, color: colors.textSecondary },
     actionButtons: { flexDirection: 'row', gap: spacing.sm },
     actionButton: { flex: 1 },
     actions: {

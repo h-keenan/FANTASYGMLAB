@@ -31,6 +31,7 @@ import {
   type PickScope,
 } from "@/lib/draftCenterPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { RookieAdpBoard } from "@/components/RookieAdpBoard";
 import { StructuredRow, StructuredRowList } from "@/components/ui/StructuredRow";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { cardRows, signalPills, signalSpokenLabel, strategyTone, type DraftSignalRow } from "@/lib/draftSignals";
@@ -262,6 +263,7 @@ export function DraftCenterContent({
 
       {tab === "overview" ? (
         <>
+          <RookieAdpBoard board={data.rookie_adp_board} />
           <DraftCardSection id="decision-signals-heading" title="League Draft Decision Signals" cards={decisionCards} myRosterId={myRosterId} />
           <DraftCardSection id="partner-discovery-heading" title="Draft Partner Discovery" cards={partnerCards} myRosterId={myRosterId} />
         </>

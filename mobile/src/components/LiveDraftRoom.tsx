@@ -4,6 +4,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import AnimatedCard from './AnimatedCard';
+import AdpLine, { AdpCredit } from './AdpLine';
+import { adpContext } from '../lib/adpPresentation';
 import AppText from './AppText';
 import CompactPlayerCard from './CompactPlayerCard';
 import { SkeletonList } from './Skeleton';
@@ -410,6 +412,8 @@ function DraftBoard({
       </View>
 
       <RankingsBoard rows={state.rankings} styles={styles} colors={colors} onOpen={onOpenPlayer} onCompare={onCompare} />
+      {state.adp_source ? <AdpCredit asOf={state.adp_source.as_of} style={styles.muted} /> : null}
+      {state.adp_est_sf_note ? <AppText style={styles.muted}>Est. SF is modeled, not real ADP. {state.adp_est_sf_note}</AppText> : null}
 
       <View>
         <SectionHeading
@@ -522,8 +526,15 @@ function RecommendationCard({
           <AppText style={styles.recReason}>{rec.recommendation_reason}</AppText>
           <AppText style={styles.muted}>Roster impact: {rec.immediate_roster_impact}</AppText>
           <AppText style={styles.muted}>
-            Value vs ADP: {rec.adp_delta !== null ? `${rec.adp_delta > 0 ? '+' : ''}${rec.adp_delta}` : 'unavailable'}
+            Value vs ADP: {rec.adp_delta != null ? `${rec.adp_delta > 0 ? '+' : ''}${rec.adp_delta}` : 'unavailable'}
           </AppText>
+          {rec.adp != null ? (
+            <AdpLine
+              style={styles.muted}
+              adp={{ adp: rec.adp ?? null, adp_label: rec.adp_label, adp_est_sf: rec.adp_est_sf, adp_est_sf_label: rec.adp_est_sf_label }}
+            />
+          ) : null}
+          {rec.adp_read ? <AppText style={styles.muted}>{rec.adp_read}</AppText> : null}
           <AppText style={styles.muted}>Confidence: {rec.confidence}</AppText>
         </View>
       ) : null}
@@ -587,6 +598,7 @@ function RankingsBoard({
                     `#${row.overall_rank ?? '—'}`,
                     row.position && row.position_rank ? `${row.position}${row.position_rank}` : '',
                     row.recommendation_label,
+                    adpContext({ adp: row.adp ?? null, adp_label: row.adp_label, adp_est_sf: row.adp_est_sf, adp_est_sf_label: row.adp_est_sf_label }),
                   ]
                     .filter(Boolean)
                     .join(' · ')}

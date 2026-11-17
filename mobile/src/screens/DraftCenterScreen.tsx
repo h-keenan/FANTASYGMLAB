@@ -28,7 +28,8 @@ import LiveDraftRoom from '../components/LiveDraftRoom';
 import { hasLiveDraft, resolveDraftTab } from '../lib/liveDraft';
 import { pickProvenance } from '../lib/pickGroups';
 import ValuesCredit from '../components/ValuesCredit';
-import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
+import RookieAdpBoard from '../components/RookieAdpBoard';
+import { api, type RookieAdpBoard as RookieAdpBoardData, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileFromRank } from '../lib/percentile';
@@ -89,6 +90,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   const [postureReason, setPostureReason] = useState('');
   const [decisionCards, setDecisionCards] = useState<DraftCard[]>([]);
   const [partnerCards, setPartnerCards] = useState<DraftCard[]>([]);
+  const [rookieBoard, setRookieBoard] = useState<RookieAdpBoardData | undefined>(undefined);
   const [reason, setReason] = useState('');
   const [locked, setLocked] = useState<{ title: string; body: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,6 +140,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           setPosture(result.posture);
           setPostureReason(result.posture_reason);
           setDecisionCards(result.decision_cards);
+          setRookieBoard(result.rookie_adp_board);
           setPartnerCards(result.partner_cards);
           setReason(result.reason);
           setPicks(picksResult.picks);
@@ -342,6 +345,8 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
 
         {tab === 'overview' ? (
           <>
+            <RookieAdpBoard board={rookieBoard} />
+
             <SectionHeading title="League Draft Decision Signals" topGap={16} />
             {decisionCards.map((card) => (
               <DraftInsightCard key={card.label} card={card} myRosterId={myRosterId} />

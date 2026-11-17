@@ -1,5 +1,7 @@
 "use client";
 
+import { AdpCredit, AdpInline } from "@/components/AdpInline";
+import { deltaText } from "@/lib/adpPresentation";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
@@ -8,6 +10,7 @@ import { abbreviatePlayerName } from "@/lib/formatPlayerName";
 import { useMemo, useState } from "react";
 
 import type {
+  AdpSource,
   LiveDraftDiscoveryResponse,
   LiveDraftPickRow,
   LiveDraftRankingRow,
@@ -114,8 +117,16 @@ function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; pr
           <div className="flex flex-wrap gap-x-4 gap-y-1" style={{ color: "var(--color-text-muted)" }}>
             <span>Roster impact: {rec.immediate_roster_impact}</span>
             <span>
-              Value vs ADP: {rec.adp_delta !== null ? `${rec.adp_delta > 0 ? "+" : ""}${rec.adp_delta}` : "unavailable"}
+              Value vs ADP: {rec.adp_delta != null ? `${rec.adp_delta > 0 ? "+" : ""}${rec.adp_delta}` : "unavailable"}
+              {rec.adp != null ? (
+                <>
+                  {" ("}
+                  <AdpInline adp={{ adp: rec.adp, adp_label: rec.adp_label, adp_est_sf: rec.adp_est_sf, adp_est_sf_label: rec.adp_est_sf_label }} />
+                  {")"}
+                </>
+              ) : null}
             </span>
+            {rec.adp_read ? <span>{rec.adp_read}</span> : null}
             <span>Confidence: {rec.confidence}</span>
           </div>
         </div>
@@ -157,6 +168,13 @@ function RankingRowView({ row, leagueId, leagueName }: { row: LiveDraftRankingRo
           {row.team || "—"}
           {row.position && row.position_rank ? ` · ${row.position}${row.position_rank}` : ""}
           {row.recommendation_label ? ` · ${row.recommendation_label}` : ""}
+          {row.adp != null ? (
+            <>
+              {" · "}
+              <AdpInline adp={{ adp: row.adp, adp_label: row.adp_label, adp_est_sf: row.adp_est_sf, adp_est_sf_label: row.adp_est_sf_label }} />
+              {row.adp_delta != null ? ` (${deltaText(row.adp_delta)})` : ""}
+            </>
+          ) : null}
         </PlayerIdentity>
         <div className="flex items-center gap-2 shrink-0">
           <span
@@ -278,10 +296,14 @@ function RankingsBoard({
   rows,
   leagueId,
   leagueName,
+  adpSource,
+  estNote,
 }: {
   rows: LiveDraftRankingRow[];
   leagueId: string;
   leagueName: string;
+  adpSource?: AdpSource | null;
+  estNote?: string | null;
 }) {
   const [filter, setFilter] = useState<LiveDraftRankFilter>("Overall");
   const options = useMemo(() => liveDraftRankFilterOptions(rows), [rows]);
@@ -324,6 +346,12 @@ function RankingsBoard({
           ))}
         </div>
       )}
+      {adpSource ? <AdpCredit asOf={adpSource.as_of} /> : null}
+      {estNote ? (
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          Est. SF is modeled, not real ADP. {estNote}
+        </p>
+      ) : null}
       {filtered.length > visible.length ? (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           Showing the top {visible.length} of {filtered.length} ranked players.
@@ -544,7 +572,7 @@ export function LiveDraftContent({
                 )}
               </CompactModule>
 
-              <RankingsBoard rows={state.rankings} leagueId={leagueId} leagueName={leagueName} />
+              <RankingsBoard rows={state.rankings} leagueId={leagueId} leagueName={leagueName} adpSource={state.adp_source} estNote={state.adp_est_sf_note} />
 
               <CompactModule
                 id="live-draft.teams"
