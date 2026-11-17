@@ -120,9 +120,11 @@ function ReasonState({ reason, navigation }: { reason: string; navigation: Props
 function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
   const [data, setData] = useState<GamesSeasonSimResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     api
       .getGamesSeasonSim(leagueId)
       .then((result) => {
@@ -134,9 +136,9 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
     return () => {
       cancelled = true;
     };
-  }, [leagueId]);
+  }, [leagueId, reloadToken]);
 
-  if (error) return <ErrorState title="Couldn't load the simulator" message={error} />;
+  if (error) return <ErrorState title="Couldn't load the simulator" message={error} onRetry={() => setReloadToken((n) => n + 1)} />;
   if (!data) return <SkeletonPage label="Games" layout="cards" family="league" />;
   if (data.reason || !data.my_team) return <ReasonState reason={data.reason || 'unavailable'} navigation={navigation} />;
 
@@ -360,6 +362,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
 
   const load = useCallback(
     (week?: number) => {
+      setError(null);
       api
         .getGamesPickem(leagueId, week)
         .then(setData)
@@ -372,7 +375,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
     load();
   }, [load]);
 
-  if (error) return <ErrorState title="Couldn't load Pick'em" message={error} />;
+  if (error) return <ErrorState title="Couldn't load Pick'em" message={error} onRetry={() => load()} />;
   if (!data) return <SkeletonPage label="Pick'em" layout="cards" family="league" />;
   if (!data.available) {
     return (
