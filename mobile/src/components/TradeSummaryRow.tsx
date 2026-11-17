@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
 import ToneBadge from './ToneBadge';
+import { Collapse } from './Presence';
 import AnimatedCard from './AnimatedCard';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
@@ -68,7 +69,7 @@ export default function TradeSummaryRow({
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={open ? 'Hide details' : 'Show details'} onPress={() => setOpen((v) => !v)} style={styles.toggle}>
             <AppText style={styles.toggleText}>{open ? 'Hide details' : 'Show details'}</AppText>
           </Pressable>
-          {open ? <View style={styles.body}>{children}</View> : null}
+          <Collapse open={open}><View style={styles.body}>{children}</View></Collapse>
         </>
       ) : null}
     </AnimatedCard>

@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
+import { Collapse } from "@/components/ui/Presence";
 import type { TradeOutcomeChip } from "@/lib/tradeOutcomeChips";
 
 export interface TradeSummaryPlayer {
@@ -68,7 +69,7 @@ export function TradeSummaryRow({
           <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="self-start text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}>
             {open ? "Hide details" : "Show details"}
           </button>
-          {open ? <div className="flex flex-col gap-3">{children}</div> : null}
+          <Collapse open={open}><div className="flex flex-col gap-3">{children}</div></Collapse>
         </>
       ) : null}
     </article>
