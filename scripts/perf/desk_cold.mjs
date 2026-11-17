@@ -30,6 +30,10 @@ const ROUTES = [
   [/\/v1\/leagues\/[^/]+\/matchup$/, () => "matchup", { matchup: [417, 38] }],
   [/\/v1\/leagues\/[^/]+\/my-team$/, () => "my_team", { my_team: [440, 25] }],
   [/\/v1\/leagues\/[^/]+\/my-team\/needs$/, () => "my_team", { my_team: [440, 25] }],
+  // Round 4: the other Desk pages (cold/warm from scripts/bench_endpoints.py on the same fixture).
+  [/\/v1\/leagues\/[^/]+\/waivers$/, () => "waivers", { waivers: [940, 100] }],
+  [/\/v1\/leagues\/[^/]+\/trade-hub$/, () => "trade_hub", { trade_hub: [2400, 6] }],
+  [/\/v1\/leagues-glance$/, () => "leagues_glance", { leagues_glance: [3500, 2] }],
   [/\/v1\/leagues\/[^/]+$/, () => null, null],
   [/\/v1\/leagues$/, () => "LEAGUES", null],
 ];
@@ -66,7 +70,12 @@ async function visit(ctx, cold, label) {
   if (prof) await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: prof.latency, downloadThroughput: prof.down, uploadThroughput: prof.up });
   await page.goto(BASE + PAGE, { waitUntil: "domcontentloaded" });
   // "useful content": the first compact module with a real summary line (skeletons are aria-busy regions).
-  await page.waitForFunction(() => document.querySelector('[data-testid="today-tiles"], [data-testid="today-matchup"], [data-testid="compact-summary"]') && !document.querySelector("main[aria-busy='true']"), null, { timeout: Number(process.env.WAIT_MS || 60000) }).catch(async () => { console.log("TIMEOUT", await page.evaluate(() => [...document.querySelectorAll("[data-testid]")].map((e) => e.getAttribute("data-testid")).slice(0, 12).join(",") + " busy=" + document.querySelector("main")?.getAttribute("aria-busy"))); await page.screenshot({ path: "/private/tmp/claude-501/s/timeout.png" }); });
+  // TODAY=1 (default for /dashboard paths): the first Today module with a real summary. Any other page (Matchup, Team, League,
+  // Players, Waivers, Trades, Sim Home): <main> has real text and no skeleton (aria-busy) region left.
+  const isToday = (process.env.PAGE || PAGE).startsWith("/dashboard");
+  await page.waitForFunction((today) => today
+    ? document.querySelector('[data-testid="today-tiles"], [data-testid="today-matchup"], [data-testid="compact-summary"]') && !document.querySelector("main[aria-busy='true']")
+    : document.querySelector("main") && document.querySelector("main").innerText.trim().length > 150 && !document.querySelector("main [aria-busy='true'], main[aria-busy='true']"), isToday, { timeout: Number(process.env.WAIT_MS || 60000) }).catch(async () => { console.log("TIMEOUT", await page.evaluate(() => [...document.querySelectorAll("[data-testid]")].map((e) => e.getAttribute("data-testid")).slice(0, 12).join(",") + " busy=" + document.querySelector("main")?.getAttribute("aria-busy"))); await page.screenshot({ path: "/private/tmp/claude-501/s/timeout.png" }); });
   const usefulMs = Date.now() - t0;
   await sleep(800);
   const p = await page.evaluate(() => ({ ...window.__p, js: performance.getEntriesByType("resource").filter((e) => e.name.endsWith(".js")).reduce((a, e) => a + (e.transferSize || 0), 0) }));

@@ -20,7 +20,14 @@ vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
     ...actual,
-    api: { ...actual.api, getTradeHub: vi.fn(), getTeamStance: vi.fn(), getLeague: vi.fn() },
+    api: {
+      ...actual.api,
+      getTradeHub: vi.fn(),
+      getTeamStance: vi.fn(),
+      getLeague: vi.fn(),
+      getMultiTeamTradeIdeas: vi.fn(() => new Promise(() => {})),
+      getPlayerValueSignals: vi.fn(() => new Promise(() => {})),
+    },
   };
 });
 
@@ -55,6 +62,17 @@ describe("TradeHubPage fetch order", () => {
 
     pending.resolve(hub("contender"));
     expect(await screen.findByTestId("trade-hub")).toHaveAttribute("data-strategy", "contender");
+  });
+
+  it("starts the 3-team ideas and value signals beside the hub request, not after it renders", async () => {
+    mockLeagueType(2);
+    vi.mocked(api.getTradeHub).mockReturnValue(new Promise(() => {})); // the hub never lands in this test
+
+    renderWithLens(<TradeHubPage />);
+
+    await waitFor(() => expect(api.getTradeHub).toHaveBeenCalledTimes(1));
+    expect(api.getMultiTeamTradeIdeas).toHaveBeenCalledWith("league-1", "Dynasty");
+    expect(api.getPlayerValueSignals).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to team-stance then ideas when the server echoes strategy=auto unresolved", async () => {

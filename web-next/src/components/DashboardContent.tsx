@@ -1,18 +1,12 @@
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { TERMS } from "@/lib/terms";
 import { ModuleMore } from "@/components/ui/ModuleMore";
 import { useEffect, useState, type MouseEvent } from "react";
 
 import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
-import { DashboardAlerts } from "@/components/DashboardAlerts";
-import { DirectionCheckinCard } from "@/components/DirectionCheckinCard";
-import { FirstValueOfferCard } from "@/components/FirstValueOfferCard";
 import { NextSteps } from "@/components/NextSteps";
-import { StartHereCard } from "@/components/StartHereCard";
 import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
-import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
-import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
-import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { formatRank, rankFill } from "@/components/SnapshotTile";
 import type { StatStripItem } from "@/components/StatStrip";
 import { StatStripModule } from "@/components/ui/ModuleTemplates";
@@ -31,6 +25,16 @@ import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY, tradesStanceLine } from "@/lib/dashboardLayout";
 import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusPositions, buildTeamStatusStanding } from "@/lib/teamStatus";
 import { todayRoomChips, todayTiles, todayTradeIdea } from "@/lib/todayView";
+
+// Below-the-fold and conditional modules load as their own chunks (after the above-the-fold content has hydrated), so they are not
+// part of Today's first-load JS. Each renders nothing until its chunk lands; none sits above the matchup card.
+const GuessThePlayerCard = dynamic(() => import("@/components/GuessThePlayerCard").then((m) => m.GuessThePlayerCard), { loading: () => null });
+const GuessThePlayerNameMatchCard = dynamic(() => import("@/components/GuessThePlayerNameMatchCard").then((m) => m.GuessThePlayerNameMatchCard), { loading: () => null });
+const LeaguePulseCard = dynamic(() => import("@/components/LeaguePulseCard").then((m) => m.LeaguePulseCard), { loading: () => null });
+const StartHereCard = dynamic(() => import("@/components/StartHereCard").then((m) => m.StartHereCard), { loading: () => null });
+const FirstValueOfferCard = dynamic(() => import("@/components/FirstValueOfferCard").then((m) => m.FirstValueOfferCard), { loading: () => null });
+const DirectionCheckinCard = dynamic(() => import("@/components/DirectionCheckinCard").then((m) => m.DirectionCheckinCard), { loading: () => null });
+const DashboardAlerts = dynamic(() => import("@/components/DashboardAlerts").then((m) => m.DashboardAlerts), { loading: () => null });
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for

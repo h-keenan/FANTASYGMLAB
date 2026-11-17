@@ -13,6 +13,7 @@ import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { TradeHubSkeleton } from "@/components/TradeHubFilters";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
+import { isEspnLeagueId } from "@/lib/leaguePlatform";
 
 export default function TradeHubPage() {
   const params = useParams<{ leagueId: string }>();
@@ -58,6 +59,11 @@ export default function TradeHubPage() {
     // requested once (as Non-Dynasty), not once as Dynasty and again.
     if (!lensReady) return;
     let cancelled = false;
+
+    // The 3-team ideas and Buy low / Sell high sections mount only after the hub renders and then fetch; start both now so
+    // they run beside the hub request (coalesced + briefly reused by lib/requestCache.ts) instead of after it.
+    if (!isEspnLeagueId(leagueId)) void api.getMultiTeamTradeIdeas(leagueId, lens).catch(() => undefined);
+    void api.getPlayerValueSignals().catch(() => undefined);
 
     api
       .getTradeHub(leagueId, "auto", lens)
