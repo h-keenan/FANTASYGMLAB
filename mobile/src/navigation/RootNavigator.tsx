@@ -6,7 +6,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import type { CollegeProspect, DraftPickAsset, RankedPlayer } from '../lib/api';
+import type { DraftPickAsset, RankedPlayer } from '../lib/api';
 import HeaderBackdrop from '../components/HeaderBackdrop';
 import BrandMark from '../components/BrandMark';
 import GmOrb from '../components/GmOrb';
@@ -82,7 +82,6 @@ const PickDetailScreen = lazyScreen(() => require('../screens/PickDetailScreen')
 const MyTeamScreen = lazyScreen(() => require('../screens/MyTeamScreen'));
 const MatchupScreen = lazyScreen(() => require('../screens/MatchupScreen'));
 const CollegeProspectsScreen = lazyScreen(() => require('../screens/CollegeProspectsScreen'));
-const ProspectScoutingDetailScreen = lazyScreen(() => require('../screens/ProspectScoutingDetailScreen'));
 const GmGameScreen = lazyScreen(() => require('../screens/GmGameScreen'));
 const FounderAnalyticsScreen = lazyScreen(() => require('../screens/FounderAnalyticsScreen'));
 const GuessThePlayerLeaderboardScreen = lazyScreen(() => require('../screens/GuessThePlayerLeaderboardScreen'));
@@ -188,7 +187,6 @@ export type RootStackParamList = {
   // Not league-scoped — shared prospect pool + personal watchlist span every league.
   // Retired as a menu page: Players > Prospects (redirects when a league is known).
   CollegeProspects: undefined;
-  CollegeProspectDetail: { prospect: CollegeProspect };
   // Not league-scoped — the whole point is standing/needs across every
   // saved league at once, not one league's context.
   Portfolio: undefined;
@@ -424,7 +422,6 @@ export default function RootNavigator() {
           <AppStack.Screen name="Alerts" component={AlertsRedirect} />
           <AppStack.Screen name="GmTargets" component={GmTargetsRedirect} />
           <AppStack.Screen name="CollegeProspects" component={CollegeProspectsScreen} />
-          <AppStack.Screen name="CollegeProspectDetail" component={ProspectScoutingDetailScreen} />
           <AppStack.Screen name="TeamStance" component={TeamStanceRedirect} />
           <AppStack.Screen name="GmPlan" component={EspnGmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />

@@ -20,6 +20,11 @@ import { usePlayerListViewMode } from '../lib/viewModePreference';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import ErrorState from './ErrorState';
+import ProspectSheet from './ProspectSheet';
+import { draftFromProspect, type ReportDraft, type ReportFlash } from './ProspectReportForm';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import { handOffPlayerId } from '../lib/prospectProfile';
+import { stubPlayer } from '../lib/playerQuickView';
 
 type FilterKey = 'all' | 'watchlist';
 type ScoutView = 'base' | 'league';
@@ -39,7 +44,7 @@ function aggregateLabel(prospect: CollegeProspect): string {
  * (Magna Carta §12), matching GmTargetsScreen's grouped-table treatment
  * rather than a per-row card. Trailing star toggles the personal watchlist
  * without leaving this screen; tapping the row itself opens
- * ProspectScoutingDetailScreen to submit/edit a grade.
+ * the prospect sheet (stats, profile, your grade).
  *
  * `grid`: coridian_'s 2-up compact card ask (Discord, 2026-10-09) — the
  * exact same fields (position, name, school/class, aggregate scout grade,
@@ -155,11 +160,9 @@ function ProspectRow({
  * your pick slots against each prospect's existing community round projection.
  */
 export default function CollegeScoutingPanel({
-  onOpenProspect,
   lens = null,
   leading = null,
 }: {
-  onOpenProspect: (prospect: CollegeProspect) => void;
   lens?: ScoutingLens | null;
   /** The page's view select (Players / Prospects), first in the one control row; none on the standalone route. */
   leading?: React.ReactNode;
@@ -173,6 +176,56 @@ export default function CollegeScoutingPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { viewMode } = usePlayerListViewMode('college-prospects');
+  const { openPlayer } = usePlayerQuickView();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, ReportDraft>>({});
+  const [flashes, setFlashes] = useState<Record<string, ReportFlash>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const onOpenProspect = (prospect: CollegeProspect) => {
+    const nflId = handOffPlayerId(prospect);
+    if (nflId) {
+      openPlayer(stubPlayer({ player_id: nflId, name: prospect.name, position: prospect.position }), { sourceLabel: 'Drafted prospect' });
+      return;
+    }
+    setDrafts((prev) => ({ ...prev, [prospect.id]: prev[prospect.id] ?? draftFromProspect(prospect) }));
+    setOpenId(prospect.id);
+  };
+
+  const submitReport = async (prospect: CollegeProspect) => {
+    const draft = drafts[prospect.id] ?? draftFromProspect(prospect);
+    if (draft.grade == null) return;
+    setBusyId(prospect.id);
+    try {
+      const result = await api.submitScoutingReport(prospect.id, { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim() });
+      if (result.ok) {
+        setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, my_report: { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim() } } : row)));
+        setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'success', message: 'Saved — thanks for scouting.' } }));
+      } else {
+        setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'error', message: 'Could not save your grade. Try again in a moment.' } }));
+      }
+    } catch {
+      setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'error', message: 'Could not save your grade. Try again in a moment.' } }));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const removeReport = async (prospect: CollegeProspect): Promise<boolean> => {
+    setBusyId(prospect.id);
+    try {
+      const result = await api.deleteScoutingReport(prospect.id);
+      if (!result.ok) return false;
+      setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, my_report: null } : row)));
+      setDrafts((prev) => ({ ...prev, [prospect.id]: { grade: null, roundProjection: null, note: '' } }));
+      setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'success', message: 'Removed your report.' } }));
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const load = useCallback(async () => {
     setError(null);
@@ -260,8 +313,23 @@ export default function CollegeScoutingPanel({
     />
   ));
 
+  const openProspect = openId ? prospects.find((row) => row.id === openId) ?? null : null;
   return (
     <View style={styles.panel}>
+      {openProspect ? (
+        <ProspectSheet
+          key={openProspect.id}
+          prospect={openProspect}
+          draft={drafts[openProspect.id] ?? draftFromProspect(openProspect)}
+          flash={flashes[openProspect.id] ?? null}
+          busy={busyId === openProspect.id}
+          onDraftChange={(next) => setDrafts((prev) => ({ ...prev, [openProspect.id]: next }))}
+          onSubmit={() => void submitReport(openProspect)}
+          onRemove={() => removeReport(openProspect)}
+          onToggleWatchlist={() => void toggleWatchlist(openProspect)}
+          onClose={() => setOpenId(null)}
+        />
+      ) : null}
       {controls(
         <>
           <FilterDropdownButton<ShowOption>

@@ -442,7 +442,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
       <PageFamilyTabs family="team" active="players" leagueId={leagueId} leagueName={leagueName} />
       {tab === 'prospects' ? (
         <ScrollView contentContainerStyle={[styles.prospectsContent, { paddingBottom: orbClearance }]}>
-          <CollegeScoutingPanel leading={viewSelect} onOpenProspect={(prospect) => navigation.navigate('CollegeProspectDetail', { prospect })} lens={scoutingLens} />
+          <CollegeScoutingPanel leading={viewSelect} lens={scoutingLens} />
         </ScrollView>
       ) : (
       <>

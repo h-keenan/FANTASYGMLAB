@@ -1,3 +1,4 @@
+import { normalizeProspectProfile, type ProspectProfileResponse } from './prospectProfile';
 import type { DraftSignalRow } from './draftSignals';
 import { normalizeCollegeProspects, normalizeLeagueRankings, normalizeMe, normalizeCommissionerIntegrity, normalizeLeagueRosters, normalizeLeagueTeamProfiles, normalizeSharedCommunityTrades } from './apiDefaults';
 import type { SimNotificationsResponse } from './simNotifications';
@@ -2874,6 +2875,8 @@ export interface CollegeProspect {
   aggregate: ProspectScoutingAggregate;
   my_report: MyScoutingReport | null;
   on_watchlist: boolean;
+  /** Set once he is drafted and mapped: the card hands off to the normal NFL player card. */
+  sleeper_player_id?: string | null;
 }
 
 export interface CollegeProspectsResponse {
@@ -4576,6 +4579,9 @@ export const api = {
       { untouchable },
     ),
   getCollegeProspects: () => authorizedFetch<CollegeProspectsResponse>('/v1/scouting/prospects').then(normalizeCollegeProspects),
+  /** The prospect detail sheet: CFBD stats, weekly log, recruiting, rookie ADP (advanced metrics are Pro, withheld server-side). */
+  getProspectProfile: (prospectId: string) =>
+    authorizedFetch<ProspectProfileResponse>(`/v1/scouting/prospects/${encodeURIComponent(prospectId)}/profile`).then(normalizeProspectProfile),
   submitScoutingReport: (
     prospectId: string,
     body: { grade: number; round_projection?: number | null; note?: string },

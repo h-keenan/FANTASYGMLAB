@@ -49,7 +49,7 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-        <CollegeScoutingPanel onOpenProspect={(prospect) => navigation.navigate('CollegeProspectDetail', { prospect })} />
+        <CollegeScoutingPanel />
       </ScrollView>
     </View>
   );

@@ -117,6 +117,10 @@ export interface SimPqvSections {
   heroTiles?: { label: string; value: string; note: string }[];
   /** Real-NFL record cut to the as-of season (career + game log), shown first in the Stats tab. */
   stats?: React.ReactNode;
+  /** A Profile tab of the world's own (college prospect: recruiting, hometown). */
+  profile?: React.ReactNode;
+  /** College prospect header: the "Class of 2027 · 6'4" · 215 lb" line that replaces "Age N", and the school logo. */
+  headerMeta?: { line: string; logo?: string | null };
 }
 
 /** A header tag as a badge glyph; the owner is the exception ("Your team" would draw a lone star on its own row, UI audit B10): it always reads as the labelled "Owner" cue. */
@@ -131,6 +135,7 @@ export default function PlayerQuickViewSheet({
   simOverlay,
   asOfSeason,
   simSections,
+  customSections,
   remote: remoteProp = true,
 }: {
   request: QuickViewRequest;
@@ -141,6 +146,8 @@ export default function PlayerQuickViewSheet({
   asOfSeason?: number;
   /** Fantasy Sim, split by tab (preferred): the game's own Overview, Outlook, Scouting and History. Present = the sim's world. */
   simSections?: SimPqvSections;
+  /** A player who is not an NFL player (a college prospect): the same shell, every tab the caller's own, nothing real-NFL. Same slots as `simSections`; use with `remote={false}`. */
+  customSections?: SimPqvSections;
   /** false for a synthetic sim player with no real data behind the id: same layout, no remote fetches. */
   remote?: boolean;
 }) {
@@ -148,7 +155,7 @@ export default function PlayerQuickViewSheet({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { openPlayer } = usePlayerQuickView();
   // Fantasy Sim: the overlay marks the game's own world. No real news, real injury / availability notes or real bye here.
-  const sim: SimPqvSections | null = simSections ?? (simOverlay != null ? { overview: simOverlay } : null);
+  const sim: SimPqvSections | null = simSections ?? customSections ?? (simOverlay != null ? { overview: simOverlay } : null);
   const isSim = sim != null;
   const realWorld = pqvRealWorld(isSim);
   const { player } = request;
@@ -430,14 +437,15 @@ export default function PlayerQuickViewSheet({
           },
         ]
       : []),
-    ...(remote
+    ...(remote || sim?.profile
       ? [
           {
             key: 'profile',
             label: 'Profile',
             render: () =>
-              bodyGate ?? (
+              !remote ? <View style={styles.body}>{sim?.profile ?? null}</View> : bodyGate ?? (
                 <View style={styles.body}>
+                  {sim?.profile ?? null}
                   {awards.length > 0 ? (
                     <Section title="Awards">
                       <AwardsStrip awards={awards} />
@@ -528,6 +536,8 @@ export default function PlayerQuickViewSheet({
               ringColor={overallRating != null ? overallRatingColor(overallRating, colors) : colors.accent}
               usageTrend={model?.usage_trend ?? null}
               simTiles={sim?.heroTiles ?? null}
+              metaLine={sim?.headerMeta?.line ?? null}
+              teamLogo={sim?.headerMeta?.logo ?? null}
               usageLoading={loading}
               valueChart={asOf == null && historyQuery.data && ratingHistoryCaption(historyQuery.data) ? <PlayerValueHistory history={historyQuery.data} /> : null}
               ovrChart={
@@ -613,7 +623,7 @@ export default function PlayerQuickViewSheet({
                 {target && remote ? <Button label="Open Full Profile" onPress={openFullProfile} style={styles.actionButton} /> : null}
               </View>
             </View>
-            <ValuesCredit />
+            {customSections ? null : <ValuesCredit />}
           </SheetScrollView>
         </SwipeDismissCard>
       </Pressable>
