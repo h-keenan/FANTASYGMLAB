@@ -63,7 +63,7 @@ def _absence(status, part, notes):
 
 def test_audit_repro_rows_are_no_longer_priced_as_season_ending():
     a = _absence("Questionable", "Knee", "MRI rules out a torn ACL; day-to-day")
-    assert not a.season_ending and not a.unconfirmed and a.weeks == 0.15
+    assert not a.season_ending and not a.unconfirmed and a.weeks == 0.3
     b = _absence("Questionable", "Hamstring", "Partially torn hamstring, expected to miss 1-2 weeks")
     assert not b.season_ending and b.weeks == 1.5 and "1-2 weeks" in b.basis
     c = _absence("Questionable", "Ankle", "No ACL tear, ankle sprain only")

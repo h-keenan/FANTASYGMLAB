@@ -207,7 +207,7 @@ _MIN_TEAMS_FOR_QB_QUALITY_LEAGUE_AVERAGE = 2
 _MIN_BAND_HALF_WIDTH = 2.5
 
 # Bumped whenever the estimator changes; surfaced in ``basis.model_version``.
-PROJECTION_MODEL_VERSION = "v3.2-calibrated-2026-11"
+PROJECTION_MODEL_VERSION = "v3.3-participation-2026-11"
 
 
 def _recency_weight(weeks_ago: int, half_life_weeks: float) -> float:
@@ -1026,16 +1026,47 @@ _V2_DOUBTFUL_MULTIPLIER = injury_status.ROWS_BY_KEY["doubtful"].p_play
 _V2_QUESTIONABLE_MULTIPLIER = injury_status.ROWS_BY_KEY["questionable"].p_play
 _V2_RESERVE_MIN_GAMES_OUT = injury_status.RESERVE_MIN_GAMES_OUT
 
-# A Questionable player who DOES play scores less than his usage baseline says:
-# walk-forward on nflverse point-in-time injury reports (2021-26, constants fitted
-# on earlier seasons only, docs/projections-v3-signals.md) the actual/estimate
-# ratio of Questionable players who played was 0.86-0.89 in every fold, and
-# applying it cut MAE by >= 0.01 on both pools in 3 of 5 seasons. This is a
-# conditional-on-playing factor and is separate from ``p_play`` above (the
-# chance he plays at all); expected points are p_play x this x the baseline.
-# Doubtful players who played came out at ~1.0 and the practice-limited tag
-# is not in Sleeper's feed, so neither gets a factor.
-_V2_QUESTIONABLE_PLAYS_FACTOR = 0.87
+# A Questionable player who DOES play scores less than his usage baseline says.
+# v3.3: refit on the 2021-26 nflverse point-in-time replay
+# (docs/audits/2026-11-projections-backtest.md, 1,250 Questionable player-weeks that
+# played): actual / unadjusted baseline was 0.94 pooled (0.88, 0.95, 0.95, 0.98, 0.97 in
+# 2022-26; 0.90 for baselines >= 12 points), so the earlier 0.87 was low for the recent
+# seasons. This is a conditional-on-playing factor and is separate from ``p_play`` (the
+# chance he plays at all: 0.70 measured, see ``injury_status``); expected points are
+# p_play x this x the baseline (0.70 x 0.95 = 0.67 vs 0.68 measured). Doubtful players who played came out at ~1.0 and the practice-limited
+# tag is not in Sleeper's feed, so neither gets a factor.
+_V2_QUESTIONABLE_PLAYS_FACTOR = 0.95
+
+# --- v3.3 participation prior (docs/audits/2026-11-projections-backtest.md) ---
+# A player who missed some of his team's last games and carries NO injury designation
+# (healthy scratch, role loss, slow return, unreported injury) is far less likely to
+# play, and his baseline still reflects the games he did play. Measured on 2021-26
+# (21,000 healthy-designated player-weeks with an estimate >= 1): the share of the
+# team's last 4 games he missed -> actual / estimate, normalised to a regular's 1.0
+# (never above it, so regulars are untouched). Stable by season (a player who missed
+# all 4 plays 35-56% of the time every year).
+PARTICIPATION_WINDOW_GAMES = 4
+PARTICIPATION_MIN_WINDOW_GAMES = 2
+# (max share of the window missed, multiplier on the baseline), compared with <=.
+_PARTICIPATION_FACTORS = ((0.0, 1.0), (0.34, 0.89), (0.67, 0.758), (0.99, 0.669), (1.0, 0.331))
+# A multiplier below this also drops the low end of the range to 0 (he may not play).
+_PARTICIPATION_ZERO_LOW_BELOW = 0.85
+
+# --- v3.3 durability for FUTURE games ----------------------------------------------
+# The projection of a game several weeks away (the rest-of-season view in
+# ``GET /v1/players/{id}/schedule``) used to assume the player is available. Measured
+# 2021-26 on healthy-designated players with an estimate >= 4: the share who play the
+# game k team games ahead, relative to the next game (k=0), by position. Rest-of-season
+# totals built from the old numbers over-projected by 12-22% (bias 22% of actual at
+# week 1, 15% at week 5). Knots are (games ahead, relative P(play)); linear between,
+# flat beyond the last. Applied only to games AFTER the next one: the next game keeps
+# its MAE-validated behaviour (availability handles its designation).
+_DURABILITY_KNOTS: Dict[str, tuple] = {
+    "QB": ((0.0, 1.0), (1.5, 0.903), (3.9, 0.822), (7.4, 0.777), (12.4, 0.716)),
+    "RB": ((0.0, 1.0), (1.5, 0.928), (3.9, 0.877), (7.4, 0.851), (12.5, 0.802)),
+    "WR": ((0.0, 1.0), (1.5, 0.933), (3.9, 0.874), (7.4, 0.845), (12.5, 0.811)),
+    "TE": ((0.0, 1.0), (1.5, 0.922), (3.9, 0.875), (7.4, 0.839), (12.5, 0.821)),
+}
 
 
 def _interp(x: float, xs: tuple, ys: tuple) -> float:
@@ -1350,6 +1381,92 @@ def _questionable_plays_adjustment(player: Dict[str, Any], games_ahead: int) -> 
     }
 
 
+_GAME_DURATION_SECONDS = 4 * 3600
+
+
+def _stats_cover_game(game_row: Dict[str, Any], stats_built_at: Optional[float]) -> bool:
+    """True unless the stats aggregate was built before this game could have finished."""
+
+    if stats_built_at is None:
+        return True
+    kickoff = game_row.get("kickoff_at")
+    if not kickoff:
+        return True
+    try:
+        from datetime import datetime
+
+        started = datetime.fromisoformat(str(kickoff).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return True
+    return float(stats_built_at) >= started + _GAME_DURATION_SECONDS
+
+
+def _participation_adjustment(
+    player: Dict[str, Any],
+    position: str,
+    schedule: List[Dict[str, Any]],
+    weekly_rows: List[Dict[str, Any]],
+    week: int,
+    games_ahead: int,
+    stats_through_week: Optional[int],
+    stats_built_at: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Participation prior for the NEXT game: how many of his team's last completed games (up to
+    ``PARTICIPATION_WINDOW_GAMES``) did he not appear in?
+
+    Only counts a missed game when the weekly stats for that week are known to be loaded
+    (``stats_through_week``) and, when the cache build time is known, only for games that had finished
+    (kickoff + 4 h) before that build; with no such guarantee nothing is applied, so a stale stats cache can
+    never read as "everyone missed last week". Players carrying an injury designation keep the availability layer
+    (no double counting); K is not adjusted."""
+
+    none = {"multiplier": 1.0, "applied": False, "missed": None, "window": None}
+    if games_ahead != 0 or stats_through_week is None or position not in ("QB", "RB", "WR", "TE"):
+        return none
+    cls = injury_status.classify(str(player.get("status") or ""), str(player.get("injury_status") or ""))
+    if cls.ruled_out or cls.p_play < 1.0:
+        return none
+    completed = sorted(
+        (
+            int(row["week"])
+            for row in schedule
+            if not row.get("bye")
+            and row.get("played")
+            and int(row["week"]) < int(week)
+            and int(row["week"]) <= int(stats_through_week)
+            and _stats_cover_game(row, stats_built_at)
+        ),
+        reverse=True,
+    )[:PARTICIPATION_WINDOW_GAMES]
+    if len(completed) < PARTICIPATION_MIN_WINDOW_GAMES:
+        return none
+    played = {
+        int(row["week"])
+        for row in weekly_rows or []
+        if isinstance(row, dict) and row.get("week") is not None and sleeper.week_row_fantasy_points_ppr(row) is not None
+    }
+    missed = sum(1 for w in completed if w not in played)
+    share = missed / len(completed)
+    multiplier = next((m for cap, m in _PARTICIPATION_FACTORS if share <= cap + 1e-9), _PARTICIPATION_FACTORS[-1][1])
+    return {
+        "multiplier": multiplier,
+        "applied": multiplier < 1.0,
+        "missed": missed,
+        "window": len(completed),
+    }
+
+
+def _durability_multiplier(position: str, games_ahead: int) -> float:
+    """Relative chance a healthy player is available ``games_ahead`` team games from now (1.0 for the
+    next game), by position; see ``_DURABILITY_KNOTS``."""
+
+    knots = _DURABILITY_KNOTS.get(position)
+    if not knots or games_ahead <= 0:
+        return 1.0
+    xs, ys = zip(*knots)
+    return _interp(float(games_ahead), xs, ys)
+
+
 # ---------------------------------------------------------------------------
 # Public projection entry point
 # ---------------------------------------------------------------------------
@@ -1423,8 +1540,15 @@ def project_player_week(
     team_qb_pass_attempts_by_team: Optional[Dict[str, Dict[int, Dict[str, float]]]] = None,
     scoring_settings: Optional[Dict[str, Any]] = None,
     prior_weekly_rows: Optional[List[Dict[str, Any]]] = None,
+    stats_through_week: Optional[int] = None,
+    stats_built_at: Optional[float] = None,
 ) -> Dict[str, Any]:
     """A first-pass real weekly point projection for one player, one week.
+
+    ``stats_through_week`` is the highest week whose weekly stats are known to be fully loaded (see
+    ``sleeper.complete_stats_through_week``). It is what lets the participation prior treat "no played row"
+    as a real missed game; ``None`` (unknown) switches that prior off. Defaults to the on-disk completeness
+    manifest of that season's stats cache.
 
     ``prior_weekly_rows`` (last season's rows for this player) seed the
     estimator so week 1 has a projection and weeks 2-4 improve
@@ -1570,6 +1694,12 @@ def project_player_week(
         weekly_rows = sleeper.cached_season_player_weekly(player_id, season)
         if prior_weekly_rows is None:
             prior_weekly_rows = prior_season_weekly_map(season).get(player_id)
+    if stats_through_week is None:
+        # Callers that inject the cached rows (the mobile API) read them from the same season cache this manifest
+        # describes; a season with no manifest (tests, unverifiable legacy cache) resolves to None = prior off.
+        stats_through_week = sleeper.complete_stats_through_week(season)
+        if stats_through_week is not None and stats_built_at is None:
+            stats_built_at = sleeper.stats_built_at(season)
     current_season_games = sum(
         1 for row in weekly_rows or [] if isinstance(row, dict) and sleeper.week_row_fantasy_points_ppr(row) is not None
     )
@@ -1688,7 +1818,19 @@ def project_player_week(
         if scored_estimate > 0:
             handcuff_lift = handcuff["estimate"] / scored_estimate
         scored_estimate = handcuff["estimate"]
-    point_estimate = scored_estimate * availability["multiplier"] * role["multiplier"] * plays["multiplier"]
+    games_ahead_now = _games_ahead(schedule, week)
+    participation = _participation_adjustment(
+        player, position, schedule, weekly_rows, week, games_ahead_now, stats_through_week, stats_built_at
+    )
+    durability = _durability_multiplier(position, games_ahead_now)
+    point_estimate = (
+        scored_estimate
+        * availability["multiplier"]
+        * role["multiplier"]
+        * plays["multiplier"]
+        * participation["multiplier"]
+        * durability
+    )
     confidence = _v2_confidence(trend["games_played"])
     if prior_seeded and current_season_games < 2 and confidence == "high":
         # Mostly last season's games: usable, but not the same trust as a
@@ -1709,6 +1851,15 @@ def project_player_week(
         # prior, so the label drops to "low".
         low = 0.0
         confidence = "low"
+    if participation["applied"]:
+        # He may not appear at all, and his own range was built from games he did play.
+        if participation["multiplier"] < _PARTICIPATION_ZERO_LOW_BELOW:
+            low = 0.0
+            confidence = "low"
+        high = max(high, point_estimate)
+    if durability < 1.0:
+        # A future game: the point estimate is an expectation over availability; keep it inside the band.
+        low = min(low, point_estimate)
 
     defense_entry = (defense_strength.get(str(opponent)) or {}).get(position)
 
@@ -1748,6 +1899,8 @@ def project_player_week(
             "availability": availability,
             "role": role,
             "questionable_plays": plays,
+            "participation": participation,
+            "future_game_durability": round(durability, 3),
             "opponent_multiplier_applied": False,
             "team_qb_quality_multiplier_applied": False,
             "opponent_multiplier": round(multiplier, 3),
