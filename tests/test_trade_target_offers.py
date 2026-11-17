@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 from freezegun import freeze_time
 
-from modules import nfl_schedule, trade_ideas, trade_target_offers as tto, trade_value_bands
+from modules import nfl_schedule, trade_grade, trade_ideas, trade_target_offers as tto, trade_value_bands
 from modules.trade_hub_engine import apply_strategy_age_curve, strategy_adjusted_pick_score_multiplier
 from scripts.profile_trade_hub import FixtureSpec, build_fixture
 
@@ -40,6 +40,9 @@ def _pinned_world():
     nfl_schedule.clear_load_games_cache()
     with freeze_time(FIXTURE_NOW), pytest.MonkeyPatch.context() as mp:
         mp.setattr(nfl_schedule, "load_games", lambda *a, **k: pd.DataFrame())
+        # These tests pin the star-package generator's premium pricing mechanism, so they run it at the
+        # full consolidation premium. The shipped user-side share is 0 (modules.trade_grade).
+        mp.setattr(trade_grade, "USER_CONSOLIDATION_SHARE", 1.0)
         yield
     trade_ideas.clear_team_shape_memos()
     nfl_schedule.clear_load_games_cache()
@@ -104,7 +107,7 @@ def _assert_fair(league, target, offers):
         assert all(a["id"] in mine for a in offer["send"] if a["kind"] == "player")
         # Fair to the caller (the Analyzer says so) ...
         assert offer["verdict"] in {"FAIR", "ACCEPT"}
-        assert offer["value_delta"] >= -_cuts(offer).edge
+        assert offer["value_delta"] > _cuts(offer).counter  # inside the Analyzer's FAIR band, never a COUNTER
         # ... and not a skim of the other manager.
         assert offer["value_delta"] <= _cuts(offer).accept
         assert offer["acceptance"]["label"] in {tto.ACCEPT_LIKELY, tto.ACCEPT_POSSIBLE, tto.ACCEPT_LONG_SHOT}
@@ -170,10 +173,16 @@ def test_picks_in_packages_are_the_users_own_and_priced_like_the_draft_picks_scr
 
 
 def test_untouchables_are_never_sent(league):
-    first = _offers(league, "F05-19")
-    sent = {a["label"] for o in first["offers"] for a in o["send"] if a["kind"] == "player"}
+    # First target that has a package at all (pick values are calibrated to realized rookies, so which
+    # fixture targets get a fair package depends on them).
+    target, first, sent = next(
+        (t, r, {a["label"] for o in r["offers"] for a in o["send"] if a["kind"] == "player"})
+        for t in ("F02-00", "F02-06", "F05-09", "F03-05")
+        for r in [_offers(league, t)]
+        if r["offers"]
+    )
     assert sent
-    again = _offers(league, "F05-19", untouchables=sorted(sent))
+    again = _offers(league, target, untouchables=sorted(sent))
     for offer in again["offers"]:
         assert not ({a["label"] for a in offer["send"]} & sent)
 

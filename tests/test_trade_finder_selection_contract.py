@@ -163,14 +163,14 @@ def test_nothing_includes_both_players_so_alternatives_are_labelled_not_results(
     # The elite QB plus a late WR: no partner takes both, but one without the WR
     # works. (A TE + QB pair is not used: the weakest teams, who need every
     # room under the one need model, can absorb it.)
-    players = ["F01-00", "F01-24"]
+    players = ["F01-00", "F01-10"]
     trace = trade_ideas.FinderSearchTrace()
     ideas = _search(fixture, players=players, trace=trace)
     assert ideas == []
     assert trace.partial, "a workable package without one of them should be offered, labelled"
     for alt in trace.partial:
         missing = alt["finder_missing_selected"]
-        assert missing and set(missing) <= {"F01-00", "F01-24"}
+        assert missing and set(missing) <= {"F01-00", "F01-10"}
         assert trade_ideas.finder_closest_note(alt)["label"] == "Without " + " and ".join(missing)
     payload = trade_ideas.finder_search_payload(trace, found=0, closest=trace.partial)
     assert payload["status"] == "selected_assets_blocked"

@@ -65,7 +65,8 @@ def test_team_fit_ignores_filler_in_headcount():
     assert not any("WR depth" in n for n in res_old["negatives"])
 
 
-def test_consolidation_applies_to_even_counts_with_clear_headliner_gap():
+def test_consolidation_applies_to_even_counts_with_clear_headliner_gap(monkeypatch):
+    monkeypatch.setattr(trade_grade, "USER_CONSOLIDATION_SHARE", 1.0)
     star = {"score": 9000}
     credit, _ = trade_grade.user_consolidation_adjustment(
         [{"score": 4500}, {"score": 4000}], [star, {"score": 3000}]

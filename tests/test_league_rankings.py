@@ -28,8 +28,8 @@ def test_safe_pick_value_computes_from_base_score_and_multipliers():
 
 
 def test_safe_pick_value_falls_back_to_round_defaults():
-    assert league_rankings.safe_pick_value({"round": 1}) == 6500
-    assert league_rankings.safe_pick_value({"round": 2}) == 3200
+    assert league_rankings.safe_pick_value({"round": 1}) == 2900
+    assert league_rankings.safe_pick_value({"round": 2}) == 1850
     # round 5: max(150, 650 - (5-4)*150) = 500
     assert league_rankings.safe_pick_value({"round": 5}) == 500
 

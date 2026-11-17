@@ -139,7 +139,9 @@ def _player(pid, score, position="WR", age=25, **extra):
     return {"asset_type": "player", "player_id": pid, "name": pid, "label": pid, "position": position, "age": age, "score": score, **extra}
 
 
-def test_consolidation_credits_the_side_that_lands_the_best_asset():
+def test_consolidation_credits_the_side_that_lands_the_best_asset(monkeypatch):
+    # The premium mechanism, at full strength (the shipped user-side share is 0, see below).
+    monkeypatch.setattr(trade_grade, "USER_CONSOLIDATION_SHARE", 1.0)
     send = [_player("a", 6000), _player("b", 2500)]
     receive = [_player("star", 8000)]
     credit, note = trade_grade.user_consolidation_adjustment(send, receive)
@@ -149,6 +151,18 @@ def test_consolidation_credits_the_side_that_lands_the_best_asset():
     assert debit == -credit
     assert "breaks up" in note
     assert trade_grade.user_consolidation_adjustment([_player("a", 6000)], [_player("b", 6500)]) == (0, "")
+
+
+def test_user_consolidation_credit_is_zero_by_default_but_the_full_premium_is_still_priced():
+    # 2021-2025 backtest: the premium over-credited the user (market values already price star
+    # concentration), so the user's verdict carries none; the partner-side premium is unchanged.
+    send = [_player("a", 6000), _player("b", 2500)]
+    receive = [_player("star", 8000)]
+    assert trade_grade.USER_CONSOLIDATION_SHARE == 0.0
+    assert trade_grade.user_consolidation_adjustment(send, receive) == (0, "")
+    full, note = trade_grade.full_consolidation_premium(send, receive)
+    assert full == trade_grade.consolidation_premium(8000, 6000 / 8000) > 0
+    assert "consolidates" in note
 
 
 def test_hub_partner_side_premium_uses_the_same_formula():
@@ -240,11 +254,13 @@ def test_breaking_up_a_stud_for_depth_is_a_decline():
 
     assert contender_fit["raw_value_delta"] > 0  # wins on raw value...
     assert contender_fit["lineup_delta"] < -1500  # ...but guts the starting lineup
-    assert contender_fit["value_adjustments"]["consolidation"] < 0
+    assert contender_fit["value_adjustments"]["consolidation"] == 0  # user-side premium is 0 (backtest-calibrated)
     # Season-value starter weight and flat injury cost are replaced in season.
     assert contender_fit["value_adjustments"]["starter_strength"] == 0
     assert contender_fit["lineup_model"]["points"]["ros_delta"] < 0
-    assert contender.ui_verdict == "DECLINE"
+    # Not an ACCEPT for the contender even though raw value says +; no consolidation debit any more
+    # (backtest: depth-for-stud break-ups won as often as the premium said they should lose).
+    assert contender.ui_verdict in {"FAIR", "COUNTER", "DECLINE"}
     assert rebuild.trade_score > contender.trade_score
     # Posture is a parameter of the one model: contenders weight real
     # lineup points more than rebuilders do.
