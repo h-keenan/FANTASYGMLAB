@@ -19,18 +19,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from modules import sleeper  # noqa: E402
+from modules import sleeper, stats_self_heal  # noqa: E402
 
 
 def main(argv: list[str]) -> int:
     seasons = [int(a) for a in argv] or [sleeper.default_player_stats_season()]
     bad = 0
     for season in seasons:
-        before = sleeper.season_stats_completeness(season)
-        sleeper.get_season_player_stats(season, refresh=True, retain_weekly=True)
-        after = sleeper.season_stats_completeness(season)
-        print(f"{season}: {before['status']} (missing {before['missing_weeks']}) -> {after['status']} (missing {after['missing_weeks']})")
-        bad += after["status"] == "incomplete"
+        out = stats_self_heal.backfill_season(season)
+        print(f"{season}: {out['before']} (missing {out['before_missing']}) -> {out['after']} (missing {out['after_missing']})")
+        bad += out["after"] == "incomplete"
     return 1 if bad else 0
 
 

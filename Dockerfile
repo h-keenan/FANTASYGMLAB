@@ -95,6 +95,11 @@ COPY . .
 # output; that keeps this Dockerfile identical for all three services.
 RUN python scripts/prepare_public_player_cache.py
 
+# Mount point for the weekly-stats cache volume (docker-compose.yml: stats_cache). Created and
+# chowned here so a brand-new empty named volume inherits appuser ownership on first start.
+ENV DYNASTYGM_STATS_CACHE_DIR=/app/cache/stats
+RUN mkdir -p /app/cache/stats
+
 RUN chown -R appuser:appuser /app
 USER appuser
 
