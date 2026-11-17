@@ -5,6 +5,7 @@
 //   clipped    an element's box crosses the right/left edge of its card or clipping container
 //   ellipsis   text-overflow: ellipsis / line-clamp that is actually cutting text (player / team names, stat lines never truncate)
 //   text-clip  text wider than its overflow:hidden box without an ellipsis (a silently cut badge or label)
+//   placeholder-clip  a visible text input whose placeholder does not fit its box (a search field squeezed to "Sear")
 //   word-break a word split across lines (a name crushed into a sliver of a column)
 //   hit-target an interactive control under 44px in either axis (inline prose links and [data-guard-ok] excepted)
 export const GUARD = (opts) => {
@@ -77,6 +78,18 @@ export const GUARD = (opts) => {
           if (!(pr.right > c.right + 1 || pr.left < c.left - 1) || p === card) push("clipped", el, `box ${Math.round(r.left)}..${Math.round(r.right)} vs ${label(card)} ${Math.round(c.left)}..${Math.round(c.right)}`);
         }
       }
+    }
+    // A text input squeezed so narrow its placeholder is cut ("Sear"): measure the placeholder at the input's own font.
+    if (el.matches("input[type=text],input[type=search],input:not([type])") && el.placeholder) {
+      const ics = cs(el);
+      const probe = document.createElement("span");
+      probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${ics.font};letter-spacing:${ics.letterSpacing}`;
+      probe.textContent = el.placeholder;
+      document.body.appendChild(probe);
+      const need = probe.getBoundingClientRect().width;
+      probe.remove();
+      const room = el.clientWidth - parseFloat(ics.paddingLeft) - parseFloat(ics.paddingRight);
+      if (need > room + 1) push("placeholder-clip", el, `placeholder "${el.placeholder}" needs ${Math.round(need)}px, field has ${Math.round(room)}px`);
     }
     // Text cut: ellipsis in action, or silently clipped in an overflow box.
     const s = cs(el);
