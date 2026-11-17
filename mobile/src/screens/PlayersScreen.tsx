@@ -2,6 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { ReSettle } from '../components/Motion';
 import PressableScale from '../components/PressableScale';
+import CompactModule from '../components/CompactModule';
+import PickGroupList from '../components/PickGroupList';
+import DraftPickAssetRow from '../components/DraftPickAssetRow';
+import { pickProvenance } from '../lib/pickGroups';
 import AppText from '../components/AppText';
 import GlassCard from '../components/GlassCard';
 import PageFamilyTabs from '../components/PageFamilyTabs';
@@ -30,6 +34,28 @@ import UsageTrendPill from '../components/UsageTrendPill';
 import ValuesCredit from '../components/ValuesCredit';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { mergeSearchMatches, useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
+import {
+  OVERALL_RATING_SORT_KEY,
+  PLAYERS_AGE_FILTERS,
+  PLAYERS_AVAILABILITY_FILTERS,
+  PLAYERS_POSITION_FILTERS,
+  PLAYERS_ROSTER_FILTERS,
+  PLAYERS_STATUS_FILTERS,
+  VALUE_SORT_KEY,
+  buildPlayersSortOptions,
+  filterPlayers,
+  findPlayersStat,
+  formatPlayersPercentile,
+  formatPlayersStatValue,
+  sortPlayers,
+  type PlayersAgeFilter,
+  type PlayersAvailabilityFilter,
+  type PlayersRosterFilter,
+  type PlayersSortMode,
+  type PlayersSortOption,
+  type PlayersStatusFilter,
+} from '../lib/playersPresentation';
+import { picksSummaryParts } from '../lib/playersModules';
 import { api, type DraftPickAsset, type LeagueIdpValuesResponse, type RankedPlayer, type ValuationLens } from '../lib/api';
 import {
   IDP_CONFIDENCE_LABEL,
@@ -55,34 +81,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Players'>;
 type PlayersTab = 'players' | 'prospects';
 const PLAYERS_VIEWS = ['Players', 'Prospects'] as const;
 
-const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
-const AGE_FILTERS = ['ALL', 'Under 25', '25-28', '29+'] as const;
-const STATUS_FILTERS = ['ALL', 'Active', 'Inactive'] as const;
-const AVAILABILITY_FILTERS = ['ALL', 'Healthy', 'Injured'] as const;
-
-type AgeFilter = (typeof AGE_FILTERS)[number];
-type StatusFilter = (typeof STATUS_FILTERS)[number];
-type AvailabilityFilter = (typeof AVAILABILITY_FILTERS)[number];
-
-function matchesAge(age: number | null, filter: AgeFilter): boolean {
-  if (filter === 'ALL') return true;
-  if (age == null) return false;
-  if (filter === 'Under 25') return age < 25;
-  if (filter === '25-28') return age >= 25 && age <= 28;
-  return age >= 29;
-}
-
-function matchesStatus(status: string | null, filter: StatusFilter): boolean {
-  if (filter === 'ALL') return true;
-  const normalized = (status ?? '').trim().toLowerCase();
-  return filter === 'Active' ? normalized === 'active' : normalized !== 'active' && normalized !== '';
-}
-
-function matchesAvailability(injuryStatus: string | null, filter: AvailabilityFilter): boolean {
-  if (filter === 'ALL') return true;
-  const hasInjury = Boolean((injuryStatus ?? '').trim());
-  return filter === 'Injured' ? hasInjury : !hasInjury;
-}
+const POSITIONS = PLAYERS_POSITION_FILTERS;
 
 /**
  * Compact icon actions for a Players row (tap-depth audit #1/#2) — web's
@@ -156,6 +155,7 @@ function PlayerRankRow({
   onAddToTrade,
   onFindTrades,
   idpConfidence,
+  sortFact,
   open = false,
   onToggle = () => {},
 }: {
@@ -163,6 +163,8 @@ function PlayerRankRow({
   onToggle?: () => void;
   /** Set only for IDP rows: shows the projection basis instead of OVR. */
   idpConfidence?: string;
+  /** The selected stat sort column's value for this row (hidden for Value/OVR), as an expanded-tile fact. */
+  sortFact?: PlayerFact | null;
   player: RankedPlayer;
   isFirst: boolean;
   isLast: boolean;
@@ -233,6 +235,7 @@ function PlayerRankRow({
   if (player.position && player.position_rank) extraFacts.push({ key: 'posrank', label: 'POS RANK', value: `${player.position}${player.position_rank}` });
   if (idpConfidence) extraFacts.push({ key: 'basis', label: 'BASIS', value: IDP_CONFIDENCE_LABEL[idpConfidence] ?? idpConfidence });
   if (player.usage_trend) extraFacts.push({ key: 'usage', label: 'USAGE', value: player.usage_trend.label ?? 'Trending' });
+  if (sortFact) extraFacts.push(sortFact);
   const injuryKind = badgeFromInjury(injury.label);
   return (
     <View style={[isFirst && styles.playerRowFirst, isLast && styles.playerRowLast]}>
@@ -286,9 +289,13 @@ export default function PlayersScreen({ route, navigation }: Props) {
     };
   }, [tab, leagueId, scoutingLens]);
   const [position, setPosition] = useState('ALL');
-  const [ageFilter, setAgeFilter] = useState<AgeFilter>('ALL');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>('ALL');
+  const [ageFilter, setAgeFilter] = useState<PlayersAgeFilter>('ALL');
+  const [statusFilter, setStatusFilter] = useState<PlayersStatusFilter>('ALL');
+  const [availabilityFilter, setAvailabilityFilter] = useState<PlayersAvailabilityFilter>('ALL');
+  const [rosterFilter, setRosterFilter] = useState<PlayersRosterFilter>('ALL');
+  const [sortKey, setSortKey] = useState<string>(VALUE_SORT_KEY);
+  const [sortMode, setSortMode] = useState<PlayersSortMode>('raw');
+  const [picks, setPicks] = useState<DraftPickAsset[]>([]);
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [players, setPlayers] = useState<RankedPlayer[] | null>(null);
@@ -298,6 +305,16 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const [reloadToken, setReloadToken] = useState(0);
   const { viewMode, setViewMode } = usePlayerListViewMode('players');
   const ownership = useRosterOwnership(leagueId);
+  const rosteredPlayerIds = ownership?.rosteredPlayerIds;
+  const rosterOwnershipKnown = Boolean(rosteredPlayerIds && rosteredPlayerIds.size > 0);
+  useEffect(() => {
+    let cancelled = false;
+    api.getLeagueDraftPicks(leagueId).then(
+      (r) => { if (!cancelled) setPicks(r.picks); },
+      () => { if (!cancelled) setPicks([]); },
+    );
+    return () => { cancelled = true; };
+  }, [leagueId]);
   const accordion = usePlayerAccordion();
   const { openId: accordionOpenId, toggle: toggleAccordionRow } = accordion;
   const onNavigateTrades = useCallback(
@@ -357,28 +374,47 @@ export default function PlayersScreen({ route, navigation }: Props) {
   // player (e.g. a rookie backup) is found instead of silently absent.
   const searchMatches = useLeaguePlayerSearch(leagueId, lens, search);
 
-  const filtered = useMemo(() => {
-    const pool = idpSelected ? idpPlayers : players ? mergeSearchMatches(players, searchMatches) : players;
-    if (!pool) return [];
-    const query = search.trim().toLowerCase();
-    return pool
-      .filter((p) => position === 'ALL' || p.position === position)
-      .filter((p) => matchesAge(p.age, ageFilter))
-      .filter((p) => matchesStatus(p.status, statusFilter))
-      .filter((p) => matchesAvailability(p.injury_status, availabilityFilter))
-      .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
-  }, [players, searchMatches, idpPlayers, idpSelected, position, ageFilter, statusFilter, availabilityFilter, search]);
-
-  const lastIndex = filtered.length - 1;
+  const offensePool = useMemo(
+    () => (players ? mergeSearchMatches(players, searchMatches) : null),
+    [players, searchMatches],
+  );
+  const pool = idpSelected ? idpPlayers : offensePool;
+  const filtered = useMemo(
+    () =>
+      pool
+        ? filterPlayers(pool, { search, position, ageFilter, statusFilter, availabilityFilter, rosterFilter, rosteredPlayerIds })
+        : [],
+    [pool, search, position, ageFilter, statusFilter, availabilityFilter, rosterFilter, rosteredPlayerIds],
+  );
+  // Sort options reflect the stats the filtered pool carries; a stale key falls back to Value.
+  const sortOptions = useMemo(() => buildPlayersSortOptions(filtered), [filtered]);
+  const activeSortOption: PlayersSortOption = sortOptions.find((option) => option.key === sortKey) ?? sortOptions[0];
+  const sortedPlayers = useMemo(
+    () => (activeSortOption.key === VALUE_SORT_KEY ? filtered : sortPlayers(filtered, activeSortOption.key, sortMode)),
+    [filtered, activeSortOption.key, sortMode],
+  );
+  const lastIndex = sortedPlayers.length - 1;
   const renderPlayerItem = useCallback(
     ({ item, index }: { item: RankedPlayer; index: number }) => {
       // Trade shortcuts are offense-only until the trade engines value defenders.
       const shortcuts = idpSelected
         ? { canAddToTrade: false, canFindTrades: false }
         : tradeShortcutsFor(item.player_id, ownership);
+      let sortFactLabel: string | undefined;
+      let sortFactValue: string | undefined;
+      if (activeSortOption.key !== VALUE_SORT_KEY && activeSortOption.key !== OVERALL_RATING_SORT_KEY) {
+        const stat = findPlayersStat(item, activeSortOption.key);
+        if (stat) {
+          const pct = sortMode === 'percentile';
+          sortFactLabel = `${stat.label}${pct ? ' pct' : ''}`.toUpperCase();
+          sortFactValue = pct ? (stat.percentile != null ? formatPlayersPercentile(stat.percentile) : '—') : formatPlayersStatValue(stat);
+        }
+      }
       return (
         <PlayerListItem
           item={item}
+          sortFactLabel={sortFactLabel}
+          sortFactValue={sortFactValue}
           index={index}
           isLast={index === lastIndex}
           grid={viewMode === 'grid'}
@@ -394,37 +430,42 @@ export default function PlayersScreen({ route, navigation }: Props) {
         />
       );
     },
-    [idpSelected, ownership, lastIndex, viewMode, accordionOpenId, idpConfidenceById, leagueId, leagueName, toggleAccordionRow, openQuickView, onNavigateTrades],
+    [idpSelected, ownership, activeSortOption.key, sortMode, lastIndex, viewMode, accordionOpenId, idpConfidenceById, leagueId, leagueName, toggleAccordionRow, openQuickView, onNavigateTrades],
   );
 
   // One Filters button instead of four dropdown pills (FilterSheet, same groups as web).
   const filterGroups = useMemo<FilterGroup[]>(
     () => [
       { id: 'position', label: 'Position', anyValue: 'ALL', options: positionOptions.map((pos) => ({ value: pos, label: pos === 'ALL' ? 'Any' : pos })) },
-      { id: 'age', label: 'Age', anyValue: 'ALL', options: AGE_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any age' : option })) },
-      { id: 'status', label: 'Status', anyValue: 'ALL', options: STATUS_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any status' : option })) },
-      { id: 'health', label: 'Health', anyValue: 'ALL', options: AVAILABILITY_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any health' : option })) },
+      { id: 'age', label: 'Age', anyValue: 'ALL', options: PLAYERS_AGE_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any age' : option })) },
+      { id: 'status', label: 'Status', anyValue: 'ALL', options: PLAYERS_STATUS_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any status' : option })) },
+      { id: 'health', label: 'Health', anyValue: 'ALL', options: PLAYERS_AVAILABILITY_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any health' : option })) },
+      { id: 'roster', label: 'Roster', anyValue: 'ALL', hidden: !rosterOwnershipKnown, options: PLAYERS_ROSTER_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any roster status' : option })) },
+      { id: 'sort', label: 'Sort by', anyValue: VALUE_SORT_KEY, options: sortOptions.map((option) => ({ value: option.key, label: option.label })) },
+      { id: 'sortMode', label: 'Stat view', anyValue: 'raw', hidden: !activeSortOption.supportsPercentile, options: [{ value: 'raw', label: 'Raw' }, { value: 'percentile', label: 'Percentile' }] },
       { id: 'layout', label: 'Layout', anyValue: 'list', options: [{ value: 'list', label: 'List' }, { value: 'grid', label: 'Grid' }] },
     ],
-    [positionOptions],
+    [positionOptions, rosterOwnershipKnown, sortOptions, activeSortOption.supportsPercentile],
   );
   const filterValues = useMemo(
-    () => valuesFromSingles(filterGroups, { position, age: ageFilter, status: statusFilter, health: availabilityFilter, layout: viewMode }),
-    [filterGroups, position, ageFilter, statusFilter, availabilityFilter, viewMode],
+    () => valuesFromSingles(filterGroups, { position, age: ageFilter, status: statusFilter, health: availabilityFilter, roster: rosterFilter, sort: activeSortOption.key, sortMode, layout: viewMode }),
+    [filterGroups, position, ageFilter, statusFilter, availabilityFilter, rosterFilter, activeSortOption.key, sortMode, viewMode],
   );
   // How many players a draft selection would show, so Apply can say "Show 24 results".
   const filterResultCount = (draft: FilterValues): number | null => {
     const draftPosition = singleValue(filterGroups[0], draft);
     const draftIdp = idpPlayers.length > 0 && isIdpPositionFilter(draftPosition);
-    const pool = draftIdp ? idpPlayers : players ? mergeSearchMatches(players, searchMatches) : players;
-    if (!pool) return null;
-    const query = search.trim().toLowerCase();
-    return pool
-      .filter((p) => draftPosition === 'ALL' || p.position === draftPosition)
-      .filter((p) => matchesAge(p.age, singleValue(filterGroups[1], draft) as AgeFilter))
-      .filter((p) => matchesStatus(p.status, singleValue(filterGroups[2], draft) as StatusFilter))
-      .filter((p) => matchesAvailability(p.injury_status, singleValue(filterGroups[3], draft) as AvailabilityFilter))
-      .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query)).length;
+    const draftPool = draftIdp ? idpPlayers : offensePool;
+    if (!draftPool) return null;
+    return filterPlayers(draftPool, {
+      search,
+      position: draftPosition,
+      ageFilter: singleValue(filterGroups[1], draft) as PlayersAgeFilter,
+      statusFilter: singleValue(filterGroups[2], draft) as PlayersStatusFilter,
+      availabilityFilter: singleValue(filterGroups[3], draft) as PlayersAvailabilityFilter,
+      rosterFilter: singleValue(filterGroups[4], draft) as PlayersRosterFilter,
+      rosteredPlayerIds,
+    }).length;
   };
 
   const viewSelect = (
@@ -457,10 +498,13 @@ export default function PlayersScreen({ route, navigation }: Props) {
             resultCount={filterResultCount}
             onApply={(next) => {
               setPosition(singleValue(filterGroups[0], next));
-              setAgeFilter(singleValue(filterGroups[1], next) as AgeFilter);
-              setStatusFilter(singleValue(filterGroups[2], next) as StatusFilter);
-              setAvailabilityFilter(singleValue(filterGroups[3], next) as AvailabilityFilter);
-              setViewMode(singleValue(filterGroups[4], next) as 'list' | 'grid');
+              setAgeFilter(singleValue(filterGroups[1], next) as PlayersAgeFilter);
+              setStatusFilter(singleValue(filterGroups[2], next) as PlayersStatusFilter);
+              setAvailabilityFilter(singleValue(filterGroups[3], next) as PlayersAvailabilityFilter);
+              setRosterFilter(singleValue(filterGroups[4], next) as PlayersRosterFilter);
+              setSortKey(singleValue(filterGroups[5], next));
+              setSortMode(singleValue(filterGroups[6], next) as PlayersSortMode);
+              setViewMode(singleValue(filterGroups[7], next) as 'list' | 'grid');
             }}
           />}
         </PageControlRow>
@@ -470,14 +514,14 @@ export default function PlayersScreen({ route, navigation }: Props) {
       {loading ? (
         <SkeletonList label="players" count={7} />
       ) : (
-        <ReSettle changeKey={filtered.slice(0, 24).map((p) => p.player_id).join(',')}>
+        <ReSettle changeKey={`${activeSortOption.key}:${sortMode}:${sortedPlayers.slice(0, 24).map((p) => p.player_id).join(',')}`}>
         <FlatList
           // Forces a clean remount on toggle — RN's FlatList explicitly does
           // not support changing `numColumns` on the fly (its own invariant
           // warning says to change `key` instead), since the internal row
           // layout math is set up once per mount.
           key={viewMode}
-          data={filtered}
+          data={sortedPlayers}
           keyExtractor={(item) => item.player_id}
           extraData={accordionOpenId}
           numColumns={viewMode === 'grid' ? 2 : 1}
@@ -488,13 +532,41 @@ export default function PlayersScreen({ route, navigation }: Props) {
           windowSize={9}
           renderItem={renderPlayerItem}
           ListFooterComponent={
-            filtered.length > 0 ? (
+            <>
+            {picks.length > 0 ? (
+              <CompactModule
+                id="players.picks"
+                title="Draft picks"
+                testID="players-picks"
+                parts={picksSummaryParts(picks.map((pick) => ({ label: pick.label, season: pick.season ?? null, score: pick.score ?? null })))}
+              >
+                <PickGroupList
+                  picks={picks}
+                  renderPick={(pick, isLast) => (
+                    <DraftPickAssetRow
+                      pickId={pick.pick_id}
+                      round={pick.round}
+                      label={pick.label}
+                      projectedRange={pick.projected_pick_range}
+                      pickTier={pick.pick_tier}
+                      contextLine={pickProvenance(pick, { showOwner: true })}
+                      trailingValue={pick.score != null ? String(Math.round(pick.score)) : '—'}
+                      showChevron
+                      onPress={() => navigation.navigate('PickDetail', { pick, leagueId, leagueName })}
+                      showDivider={!isLast}
+                    />
+                  )}
+                />
+              </CompactModule>
+            ) : null}
+            {sortedPlayers.length > 0 ? (
               <>
                 {idpSelected ? <AppText style={styles.idpNote}>{idpMethodNote(idp)}</AppText> : null}
                 <AppText style={styles.idpNote}>{"Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position; tap any player for the full breakdown."}</AppText>
                 <ValuesCredit />
               </>
-            ) : null
+            ) : null}
+            </>
           }
           ListEmptyComponent={
             <EmptyState
@@ -519,6 +591,8 @@ type PlayerListItemProps = {
   grid: boolean;
   open: boolean;
   idpConfidence?: string;
+  sortFactLabel?: string;
+  sortFactValue?: string;
   canAddToTrade: boolean;
   canFindTrades: boolean;
   leagueId: string;
@@ -535,12 +609,13 @@ type PlayerListItemProps = {
  * passes stable callbacks plus the row's own primitives.
  */
 const PlayerListItem = React.memo(function PlayerListItem({
-  item, index, isLast, grid, open, idpConfidence, canAddToTrade, canFindTrades, leagueId, leagueName,
+  item, index, isLast, grid, open, idpConfidence, sortFactLabel, sortFactValue, canAddToTrade, canFindTrades, leagueId, leagueName,
   onToggleRow, onOpenPlayer, onNavigateTrades,
 }: PlayerListItemProps) {
   return (
     <PlayerRankRow
       idpConfidence={idpConfidence}
+      sortFact={sortFactLabel && sortFactValue ? { key: 'sorted-stat', label: sortFactLabel, value: sortFactValue } : null}
       player={item}
       isFirst={index === 0}
       isLast={isLast}
