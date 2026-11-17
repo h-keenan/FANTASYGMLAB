@@ -21,6 +21,7 @@ const guardViolations = [];
 // AXE=1 runs axe-core (WCAG 2.x A/AA) on each route and fails on serious / critical issues (docs/audits/2026-11-accessibility.md).
 // AXE_CORE=path/to/axe.min.js (CI installs axe-core next to playwright-core); AXE_ROUTES overrides the default key-route list.
 const AXE_ON = process.env.AXE === "1";
+const AXE_ONLY = AXE_ON && process.env.AXE_ONLY === "1";
 const AXE_ROUTES = (process.env.AXE_ROUTES || "today,team,trades,matchup,waivers,gm-plan").split(",");
 const axeViolations = [];
 const axeSource = AXE_ON ? fs.readFileSync(process.env.AXE_CORE || "node_modules/axe-core/axe.min.js", "utf8") : "";
@@ -494,7 +495,7 @@ for (const r of results) {
   if (r.width >= 1024 && r.page === "matchup" && r.mainWidth < 1000) problems.push(`matchup column only ${r.mainWidth}px wide at desktop`);
   if (r.recRowMaxH > 96 && r.width >= 390 && !LARGE) problems.push(`recommended-add row ${r.recRowMaxH}px tall (compact rows are <= 96)`);
   if (r.modules === 0 && !r.noModules) problems.push("no compact modules rendered (fixtures not applied?)");
-  if (problems.length) bad += 1;
+  if (problems.length && !AXE_ONLY) bad += 1; // AXE_ONLY: layout budgets are the route-overflow step's job (CI fonts differ from local), this run fails on axe alone
   console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}: modules=${r.modules} heroes=${r.heroes} headers=${r.headerBars} main=${r.mainWidth} recRows=${r.recRows}/${r.recRowMaxH} tablists=${r.tablists} height=${r.height}${problems.length ? "  " + problems.join("; ") : ""}`);
 }
 if (GUARD_ON) {

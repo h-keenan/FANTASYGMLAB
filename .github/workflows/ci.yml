@@ -226,6 +226,7 @@ jobs:
           OUT: ${{ runner.temp }}/axe
           WIDTHS: "390"
           AXE: "1"
+          AXE_ONLY: "1"
           ONLY: today,team,trades,matchup,waivers,gm-plan
         run: node scripts/sim_layout_playwright/module_scan.mjs
       - name: Server log on failure
