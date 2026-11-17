@@ -144,7 +144,7 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
           <SwipeDismissCard style={styles.listSheet} onDismiss={() => setViewAllOpen(false)}>
             <View style={styles.listSheetHeaderRow}>
               <AppText style={styles.sheetTitle}>All Awards</AppText>
-              <PressableScale onPress={() => setViewAllOpen(false)} hitSlop={8}>
+              <PressableScale onPress={() => setViewAllOpen(false)} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close all awards">
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
               </PressableScale>
             </View>

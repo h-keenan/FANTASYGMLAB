@@ -235,7 +235,7 @@ function RationaleDetailModal({
             <AppText style={styles.rationaleSheetTitle} numberOfLines={1}>
               Why this works
             </AppText>
-            <PressableScale onPress={onClose} hitSlop={8}>
+            <PressableScale onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={20} color={colors.textSecondary} />
             </PressableScale>
           </View>

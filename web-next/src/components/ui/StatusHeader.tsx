@@ -199,7 +199,7 @@ export function StatusHeader({
     <>
       {model.ring ? <StatusRingMark ring={model.ring} /> : null}
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="flex items-center gap-2">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }}>
             {model.kicker}
           </span>

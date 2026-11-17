@@ -69,7 +69,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
         </button>
       </div>
       <div className="shell-header-ribbon" role="group" aria-label="This game at a glance">
-        <div className="shell-header-ribbon-inner">
+        <div className="shell-header-ribbon-inner" tabIndex={0}>
           <h2 className="shell-header-chip" style={{ color: "var(--color-accent)" }} data-testid="game-heading-phone">{simCompactWeek(game)}</h2>
           {season ? (
             <span className="shell-header-chip" style={{ color: "var(--color-text-secondary)" }} data-testid="dynasty-progress-phone" title="Season">{season}</span>

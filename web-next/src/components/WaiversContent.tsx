@@ -245,7 +245,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
         <WaiverIdentity player={player} avatarSize={48} />
         <ReasonChips chips={waiverReasonChips(player)} />
         <UsageFlagChip player={player} />
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <ValueWithRing player={player} big />
           <FaabRange player={player} prominent />
         </div>

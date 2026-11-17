@@ -90,6 +90,10 @@ jobs:
         run: node scripts/check_legacy_header.mjs
       - name: Onboarding copy has no em-dashes
         run: node scripts/check_onboarding_copy.mjs
+      - name: App icon-only pressables carry an accessibilityLabel
+        run: node scripts/check_app_a11y_labels.mjs
+      - name: Reduce Motion is honored by every animation
+        run: node scripts/check_motion_usage.mjs
 
   mobile-app:
     needs: [classify]
@@ -194,9 +198,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
           npm init -y >/dev/null
-          npm install --no-audit --no-fund playwright-core@1.65.1
+          npm install --no-audit --no-fund playwright-core@1.65.1 axe-core@4.10.2
           npx playwright-core install --with-deps chromium
           echo "PW_CORE=$RUNNER_TEMP/pw/node_modules/playwright-core/index.mjs" >> "$GITHUB_ENV"
+          echo "AXE_CORE=$RUNNER_TEMP/pw/node_modules/axe-core/axe.min.js" >> "$GITHUB_ENV"
       - name: Start web-next dev server
         working-directory: web-next
         env:
@@ -213,6 +218,16 @@ jobs:
           OUT: ${{ runner.temp }}/route-overflow
           WIDTHS: "390"
           OVERFLOW: "1"
+        run: node scripts/sim_layout_playwright/module_scan.mjs
+      - name: axe-core on key routes (fails on serious / critical WCAG A/AA issues)
+        env:
+          BROWSER: chromium
+          BASE: http://localhost:3231
+          OUT: ${{ runner.temp }}/axe
+          WIDTHS: "390"
+          AXE: "1"
+          AXE_ONLY: "1"
+          ONLY: today,team,trades,matchup,waivers,gm-plan
         run: node scripts/sim_layout_playwright/module_scan.mjs
       - name: Server log on failure
         if: failure()
