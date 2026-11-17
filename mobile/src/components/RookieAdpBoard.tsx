@@ -4,9 +4,9 @@ import { StyleSheet, View } from 'react-native';
 import AdpLine, { AdpCredit } from './AdpLine';
 import AnimatedCard from './AnimatedCard';
 import AppText from './AppText';
-import SectionHeading from './SectionHeading';
+import CompactModule from './CompactModule';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { deltaText } from '../lib/adpPresentation';
+import { deltaText, ROOKIE_BOARD_NO_ADP_NOTE, ROOKIE_BOARD_TITLE, rookieBoardSummaryParts } from '../lib/adpPresentation';
 import type { RookieAdpBoard as RookieAdpBoardData } from '../lib/api';
 import { spacing, type ThemeColors } from '../theme';
 
@@ -19,12 +19,8 @@ export default function RookieAdpBoard({ board }: { board: RookieAdpBoardData | 
   if (!board || board.rows.length === 0) return null;
   const withAdp = board.rows.filter((row) => row.adp != null);
   return (
-    <View>
-      <SectionHeading
-        title="Rookie Board vs ADP"
-        topGap={16}
-        caption={withAdp.length ? 'Our rookie rank next to market ADP.' : 'Rookie ADP is published only during rookie-draft season.'}
-      />
+    <CompactModule id="draft.rookie-adp-board" title={ROOKIE_BOARD_TITLE} persist={false} parts={rookieBoardSummaryParts(board.rows)} testID="rookie-adp-board">
+      {withAdp.length === 0 ? <AppText style={styles.credit}>{ROOKIE_BOARD_NO_ADP_NOTE}</AppText> : null}
       <AnimatedCard style={styles.card}>
         {board.rows.map((row, index) => (
           <View key={row.player_id} style={[styles.row, index < board.rows.length - 1 && styles.divider]}>
@@ -53,7 +49,7 @@ export default function RookieAdpBoard({ board }: { board: RookieAdpBoardData | 
       </AnimatedCard>
       {board.source ? <AdpCredit asOf={board.source.as_of} style={styles.credit} /> : null}
       {board.est_sf_note ? <AppText style={styles.credit}>Est. SF is modeled, not real ADP. {board.est_sf_note}</AppText> : null}
-    </View>
+    </CompactModule>
   );
 }
 

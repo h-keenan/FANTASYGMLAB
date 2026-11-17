@@ -62,6 +62,7 @@ import {
   simOverLimitNote,
 } from '../lib/simGame';
 import { playerSurname } from '../lib/playerNameDisplay';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 type Busy = 'start' | 'pick' | 'auto' | 'season' | null;
 
@@ -154,7 +155,7 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
   if (state === 'error' || !off) {
     return (
       <ErrorState
-        title="Could not load the offseason"
+        title={SIM_LOAD_ERROR.offseason}
         message="Check your connection and try again."
         onRetry={() => {
           setState('loading');

@@ -59,6 +59,7 @@ import {
 } from '../lib/simGame';
 import { positionColor, radii, spacing, type ThemeColors } from '../theme';
 import { playerSurname } from '../lib/playerNameDisplay';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 /** Lineup, bench and this week's matchup. Every change saves at once (PUT /lineup). */
 /** Sim Players opens on the waiver wire (owner request); the last view picked is remembered for the rest of the session. */
@@ -176,7 +177,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   if (state === 'error' || !lineup?.slots) {
     return (
       <ErrorState
-        title="Your lineup did not load"
+        title={SIM_LOAD_ERROR.lineup}
         message="Check your connection and try again."
         onRetry={() => {
           setState('loading');

@@ -44,6 +44,7 @@ import {
 } from '../lib/simGame';
 import { spacing, type ThemeColors } from '../theme';
 import { playerSurname } from '../lib/playerNameDisplay';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 type Panel = 'board' | 'queue' | 'roster' | 'picks';
 
@@ -232,7 +233,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   if (loadState === 'error' || !draft) {
     return (
       <ErrorState
-        title="The draft did not load"
+        title={SIM_LOAD_ERROR.draft}
         message="Check your connection and try again."
         onRetry={() => {
           setLoadState('loading');

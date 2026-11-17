@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import type { SimHistorySeason } from "@/lib/simGame";
 import { simCareerSeasonParts, simCareerSeasonTitle } from "@/lib/simHistory";
 import { simScoreTierTone, simWeekTier } from "@/lib/simScoreTier";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 /**
  * The sim's OWN seasons of a player, newest first, under the real career in the Stats tab: one compact module per season played
@@ -37,7 +38,7 @@ export function SimSimSeasons({ gameId, playerId }: { gameId: string; playerId: 
     };
   }, [gameId, playerId]);
 
-  if (failed) return <p className="pqv-status-text">Could not load this player&apos;s sim seasons.</p>;
+  if (failed) return <p className="pqv-status-text">{SIM_LOAD_ERROR.simSeasons}</p>;
   if (seasons == null) return <SkeletonRows count={2} />;
   return (
     <section className="pqv-stat-season flex flex-col gap-2" data-testid="sim-sim-seasons">

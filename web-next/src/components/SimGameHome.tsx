@@ -47,6 +47,7 @@ import {
   simGameReasonMessage,
 } from "@/lib/simGame";
 import type { SimTab } from "@/lib/simGameFlow";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 /**
  * The game's landing tab: this week's head-to-head, what to do this week,
@@ -117,7 +118,7 @@ export function SimHomeTab({
   }
 
   if (failed && !home) {
-    return <EmptyState title="Could not load your home screen" subtitle={failed} actionLabel="Try again" onAction={() => { setFailed(null); setAttempt((n) => n + 1); }} />;
+    return <EmptyState title={SIM_LOAD_ERROR.home} subtitle={failed} actionLabel="Try again" onAction={() => { setFailed(null); setAttempt((n) => n + 1); }} />;
   }
   if (!home) {
     return (

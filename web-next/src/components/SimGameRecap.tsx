@@ -40,6 +40,7 @@ import {
   type SimGameResult,
   type SimWeekRecap,
 } from "@/lib/simGame";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 /** One week's recap: the score lands first, then your starters, the league and what changed. */
 export function SimWeekRecapView({
@@ -240,7 +241,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   }, [gameId, attempt]);
 
   if (failed) {
-    return <EmptyState title="Could not load your final result" subtitle={failMessage || "Your season is saved. Try again in a moment."} actionLabel="Try again" onAction={() => { setFailed(false); setFailMessage(""); setAttempt((n) => n + 1); }} />;
+    return <EmptyState title={SIM_LOAD_ERROR.finalResult} subtitle={failMessage || "Your season is saved. Try again in a moment."} actionLabel="Try again" onAction={() => { setFailed(false); setFailMessage(""); setAttempt((n) => n + 1); }} />;
   }
   if (!result) return <div className="flex flex-col gap-3" aria-busy="true"><SkeletonCard lines={4} /><SkeletonCard lines={6} /></div>;
 

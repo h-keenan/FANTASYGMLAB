@@ -52,6 +52,7 @@ import Input from '../components/Input';
 import HelpLink from '../components/HelpLink';
 import { supportMailto } from '../lib/support';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
+import { ACCOUNT_SECTION_TITLE } from '../lib/accountSections';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 type IconName = React.ComponentProps<typeof IconCircle>['name'];
@@ -414,7 +415,7 @@ export default function MoreScreen({ navigation }: Props) {
       >
         {isGuest ? null : (
           <>
-            <SectionHeading title="Identity" />
+            <SectionHeading title={ACCOUNT_SECTION_TITLE.identity} />
             <AnimatedCard style={styles.groupCard}>
               <SettingsRow
                 label="Email"
@@ -457,7 +458,19 @@ export default function MoreScreen({ navigation }: Props) {
           </>
         )}
 
-        <SectionHeading title="Preferences" topGap={isGuest ? 0 : 16} />
+        <SectionHeading title={ACCOUNT_SECTION_TITLE.billing} topGap={isGuest ? 0 : 16} />
+        <AnimatedCard style={styles.groupCard}>
+          <SettingsRow
+            icon="card-outline"
+            iconColor={colors.textSecondary}
+            label={planOf(me) === 'free' ? 'Upgrade to Pro' : 'Manage Subscription'}
+            description={trialEndLabel(trialEnd) || undefined}
+            onPress={onManageSubscription}
+            showDivider={false}
+          />
+        </AnimatedCard>
+
+        <SectionHeading title={ACCOUNT_SECTION_TITLE.preferences} topGap={16} />
         <AnimatedCard style={styles.prefsCard}>
         <AppText style={styles.groupCaption}>Density</AppText>
         <View style={styles.optionRow}>
@@ -725,7 +738,7 @@ export default function MoreScreen({ navigation }: Props) {
           </View>
         )}
 
-        <SectionHeading title="Account" topGap={16} />
+        <SectionHeading title={ACCOUNT_SECTION_TITLE.actions} topGap={16} />
         <AnimatedCard style={styles.groupCard}>
           {isGuest ? (
             <SettingsRow
@@ -737,14 +750,6 @@ export default function MoreScreen({ navigation }: Props) {
               showDivider
             />
           ) : null}
-          <SettingsRow
-            icon="card-outline"
-            iconColor={colors.textSecondary}
-            label={planOf(me) === 'free' ? 'Upgrade to Pro' : 'Manage Subscription'}
-            description={trialEndLabel(trialEnd) || undefined}
-            onPress={onManageSubscription}
-            showDivider
-          />
           <SettingsRow
             icon="download-outline"
             iconColor={colors.textSecondary}

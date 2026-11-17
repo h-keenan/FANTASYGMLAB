@@ -414,7 +414,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
         <AppText style={styles.error}>No subscription plans are available right now.</AppText>
       ) : (
         <>
-          <SectionHeading title="Choose Your Plan" icon="card-outline" />
+          <SectionHeading title="Choose your plan" icon="card-outline" />
           <View style={styles.packages}>
             {packages.map((pack) => {
               const monthlyPack = packages.find((p) => p.packageType === PACKAGE_TYPE.MONTHLY);

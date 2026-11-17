@@ -568,7 +568,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
                 />
               }
             />
-            <SectionHeading title="What You Want Back" topGap={12} />
+            <SectionHeading title="What you want back" topGap={12} />
             <SegmentedTabBar<'any' | 'picks' | 'players'>
               options={[
                 { key: 'any', label: 'Any return' },
@@ -625,7 +625,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
             ) : searchError ? (
               <AppText style={styles.error}>{searchError}</AppText>
             ) : null}
-            <SectionHeading title="Your Roster" topGap={12} />
+            <SectionHeading title="Your roster" topGap={12} />
           </View>
         }
         ListFooterComponent={

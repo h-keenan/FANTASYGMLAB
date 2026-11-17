@@ -39,6 +39,7 @@ import { spacing } from '../theme';
 import { PresenceSwap } from './Presence';
 import { RankChip, ReorderRow } from './Motion';
 import { MAX_FLIP_ROWS, staggerDelay } from '../lib/motion';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 type View_ = 'standings' | 'scores' | 'feed' | 'teams' | 'players';
 
@@ -235,7 +236,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
   if (failed) {
     return (
       <ErrorState
-        title="The league did not load"
+        title={SIM_LOAD_ERROR.league}
         message="Check your connection and try again."
         onRetry={() => {
           setFailed(false);

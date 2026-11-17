@@ -40,6 +40,7 @@ import {
 import { buildReviewShareModel, buildSimReviewSections } from '../lib/simReview';
 import { SIM_REVIEW_COLLAPSED_ON_PHONE, SIM_REVIEW_VIEWS, simReviewViewFor, type SimReviewView } from '../lib/simLayout';
 import { spacing, type ThemeColors } from '../theme';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 /** One week's recap: the score lands first, then your starters, the league and what changed. */
 export function SimWeekRecapView({
@@ -251,7 +252,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   if (failed) {
     return (
       <ErrorState
-        title="Your final result did not load"
+        title={SIM_LOAD_ERROR.finalResult}
         message={failMessage || 'Your season is saved. Try again in a moment.'}
         onRetry={() => {
           setFailed(false);

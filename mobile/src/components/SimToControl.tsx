@@ -32,6 +32,7 @@ import {
   type SimToPrefs,
 } from '../lib/simTo';
 import { spacing } from '../theme';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 export interface SimToRequest {
   option: SimToOption;
@@ -90,7 +91,7 @@ export function SimToSheet({ ctx, onClose, onRun }: { ctx: SimCtx; onClose: () =
         <AppText style={common.small}>Play several weeks at once. It stops early when you have something to decide.</AppText>
         {failed ? (
           <ErrorState
-            title="Options did not load"
+            title={SIM_LOAD_ERROR.options}
             message="Check your connection and try again."
             onRetry={() => {
               setFailed(false);

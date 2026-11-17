@@ -27,6 +27,7 @@ import { NotificationControls } from "@/components/NotificationControls";
 import { SavedLeaguesSection } from "@/components/SavedLeaguesSection";
 import { SleeperUsernameRelink } from "@/components/SleeperUsernameRelink";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
+import { ACCOUNT_SECTION_TITLE } from "@/lib/accountSections";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
  * — same ten categories, same copy — so a user who's seen this in the app
@@ -58,7 +59,7 @@ function IdentitySection({ user }: { user: MeResponse["user"] }) {
   const sleeperUsername = linkedUsername ?? user.sleeper_username;
   return (
     <section className="glass-surface p-4 flex flex-col gap-3" aria-labelledby="account-identity-heading">
-      <SectionHeading id="account-identity-heading">Identity</SectionHeading>
+      <SectionHeading id="account-identity-heading">{ACCOUNT_SECTION_TITLE.identity}</SectionHeading>
       <dl className="flex flex-col gap-2 text-sm">
         <div className="flex items-center justify-between gap-3">
           <dt style={{ color: "var(--color-text-secondary)" }}>Email</dt>
@@ -94,7 +95,7 @@ function BillingSection({
 
   return (
     <section className="glass-surface p-4 flex flex-col gap-3" aria-labelledby="account-billing-heading">
-      <SectionHeading id="account-billing-heading">Billing</SectionHeading>
+      <SectionHeading id="account-billing-heading">{ACCOUNT_SECTION_TITLE.billing}</SectionHeading>
       {plan === "pro" ? (
         <>
           {trialEndLabel(trialEndsAt) ? (
@@ -286,7 +287,7 @@ function PreferencesSection({
 
   return (
     <section className="glass-surface p-4 flex flex-col gap-4" aria-labelledby="account-preferences-heading">
-      <SectionHeading id="account-preferences-heading">Preferences</SectionHeading>
+      <SectionHeading id="account-preferences-heading">{ACCOUNT_SECTION_TITLE.preferences}</SectionHeading>
 
       <ExplanationsSetting />
 
@@ -365,7 +366,7 @@ function AccountActionsSection({
 
   return (
     <section className="glass-surface p-4 flex flex-col gap-3" aria-labelledby="account-actions-heading">
-      <SectionHeading id="account-actions-heading">Account actions</SectionHeading>
+      <SectionHeading id="account-actions-heading">{ACCOUNT_SECTION_TITLE.actions}</SectionHeading>
       <ButtonLink href="/features" variant="secondary">
         See everything FantasyDesk can do
       </ButtonLink>
@@ -415,7 +416,7 @@ function DeleteAccountSection() {
       aria-labelledby="account-danger-heading"
     >
       <SectionHeading id="account-danger-heading" color="var(--color-danger)">
-        Delete account
+        {ACCOUNT_SECTION_TITLE.danger}
       </SectionHeading>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         Self-service account deletion is temporarily unavailable. Contact support and we will permanently delete

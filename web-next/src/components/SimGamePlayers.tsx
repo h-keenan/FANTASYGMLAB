@@ -47,6 +47,7 @@ import {
   type SimPlayerStatusFilter,
   type SimPosFilter,
 } from "@/lib/simGame";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 /**
  * Searchable, filterable, sortable table of every player in the game: owner
@@ -182,7 +183,7 @@ export function SimPlayerBrowser({
         <SkeletonRows count={6} />
       ) : state === "error" ? (
         <EmptyState
-          title="Could not load players"
+          title={SIM_LOAD_ERROR.players}
           subtitle="Check your connection and try again."
           actionLabel="Try again"
           onAction={() => setAttempt((n) => n + 1)}
@@ -387,7 +388,7 @@ function SimProfileSection({ player }: { player: SimGamePlayer }) {
 
 function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePlayer; detail: SimPlayerDetailState; seasonLabel?: string | null }) {
   const body = detail.data;
-  if (detail.failed) return <EmptyState title="Could not load the outlook" subtitle="Close the sheet and open him again." />;
+  if (detail.failed) return <EmptyState title={SIM_LOAD_ERROR.outlook} subtitle="Close the sheet and open him again." />;
   if (!body) return <SkeletonRows count={2} />;
   const ros = body.ros ?? null;
   const series = simWeeklySeries(body);

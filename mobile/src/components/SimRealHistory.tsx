@@ -9,6 +9,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api, type CareerSeason, type WeeklyStatPoint } from '../lib/api';
 import { simCareerAsOf, simGameLog } from '../lib/simAsOf';
 import { SkeletonText } from './Skeleton';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 /**
  * The real-NFL record behind a Fantasy Sim player, cut to the last finished real season at the sim's start (lib/simAsOf.ts):
@@ -46,7 +47,7 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
     };
   }, [playerId, asOf]);
 
-  if (failed) return <ErrorState title="Past seasons did not load" message="Check your connection and try again." />;
+  if (failed) return <ErrorState title={SIM_LOAD_ERROR.pastSeasons} message="Check your connection and try again." />;
   if (career == null) return <SkeletonText label="past seasons" lines={3} />;
   const summary = simGameLog(log ?? []);
   if (career.length === 0 && summary.games === 0) return <AppText style={common.small}>No NFL seasons on file before this one.</AppText>;

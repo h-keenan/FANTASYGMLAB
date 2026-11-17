@@ -36,6 +36,7 @@ import {
 import { PresenceSwap } from "@/components/ui/Presence";
 import { RankChip } from "@/components/Motion";
 import { useFlipList } from "@/lib/useFlipList";
+import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 type View = "standings" | "scores" | "feed" | "teams" | "players";
 
@@ -242,7 +243,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
   const names = useMemo(() => simTeamNameMap(league?.teams), [league?.teams]);
 
   if (failed) {
-    return <EmptyState title="Could not load the league" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setFailed(false); setAttempt((n) => n + 1); }} />;
+    return <EmptyState title={SIM_LOAD_ERROR.league} subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setFailed(false); setAttempt((n) => n + 1); }} />;
   }
   if (!league) return <SkeletonCard lines={6} />;
 

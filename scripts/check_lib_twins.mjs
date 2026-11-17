@@ -133,6 +133,8 @@ export const IDENTICAL = [
   "tradeValueBands.generated.ts",
   "verdictText.ts",
   "presence.ts",
+  "accountSections.ts",
+  "simErrorCopy.ts",
 ];
 
 // Same code, differing only in comments / import specifiers / quote style.

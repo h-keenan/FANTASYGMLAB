@@ -18,6 +18,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simSeasonText, type SimPlayerHistoryResponse } from '../lib/simGame';
 import { simDraftSlotText, simHistoryText, simWhenLabel } from '../lib/simHistory';
+import { SIM_LOAD_ERROR } from '../lib/simErrorCopy';
 
 /**
  * A player's History tab in the Fantasy Sim quick view: where he came from (the round and pick he was drafted at),
@@ -51,7 +52,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
   if (failed) {
     return (
       <ErrorState
-        title="History did not load"
+        title={SIM_LOAD_ERROR.playerHistory}
         message="Check your connection and try again."
         onRetry={() => {
           setFailed(false);
