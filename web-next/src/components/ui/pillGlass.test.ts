@@ -11,7 +11,7 @@ describe("footer pill glass", () => {
     const token = /--pill-glass-bg:([^;]+);/.exec(css)?.[1] ?? "";
     const alphas = [...token.matchAll(/(\d+)%, transparent/g)].map((m) => Number(m[1]));
     expect(alphas.length).toBeGreaterThanOrEqual(2);
-    for (const a of alphas) expect(a).toBeGreaterThanOrEqual(85);
+    for (const a of alphas) expect(a).toBeGreaterThanOrEqual(95);
     const blur = /--pill-glass-blur:\s*blur\((\d+)px\)/.exec(css)?.[1];
     expect(Number(blur)).toBeGreaterThanOrEqual(24);
   });
@@ -22,5 +22,15 @@ describe("footer pill glass", () => {
       expect(block, selector).toContain("var(--pill-glass-bg)");
       expect(block, selector).toContain("var(--pill-glass-blur)");
     }
+  });
+  it("the Sheet, its glass variant and both light themes use the one 99%-opaque sheet token", () => {
+    const tokens = [...css.matchAll(/--sheet-glass-bg:([^;]+);/g)].map((m) => m[1]);
+    expect(tokens.length).toBe(3); // dark + the two light selectors
+    for (const t of tokens) for (const m of t.matchAll(/rgba\([^)]*,\s*([\d.]+)\)/g)) expect(Number(m[1])).toBeGreaterThanOrEqual(0.99);
+    const start = css.indexOf(".ui-sheet {");
+    expect(css.slice(start, css.indexOf("}", start))).toContain("var(--sheet-glass-bg)");
+    const globals = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf8");
+    const g = globals.indexOf(".ui-sheet.gm-orb-sheet {");
+    expect(globals.slice(g, globals.indexOf("}", g))).toContain("var(--sheet-glass-bg)");
   });
 });
