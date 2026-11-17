@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 MOBILE_APP_PATH_RULES = (re.compile(r"^mobile/"),)
-WEB_NEXT_PATH_RULES = (re.compile(r"^web-next/"),)
+WEB_NEXT_PATH_RULES = (re.compile(r"^web-next/"), re.compile(r"^scripts/sim_layout_playwright/"))
 
 
 def is_mobile_app_path(path: str) -> bool:
