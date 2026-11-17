@@ -778,8 +778,10 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .ui-sheet.gm-orb-sheet {
-  /* Sheet glass variant: the glass tint instead of the near-opaque sheet gradient, so the texture shows through. */
-  background: rgba(31, 34, 38, 0.9);
+  /* Sheet glass variant: same opacity and blur as the shared .ui-sheet (PQV), so page content never bleeds through the rows; the drifting texture sits on top. */
+  background: rgba(31, 34, 38, 0.97);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
 }
 .ui-sheet.gm-orb-sheet >:not(.gm-orb-sheet-field):not(.gm-orb-sheet-sweep) {
   position: relative;
@@ -787,11 +789,11 @@ body {
 }
 @media (prefers-color-scheme: light) {
   :where(:root:not([data-theme="dark"])) .ui-sheet.gm-orb-sheet {
-    background: rgba(255, 255, 255, 0.92);
+    background: rgba(255, 255, 255, 0.97);
   }
 }
 :where(:root[data-theme="light"]) .ui-sheet.gm-orb-sheet {
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.97);
 }
 .gm-orb-sheet-field,
 .gm-orb-sheet-sweep {

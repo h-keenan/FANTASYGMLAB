@@ -13,7 +13,6 @@ import { describe, expect, it } from "vitest";
  * and in docs/ui-patterns.md). An entry that now has an avatar, or whose file is gone, fails the test so it is removed.
  */
 const WEB_ALLOW: Record<string, string> = {
-  "components/NavSheet.tsx": "nav search player rows keep the position badge identity the orb search always had (carried over from GmOrb; avatar migration is a follow-up)",
   "components/LiveFeedPanel.tsx": "TEXT: names inside a news headline",
   "components/SimToControl.tsx": "TEXT: injury names inside a sentence",
   "components/SimRecapStory.tsx": "TEXT: top-scorer name inside a fact line",

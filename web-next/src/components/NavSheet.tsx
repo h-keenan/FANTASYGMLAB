@@ -6,7 +6,7 @@ import { useMemo, useRef, useState } from "react";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { NavProMarker } from "@/components/NavProMarker";
 import { PlayerName } from "@/components/PlayerName";
-import { PositionBadge } from "@/components/PositionBadge";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { SkeletonText } from "@/components/Skeleton";
 import { Sheet } from "@/components/ui/Sheet";
 import { useAuth } from "@/context/AuthContext";
@@ -121,7 +121,7 @@ export function NavSheet({
                       className="flex items-center gap-3 py-2.5 text-left"
                       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
                     >
-                      <PositionBadge position={player.position} />
+                      <PlayerAvatar playerId={player.player_id} name={player.name} position={player.position} team={player.team} size={32} />
                       <span className="flex min-w-0 flex-col">
                         <PlayerName name={player.name} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
                         {player.team ? (
