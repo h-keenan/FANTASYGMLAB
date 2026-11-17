@@ -1149,6 +1149,18 @@ def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict
 _TRIAL_COLUMN_MISSING = False
 
 
+def _referral_comp_active(config: dict, user_id: str, access_token: str) -> bool:
+    """True when this account holds a live referral comp window (own-row read, fails closed)."""
+
+    try:
+        settings_row, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+        if error or not isinstance(settings_row, dict):
+            return False
+        return bool(referrals.comp_is_active(settings_row))
+    except Exception:
+        return False
+
+
 def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str) -> dict[str, str]:
     """Read select `profiles` columns using the caller's own token (RLS-scoped).
 
@@ -1214,8 +1226,16 @@ def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str
         # aren't gated anywhere on this API yet, so there's nothing lost by
         # not exposing a third wire value until a caller actually needs it.
         normalized_tier = premium.canonical_tier(row.get("entitlement"))
+        wire_entitlement = "premium" if normalized_tier != premium.FREE else "free"
+        if wire_entitlement == "free" and _referral_comp_active(config, user_id, access_token):
+            # A live referral comp (3 referrals = 30 days of Pro) is a real Pro
+            # grant. modules.premium.effective_entitlement has always modelled
+            # it, but this API read only profiles.entitlement, so web/app never
+            # honoured the reward. Only ever upgrades a Free read; a paid tier
+            # is never touched, and any failure here stays Free (fail closed).
+            wire_entitlement = "premium"
         return {
-            "entitlement": "premium" if normalized_tier != premium.FREE else "free",
+            "entitlement": wire_entitlement,
             "sleeper_username": str(row.get("sleeper_username") or "").strip(),
             "trial_ends_at": str(row.get("trial_ends_at") or "").strip(),
             "status": "ok",

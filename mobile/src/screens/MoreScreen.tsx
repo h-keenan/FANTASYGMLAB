@@ -22,6 +22,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AnimatedCard from '../components/AnimatedCard';
 import IconCircle from '../components/IconCircle';
 import { api, ApiError, type MeResponse, type PushCategory } from '../lib/api';
+import { planOf } from '../lib/plan';
 import { supabase } from '../lib/supabase';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { describeSleeperConnectError } from '../lib/sleeperConnectErrors';
@@ -441,10 +442,10 @@ export default function MoreScreen({ navigation }: Props) {
                   <AppText
                     style={[
                       styles.identityValue,
-                      me?.entitlement === 'premium' && { color: colors.premium },
+                      planOf(me) === 'pro' && { color: colors.premium },
                     ]}
                   >
-                    {me ? (me.entitlement === 'premium' ? 'Pro' : 'Free') : '—'}
+                    {me ? (planOf(me) === 'pro' ? 'Pro' : planOf(me) === 'free' ? 'Free' : 'Unavailable') : '—'}
                   </AppText>
                 }
                 showDivider={false}

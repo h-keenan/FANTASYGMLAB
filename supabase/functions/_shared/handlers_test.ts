@@ -568,3 +568,13 @@ Deno.test("stripe-webhook: profile create retries without trial_ends_at on an ol
   assertEquals(res.status, 200);
   assertEquals(posts, 2);
 });
+
+Deno.test("checkout: an already-subscribed account gets 409 already_subscribed and never reaches Stripe", async () => {
+  for (const profile of [{ stripe_subscription_status: "active" }, { entitlement: "premium" }]) {
+    const f = fakeFetch({ ...userRoutes(profile), ...stripeRoutes() });
+    const res = await checkout(checkoutReq({ tier: "pro" }), { env: envOf(BASE_ENV), fetch: f.fn, now: () => NOW });
+    assertEquals(res.status, 409);
+    assertEquals((await res.json()).code, "already_subscribed");
+    assert(!f.calls.some((c) => c.url.includes("api.stripe.com")));
+  }
+});

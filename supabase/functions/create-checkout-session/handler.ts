@@ -10,6 +10,22 @@ import { createCheckoutSession, trialEligible } from "../_shared/stripe_api.ts";
 import { fetchBillingProfile, verifyUserJwt } from "../_shared/supabase_rest.ts";
 import { ACCOUNT_REQUIRED_CODE, ACCOUNT_REQUIRED_MESSAGE, errorResponse, HttpError, isObj, jsonResponse, st } from "../_shared/util.ts";
 
+export const ALREADY_SUBSCRIBED_CODE = "already_subscribed";
+
+/** Non-empty user-facing reason when this profile already pays for Pro. */
+export function alreadySubscribed(profile: Record<string, unknown> | null): string {
+  if (!profile) return "";
+  const status = st(profile.stripe_subscription_status).toLowerCase();
+  if (status === "active" || status === "trialing") {
+    return "You already have an active subscription. Manage it from Billing.";
+  }
+  const entitlement = st(profile.entitlement).toLowerCase();
+  if (entitlement === "premium" || entitlement === "front_office") {
+    return "Your account already has Pro (for example through the App Store). Manage it there instead of subscribing again.";
+  }
+  return "";
+}
+
 export async function handle(req: Request, deps: Deps): Promise<Response> {
   const cors = corsHeaders(deps.env, req.headers.get("origin"));
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
@@ -33,6 +49,10 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     const interval = st(body.interval) || MONTHLY;
 
     const profile = await fetchBillingProfile(supabase, deps.fetch, user.id);
+    // One paid plan per account: a second Checkout would bill twice (two Stripe
+    // subscriptions, or Stripe on top of an App Store subscription).
+    const already = alreadySubscribed(profile);
+    if (already) throw new HttpError(409, already, ALREADY_SUBSCRIBED_CODE);
     const trialOk = await trialEligible(config, deps.fetch, {
       tier,
       email: user.email,

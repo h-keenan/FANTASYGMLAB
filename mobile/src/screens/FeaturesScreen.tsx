@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNotice } from '../components/NoticeToast';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
 import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
@@ -13,13 +12,11 @@ import IconCircle from '../components/IconCircle';
 import SectionHeading from '../components/SectionHeading';
 import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { api } from '../lib/api';
 import { FEATURE_GROUPS, FEATURE_ITEMS, featureTarget, type FeatureLeague } from '../lib/featureCatalog';
 import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { accentColor } from '../lib/destinationAccent';
-import { queryKeys } from '../lib/queryKeys';
-import { getEntitlementTier, isAtLeast, PRO } from '../lib/revenuecat';
+import { useShowProTags } from '../lib/useShowProTags';
 import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -44,21 +41,7 @@ export default function FeaturesScreen({ navigation, route }: Props) {
   const passed = route.params?.leagueId && route.params?.leagueName ? { leagueId: route.params.leagueId, leagueName: route.params.leagueName } : null;
   const league: FeatureLeague | null = passed ?? lastLeague;
 
-  const isRestoring = useIsRestoring();
-  const planQuery = useQuery({ queryKey: queryKeys.mePlan(), queryFn: () => api.getMe(), enabled: !isRestoring, staleTime: 5 * 60 * 1000 });
-  const [storeSubscriber, setStoreSubscriber] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    getEntitlementTier()
-      .then((tier) => {
-        if (!cancelled) setStoreSubscriber(isAtLeast(tier, PRO));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  const showPro = planQuery.data?.user.profile_status === 'ok' && planQuery.data.user.entitlement !== 'premium' && !storeSubscriber;
+  const showPro = useShowProTags();
 
   return (
     <View style={styles.root}>

@@ -48,6 +48,7 @@ import { HOME_SUBTITLE, navPage, navPagesIn, type NavCatalogPage } from '../lib/
 import { ORB_COACHMARK_SEEN_KEY, ORB_COACHMARK_TEXT } from '../lib/orbCoachmark';
 import { ROUTE_BY_PAGE, searchOrbDestinations, type OrbSearchHit } from '../lib/orbTabs';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
+import { showProMarkers } from '../lib/plan';
 import { PRO, getEntitlementTier, isAtLeast } from '../lib/revenuecat';
 import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
 import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
@@ -482,7 +483,7 @@ export default function GmOrb() {
     staleTime: 5 * 60 * 1000,
   });
   const showProTags =
-    planQuery.data?.user.profile_status === 'ok' && planQuery.data.user.entitlement !== 'premium' && !storeSubscriber;
+    showProMarkers(planQuery.data?.user, storeSubscriber);
 
   // Lightweight destination search — substring match against label +
   // subtitle across the same three static destination lists the

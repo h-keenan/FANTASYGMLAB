@@ -189,9 +189,9 @@ export async function verifyUserJwt(cfg: SupabaseConfig, fetchFn: FetchFn, autho
 
 /** Billing-history columns for trial eligibility, progressively narrower for older schemas. Returns null if unreadable. */
 const TRIAL_PROFILE_SELECTS = [
-  "stripe_customer_id,stripe_subscription_id,stripe_subscription_status,revenuecat_app_user_id,trial_ends_at",
-  "stripe_customer_id,stripe_subscription_id,stripe_subscription_status",
-  "stripe_customer_id,stripe_subscription_id",
+  "entitlement,stripe_customer_id,stripe_subscription_id,stripe_subscription_status,revenuecat_app_user_id,trial_ends_at",
+  "entitlement,stripe_customer_id,stripe_subscription_id,stripe_subscription_status",
+  "entitlement,stripe_customer_id,stripe_subscription_id",
 ];
 
 export async function fetchBillingProfile(cfg: SupabaseConfig, fetchFn: FetchFn, userId: string): Promise<Json | null> {
@@ -220,6 +220,7 @@ export function revenueCatStore(cfg: SupabaseConfig, fetchFn: FetchFn): BillingS
         "revenuecat_event_type",
         "revenuecat_environment",
         "revenuecat_event_created_at",
+        "stripe_subscription_status",
         "premium_updated_at",
         "entitlement",
       ],

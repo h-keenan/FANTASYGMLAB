@@ -160,10 +160,30 @@ export function buildRevenueCatPayload(action: Record<string, string>, now: Date
   return payload;
 }
 
+/**
+ * Cross-provider guard (Premium carries over between web and app). Entitlement
+ * is one column written by two billing providers. RevenueCat only knows about
+ * store subscriptions, so its "no active store entitlement" verdict must never
+ * strip Pro from an account whose Stripe subscription is still live: that is a
+ * user who subscribed on the web after an iOS lapse, and the lapsed store
+ * subscription's EXPIRATION/BILLING_ISSUE event would otherwise wipe it.
+ * Stripe's own events keep `stripe_subscription_status` current (a delete or
+ * failed payment moves it off active/trialing), so the row is the source of
+ * truth for "Stripe still pays for this account".
+ */
+export const NO_LIVE_STRIPE_SUBSCRIPTION =
+  "or(stripe_subscription_status.is.null,stripe_subscription_status.not.in.(active,trialing))";
+
 export function revenueCatOrderingParams(payload: ProfilePayload): Record<string, string> {
+  const ordering = revenueCatOrderingClause(payload);
+  if (st(payload.entitlement).toLowerCase() !== "free") return ordering ? { or: `(${ordering})` } : {};
+  return { and: `(${[ordering && `or(${ordering})`, NO_LIVE_STRIPE_SUBSCRIPTION].filter(Boolean).join(",")})` };
+}
+
+function revenueCatOrderingClause(payload: ProfilePayload): string {
   const createdAt = st(payload.revenuecat_event_created_at);
   const eventId = st(payload.revenuecat_event_id);
-  if (!createdAt) return {};
+  if (!createdAt) return "";
   const identity = eventId ? `or(revenuecat_event_id.is.null,revenuecat_event_id.neq.${eventId})` : "";
   const clauses = [
     identity ? `and(revenuecat_event_created_at.is.null,${identity})` : "revenuecat_event_created_at.is.null",
@@ -176,7 +196,7 @@ export function revenueCatOrderingParams(payload: ProfilePayload): Record<string
       `and(revenuecat_event_created_at.eq.${createdAt},or(revenuecat_event_id.is.null,revenuecat_event_id.neq.${eventId}))`,
     );
   }
-  return { or: `(${clauses.join(",")})` };
+  return clauses.join(",");
 }
 
 export async function processRevenueCatEvent(

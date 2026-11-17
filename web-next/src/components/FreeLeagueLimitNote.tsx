@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { FreeLimitNote } from "@/components/FreeLimitNote";
 import { api } from "@/lib/api";
+import { isProOrNull } from "@/lib/plan";
 import { supabase } from "@/lib/supabase";
 
 /**
@@ -24,7 +25,7 @@ export function FreeLeagueLimitNote() {
         setState({
           cap: user.league_cap,
           used: (saved.data ?? []).length,
-          isPremium: user.profile_status === "ok" ? user.entitlement === "premium" : null,
+          isPremium: isProOrNull(user),
         });
       })
       .catch(() => {});

@@ -1,3 +1,4 @@
+import { planOf } from './plan.ts';
 /**
  * "All leagues at a glance" (My Leagues screen) — the response types for
  * GET /v1/leagues-glance (services/mobile_api_service.py, built per league
@@ -88,9 +89,10 @@ export function glanceSectionState(input: {
 }): GlanceSectionState {
   // Same rule HomeScreen's league-cap lock follows: an unverified plan is
   // never shown as Free, so a paying user never sees a lock over a blip.
-  if (input.profileStatus !== 'ok' || !input.entitlement) return 'hidden';
+  const plan = planOf({ entitlement: input.entitlement, profile_status: input.profileStatus });
+  if (plan === 'unknown' || !input.entitlement) return 'hidden';
   if (input.savedLeagueCount <= 0) return 'hidden';
-  if (input.entitlement !== 'premium') return 'locked';
+  if (plan !== 'pro') return 'locked';
   return input.savedLeagueCount >= 2 ? 'active' : 'hidden';
 }
 
