@@ -50,7 +50,7 @@ describe("simWeeklySeries", () => {
         { week: 4, projection: 0, floor: 0, ceiling: 0, bye: true, out: false },
         { week: 5, projection: 0, floor: 0, ceiling: 0, bye: false, out: true },
       ],
-      ros: null,
+      ros: undefined,
     });
     expect(series.weeks.map((w) => w.fantasy_points_ppr)).toEqual([10, 14]);
     expect(series.projection?.map((p) => p.week)).toEqual([3]);
