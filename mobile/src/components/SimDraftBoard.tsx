@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '../lib/haptic';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -70,7 +70,7 @@ export function SimDraftIconButton({
     if (inflight.current || disabled) return;
     inflight.current = true;
     setPending(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    haptic('commit');
     try {
       await onPress();
     } finally {

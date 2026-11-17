@@ -442,7 +442,7 @@ function ScoreSide({
         </AppText>
       )}
       <AppText style={styles.scoreRecord}>{recordLabel(side)}</AppText>
-      <TickNumber value={headline} style={styles.scoreValue} />
+      <TickNumber value={headline} variant="roll" style={styles.scoreValue} />
       {caption ? <AppText style={styles.scoreCaption}>{caption}</AppText> : null}
     </View>
   );

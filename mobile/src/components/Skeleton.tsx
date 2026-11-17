@@ -1,16 +1,11 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { radii, spacing, type ThemeColors } from '../theme';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { useReducedMotion } from '../lib/useMotion';
+import { useShimmerClock } from '../lib/shimmerClock';
 import { pageTabFamily, type PageTabFamilyKey } from '../lib/pageFamilies';
 import { avatarSize, type AvatarTier } from '../lib/playerAnatomy';
 
@@ -21,7 +16,7 @@ import { avatarSize, type AvatarTier } from '../lib/playerAnatomy';
  * about to appear (and the page does not jump when it lands). The shared templates (CompactModule,
  * PlayerAccordionRow, TradeCompactCard, StatusHeader) draw them for their own loading state. This file is the only
  * place allowed to draw a loading placeholder (skeletonScan.test.ts bans a bare `ActivityIndicator` screen or a
- * "Loading..." line anywhere else). The pulse stops under the OS Reduce Motion setting.
+ * "Loading..." line anywhere else). One shared shimmer clock drives every sweep; it freezes under Reduce Motion and the Reduced effects setting.
  */
 export function SkeletonBlock({
   width = '100%',
@@ -34,35 +29,41 @@ export function SkeletonBlock({
   radius?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  const { colors } = useThemeMode();
-  const pulse = useSharedValue(0);
-  const reduced = useReducedMotion();
+  const { colors, isDark } = useThemeMode();
+  const { clock, running } = useShimmerClock();
+  const w = useSharedValue(0);
 
-  useEffect(() => {
-    if (reduced) {
-      pulse.value = 0.5;
-      return;
-    }
-    pulse.value = withRepeat(withTiming(1, { duration: 900, easing: Easing.inOut(Easing.ease) }), -1, true);
-  }, [pulse, reduced]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: 0.5 + pulse.value * 0.3,
+  // One diagonal glass sweep (translateX of a gradient band) driven by the ONE shared clock; frozen when not running.
+  const sweepStyle = useAnimatedStyle(() => ({
+    opacity: running ? 1 : 0,
+    transform: [{ translateX: -w.value * 0.6 + clock.value * w.value * 1.6 }, { skewX: '-18deg' }],
   }));
 
   return (
-    <Animated.View
+    <View
+      onLayout={(e) => {
+        w.value = e.nativeEvent.layout.width;
+      }}
       style={[
         {
           width,
           height,
           borderRadius: radius,
           backgroundColor: colors.backgroundElevated,
+          overflow: 'hidden',
         },
-        animatedStyle,
         style,
       ]}
-    />
+    >
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { width: '60%' }, sweepStyle]}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0)', isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.65)', 'rgba(255,255,255,0)']}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      </Animated.View>
+    </View>
   );
 }
 

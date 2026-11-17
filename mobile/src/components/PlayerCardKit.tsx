@@ -290,6 +290,7 @@ function MatchupCard({ model, onPress, editing, mirror = false, emphasis = 'even
           {head.value != null ? (
             <TickNumber
               value={head.value}
+              variant="roll"
               testID="player-card-points"
               style={[
                 styles.points,

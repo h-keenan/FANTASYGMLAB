@@ -45,6 +45,7 @@ import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import ReferralCard from '../components/ReferralCard';
 import Toggle from '../components/Toggle';
+import { effectsPrefs, useEffectsPrefs } from '../lib/effectsPrefs';
 import NotificationControls from '../components/NotificationControls';
 import GuestCreateAccountModal from '../components/GuestCreateAccountModal';
 import Input from '../components/Input';
@@ -112,6 +113,7 @@ export default function MoreScreen({ navigation }: Props) {
     setLevel: setExperienceLevel,
   } = useExperienceLevel();
   const { mode: themeMode, setMode: setThemeMode, colors } = useThemeMode();
+  const effects = useEffectsPrefs();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
   const [updatingCategory, setUpdatingCategory] = useState<PushCategory | null>(null);
@@ -492,6 +494,18 @@ export default function MoreScreen({ navigation }: Props) {
             />
           ))}
         </View>
+        <SettingsRow
+          label="Haptics"
+          description="Taps and snaps you can feel. Never on live score updates."
+          showDivider
+          right={<Toggle value={effects.haptics} onValueChange={(v) => { effectsPrefs.set({ haptics: v }) }} label="Haptics" />}
+        />
+        <SettingsRow
+          label="Reduced effects"
+          description="Turns off shimmer, parallax and ambient motion. Helps battery on older phones."
+          showDivider={communityOptedOut !== null}
+          right={<Toggle value={effects.reducedEffects} onValueChange={(v) => { effectsPrefs.set({ reducedEffects: v }); }} label="Reduced effects" />}
+        />
         {communityOptedOut !== null ? (
           <>
             <SettingsRow
