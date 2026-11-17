@@ -1064,6 +1064,10 @@ export interface MatchupWinProbability {
   probability?: number;
   my_projected_total?: number;
   opponent_projected_total?: number;
+  coverage?: { my: number; opponent: number };
+  imputed_starters?: { my: number; opponent: number };
+  /** Plain-words caveat when starters were counted at a replacement-level week. */
+  note?: string;
 }
 
 export interface MatchupComparison {

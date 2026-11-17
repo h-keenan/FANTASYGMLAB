@@ -1938,6 +1938,10 @@ export interface MatchupWinProbability {
   my_projected_total?: number;
   opponent_projected_total?: number;
   coverage?: { my: number; opponent: number };
+  /** Starters counted at a replacement-level week (no projection data). */
+  imputed_starters?: { my: number; opponent: number };
+  /** Plain-words caveat when `imputed_starters` is set. */
+  note?: string;
 }
 
 export interface MatchupResponse {

@@ -220,6 +220,13 @@ export function winProbabilityUnavailableMessage(matchup: MatchupResponse): stri
   return "Win probability appears once Sleeper posts both lineups.";
 }
 
+/** Caveat shown under the win probability when starters without projection
+ * data were counted at a replacement-level week (the server's own reason text). */
+export function winProbabilityNote(matchup: MatchupResponse): string | null {
+  const odds = matchup.win_probability;
+  return odds?.available && odds.note ? odds.note : null;
+}
+
 /** "RB2" for the second RB slot in a lineup with several, "FLEX" for the
  * only one. Ordinals follow the actual Sleeper lineup's own slot order. */
 export function moveSlotLabel(move: MatchupSuggestedMove, actualStarters: MatchupRealStarter[]): string {

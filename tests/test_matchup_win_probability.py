@@ -248,3 +248,41 @@ def test_a_starter_ruled_out_before_kickoff_adds_nothing_to_the_team_projection(
     # once his game has a real score, the real score counts as before
     scored = {**out, "actual_points": 3.0, "game_started": True, "game_final": True}
     assert starter_expected_points(scored) == 3.0
+
+
+def _roster(n: int = 4):
+    return [dict(_projected_starter(15.0, 10.0, 20.0), position="WR") for _ in range(n)]
+
+
+def _unmodeled(position: str, status: str = "insufficient_data"):
+    return {"position": position, "actual_points": None, "game_started": False, "projection": {"status": status}}
+
+
+def test_unmodeled_starter_is_imputed_at_replacement_not_zero():
+    mine = _roster()
+    mine[0] = _unmodeled("RB")
+    result = compute_live_win_probability(mine, _roster())
+    assert result["available"] is True
+    # replacement RB week (4.5) rather than 0 in the projected total
+    assert result["my_projected_total"] == 45.0 + 4.5
+    assert result["imputed_starters"] == {"my": 1, "opponent": 0}
+    assert "replacement-level" in result["note"]
+    assert result["probability"] < 0.5
+
+
+def test_mirror_matchup_with_one_unmodeled_each_side_stays_fifty():
+    result = compute_live_win_probability(_roster(3) + [_unmodeled("TE")], _roster(3) + [_unmodeled("TE")])
+    assert result["probability"] == 0.5
+    assert result["imputed_starters"] == {"my": 1, "opponent": 1}
+
+
+def test_bye_starter_is_not_imputed():
+    mine = _roster()
+    mine[0] = _unmodeled("WR", "bye_week")
+    result = compute_live_win_probability(mine, _roster())
+    assert "imputed_starters" not in result
+    assert result["my_projected_total"] == 45.0
+
+
+def test_fully_modeled_lineups_carry_no_note():
+    assert "note" not in compute_live_win_probability(_roster(), _roster())

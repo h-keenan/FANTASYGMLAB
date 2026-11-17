@@ -230,7 +230,7 @@ Tests: `tests/test_sim_rookie_v.py` (gate, serialization and the stability depen
 3. **A QB behind a Doubtful starter was projected at 20 percent** (`player_projections._role_adjustment`), so a Doubtful starter (p_play 0.15) plus his backup produced
    about 35 percent of a QB. The share is now `max(0.2, 1 - starter p_play)`.
 
-### P1 (proposals)
+### P1 (owner approved; delivered status in the "Desk P1 delivery" section below)
 - **Win probability counts an unmodeled starter as 0 points and a bye starter as "unavailable"** (`matchup_win_probability._starter_distribution`). One starter with no
   history moves a mirror matchup to 36.6 percent (true 50); an Out starter is a known zero while a bye starter is not. Fix: treat bye as a known zero, impute an unmodeled
   starter at the position's replacement mean with the usual variance, keep the coverage flag.
@@ -251,6 +251,12 @@ Tests: `tests/test_sim_rookie_v.py` (gate, serialization and the stability depen
 - **The trade season window ignores playoffs and elimination** (`trade_grade.season_window`, 17 equal weeks). Weight weeks by playoff-reaching probability; zero after elimination.
 - **Start/sit lean disagrees with the planner's headline** (`start_sit_range.lean` hard cuts at 0.30 / 0.70 and a 0.5 ratio versus an expected-points maximizer). Derive the lean from
   the win-probability delta already computed in `matchup_what_if` with a minimum delta.
+
+### Desk P1 delivery
+
+| Item | Before | After |
+| --- | --- | --- |
+| Win % unmodeled starter | counted as 0 points, a mirror matchup read 36.6 percent | imputed at a replacement-level week for his position (`matchup_win_probability.REPLACEMENT_WEEK`, QB 12 / RB 4.5 / WR 5 / TE 3.5 / K 7 with a wide spread), coverage still counts only truly modeled starters, the result carries `imputed_starters` and a `note` that web and mobile show under the odds; a bye starter stays a known zero, DEF/IDP stay unmodeled |
 
 ### P2
 - Confidence adds points for the explanation the same module wrote (`trade_ideas._trade_confidence_context`); candidate windows are absolute points (`_value_fits`); TE premium is a

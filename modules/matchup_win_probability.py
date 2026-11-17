@@ -236,22 +236,61 @@ def _starter_distribution(starter: dict[str, Any], *, now: datetime | None = Non
     return final, remaining * projection_variance, True
 
 
+# Fallback for a starter the projection layer could not model (a rookie, a
+# returning player, no recent-game data). Counting him as 0 points moved a
+# mirror matchup to ~37% when the truth is 50%, so he is imputed at a
+# documented replacement-level week for his position with a wide spread.
+# (mean, sd) in PPR points per game; the means are the replacement anchors of
+# trade_lineup_model.STATIC_ANCHORS, the sds are typical weekly spread at that
+# level. Not calibrated to the league's scoring: the result flags the
+# uncertainty (``imputed_starters`` / ``note``) rather than hiding it.
+REPLACEMENT_WEEK: dict[str, tuple[float, float]] = {
+    "QB": (12.0, 7.0),
+    "RB": (4.5, 4.5),
+    "WR": (5.0, 4.5),
+    "TE": (3.5, 3.5),
+    "K": (7.0, 3.5),
+}
+
+
+def _fallback_distribution(starter: dict[str, Any]) -> tuple[float, float] | None:
+    """(mean, variance) for an unmodeled starter, or None when there is no
+    honest fallback (a bye week is a known zero; DEF/IDP/unknown positions
+    keep the old "not modeled" treatment)."""
+
+    if str((starter.get("projection") or {}).get("status") or "") == "bye_week":
+        return None
+    position = str(starter.get("position") or "").strip().upper()
+    if position not in REPLACEMENT_WEEK:
+        return None
+    mean, sd = REPLACEMENT_WEEK[position]
+    return mean, sd * sd
+
+
 def _team_distribution(
     starters: list[dict[str, Any]], *, now: datetime | None = None
-) -> tuple[float, float, float]:
-    """Returns (mean, variance, coverage) for one team's full lineup."""
+) -> tuple[float, float, float, int]:
+    """Returns (mean, variance, coverage, imputed_count) for one team's
+    lineup. ``coverage`` counts genuinely modeled starters only; imputed
+    ones are reported separately so the caller can flag the uncertainty."""
 
     mean = 0.0
     variance = 0.0
     modeled_count = 0
+    imputed = 0
     for starter in starters:
         starter_mean, starter_variance, modeled = _starter_distribution(starter, now=now)
-        mean += starter_mean
-        variance += starter_variance
         if modeled:
             modeled_count += 1
+        else:
+            fallback = _fallback_distribution(starter)
+            if fallback is not None:
+                starter_mean, starter_variance = fallback
+                imputed += 1
+        mean += starter_mean
+        variance += starter_variance
     coverage = modeled_count / len(starters) if starters else 0.0
-    return mean, variance, coverage
+    return mean, variance, coverage, imputed
 
 
 def _normal_cdf(z: float) -> float:
@@ -280,8 +319,10 @@ def compute_live_win_probability(
     if not my_starters or not opponent_starters:
         return {"available": False, "reason": "no_starters"}
 
-    my_mean, my_variance, my_coverage = _team_distribution(my_starters, now=now)
-    opponent_mean, opponent_variance, opponent_coverage = _team_distribution(opponent_starters, now=now)
+    my_mean, my_variance, my_coverage, my_imputed = _team_distribution(my_starters, now=now)
+    opponent_mean, opponent_variance, opponent_coverage, opponent_imputed = _team_distribution(
+        opponent_starters, now=now
+    )
 
     if my_coverage < MIN_COVERAGE_TO_SHOW or opponent_coverage < MIN_COVERAGE_TO_SHOW:
         return {
@@ -297,10 +338,24 @@ def compute_live_win_probability(
     else:
         probability = _normal_cdf(diff_mean / diff_stdev)
 
-    return {
+    result: dict[str, Any] = {
         "available": True,
         "probability": round(probability, 4),
         "my_projected_total": round(my_mean, 1),
         "opponent_projected_total": round(opponent_mean, 1),
         "coverage": {"my": round(my_coverage, 2), "opponent": round(opponent_coverage, 2)},
     }
+    if my_imputed or opponent_imputed:
+        result["imputed_starters"] = {"my": my_imputed, "opponent": opponent_imputed}
+        result["note"] = imputed_note(my_imputed + opponent_imputed)
+    return result
+
+
+def imputed_note(total: int) -> str:
+    """The reason text shown wherever the probability is shown."""
+
+    who = "starter" if total == 1 else "starters"
+    return (
+        f"{total} {who} without projection data counted at a replacement-level week, "
+        "so this chance is less certain."
+    )
