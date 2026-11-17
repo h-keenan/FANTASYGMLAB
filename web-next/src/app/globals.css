@@ -146,6 +146,8 @@
   --page-gutter: var(--space-lg);
   --page-gap: var(--space-lg);
   --page-pad-y: var(--space-lg);
+  /* Batch B: the one small gap between the sticky chrome (shell header, tab strip, status line) and the first module, on every page. */
+  --page-top-gap: var(--space-md);
   --page-gap-prose: var(--space-xl);
 
   /* Canonical asset portrait sizes */
@@ -4047,9 +4049,46 @@ main > header:has(> h1.sr-only:only-child) {
   flex-direction: column;
   gap: var(--page-gap);
   padding: var(--page-pad-y) var(--page-gutter);
+  padding-top: var(--page-top-gap);
   width: 100%;
   max-width: 48rem;
   margin-inline: auto;
+}
+/* One compact page sub-line (ui/PageStatusLine.tsx): context left, freshness + refresh icon right, ~32px tall; the negative bottom
+   margin pulls the next module up from the page gap to the standard --page-top-gap. */
+.page-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: 32px;
+  margin-bottom: calc(var(--page-top-gap) - var(--page-gap));
+}
+.page-status-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  margin-block: calc((32px - var(--touch-target-min)) / 2);
+  margin-right: calc(-1 * var(--space-sm));
+  color: var(--color-accent);
+}
+.page-status-refresh:disabled {
+  opacity: 0.6;
+}
+@keyframes page-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.page-status-spin {
+  animation: page-status-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-status-spin {
+    animation: none;
+  }
 }
 .page-shell-prose {
   gap: var(--page-gap-prose);

@@ -426,6 +426,10 @@ coridian_: the "?" buttons "are adding too much space in many different places a
 - **Retired and deleted:** `WhyCorner`, `.ui-why-corner*`, `.ui-why-host`, web `BeginnerHelp` / `InfoTip` / `GlossaryNote`, app `BeginnerHelp` / `ScreenInfoNote` / `GlossaryNote`.
 - **Guards.** `scripts/check_info_mark_usage.mjs` (CI `lib-twins` job) fails on any retired variant or an absolutely-positioned InfoMark; `scripts/sim_layout_playwright/module_scan.mjs` records every rendered "?" and fails when one sits alone on its row or overlaps text.
 
+## PageStatusLine and the top gap (UI audit batch B, 2026-11-16)
+
+One compact sub-line under the shell header: context on the left ("Week 10", a Live badge), freshness plus a refresh icon on the right, about 32px tall. It replaces the separate title/week row and the separate "Updated 3m ago . Refresh" row (Matchup was ~112px of chrome before its first card). Rules: the status line owns the week, so the first card does not repeat it (`matchupCardModel({ omitWeek: true })`); the "?" stays inline in the header slot (InfoMark); one standard gap, `--page-top-gap` (12px, mobile `PAGE_TOP_GAP`), sits between the sticky chrome and the first module, applied by `.page-shell` padding-top. Players folds its controls into two rows (search + Filters, position pills + Sort). Web `components/ui/PageStatusLine.tsx`, app `components/PageStatusLine.tsx`. CI: `scripts/sim_layout_playwright/module_scan.mjs` fails a page whose first card/row starts more than 110px below the nav at 390px (pages with a control stack above their first row are ratcheted at their current value in `TOP_BUDGET_OVERRIDES`: lower them, never raise them).
+
 ## StructuredRow
 
 The replacement for delimiter-joined strings and generated sentences. One row is **crest/avatar + name

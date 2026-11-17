@@ -24,6 +24,12 @@ const LID = "1221647449446162432";
 // Audit knobs (docs/audits/2026-11-ui-consistency-audit-4.md): NAV=bottom opens every page in the phone shell (header + bottom pill) instead of the legacy
 // header + orb, FULL=1 saves full-page screenshots, METRICS=1 adds the design-token census (radii, type sizes, gold, button heights) to report.json.
 const NAV = process.env.NAV || "";
+// First-module budget (batch B, docs/audits/2026-11-ui-audit-e2e.md P0-2): at phone width the first card/row must start within TOP_BUDGET px below the sticky nav.
+// Pages whose first row legitimately sits under a control stack are ratcheted at their current value (the number may go down, never up); fixture-only or
+// banner pages are exempt.
+const TOP_BUDGET = 110;
+const TOP_BUDGET_OVERRIDES = { players: 210, "players-prospects": 280, "news-nfl": 300, "news-league": 230, "news-league-history": 165, "news-league-storylines": 165, "news-league-roundup": 165, recaps: 220, games: 150 };
+const TOP_EXEMPT = new Set(["sample-league", "landing", "commissioner", "commissioner-missing", "trade-analyzer", "trade-analyzer-missing"]);
 // OVERFLOW=1: every route (incl. the overflow-only ones), failing ONLY on a sideways-scrolling document and naming the elements that cause it.
 const OVERFLOW_MODE = process.env.OVERFLOW === "1";
 const FULL = process.env.FULL === "1";
@@ -211,6 +217,36 @@ const OFFENDERS = () => {
   });
 };
 
+// First-module offset (docs/audits/2026-11-ui-audit-e2e.md P0-2, batch B): how far below the sticky nav (shell header + page tab strip) the first
+// piece of page content starts. Walks into layout wrappers (no background/border/shadow) until it reaches a card, a control row or a heading.
+const FIRST_MODULE = () => {
+  const vis = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 4 && r.height > 4 && cs.display !== "none" && cs.visibility !== "hidden" && cs.position !== "absolute" && !el.classList.contains("sr-only"); };
+  const sticky = [...document.querySelectorAll(".shell-header, .pill-row-glass, body > header")].filter((el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top < 140; });
+  const navBottom = Math.max(0, ...sticky.map((el) => el.getBoundingClientRect().bottom));
+  const isChrome = (el) => el.matches(".pill-row-glass, [data-testid=page-tab-bar]") || Boolean(el.querySelector(":scope > .pill-row-glass"));
+  const isCard = (el) => { const cs = getComputedStyle(el); const bg = cs.backgroundColor; return (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") || cs.boxShadow !== "none" || parseFloat(cs.borderTopWidth) > 0 || cs.backdropFilter !== "none" && cs.backdropFilter !== undefined || el.matches("button,input,select,h1,h2,h3,p,[role=tablist]"); };
+  let node = document.querySelector("main");
+  if (!node) return null;
+  for (let depth = 0; depth < 8; depth += 1) {
+    const kids = [...node.children].filter((el) => vis(el) && !isChrome(el) && !el.matches("nextjs-portal,script,style"));
+    if (!kids.length) break;
+    const k = kids[0];
+    if (isCard(k) || !k.children.length) { node = k; break; }
+    node = k;
+  }
+  // First card/row: the first visible surface (shadow, backdrop blur or a list row) at least 48px tall that is not a control or the tab strip; what the owner means by "the first module".
+  const cardEl = [...document.querySelectorAll("main *")].find((el) => {
+    if (!vis(el) || isChrome(el) || el.closest(".pill-row-glass") || el.matches("button,input,select,a,[role=tab],[role=tablist]")) return false;
+    const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return r.height >= 48 && r.width >= 200 && (cs.boxShadow !== "none" || (cs.backdropFilter && cs.backdropFilter !== "none") || el.matches("[data-testid$=-row],[data-testid=player-accordion-row]"));
+  });
+  const cardGap = cardEl ? Math.round(cardEl.getBoundingClientRect().top + scrollY - navBottom) : null;
+  const r = node.getBoundingClientRect();
+  const id = node.getAttribute("data-testid");
+  const cid = cardEl && cardEl.getAttribute("data-testid");
+  return { cardGap, card: cardEl ? `${cardEl.tagName.toLowerCase()}${cid ? `[${cid}]` : ""}` : null, top: Math.round(r.top + scrollY), navBottom: Math.round(navBottom), gap: Math.round(r.top + scrollY - navBottom), el: `${node.tagName.toLowerCase()}${id ? `[${id}]` : ""}`, text: (node.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40) };
+};
+
 const PAGE_CHECK = () => {
   const W = document.documentElement.clientWidth;
   const out = { overflow: document.documentElement.scrollWidth > W + 1 ? { scrollWidth: document.documentElement.scrollWidth, width: W } : null, emptyHeaders: [], modules: 0, tablists: 0, height: document.documentElement.scrollHeight, heroes: document.querySelectorAll('[data-testid="hero-value"]').length, summaries: [] };
@@ -348,6 +384,7 @@ for (const w of WIDTHS) {
       if (OVERFLOW_MODE) await page.addStyleTag({ content: ".app-shell,.sim-root{overflow-x:visible!important}" }).catch(() => {});
       if (LARGE) await page.addStyleTag({ content: "html{font-size:125%!important}" }).catch(() => {});
       const res = await page.evaluate(PAGE_CHECK);
+      res.firstModule = await page.evaluate(FIRST_MODULE);
       if (res.overflow) res.overflow.offenders = await page.evaluate(OFFENDERS);
       if (r.expandAll) {
         // Open every collapsed module and the first player row, so the scan covers the bodies, then pick another week from the strip.
@@ -394,6 +431,12 @@ for (const r of results) {
   if (r.overflow) problems.push(`overflow ${r.overflow.scrollWidth}>${r.overflow.width}${r.overflow.offenders?.length ? " culprits: " + r.overflow.offenders.join(" || ") : ""}`);
   if (r.crashed) problems.push("route error screen (a missing or partial field blanked the page)");
   if (r.expectTextMissing) problems.push("fixture content not rendered");
+  if (r.firstModule && r.width < 768) console.log(`first-module ${r.page}@${r.width}: top=${r.firstModule.top} navBottom=${r.firstModule.navBottom} gap=${r.firstModule.gap} cardGap=${r.firstModule.cardGap} <${r.firstModule.card}> first=<${r.firstModule.el}> "${r.firstModule.text}"`);
+  if (r.firstModule && r.width < 768 && !TOP_EXEMPT.has(r.page)) {
+    const offset = r.firstModule.cardGap ?? r.firstModule.gap;
+    const budget = TOP_BUDGET_OVERRIDES[r.page] ?? TOP_BUDGET;
+    if (offset > budget) problems.push(`first module starts ${offset}px below the nav (budget ${budget}px): one compact header + --page-top-gap, no stacked control rows`);
+  }
   if (OVERFLOW_MODE) { console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}${problems.length ? "  " + problems.join("; ") : ""}`); if (problems.length) bad += 1; continue; }
   if (r.emptyHeaders?.length) problems.push(`empty collapsed headers: ${r.emptyHeaders.map((h) => h.title).join(", ")}`);
   // Strip geometry (equal, centred tabs) is a >= 360px rule: at 320px a long label (Standings, Notifications) makes a tab wider than its share and the row scrolls instead of cutting it.
