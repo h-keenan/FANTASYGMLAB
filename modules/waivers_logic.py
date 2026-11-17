@@ -3,6 +3,7 @@ from typing import Any, Mapping
 import pandas as pd
 from modules import derived_cache
 from modules import injury_status
+from modules import league_calendar
 from modules import league_maturity
 from modules.frame_records import frame_records
 from modules import league_display
@@ -463,7 +464,10 @@ def default_played_ids(league: Mapping[str, Any] | None) -> set[str] | None:
         week = int(((league or {}).get("settings") or {}).get("leg") or 0)
     except (TypeError, ValueError):
         week = 0
-    if week <= 0:
+    # Between seasons Sleeper still reports last season's final week in `leg`.
+    # The "has played" gate would then hide every rookie and new signing from
+    # the wire all summer, so it is skipped until the league is back in season.
+    if week <= 0 or league_calendar.is_offseason(league):
         return None
     try:
         stats = sleeper.get_season_player_stats(

@@ -152,14 +152,10 @@ def _pick_id(pick):
 
 
 def _freeze_now(monkeypatch, when):
-    import datetime as _dt
+    # "Today" comes from the one injectable season clock (modules.season_clock).
+    from modules import season_clock
 
-    class _Frozen(_dt.datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return cls(when.year, when.month, when.day)
-
-    monkeypatch.setattr(trade_ideas, "datetime", _Frozen)
+    monkeypatch.setattr(season_clock, "_today_utc", lambda: when)
 
 
 def test_in_season_league_without_draft_status_does_not_offer_spent_picks(monkeypatch):

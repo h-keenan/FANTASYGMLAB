@@ -104,7 +104,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
-from modules import league_rankings, league_recaps, league_standings, projection_calibration, redis_cache, sleeper
+from modules import league_calendar, league_rankings, league_recaps, league_standings, projection_calibration, redis_cache, sleeper
 
 # Logistic-regression (no intercept) fit of win probability on z-scored
 # power_score differential needs enough same-season games to be more
@@ -762,6 +762,10 @@ def build_league_playoff_odds(
     league = sleeper.get_league(league_id)
     if not league:
         return {"ok": True, "reason": "unavailable", "teams": []}
+    if league_calendar.is_offseason(league):
+        # A finished season has no rest-of-season to simulate (it would print
+        # 100% / 0% "odds" and "0 weeks left"), and a new one has no results.
+        return {"ok": True, "reason": "offseason", "teams": []}
 
     rosters = sleeper.get_rosters(league_id)
     roster_profiles = sleeper.get_league_roster_profiles(league_id)

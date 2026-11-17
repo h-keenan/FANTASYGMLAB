@@ -197,6 +197,14 @@ def season_clock(today: date | None = None) -> SeasonClock:
         return clock
 
 
+def calendar_year(today: date | None = None) -> int:
+    """The calendar year, from the one injectable "today" (UTC) for callers that
+    need a year rather than a season (pick years, fallbacks). Use this instead of
+    ``datetime.now().year`` so tests can freeze the date."""
+
+    return (today or _today_utc()).year
+
+
 def current_season(today: date | None = None) -> int:
     return season_clock(today).season
 

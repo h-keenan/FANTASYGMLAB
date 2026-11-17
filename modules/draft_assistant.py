@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
 import re
 from typing import Any, Iterable, Mapping
 
 import pandas as pd
 
+from modules import season_clock
 from modules import injury_status as injury_table
 from modules import league_format_context, sleeper
 from modules.league_value_settings import _safe_positive_int
@@ -520,7 +520,7 @@ def fetch_league_draft_options(
         merged.update(draft or {})
         status = normalize_draft_status(merged.get("status"))
         rounds = draft_round_count(merged)
-        season = _safe_int(merged.get("season"), datetime.now().year)
+        season = _safe_int(merged.get("season"), season_clock.calendar_year())
         start_time = _safe_int(merged.get("start_time"), 0)
         draft_type = _safe_text(merged.get("type") or merged.get("draft_type"))
         options.append(
@@ -605,7 +605,7 @@ def build_live_draft_context(
                 "status": normalize_draft_status(draft.get("status")),
                 "status_label": draft_status_label(draft.get("status")),
                 "rounds": draft_round_count(draft),
-                "season": _safe_int(draft.get("season"), datetime.now().year),
+                "season": _safe_int(draft.get("season"), season_clock.calendar_year()),
                 "start_time": _safe_int(draft.get("start_time"), 0),
                 "type": _safe_text(draft.get("type") or draft.get("draft_type")),
                 "label": draft_option_label(draft, draft_id=selected_id),
@@ -764,7 +764,7 @@ def _detect_rookie_draft_candidate(league_id: str, league: dict) -> dict:
         (league.get("settings") or {}).get("draft_rounds"),
         4,
     )
-    league_season = _safe_positive_int(league.get("season"), 0) or datetime.now().year
+    league_season = _safe_positive_int(league.get("season"), 0) or season_clock.calendar_year()
     candidates = []
 
     for draft_stub in drafts:
@@ -839,7 +839,7 @@ def rookie_draft_context(
         "draft_available": False,
         "draft_completed": False,
         "draft_status": "unknown",
-        "draft_year": _safe_positive_int(datetime.now().year, datetime.now().year),
+        "draft_year": _safe_positive_int(season_clock.calendar_year(), season_clock.calendar_year()),
         "draft_rounds": 0,
         "picks_made": 0,
         "total_picks": 0,
@@ -863,7 +863,7 @@ def rookie_draft_context(
     rosters = sleeper.get_rosters(league_id) or []
     league_settings = dict(league_settings_items or ())
     league_size = max(_safe_positive_int(league_settings.get("league_size"), 0), len(rosters))
-    league_season = _safe_positive_int(league.get("season"), datetime.now().year) or datetime.now().year
+    league_season = _safe_positive_int(league.get("season"), season_clock.calendar_year()) or season_clock.calendar_year()
     candidate = _detect_rookie_draft_candidate(league_id, league)
     draft_id = _safe_text(candidate.get("draft_id"))
     draft = candidate.get("draft") or {}
