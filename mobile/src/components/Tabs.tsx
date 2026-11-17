@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '../lib/haptic';
 import Reanimated, { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import SegmentedTabBar from './SegmentedTabBar';
@@ -80,7 +80,7 @@ export function useTabs({ id, tabs, initial, onChange }: { id: string; tabs: rea
   nav.value = { i: index, n: keys.length };
   const commit = (target: string) => {
     if (target === previous.current) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    haptic('select');
     select(target);
   };
   const keysRef = useRef(keys);

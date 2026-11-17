@@ -13,6 +13,8 @@ export const EASE = {
   out: [0.2, 0.9, 0.3, 1],
   inOut: [0.4, 0, 0.2, 1],
   in: [0.4, 0, 1, 1],
+  /** Hero entrances (app-only use). */
+  emphasized: [0.2, 0, 0, 1],
 } as const;
 export const easeCss = (name: keyof typeof EASE): string => `cubic-bezier(${EASE[name].join(", ")})`;
 
@@ -162,4 +164,19 @@ export const SPRING = {
   press: { damping: 18, stiffness: 320, mass: 0.6 },
   settle: { damping: 20, stiffness: 220, mass: 0.8 },
   sheet: { damping: 26, stiffness: 180, mass: 1 },
+  // app-only: pop = overshoot for celebration/reveal, rubber = over-scroll snap-back, fling = velocity handoff after release.
+  pop: { damping: 12, stiffness: 260, mass: 0.7 },
+  rubber: { damping: 30, stiffness: 400, mass: 1 },
+  fling: { damping: 22, stiffness: 140, mass: 1 },
 } as const;
+export type SpringName = keyof typeof SPRING;
+
+// app-only: durations beyond the 120-300 ladder. `hero` = draw-ins, versus reveal, ticker roll; `epic` = championship only.
+export const HERO_MS = { hero: 600, epic: 1400 } as const;
+// app-only: ambient loops (compositor transform/opacity only; frozen under Reduce Motion and Reduced effects).
+export const AMBIENT_MS = { background: 14000, shimmer: 1600, orbBreath: 4000 } as const;
+
+/** Duration of a role/number, zero when reduced. The ticker roll uses `hero`. */
+export function heroMs(speed: keyof typeof HERO_MS, reduced: boolean): number {
+  return reduced ? 0 : HERO_MS[speed];
+}

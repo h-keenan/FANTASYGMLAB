@@ -2,6 +2,7 @@ import React from 'react';
 import { Switch } from 'react-native';
 
 import { useThemeMode } from '../context/ThemeModeContext';
+import { haptic } from '../lib/haptic';
 
 /**
  * The one switch: the native Switch with theme track colors. `tone` picks the
@@ -26,7 +27,10 @@ export default function Toggle({
   return (
     <Switch
       value={value}
-      onValueChange={onValueChange}
+      onValueChange={(next) => {
+        haptic('toggle');
+        onValueChange(next);
+      }}
       disabled={disabled}
       accessibilityLabel={label}
       trackColor={{ true: on, false: colors.border }}

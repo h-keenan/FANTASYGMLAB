@@ -7,6 +7,9 @@
  *   3. a new `useNativeDriver: false` in the app (JS-driven animation on the UI thread budget).
  *   4. a transition/animation duration in CSS that is not a motion token (`var(--motion-*)`) or one of 120/180/240/300ms
  *      (+ the count-up and a few documented long ones), checked only in files NOT on the allowlist.
+ *   5. (app, docs/design/app-motion-plan.md 2.4-2.5) a direct `expo-haptics` import anywhere but mobile/src/lib/haptic.ts
+ *      (use `haptic('intent')`), a hand-written `Easing.bezier(<numbers>)` (use the EASE tokens from lib/motion), and a
+ *      motion primitive (shimmer clock, TickNumber, useMotion) that never reads the reduced-motion switch.
  * The allowlist is the existing debt, each with a reason; it only shrinks. Run by web `npm test` (src/lib/motionScan.test.ts) and mobile `npm test`.
  */
 import fs from "node:fs";
@@ -27,6 +30,10 @@ export const LAYOUT_TRANSITION_ALLOW = [
   { file: "mobile/src/components/Presence.tsx", needle: "useNativeDriver: false", why: "collapse animates measured height (the documented Presence exception)" },
   { file: "mobile/src/components/SegmentedTabBar.tsx", needle: "useNativeDriver: false", why: "tab indicator width/left (candidate: scaleX + translateX)" },
 ];
+
+const HAPTIC_FILE = "mobile/src/lib/haptic.ts";
+/** App motion primitives that must honor Reduce Motion / Reduced effects. */
+const REDUCED_AWARE = ["mobile/src/lib/shimmerClock.ts", "mobile/src/lib/useMotion.ts", "mobile/src/components/TickNumber.tsx", "mobile/src/components/Skeleton.tsx"];
 
 const EXT = /\.(tsx?|css)$/;
 const SKIP = /(node_modules|\.next|\.expo|dist|build|coverage)$/;
@@ -57,10 +64,24 @@ export function scan() {
         if ((LAYOUT_PROP.test(line) || LAYOUT_PROP_TS.test(line)) && !allowed(rel, line)) {
           problems.push(`${where}  transition on a layout property: animate transform/opacity instead (ProgressFill, useFlipList, Presence)  -> ${line.trim().slice(0, 100)}`);
         }
+        if (rel.startsWith("mobile/") && rel !== HAPTIC_FILE && /from\s+['"]expo-haptics['"]|require\(['"]expo-haptics['"]\)/.test(line)) {
+          problems.push(`${where}  direct expo-haptics import: call haptic('<intent>') from lib/haptic (the only file allowed to import it)`);
+        }
+        if (rel.startsWith("mobile/") && rel !== "mobile/src/lib/motion.ts" && /Easing\.bezier\(\s*-?\d/.test(line)) {
+          problems.push(`${where}  hand-written Easing.bezier(numbers): use the EASE tokens from lib/motion`);
+        }
         if (rel.startsWith("mobile/") && /useNativeDriver:\s*false/.test(line) && !allowed(rel, line)) {
           problems.push(`${where}  useNativeDriver: false: animate transform/opacity on the native driver (or allowlist with a reason)`);
         }
       });
+    }
+  }
+  for (const rel of REDUCED_AWARE) {
+    const abs = path.join(root, rel);
+    if (!fs.existsSync(abs)) {
+      problems.push(`${rel}  motion primitive is missing`);
+    } else if (!/reduced|ambient/i.test(fs.readFileSync(abs, "utf8"))) {
+      problems.push(`${rel}  motion primitive never reads the reduced-motion switch (useMotion / useReducedMotion)`);
     }
   }
   return problems;

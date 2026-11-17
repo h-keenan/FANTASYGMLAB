@@ -84,7 +84,7 @@ export function ComparisonHeader({
           <AppText style={[styles.teamName, { color: colors.accent }]}>
             {mine.team_name || 'You'}
           </AppText>
-          <TickNumber value={totals.mineNow} style={styles.total} />
+          <TickNumber value={totals.mineNow} variant="roll" style={styles.total} />
           {showFinal ? <AppText style={styles.sub}>{`Proj final ${totals.mineFinal.toFixed(1)}`}</AppText> : null}
         </View>
         <View style={{ alignItems: 'center', gap: 4 }}>
@@ -100,7 +100,7 @@ export function ComparisonHeader({
           <AppText style={[styles.teamName, { color: colors.textPrimary }]}>
             {opponent.team_name || 'Opponent'}
           </AppText>
-          <TickNumber value={totals.opponentNow} style={styles.total} />
+          <TickNumber value={totals.opponentNow} variant="roll" style={styles.total} />
           {showFinal ? <AppText style={styles.sub}>{`Proj final ${totals.opponentFinal.toFixed(1)}`}</AppText> : null}
         </View>
       </View>
@@ -203,6 +203,7 @@ function CompactSide({
           {head.value != null ? (
             <TickNumber
               value={head.value}
+              variant="roll"
               style={[styles.sidePoints, { color: emphasis === 'lose' ? colors.textTertiary : colors.textPrimary }]}
             />
           ) : (

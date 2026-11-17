@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import type { TabIconName } from '../lib/tabIcons';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '../lib/haptic';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -550,7 +550,7 @@ export default function GmOrb() {
     .activateAfterLongPress(350)
     .onStart(() => {
       dragStartX.value = dragX.value;
-      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+      runOnJS(haptic)('lift');
     })
     .onUpdate((event) => {
       const next = dragStartX.value + event.translationX;
@@ -560,6 +560,7 @@ export default function GmOrb() {
       const finalX = dragX.value;
       const fraction = finalX >= 0 ? finalX / rightBound : finalX / -leftBound;
       runOnJS(setHorizontalFraction)(fraction);
+      runOnJS(haptic)('drop');
     });
 
   // RevenueCat caches customer info, so this is cheap per open; any failure
@@ -696,7 +697,7 @@ export default function GmOrb() {
   const openSheet = () => {
     if (coachOpen) dismissCoach();
     if (closeTimer.current) clearTimeout(closeTimer.current);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptic('tap');
     setSearchQuery('');
     setVisible(true);
     setOpen(true);

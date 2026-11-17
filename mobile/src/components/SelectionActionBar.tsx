@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import Button from './Button';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { selectionHaptic } from '../lib/footerHaptics';
+import { haptic } from '../lib/haptic';
 import { selectionActionLabel } from '../lib/bottomNav';
 import { useOrbClearance } from '../lib/orbLayout';
 import { spacing, type ThemeColors } from '../theme';
@@ -22,7 +22,7 @@ export default function SelectionActionBar({ count, verb, busy = false, disabled
   const orbClearance = useOrbClearance();
   const prev = useRef(0);
   useEffect(() => {
-    if (count !== prev.current && count > 0) selectionHaptic();
+    if (count !== prev.current && count > 0) haptic('select');
     prev.current = count;
   }, [count]);
   if (!(count > 0)) return null;

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '../lib/haptic';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
@@ -175,7 +175,7 @@ export default function PercentileExplorerSheet({
 
   // Tick as the scrub finger crosses into a new bar.
   useEffect(() => {
-    if (focusBin >= 0) void Haptics.selectionAsync().catch(() => {});
+    if (focusBin >= 0) haptic('select');
   }, [focusBin]);
 
   const changePool = (key: string) => {
@@ -202,7 +202,7 @@ export default function PercentileExplorerSheet({
   const pick = (player: ExplorerPlayer) => {
     if (me && player.player_id === me.player_id) return;
     trackUse('percentile_explorer', 'compare_picked', { props: { item_kind: metric.key } });
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    haptic('tap');
     setPickedId(player.player_id);
     setPins((prev) => addPin(prev, player.player_id));
     setSwapped(false);
