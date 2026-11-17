@@ -110,6 +110,7 @@ season-1 pool is a young, freshly drafted league, and the controllers (retire ha
 ```
 python -m modules.sim.calibration.longrun_soak run --out DIR --seeds 8 --seasons 30 --procs 4                         # about 12 min on 4 cores
 python -m modules.sim.calibration.longrun_soak run --out DIR3 --seeds 8 --seasons 30 --flags '{"stability_v": 3}'      # the before side
-python -m modules.sim.calibration.longrun_soak report --out DIR --before DIR3 --png docs/audits/sim-longrun            # tables + charts (matplotlib)
+python -m modules.sim.calibration.longrun_soak report --out DIR --before DIR3 --json tables.json                          # the tables
+python scripts/sim_longrun_charts.py tables.json docs/audits/sim-longrun                                              # the charts (matplotlib)
 python -m pytest tests/test_sim_longrun_regression.py
 ```

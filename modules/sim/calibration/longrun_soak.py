@@ -1,7 +1,8 @@
 """Long-run soak: many seeds x 30 dynasty seasons, one metrics row per season, to catch slow drift in the balance or the economy.
 
     python -m modules.sim.calibration.longrun_soak run    --out DIR [--seeds 8] [--seasons 30] [--procs 4]      # 1QB and superflex, 12-team PPR, current flags
-    python -m modules.sim.calibration.longrun_soak report --out DIR                                              # drift table from the saved runs
+    python -m modules.sim.calibration.longrun_soak report --out DIR [--before DIR3]                               # drift table from the saved runs
+    python scripts/sim_longrun_charts.py tables.json docs/audits/sim-longrun                                     # the charts (report --json tables.json; needs matplotlib)
 
 Headless games on the committed 2025 panel pool (``dynasty_run``; a throwaway pool, never ``data/players.db``), every current gate on (a new game takes the
 newest version of each rule). ``season_metrics`` turns one simulated season into scalars; ``BOUNDS`` is what the quick regression test
@@ -168,49 +169,6 @@ def load(out: str, mode: str) -> list[list[dict[str, Any]]]:  # pragma: no cover
     return [pickle.load(open(os.path.join(out, f), "rb")) for f in fs]
 
 
-PANELS: list[tuple[str, str, list[str]]] = [
-    ("scores", "Weekly AI team score", ["score_mean", "score_p1", "score_p99"]),
-    ("scores_tail", "Share of AI team-weeks (percent)", ["score_lt70", "score_lt60", "score_gt170"]),
-    ("positions", "Rank-12 points per game", ["QB12_ppg", "RB12_ppg", "WR12_ppg", "TE12_ppg"]),
-    ("ages", "Age", ["starter_age", "roster_age"]),
-    ("age_mix", "Share of rostered players (percent)", ["roster_age_u24", "roster_age_30plus", "starter_age_30plus"]),
-    ("churn", "Players per offseason", ["retired", "rookie_class_n"]),
-    ("economy", "Market value", ["top_market", "market_mean", "team_value_mean", "pick_value_12", "pick_value_36"]),
-    ("price_curve", "log market on log projection", ["market_slope_RB", "market_slope_WR", "market_slope_TE"]),
-    ("activity", "Events per season", ["waivers", "drops", "trades"]),
-    ("qb", "Quarterbacks", ["qb_per_team", "teams_3plus_qb"]),
-    ("rookies", "Rookie class", ["best_rookie_vs_vet12", "rookies_top12_skill"]),
-    ("parity", "Parity", ["win_sd", "pf_cv", "team_value_cv"]),
-]
-
-
-def plots(tables: dict[str, dict[str, np.ndarray]], png: str) -> None:  # pragma: no cover
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    os.makedirs(png, exist_ok=True)
-    for name, ylabel, keys in PANELS:
-        fig, axes = plt.subplots(1, len(keys), figsize=(3.6 * len(keys), 3.0), squeeze=False)
-        for ax, k in zip(axes[0], keys):
-            for mode, t in tables.items():
-                if k not in t:
-                    continue
-                a = t[k]
-                x =np.arange(1, a.shape[1] + 1)
-                ax.plot(x, np.nanmean(a, axis=0), label=mode, lw=1.8)
-                ax.fill_between(x, np.nanmin(a, axis=0), np.nanmax(a, axis=0), alpha=0.12)
-            ax.set_title(k, fontsize=9)
-            ax.set_xlabel("season")
-            ax.grid(alpha=0.25)
-        axes[0][0].set_ylabel(ylabel, fontsize=8)
-        axes[0][0].legend(fontsize=7)
-        fig.tight_layout()
-        fig.savefig(os.path.join(png, f"{name}.png"), dpi=110)
-        plt.close(fig)
-
-
 def main() -> None:  # pragma: no cover
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=("run", "report"))
@@ -219,8 +177,8 @@ def main() -> None:  # pragma: no cover
     ap.add_argument("--seasons", type=int, default=30)
     ap.add_argument("--procs", type=int, default=4)
     ap.add_argument("--flags", default="", help='run: GameSettings overrides as JSON for a before side, e.g. \'{"stability_v": 3}\'')
+    ap.add_argument("--json", default="", help="report: write every metric table (seeds x seasons) to this file for scripts/sim_longrun_charts.py")
     ap.add_argument("--before", default="", help="report: a second run directory (made with --flags stability_v 3) drawn on the charts and printed beside it")
-    ap.add_argument("--png", default="", help="report: also write charts (needs matplotlib) into this directory")
     a = ap.parse_args()
     if a.cmd == "run":
         run_all(a.out, a.seeds, a.seasons, min(a.procs, 4), json.loads(a.flags) if a.flags else None)
@@ -241,8 +199,9 @@ def main() -> None:  # pragma: no cover
             print(f"== before (1qb) {len(runs)} seeds   parity {parity(runs)}")
             for k, s13, mid, last in drift_rows(tables["1qb before"]):
                 print(f"{k:<24}{s13:>10.2f}{mid:>10.2f}{last:>10.2f}")
-    if a.png:
-        plots(tables, a.png)
+    if a.json:
+        with open(a.json, "w") as fh:
+            json.dump({m: {k: v.tolist() for k, v in t.items()} for m, t in tables.items()}, fh)
 
 
 if __name__ == "__main__":  # pragma: no cover
