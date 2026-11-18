@@ -42,7 +42,7 @@ function Column({ side, label, assets, mode, max, editing, addHint, onAdd, onRem
         render={(a) => (
           <View style={styles.assetRow} testID="scale-asset">
             <View style={styles.assetMain}>
-              <TradeAssetCard asset={a} mode={mode} />
+              <TradeAssetCard asset={a} mode={mode} stacked />
             </View>
             {editing && onRemove ? (
               <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${a.player?.name ?? a.pickLabel ?? 'asset'}`} onPress={() => onRemove(side, a.key)} style={styles.remove} hitSlop={6}>
@@ -156,7 +156,7 @@ function createStyles(colors: ThemeColors) {
     addPlus: { fontSize: 16, fontWeight: '800', color: colors.accent },
     addHint: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, textAlign: 'center', paddingHorizontal: 4 },
     meterCard: { gap: 4, padding: spacing.sm, backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, borderRadius: radii.tile },
-    actions: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+    actions: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
     action: { flex: 1, minWidth: 0 },
   });
 }

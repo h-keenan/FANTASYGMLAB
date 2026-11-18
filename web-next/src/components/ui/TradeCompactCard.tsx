@@ -33,12 +33,13 @@ export interface TradeCardAsset {
 }
 
 /** One asset as a compact player card (avatar included, tap opens the sheet) or a pick row with the round pick avatar. Shared by the trade card and the builder. */
-export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode: PlayerMode }) {
+export function TradeAssetCard({ asset: a, mode, stacked = false }: { asset: TradeCardAsset; mode: PlayerMode; /** Narrow two-column sides: name / pick label on one line, badge or detail left and ring + value right-aligned on the next. */ stacked?: boolean }) {
   if (a.player) {
     return (
       <CompactPlayerCard
         player={a.player}
         shortName
+        stacked={stacked}
         onOpen={a.onOpen}
         nonInteractive={a.nonInteractive}
         detail={a.detail}
@@ -53,16 +54,30 @@ export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode
       />
     );
   }
+  const value = mode === "desk" && a.value != null ? Math.round(a.value).toLocaleString() : null;
   return (
     <PickTap label={a.pickLabel ?? ""} id={a.pickId} detail={a.pickDetail} onOpen={a.onOpenPick} nonInteractive={a.nonInteractive}>
-      <div className="flex items-center gap-2 text-sm font-bold" style={{ minHeight: 44 }} data-testid="trade-pick-row">
-        <span className="shrink-0"><PickAvatar label={a.pickLabel} size={avatarSize("row")} /></span>
-        <span className="min-w-0 flex-1 [overflow-wrap:normal]">
-          {a.pickLabel}
-          {a.pickDetail ? <span className="block text-xs font-normal" style={{ color: "var(--color-text-secondary)" }}>{a.pickDetail}</span> : null}
-        </span>
-        {mode === "desk" && a.value != null ? <span>{Math.round(a.value).toLocaleString()}</span> : null}
-      </div>
+      {stacked ? (
+        <div className="flex min-w-0 flex-col gap-0.5 py-0.5 text-sm font-bold" data-testid="trade-pick-row">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0"><PickAvatar label={a.pickLabel} size={avatarSize("row")} /></span>
+            <span className="min-w-0 flex-1 whitespace-nowrap">{a.pickLabel}</span>
+          </span>
+          <span className="flex min-w-0 items-center justify-between gap-2">
+            <span className="min-w-0 flex-1 truncate text-xs font-normal" style={{ color: "var(--color-text-secondary)" }}>{a.pickDetail}</span>
+            {value ? <span className="ml-auto shrink-0 font-extrabold tabular-nums">{value}</span> : null}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-sm font-bold" style={{ minHeight: 44 }} data-testid="trade-pick-row">
+          <span className="shrink-0"><PickAvatar label={a.pickLabel} size={avatarSize("row")} /></span>
+          <span className="min-w-0 flex-1 [overflow-wrap:normal]">
+            <span className="whitespace-nowrap">{a.pickLabel}</span>
+            {a.pickDetail ? <span className="block truncate text-xs font-normal" style={{ color: "var(--color-text-secondary)" }}>{a.pickDetail}</span> : null}
+          </span>
+          {value ? <span className="tabular-nums">{value}</span> : null}
+        </div>
+      )}
     </PickTap>
   );
 }

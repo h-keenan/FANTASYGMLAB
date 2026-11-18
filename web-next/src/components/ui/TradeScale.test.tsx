@@ -25,6 +25,16 @@ describe("TradeScale (two-column scale)", () => {
     expect(screen.getAllByTestId("player-avatar-slot")).toHaveLength(1);
   });
 
+  it("lays both sides out the same way: top-aligned boxes, a one-line pick label, value in the right-aligned foot", () => {
+    render(<TradeScale give={[gibbs]} get={[chase, { key: "p2", pickLabel: "2027 2nd", pickDetail: "proj. 2.05 · Gridiron's pick", value: 1823 }]} onAdd={() => {}} />);
+    expect(screen.getByTestId("scale-give").parentElement?.className).toContain("items-start");
+    const pickRow = screen.getByTestId("trade-pick-row");
+    expect(pickRow).toHaveTextContent("2027 2nd");
+    expect(pickRow).toHaveTextContent("proj. 2.05 · Gridiron's pick");
+    expect(pickRow.querySelector(".whitespace-nowrap")).not.toBeNull();
+    expect(screen.getAllByTestId("compact-player-card")).toHaveLength(2);
+  });
+
   it("updates the meter live as assets change", () => {
     const { rerender } = render(<TradeScale give={[gibbs]} get={[chase]} onAdd={() => {}} />);
     expect(screen.getByTestId("fairness-label").textContent).toMatch(/win|edge to you/i);

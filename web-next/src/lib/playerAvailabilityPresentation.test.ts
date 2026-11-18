@@ -26,9 +26,9 @@ describe("playerAvailabilityPresentation", () => {
     ]);
   });
   it("only appends '(this week)' to the bye pill for an unavailable player", () => {
-    expect(byePillText(8, true, true)).toBe("Bye: Wk 8 (this week)");
-    expect(byePillText(8, true, false)).toBe("Bye: Wk 8");
-    expect(byePillText(8, false, true)).toBe("Bye: Wk 8");
+    expect(byePillText(8, true, true)).toBe("Bye 8 (this week)");
+    expect(byePillText(8, true, false)).toBe("Bye 8");
+    expect(byePillText(8, false, true)).toBe("Bye 8");
   });
   it("formats news age and the filtered news link", () => {
     const now = 1_000_000 * 1000;

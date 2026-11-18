@@ -131,6 +131,7 @@ export const IDENTICAL = [
   "startSitRange.ts",
   "tabIcons.ts",
   "teamInitials.ts",
+  "teamLabel.ts",
   "terms.ts",
   "tradeCautions.ts",
   "tradeValueBands.generated.ts",

@@ -34,6 +34,7 @@ import {
 } from "@/lib/commissionerIntegrity";
 import { pickToTradeAsset, playerToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { SkeletonText } from "@/components/Skeleton";
+import { teamPickerLabel } from "@/lib/teamLabel";
 
 /**
  * Commissioner: Trade veto calculator. The commissioner enters a proposed
@@ -531,7 +532,7 @@ export function VetoCalculator({ leagueId, lens = "Dynasty" }: { leagueId: strin
           const rosterId = String((roster.roster_id as string | number | undefined) ?? "");
           const players = Array.isArray(roster.players) ? (roster.players as unknown[]) : [];
           const profile = profiles.profiles[rosterId];
-          const label = [profile?.team_name, profile?.owner_name].filter(Boolean).join(" · ") || `Team ${rosterId}`;
+          const label = teamPickerLabel(profile?.team_name, profile?.owner_name, `Team ${rosterId}`);
           return { rosterId, label, playerIds: new Set(players.map(String)) };
         })
         .filter((t) => t.rosterId)

@@ -47,7 +47,7 @@ function Column({
         render={(a) => (
           <div className="flex min-w-0 items-center gap-1" data-testid="scale-asset">
             <div className="min-w-0 flex-1">
-              <TradeAssetCard asset={a} mode={mode} />
+              <TradeAssetCard asset={a} mode={mode} stacked />
             </div>
             {editing && onRemove ? (
               <button type="button" aria-label={`Remove ${a.player?.name ?? a.pickLabel ?? "asset"}`} onClick={() => onRemove(side, a.key)} className="inline-flex shrink-0 items-center justify-center text-base font-bold" style={{ width: 32, minHeight: "var(--touch-target-min)", color: "var(--color-text-muted)" }}>
@@ -141,7 +141,7 @@ export function TradeScale({
   const shown: FairnessMeter = missing ? { position: 0.5, edge: 0, label: missing, description: missing, tone: "muted" } : live;
   return (
     <section className="flex min-w-0 flex-col gap-2" data-testid={testId} data-phase={phase} aria-label="Trade">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 items-start gap-2">
         <Column side="give" label={giveLabel} assets={give} mode={mode} max={max} editing={editing} addHint={addHint?.give} onAdd={onAdd} onRemove={onRemove} />
         <Column side="get" label={getLabel} assets={get} mode={mode} max={max} editing={editing} addHint={addHint?.get} onAdd={onAdd} onRemove={onRemove} />
       </div>
@@ -153,7 +153,7 @@ export function TradeScale({
       {phase === "review" || phase === "tweak" ? (
         <div className="enter-rise flex flex-col gap-2" key={phase} data-testid="scale-actions">
           {phase === "review" ? verdict : null}
-          <div className="grid grid-flow-col auto-cols-fr items-center gap-2" data-testid="scale-action-row">
+          <div className="grid grid-flow-col auto-cols-fr items-stretch gap-2" data-testid="scale-action-row">
             {phase === "review" ? (
               <>
                 {onSend ? <Button fullWidth loading={sending} disabled={!canSend} onClick={onSend}>{sendLabel}</Button> : null}

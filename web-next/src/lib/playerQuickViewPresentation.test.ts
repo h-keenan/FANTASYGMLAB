@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { opportunityLabelTone, rookieBadge } from "./playerQuickViewPresentation";
+import { opportunityLabelTone, rookieBadge, usageTrendSummary, usageWindowLabel } from "./playerQuickViewPresentation";
 
 describe("rookieBadge", () => {
   it("only shows for is_rookie true", () => {
@@ -28,5 +28,13 @@ describe("opportunityLabelTone", () => {
     expect(opportunityLabelTone("Elite Opportunity")).toBe("success");
     expect(opportunityLabelTone("Committee Back")).toBe("muted");
     expect(opportunityLabelTone(null)).toBe("muted");
+  });
+});
+
+describe("usage trend window label", () => {
+  it("says which window the percentage covers, from the server's own window", () => {
+    expect(usageTrendSummary({ arrow: "▲", trend_pct: 8, window: 4 })).toBe("▲ 8% last 4 gm");
+    expect(usageTrendSummary({ arrow: "▼", trend_pct: -12 })).toBe("▼ 12% recent");
+    expect(usageWindowLabel({ window: 0 })).toBe("recent");
   });
 });

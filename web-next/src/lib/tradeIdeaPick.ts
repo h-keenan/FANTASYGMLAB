@@ -26,3 +26,22 @@ export function partnerFitLine(reason: string | null | undefined): string | null
   const text = (reason ?? '').trim();
   return text ? text : null;
 }
+
+function ordinalRound(round: number): string {
+  const teen = round % 100 >= 11 && round % 100 <= 13;
+  const suffix = teen ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[round % 10] ?? "th";
+  return `${round}${suffix}`;
+}
+
+/** The one short pick label every trade surface shows: "2027 2nd" (never "2027 Round 2", which wraps in a half-width card).
+ * Reads the season and round from the server label ("2027 Round 2", "2027 R2", "2027 2nd round") or the explicit fields;
+ * anything it cannot parse (a "(Pick 1.04)" label) is returned as it came. */
+export function pickCompactLabel(label: string | null | undefined, season?: number | string | null, round?: number | string | null): string {
+  const text = (label ?? "").trim();
+  const match = text.match(/^(\d{4})\s+(?:round\s+|r)(\d{1,2})\b/i) ?? text.match(/^(\d{4})\s+(\d{1,2})(?:st|nd|rd|th)\b/i);
+  if (match) return `${match[1]} ${ordinalRound(Number(match[2]))}`;
+  const year = season != null && String(season).trim() !== "" ? String(season) : null;
+  const rnd = round != null && String(round).trim() !== "" ? Number(round) : null;
+  if (!text && year && rnd) return `${year} ${ordinalRound(rnd)}`;
+  return text || "Draft pick";
+}

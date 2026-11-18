@@ -23,9 +23,9 @@ test('detail parts keep only what the server returned', () => {
 });
 
 test('bye pill says (this week) only for an unavailable player on bye', () => {
-  assert.equal(byePillText(8, true, true), 'Bye: Wk 8 (this week)');
-  assert.equal(byePillText(8, true, false), 'Bye: Wk 8');
-  assert.equal(byePillText(8, false, true), 'Bye: Wk 8');
+  assert.equal(byePillText(8, true, true), 'Bye 8 (this week)');
+  assert.equal(byePillText(8, true, false), 'Bye 8');
+  assert.equal(byePillText(8, false, true), 'Bye 8');
 });
 
 test('news age label', () => {

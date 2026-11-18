@@ -44,7 +44,7 @@ export function cautionDetail(caution: TradeCaution, verdictBand?: string): stri
   const base = (caution.explanation || "").trim();
   if (!caution.softened || !caution.softened_from) return base;
   const now = verdictBand ? titleCase(verdictBand) : "Accept";
-  return `${base} Label eased one step, from ${titleCase(caution.softened_from)} to ${now}.`.trim();
+  return `${base} Label eased, from ${titleCase(caution.softened_from)} to ${now}.`.trim();
 }
 
 /** One sentence for plain-text and image share output: the tag, so a shared

@@ -25,7 +25,7 @@ import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { tradeIdeaGainText } from '../lib/tradeIdeaSummary';
-import { partnerFitLine, pickProjectionLine } from '../lib/tradeIdeaPick';
+import { partnerFitLine, pickCompactLabel, pickProjectionLine } from '../lib/tradeIdeaPick';
 import type { DraftPickAsset, PresentationAsset, RankedPlayer, TradeIdea, TradeVerdict } from '../lib/api';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -301,7 +301,7 @@ export default function TradeIdeaCard({
   // included), a fairness meter; the former card body is the expand-in-place details. Web twin: ui/TradeCompactCard.
   const toCardAsset = (asset: PresentationAsset, index: number): TradeCardAsset =>
     asset.asset_type === 'pick'
-      ? { key: `pick-${index}`, pickLabel: asset.label || 'Draft pick', pickDetail: pickProjectionLine(asset), value: asset.score ?? null, onPress: () => openPick(asset) }
+      ? { key: `pick-${index}`, pickLabel: pickCompactLabel(asset.label, asset.season, asset.round), pickDetail: pickProjectionLine(asset), value: asset.score ?? null, onPress: () => openPick(asset) }
       : {
           key: asset.player_id ?? `p-${index}`,
           player: { id: asset.player_id ?? null, name: asset.name || 'Player', position: asset.position, team: asset.team, age: asset.age, tier: asset.tier },

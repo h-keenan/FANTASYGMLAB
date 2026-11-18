@@ -809,13 +809,15 @@ def decide_offer_verdict(
         tone = "fair"
 
     # Caution tags (modules.trade_cautions): words plus, at most, a ONE-step
-    # softening of the top rung. The numbers and the score never change.
-    cautions, soften = trade_cautions.apply_cautions(
+    # step-down of a positive label. The numbers and the score never change.
+    cautions, softened_band = trade_cautions.apply_cautions(
         band,
         trade_cautions.pick_glut(posture, send_assets, receive_assets, pick_context, posture_assessment),
     )
+    soften = softened_band != band
     if soften:
-        band, ui, tone = VERDICT_ACCEPT, UI_VERDICT_ACCEPT, "accept"
+        ui = softened_band if softened_band == trade_cautions.VERDICT_LEAN_ACCEPT else UI_VERDICT_ACCEPT
+        band, tone = softened_band, "accept"
 
     lineup_warnings = tuple(dict(w) for w in (fit.get("lineup_warnings") or ()) if isinstance(w, Mapping))
     has_critical_hole = any(w.get("severity") == "critical" for w in lineup_warnings)
@@ -848,7 +850,7 @@ def decide_offer_verdict(
 
     if explanation:
         rationale = explanation
-    elif band in {VERDICT_ACCEPT, VERDICT_SMASH_ACCEPT}:
+    elif band in {VERDICT_ACCEPT, VERDICT_SMASH_ACCEPT, trade_cautions.VERDICT_LEAN_ACCEPT}:
         rationale = "The package improves your side enough to take as offered."
     elif band in {VERDICT_DECLINE, VERDICT_HARD_DECLINE}:
         rationale = "The cost outweighs the return for your roster and strategy."

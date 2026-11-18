@@ -239,7 +239,7 @@ describe("TradeAnalyzerContent", () => {
     addVia("You send", "My RB");
     addVia("You receive", "Their WR");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
     });
     expect(await screen.findByText(/3 free trade checks/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Upgrade to Pro/ })).toHaveAttribute("href", "/premium");
@@ -257,7 +257,7 @@ describe("TradeAnalyzerContent", () => {
     addVia("You send", "My RB");
     addVia("You receive", "Their WR");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
     });
     expect(await screen.findByTestId("verdict-assumptions-line")).toHaveTextContent("Assumed: 1QB, PPR");
     expect(screen.getByRole("button", { name: "Report a bad verdict" })).toBeInTheDocument();
@@ -271,7 +271,7 @@ describe("TradeAnalyzerContent", () => {
     addVia("You receive", "Their WR");
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
     });
 
     expect(api.postTradeAnalyzer).toHaveBeenCalledWith(
@@ -330,7 +330,7 @@ describe("TradeAnalyzerContent", () => {
     addVia("You send", "My RB");
     addVia("You receive", "Their WR");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
     });
 
     const warnings = await screen.findByTestId("lineup-warnings");
@@ -377,7 +377,7 @@ describe("TradeAnalyzerContent", () => {
     addVia("You send", "My RB");
     addVia("You receive", "Their WR");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
     });
 
     await openVerdictModules();
@@ -437,7 +437,7 @@ describe("TradeAnalyzerContent", () => {
     addVia("You send", "My RB");
     addVia("You receive", "Their WR");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
     });
 
     const chip = await screen.findByTestId("posture-chip");
@@ -459,7 +459,7 @@ describe("TradeAnalyzerContent", () => {
     addVia("You send", "My RB");
     addVia("You receive", "Their WR");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
     });
   }
 
@@ -622,7 +622,7 @@ describe("TradeAnalyzerContent", () => {
       openTweak();
       expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Remove Their WR" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Remove 2027 Round 1" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove 2027 1st" })).toBeInTheDocument();
       expect(screen.queryByText(/gone-player/)).not.toBeInTheDocument();
     });
 
@@ -644,7 +644,7 @@ describe("TradeAnalyzerContent", () => {
       expect(screen.getByTestId("scale-get")).toBeInTheDocument();
       expect(screen.getAllByTestId("player-avatar-slot").length).toBeGreaterThanOrEqual(2);
       expect(screen.getByTestId("fairness-label").textContent).not.toMatch(/^Add /);
-      expect(screen.getByRole("button", { name: /^Analyze Trade \(1 for 1\)/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Analyze$/ })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Tweak" })).toBeInTheDocument();
     });
   });
@@ -724,10 +724,10 @@ describe("TradeAnalyzerContent", () => {
       fireEvent.click(screen.getByRole("tab", { name: /Picks/ }));
       fireEvent.click(screen.getByRole("button", { name: "Add 2027 Round 1" }));
       fireEvent.click(screen.getByRole("button", { name: /^Add 1 to trade/ }));
-      expect(screen.getByRole("button", { name: "Remove 2027 Round 1" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove 2027 1st" })).toBeInTheDocument();
 
       await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+        fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
       });
 
       const counterButton = await screen.findByRole("button", { name: "Build the counter →" });
@@ -736,7 +736,7 @@ describe("TradeAnalyzerContent", () => {
       // The pick-type action used to be silently unsupported (the button
       // only rendered/applied for asset_type "player") — this is the fix:
       // the exact pick the server named is gone from You send afterward.
-      expect(screen.queryByRole("button", { name: "Remove 2027 Round 1" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove 2027 1st" })).not.toBeInTheDocument();
     });
   });
 
@@ -759,7 +759,7 @@ describe("TradeAnalyzerContent", () => {
       fireEvent.change(screen.getByLabelText("Trading with"), { target: { value: "2" } });
       addVia("You receive", "Their WR");
       await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
+        fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
       });
       await screen.findByText("Reviewed package");
     }
@@ -848,7 +848,7 @@ describe("Quick Compare (the app's instant players-only readout, on web)", () =>
     addVia("You receive", "Their WR");
     expect(screen.getByTestId("quick-compare")).toBeInTheDocument();
     expect(screen.getByTestId("trade-value-bar")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Analyze Trade/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Analyze$/ })).toBeNull();
     expect(api.postTradeAnalyzer).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("tab", { name: "Full Analysis" }));
     expect(screen.queryByTestId("quick-compare")).toBeNull();

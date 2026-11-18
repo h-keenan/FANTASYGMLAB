@@ -25,7 +25,9 @@ Rule (``pick_glut``), derived from facts, not from one player or one team:
   anything and the caution stays quiet. Unknown room never blocks it.
 
 Effect (and the only one): a tag with a one-line explanation in ``cautions``
-and, when the verdict was SMASH ACCEPT, a ONE-step softening to ACCEPT.
+and a label step-down on a positive verdict, so a green ACCEPT never sits above
+a material warning: SMASH ACCEPT -> ACCEPT -> LEAN ACCEPT, one step, or two when
+``severity`` finds three independent confirmations.
 Value numbers, trade score, confidence and counter search are never touched.
 Wording lives here; web and mobile render these strings verbatim
 (web-next/src/lib/tradeCautions.ts is the identical twin of the mobile one).
@@ -52,7 +54,7 @@ CURRENT_OUT_MIN = 1500.0
 LINEUP_OUT_MIN = 5.0
 AGING_AGE = 28
 
-# Verdict labels the caution may sit next to; only the top rung softens.
+# Verdict labels the caution may sit next to; the positive rungs step down.
 _ELIGIBLE_VERDICTS = {bands.VERDICT_SMASH_ACCEPT, bands.VERDICT_ACCEPT, bands.VERDICT_FAIR}
 
 
@@ -188,18 +190,52 @@ def explanation(held: int, incoming: int) -> str:
     )
 
 
+# The rungs a material caution walks down, top first. LEAN ACCEPT is a label
+# only (tone stays "accept": green, never red); every number is untouched.
+VERDICT_LEAN_ACCEPT = "LEAN ACCEPT"
+_LADDER = (bands.VERDICT_SMASH_ACCEPT, bands.VERDICT_ACCEPT, VERDICT_LEAN_ACCEPT)
+# Independent confirmations (see ``severity``) that earn a second step.
+SEVERE_POINTS = 3
+
+
+def severity(caution: Mapping[str, Any] | None) -> int:
+    """How many independent facts say the warning is heavy, 0 to 4.
+
+    The caution already passed every gate in ``pick_glut`` (direction, picks
+    held, pick share, outflow, roster room). These count how far past the
+    gates it is, from separate facts, so one big number cannot decide alone:
+    a glut well beyond the threshold, picks being most of the return, a lot
+    of present value leaving, and a real lineup loss."""
+
+    facts = (caution or {}).get("facts") or {}
+    points = 0
+    if _num(facts.get("held_premium_picks")) >= GLUT_UNITS + 2:
+        points += 1
+    if _num(facts.get("pick_share_of_incoming")) >= 0.5:
+        points += 1
+    if _num(facts.get("current_value_out")) >= 2 * CURRENT_OUT_MIN:
+        points += 1
+    if _num(facts.get("lineup_points")) <= -2 * LINEUP_OUT_MIN:
+        points += 1
+    return points
+
+
 def apply_cautions(
     verdict: str, caution: dict[str, Any] | None
-) -> tuple[list[dict[str, Any]], bool]:
-    """(cautions, soften). The caution only shows on a verdict that still reads
-    positive or close (a decline needs no extra warning); it softens exactly
-    one rung, SMASH ACCEPT -> ACCEPT, and nothing else."""
+) -> tuple[list[dict[str, Any]], str]:
+    """(cautions, verdict). The caution only shows on a verdict that still
+    reads positive or close (a decline needs no extra warning). A positive
+    verdict steps down one rung (SMASH ACCEPT -> ACCEPT -> LEAN ACCEPT), two
+    when ``severity`` reaches ``SEVERE_POINTS``; FAIR keeps its label."""
 
     if not caution or verdict not in _ELIGIBLE_VERDICTS:
-        return [], False
-    soften = verdict == bands.VERDICT_SMASH_ACCEPT
+        return [], verdict
     out = dict(caution)
-    if soften:
+    new = verdict
+    if verdict in _LADDER:
+        steps = 2 if severity(caution) >= SEVERE_POINTS else 1
+        new = _LADDER[min(len(_LADDER) - 1, _LADDER.index(verdict) + steps)]
+    if new != verdict:
         out["softened"] = True
-        out["softened_from"] = bands.VERDICT_SMASH_ACCEPT
-    return [out], soften
+        out["softened_from"] = verdict
+    return [out], new
