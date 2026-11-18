@@ -30,6 +30,7 @@ const ALL_CATEGORIES_ON: Record<PushCategory, boolean> = {
   waiver_reminder: true,
   trade_deadline: true,
   weekly_roundup: true,
+  sim_week_ready: false,
 };
 
 function renderContent(overrides: Partial<Parameters<typeof AccountContent>[0]> = {}) {

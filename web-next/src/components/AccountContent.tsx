@@ -50,6 +50,7 @@ const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; descript
   { value: "trade_deadline", label: "Trade deadline", description: "Two weeks out, one week out, and the deadline week itself" },
   { value: "waiver_reminder", label: "Waiver reminders", description: "Before waivers process, only when you have a clear need" },
   { value: "weekly_roundup", label: "Weekly roundup", description: "Tuesday after games: what you left on the bench and whether you could have known" },
+  { value: "sim_week_ready", label: "Fantasy Sim week ready", description: "Off by default: when your Fantasy Sim week has been waiting for you" },
 ];
 
 function SectionHeading({ id, children, color }: { id: string; children: React.ReactNode; color?: string }) {

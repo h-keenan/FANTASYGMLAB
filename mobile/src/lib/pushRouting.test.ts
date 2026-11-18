@@ -94,6 +94,10 @@ test('recap push opens News > My League on the Recap tab, not the dashboard', ()
   });
 });
 
+test('Fantasy Sim week-ready push opens the Sim hub with no league', () => {
+  assert.deepEqual(resolvePushTapTarget({ category: 'sim_week_ready', week: 4 }), { screen: 'GmGame' });
+});
+
 test('payloads with no usable target return null', () => {
   assert.equal(resolvePushTapTarget(null), null);
   assert.equal(resolvePushTapTarget('nope'), null);
