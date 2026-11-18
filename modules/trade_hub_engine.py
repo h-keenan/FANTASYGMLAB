@@ -34,10 +34,12 @@ from modules import keepers as keepers_module
 from modules import league_rankings
 from modules import league_value_settings
 from modules import model_status
+from modules import partner_context as partner_context_module
 from modules import player_quick_view
 from modules import redis_cache
 from modules import sleeper
 from modules import swr_cache
+from modules import team_profile as team_profile_module
 from modules import team_stance as team_stance_module
 from modules import trade_hub_presentation
 from modules import trade_posture as trade_posture_module
@@ -528,6 +530,7 @@ def generate_trade_idea_records(
     require_receive_players: bool = False,
     keeper_context: Mapping[str, Any] | None = None,
     finder_trace: "trade_ideas_module.FinderSearchTrace | None" = None,
+    team_profiles: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
     and modules.trade_hub_presentation already work with (trade_confidence_label,
@@ -685,6 +688,7 @@ def generate_trade_idea_records(
         require_receive_picks=bool(require_receive_picks),
         require_receive_players=bool(require_receive_players),
         finder_trace=finder_trace,
+        team_profiles=team_profiles,
     )
     enforced = enforce_generated_trade_ideas(
         raw_ideas,
@@ -797,9 +801,20 @@ def _generate_trade_idea_records_cached(
     df_summary, _draft_capital_summary = league_rankings.build_league_summary_and_draft_capital_cached(
         league_id=league_id, lens=lens, players_db_path=players_db_path
     )
+    # Partner context (handshakes 3-5): the shared league team profile carries
+    # every partner's trade tendency. A missing profile degrades to neutral.
+    team_profiles = None
+    if partner_context_module.enabled():
+        try:
+            team_profiles = team_profile_module.league_team_profiles_cached(
+                league_id=league_id, lens=lens, players_db_path=players_db_path
+            )
+        except Exception:
+            team_profiles = None
     return generate_trade_idea_records(
         league_id=league_id,
         my_roster_id=roster_id,
+        team_profiles=team_profiles,
         players_df=valued,
         rosters=rosters,
         untouchable_player_ids=untouchable_player_ids,
@@ -885,7 +900,8 @@ def generate_trade_idea_records_cached(
         keepers_module.clamp_round_penalty(keeper_round_penalty),
         # Round 4: the league-state fingerprint (settings, rosters, traded picks, players/values files) replaces the clock
         # bucket, so the entry is served stale-while-revalidate and a real change is a different key.
-        league_value_settings.league_state_fingerprint(league_id, players_db_path),
+        f"{league_value_settings.league_state_fingerprint(league_id, players_db_path)}"
+        f"|pc={int(partner_context_module.enabled())}",
     )
     cache_key = redis_cache.build_cache_key("trade_hub_ideas", *key)
     records = swr_cache.redis_swr_cache(
