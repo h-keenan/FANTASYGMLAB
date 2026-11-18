@@ -40,6 +40,9 @@ describe("gmPlanPlan", () => {
     expect(steps.map((s) => s.title)).toEqual(["Sell aging vets for picks", "Stack draft capital", "Roster Construction"]);
     expect(steps[0]).toMatchObject({ kind: "trades", summary: "2 ideas: The Hospital and Just Win" });
     expect(steps[1].chip).toEqual({ label: "1st", tone: "success" });
+    expect(steps[1].summary).toBe("You hold the most draft capital in the league");
+    const mid = buildPlanSteps({ stance: "rebuilding", tradeCount: 0, partners: [], topConfidence: null, capital: { rank: 4, total: 12 }, areas: [] });
+    expect(mid[1].summary).toBe("Your draft capital ranks 4th of 12");
   });
 
   it("explains the stance and is null without one", () => {

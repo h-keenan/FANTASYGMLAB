@@ -38,6 +38,7 @@ const DELTA_WORDS = /\b(gain|gainColor|balanceColor|tradeGain|trade_gain|netValu
 // named netPts (not in DELTA_WORDS) and its stripe came from a mapped helper (verdictToneColorVar). Two general rules:
 //   6. a negative-sign ternary that yields danger (x < 0 ? "danger", delta < 0 ? colors.danger): a loss is muted;
 //   7. an accent stripe fed by a verdict helper (accent = verdictColor(...)): one calm stripe, the verdict lives on a chip.
+//   8. the "You send" side of a trade package coloured danger (ExchangeSide dot / total): the user's own side is neutral grey.
 // Rule 6 covers the trade / track-record surfaces (other surfaces, e.g. live scoring, have their own meaning for a negative).
 const TRADE_FILE = /(Trade|TrackRecord|trackRecord)/;
 const NEGATIVE_DANGER = /<\s*0\s*\?\s*(["']danger["']|var\(--color-danger\)|colors\.danger)/;
@@ -46,6 +47,8 @@ const DANGER_TONE = /(["'])danger\1|var\(--color-danger\)|\bcolors\.danger\b/;
 // A card / module accent stripe chosen with a ternary that can turn it red (accent = x ? danger : accent): one calm stripe;
 // the reason (an injury) is said in the text or a small chip.
 const STRIPE_DANGER = /\baccent\s*=\s*\{?[^;]*injur[^;]*\?[^;]*(var\(--color-danger\)|colors\.danger|["']danger["'])/i;
+
+const SEND_DANGER = /(You (?:send|sent)\b|side\s*===\s*['"]send['"]).*(var\(--color-danger\)|colors\.danger\b)/;
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -72,6 +75,10 @@ export function scanText(rel, text) {
     }
     if (TRADE_FILE.test(rel) && NEGATIVE_DANGER.test(line)) {
       problems.push(`${rel}:${i + 1}: a negative value is coloured red (${line.trim().slice(0, 80)}); a loss is muted ("Down 12" chip), never red`);
+      return;
+    }
+    if (SEND_DANGER.test(line)) {
+      problems.push(`${rel}:${i + 1}: the send side of a trade is coloured red (${line.trim().slice(0, 80)}); the user's own side is neutral grey`);
       return;
     }
     if (STRIPE_VERDICT.test(line)) {

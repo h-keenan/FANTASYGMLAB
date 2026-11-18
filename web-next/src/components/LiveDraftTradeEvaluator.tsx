@@ -349,7 +349,7 @@ export function LiveDraftTradeEvaluator({
                 style={{ background: "var(--color-surface-raised)", border: "var(--border-width-default) solid var(--color-border)" }}
               >
                 <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-3 items-start">
-                  <ExchangeSide label="You send" dotColor="var(--color-danger)" assets={result.send_assets} />
+                  <ExchangeSide label="You send" dotColor="var(--color-text-muted)" assets={result.send_assets} />
                   <div
                     className="hidden sm:flex items-center justify-center text-xs font-bold uppercase self-stretch"
                     style={{ color: "var(--color-accent)" }}

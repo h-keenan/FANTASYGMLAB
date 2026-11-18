@@ -41,6 +41,9 @@ test('steps follow stance, capital, then signal areas', () => {
   });
   assert.deepEqual(steps.map((s) => s.title), ['Sell aging vets for picks', 'Stack draft capital', 'Roster Construction']);
   assert.equal(steps[0].summary, '2 ideas: The Hospital and Just Win');
+  assert.equal(steps[1].summary, 'You hold the most draft capital in the league');
+  const mid = buildPlanSteps({ stance: 'rebuilding', tradeCount: 0, partners: [], topConfidence: null, capital: { rank: 4, total: 12 }, areas: [] });
+  assert.equal(mid[1].summary, 'Your draft capital ranks 4th of 12');
 });
 
 test('why line needs a stance', () => {

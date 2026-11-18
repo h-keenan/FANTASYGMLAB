@@ -135,7 +135,7 @@ export function buildPlanSteps(input: {
     steps.push({
       key: "capital",
       title: CAPITAL_TITLE[stance] ?? "Know your draft capital",
-      summary: top ? `You hold the ${ordinal(rank)}-most capital of ${total}` : `You rank ${ordinal(rank)} of ${total} in draft capital`,
+      summary: rank === 1 ? "You hold the most draft capital in the league" : `Your draft capital ranks ${ordinal(rank)} of ${total}`,
       chip: { label: ordinal(rank), tone: top ? "success" : "muted" },
       kind: "plain",
     });

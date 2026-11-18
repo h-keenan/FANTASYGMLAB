@@ -77,7 +77,7 @@ function TradeRow({ item, detailsHref }: { item: GmPlanTradeItem; detailsHref?: 
       <Collapse open={open}>
         <div className="flex flex-col gap-2 pb-2">
           <div className="grid grid-cols-1 gap-2">
-            <ExchangeSide label="You send" dotColor="var(--color-danger)" assets={item.send_assets} />
+            <ExchangeSide label="You send" dotColor="var(--color-text-muted)" assets={item.send_assets} />
             <ExchangeSide label="You get" dotColor="var(--color-success)" assets={item.receive_assets} />
           </div>
           <div className="flex items-end justify-between gap-3">
