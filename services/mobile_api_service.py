@@ -12116,7 +12116,10 @@ class UpdatePushPreferenceRequest(BaseModel):
 
 def _push_categories_from_settings(settings: dict[str, Any]) -> dict[str, bool]:
     stored = settings.get("push_categories") if isinstance(settings.get("push_categories"), dict) else {}
-    return {category: bool(stored.get(category, True)) for category in push_triggers.TOGGLEABLE_PUSH_CATEGORIES}
+    return {
+        category: bool(stored.get(category, category not in push_triggers.DEFAULT_OFF_PUSH_CATEGORIES))
+        for category in push_triggers.TOGGLEABLE_PUSH_CATEGORIES
+    }
 
 
 @app.get("/v1/push/preferences")

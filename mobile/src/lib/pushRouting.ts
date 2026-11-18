@@ -32,6 +32,7 @@ export type PushTapTarget =
   | { screen: 'Trades'; leagueId: string; leagueName: string }
   | { screen: 'News'; initialTab: 'league'; leagueId: string; leagueName: string; recapsTab: 'roundup' | 'recap'; week?: number }
   | { screen: 'TradeHistory' }
+  | { screen: 'GmGame' }
   | null;
 
 function str(value: unknown): string {
@@ -49,6 +50,9 @@ export function resolvePushTapTarget(data: unknown): PushTapTarget {
   if (str(payload.type) === 'trade_outcome_followup' || str(payload.category) === 'trade_followup') {
     return { screen: 'TradeHistory' };
   }
+
+  // Fantasy Sim week-ready is league-free: it opens the Sim hub.
+  if (str(payload.category) === 'sim_week_ready') return { screen: 'GmGame' };
 
   if (!leagueId) return null;
 

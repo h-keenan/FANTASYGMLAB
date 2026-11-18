@@ -51,7 +51,9 @@ TRADE_OUTCOMES_TABLE = "trade_outcomes"
 TRADE_OUTCOME_FOLLOWUP_DELAY_HOURS = 20
 # Every push category a user can individually toggle off — the Notification
 # Settings screen (mobile) reads/writes exactly this key set.
-TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury", "team_situation", "trade_followup", "lineup_lock", "waiver_reminder", "trade_deadline", "weekly_roundup")
+TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury", "team_situation", "trade_followup", "lineup_lock", "waiver_reminder", "trade_deadline", "weekly_roundup", "sim_week_ready")
+# Categories a user must opt IN to: a missing/unset toggle means OFF, not on.
+DEFAULT_OFF_PUSH_CATEGORIES = frozenset({"sim_week_ready"})
 # push item category -> the preference key that gates it. Only the two
 # one-off pushes differ from their category name.
 PREFERENCE_KEY_BY_CATEGORY = {
@@ -69,6 +71,7 @@ PUSH_PRIORITY_ORDER = (
     "waiver_reminder",
     "trade_followup",
     "weekly_roundup",
+    "sim_week_ready",
     "recap",
     "gm_stance_reminder",
 )
@@ -119,6 +122,7 @@ PUSH_TITLE_BY_CATEGORY = {
     "waiver_reminder": "Waivers Process Soon",
     "trade_deadline": "Trade Deadline",
     "weekly_roundup": "Weekly Roundup",
+    "sim_week_ready": "Fantasy Sim",
 }
 DEFAULT_LENS = league_value_settings.DEFAULT_VALUATION_LENS  # per-league lens: default_lens_for_league
 
@@ -270,7 +274,8 @@ def fetch_push_settings(
         settings = row.get("settings") if isinstance(row.get("settings"), Mapping) else {}
         categories = settings.get("push_categories") if isinstance(settings.get("push_categories"), Mapping) else {}
         preferences[user_id] = {
-            category: bool(categories.get(category, True)) for category in TOGGLEABLE_PUSH_CATEGORIES
+            category: bool(categories.get(category, category not in DEFAULT_OFF_PUSH_CATEGORIES))
+            for category in TOGGLEABLE_PUSH_CATEGORIES
         }
         notif_prefs[user_id] = notification_prefs.prefs_from_settings(
             settings, valid_categories=TOGGLEABLE_PUSH_CATEGORIES
@@ -288,10 +293,12 @@ def fetch_push_preferences(config: PushTriggerConfig, user_ids: list[str]) -> di
 def push_item_allowed(preferences: dict[str, dict[str, bool]], *, user_id: str, category: str) -> bool:
     """Default-open: no settings row (or an unrecognized category) means enabled."""
 
+    key = PREFERENCE_KEY_BY_CATEGORY.get(category, category)
+    default = key not in DEFAULT_OFF_PUSH_CATEGORIES
     user_prefs = preferences.get(user_id)
     if user_prefs is None:
-        return True
-    return bool(user_prefs.get(PREFERENCE_KEY_BY_CATEGORY.get(category, category), True))
+        return default
+    return bool(user_prefs.get(key, default))
 
 
 def fetch_gm_stance_leagues(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, set[str]]:
@@ -453,6 +460,211 @@ def already_notified_batch(config: PushTriggerConfig, *, user_id: str, recommend
     return {str(row.get("recommendation_id")) for row in rows if isinstance(row, dict) and row.get("recommendation_id")}
 
 
+INJURY_CLEAR_PREFIX = "injury_clear:"
+# A player who was hurt, recovered and is hurt again re-alerts only when BOTH hold:
+# the last injury push is at least this old (minimum gap) and the player has been
+# seen healthy for at least this long (healthy period, so Out/Questionable flicker
+# around a game day never re-pushes).
+INJURY_REALERT_MIN_GAP = timedelta(days=7)
+INJURY_REALERT_HEALTHY_PERIOD = timedelta(days=3)
+
+
+def injury_realert_resets(
+    *,
+    injury_rows: list[Mapping[str, Any]],
+    marker_rows: list[Mapping[str, Any]],
+    healthy_ids: set[str],
+    unavailable_ids: set[str],
+    now: datetime,
+) -> tuple[list[str], list[str], list[str]]:
+    """Pure decision for injury re-alerts.
+
+    injury_rows / marker_rows are push_notification_log rows ({recommendation_id, sent_at}).
+    Returns (marker_ids_to_create, recommendation_ids_to_delete, player_ids_reset):
+      - a previously alerted player seen healthy gets a ``injury_clear:{player}`` marker (first sighting kept);
+      - a marker for a player who is unavailable again is dropped (healthy period broken);
+      - a player whose marker is old enough AND whose last injury push is old enough is reset: their injury
+        rows and marker are deleted so the next injury alerts again.
+    """
+
+    last_push: dict[str, datetime] = {}
+    for row in injury_rows:
+        rid = _safe_text(row.get("recommendation_id"))
+        parts = rid.split(":")
+        sent = _parse_dt(row.get("sent_at"))
+        if len(parts) >= 3 and parts[0] == "injury" and sent is not None:
+            last_push[parts[1]] = max(sent, last_push.get(parts[1], sent))
+    markers: dict[str, datetime | None] = {}
+    for row in marker_rows:
+        rid = _safe_text(row.get("recommendation_id"))
+        if rid.startswith(INJURY_CLEAR_PREFIX):
+            markers[rid[len(INJURY_CLEAR_PREFIX):]] = _parse_dt(row.get("sent_at"))
+    create: list[str] = []
+    delete: list[str] = []
+    reset: list[str] = []
+    for pid, pushed_at in last_push.items():
+        if pid in unavailable_ids:
+            if pid in markers:
+                delete.append(f"{INJURY_CLEAR_PREFIX}{pid}")
+            continue
+        if pid not in healthy_ids:
+            continue
+        seen = markers.get(pid)
+        if pid not in markers:
+            create.append(f"{INJURY_CLEAR_PREFIX}{pid}")
+            continue
+        if seen is None:
+            continue
+        if now - seen >= INJURY_REALERT_HEALTHY_PERIOD and now - pushed_at >= INJURY_REALERT_MIN_GAP:
+            reset.append(pid)
+            delete.append(f"{INJURY_CLEAR_PREFIX}{pid}")
+            delete.extend(
+                _safe_text(r.get("recommendation_id"))
+                for r in injury_rows
+                if _safe_text(r.get("recommendation_id")).startswith(f"injury:{pid}:")
+            )
+    return create, delete, reset
+
+
+def reset_injury_realerts(
+    config: PushTriggerConfig,
+    *,
+    user_id: str,
+    healthy_ids: set[str],
+    unavailable_ids: set[str],
+    now: datetime | None = None,
+) -> list[str]:
+    """Apply injury_realert_resets against the log. Best effort: any failure leaves dedupe as it was
+    (a missed re-alert beats a duplicate). Returns the player ids reset."""
+
+    if not config.configured or not user_id or not (healthy_ids or unavailable_ids):
+        return []
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{NOTIFICATION_LOG_TABLE}",
+            headers=_headers(config),
+            params={
+                "select": "recommendation_id,sent_at",
+                "user_id": f"eq.{user_id}",
+                "or": f"(recommendation_id.like.injury:*,recommendation_id.like.{INJURY_CLEAR_PREFIX}*)",
+            },
+            timeout=15,
+        )
+        if response.status_code >= 400:
+            return []
+        rows = response.json()
+    except Exception:
+        return []
+    if not isinstance(rows, list) or not rows:
+        return []
+    injury_rows = [r for r in rows if isinstance(r, Mapping) and _safe_text(r.get("recommendation_id")).startswith("injury:")]
+    marker_rows = [r for r in rows if isinstance(r, Mapping) and _safe_text(r.get("recommendation_id")).startswith(INJURY_CLEAR_PREFIX)]
+    create, delete, reset = injury_realert_resets(
+        injury_rows=injury_rows,
+        marker_rows=marker_rows,
+        healthy_ids=healthy_ids,
+        unavailable_ids=unavailable_ids,
+        now=now or _utcnow(),
+    )
+    try:
+        if create:
+            requests.post(
+                f"{config.url}/rest/v1/{NOTIFICATION_LOG_TABLE}",
+                headers=_headers(config, prefer="return=minimal,resolution=ignore-duplicates"),
+                json=[{"user_id": user_id, "recommendation_id": rid, "league_id": ""} for rid in create],
+                timeout=15,
+            )
+        for rid in dict.fromkeys(delete):
+            if "," in rid or ")" in rid:
+                continue
+            requests.delete(
+                f"{config.url}/rest/v1/{NOTIFICATION_LOG_TABLE}",
+                headers=_headers(config, prefer="return=minimal"),
+                params={"user_id": f"eq.{user_id}", "recommendation_id": f"eq.{rid}"},
+                timeout=15,
+            )
+    except Exception:
+        return []
+    return reset
+
+
+SIM_GAMES_TABLE = "sim_games"
+# A Fantasy Sim week is "ready" for the player when the season is live and the game has sat on the
+# current week for this long (the sim is turn-based, so the week waits for the player). Games idle
+# past SIM_WEEK_READY_MAX_IDLE are treated as abandoned and never nagged.
+SIM_WEEK_READY_AFTER = timedelta(hours=20)
+SIM_WEEK_READY_MAX_IDLE = timedelta(days=7)
+
+
+def sim_week_ready_push_item(rows: list[Mapping[str, Any]], *, now: datetime) -> dict[str, Any] | None:
+    """Pure: the push item for the newest live Sim game whose week is waiting, else None."""
+
+    best: tuple[datetime, Mapping[str, Any]] | None = None
+    for row in rows:
+        if _safe_text(row.get("status")) not in {"in_season", "playoffs"}:
+            continue
+        updated = _parse_dt(row.get("updated_at"))
+        game_id = _safe_text(row.get("id"))
+        week = row.get("current_week")
+        if updated is None or not game_id or not isinstance(week, int) or week < 1:
+            continue
+        idle = now - updated
+        if idle < SIM_WEEK_READY_AFTER or idle > SIM_WEEK_READY_MAX_IDLE:
+            continue
+        if best is None or updated > best[0]:
+            best = (updated, row)
+    if best is None:
+        return None
+    row = best[1]
+    week = int(row["current_week"])
+    return {
+        "league_id": "",
+        "league_name": "",
+        "category": "sim_week_ready",
+        "headline": f"Your Fantasy Sim Week {week} is ready. Set your lineup and play it.",
+        "recommendation_id": f"sim_week_ready:{_safe_text(row.get('id'))}:{week}",
+        "week": week,
+    }
+
+
+def fetch_sim_week_items(config: PushTriggerConfig, user_ids: list[str], *, now: datetime | None = None) -> dict[str, dict[str, Any]]:
+    """user_id -> sim_week_ready item, for opted-in users only. Fail-soft: any read problem
+    (including the sim tables not being applied) yields no items."""
+
+    ids = [uid for uid in (_safe_text(u) for u in user_ids) if uid]
+    if not config.configured or not ids:
+        return {}
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{SIM_GAMES_TABLE}",
+            headers=_headers(config),
+            params={
+                "select": "id,user_id,status,current_week,updated_at",
+                "user_id": f"in.({','.join(ids)})",
+                "status": "in.(in_season,playoffs)",
+            },
+            timeout=15,
+        )
+        if response.status_code >= 400:
+            return {}
+        rows = response.json()
+    except Exception:
+        return {}
+    if not isinstance(rows, list):
+        return {}
+    by_user: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        if isinstance(row, Mapping) and _safe_text(row.get("user_id")):
+            by_user.setdefault(_safe_text(row["user_id"]), []).append(row)
+    current = now or _utcnow()
+    out: dict[str, dict[str, Any]] = {}
+    for uid, user_rows in by_user.items():
+        item = sim_week_ready_push_item(user_rows, now=current)
+        if item:
+            out[uid] = item
+    return out
+
+
 def delete_invalid_push_tokens(config: PushTriggerConfig, tokens: list[str]) -> None:
     """Remove tokens Expo reported as DeviceNotRegistered (service-role)."""
 
@@ -574,7 +786,13 @@ def count_recent_pushes(
         response = requests.get(
             f"{config.url}/rest/v1/{NOTIFICATION_LOG_TABLE}",
             headers=_headers(config),
-            params={"select": "sent_at", "user_id": f"eq.{user_id}", "sent_at": f"gte.{cutoff}"},
+            params={
+                "select": "sent_at",
+                "user_id": f"eq.{user_id}",
+                "sent_at": f"gte.{cutoff}",
+                # Injury "healthy since" markers are bookkeeping, not pushes.
+                "recommendation_id": f"not.like.{INJURY_CLEAR_PREFIX}*",
+            },
             timeout=15,
         )
     except Exception:
@@ -961,6 +1179,21 @@ def injury_status_push_items(
     return items
 
 
+def injury_availability(roster_player_ids: set[str], players_df: pd.DataFrame) -> list[tuple[str, bool]]:
+    """(player_id, is_healthy) for roster players present in the player table."""
+
+    if not roster_player_ids or players_df is None or players_df.empty or "player_id" not in players_df.columns:
+        return []
+    rows = players_df[players_df["player_id"].astype(str).isin(roster_player_ids)]
+    out: list[tuple[str, bool]] = []
+    for _, row in rows.iterrows():
+        pid = _safe_text(row.get("player_id"))
+        if not pid:
+            continue
+        out.append((pid, not injury_table.is_unavailable(_safe_text(row.get("status")), _safe_text(row.get("injury_status")))))
+    return out
+
+
 _EMPTY_SLOT_IDS = frozenset({"", "0", "none", "null"})
 
 
@@ -1304,6 +1537,9 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
         stats["errors"].append("Push preferences could not be read; sent nothing this run.")
         return stats
     preferences, user_notification_prefs = fetched_settings
+    # Sim week-ready is opt-in: only users who switched it on are even looked up.
+    sim_opt_in = [uid for uid in recipients if push_item_allowed(preferences, user_id=uid, category="sim_week_ready")]
+    sim_week_items = fetch_sim_week_items(config, sim_opt_in) if sim_opt_in else {}
     timezones = fetch_push_timezones(config)
     gm_stance_leagues = fetch_gm_stance_leagues(config, list(recipients.keys()))
     gm_untouchable_ids = fetch_gm_targets_untouchable_ids(config, list(recipients.keys()))
@@ -1358,6 +1594,8 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
 
         candidates: list[dict[str, Any]] = []
         roster_ids_by_league: dict[str, set[str]] = {}
+        healthy_roster_ids: set[str] = set()
+        unavailable_roster_ids: set[str] = set()
         for league in leagues:
             league_id = _safe_text(league.get("league_id"))
             if not league_id:
@@ -1408,6 +1646,11 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             if my_roster is not None:
                 roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
                 roster_ids_by_league[league_id] = roster_player_ids
+                try:
+                    for _pid, _healthy in injury_availability(roster_player_ids, players_df):
+                        (healthy_roster_ids if _healthy else unavailable_roster_ids).add(_pid)
+                except Exception as exc:
+                    stats["errors"].append(f"{user_id}/{league_id}: injury availability failed ({exc})")
                 try:
                     push_items.extend(
                         injury_status_push_items(
@@ -1499,6 +1742,17 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                 item for item in push_items if push_item_allowed(preferences, user_id=user_id, category=item["category"])
             )
 
+        sim_item = sim_week_items.get(user_id)
+        if sim_item and push_item_allowed(preferences, user_id=user_id, category="sim_week_ready"):
+            candidates.append(dict(sim_item))
+        # Hurt -> recovered -> hurt again re-alerts, but only after a healthy period and a minimum gap.
+        if healthy_roster_ids or unavailable_roster_ids:
+            reset_injury_realerts(
+                config,
+                user_id=user_id,
+                healthy_ids=healthy_roster_ids - unavailable_roster_ids,
+                unavailable_ids=unavailable_roster_ids,
+            )
         # The same player on two of the user's leagues yields one injury id:
         # push it once, not "X is out (+1 more update)" about the same X.
         candidates = list({item["recommendation_id"]: item for item in reversed(candidates)}.values())[::-1]

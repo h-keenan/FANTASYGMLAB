@@ -212,6 +212,9 @@ def deep_link_for(item: Mapping[str, Any]) -> str:
     if category == "trade_followup":
         # The "did this trade happen?" prompt lives in Trade History (Trade Hub > History).
         return "/trade-history"
+    if category == "sim_week_ready":
+        # Fantasy Sim is a standalone game (no league): the tap opens the Sim hub.
+        return "/gm-game"
     if not league:
         return ""
     if category == "weekly_roundup":

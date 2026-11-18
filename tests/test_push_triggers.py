@@ -194,6 +194,7 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
                                         preferences_response,
                                         gm_stance_response,
                                         gm_untouchable_response,
+                                        not_notified_response,  # injury re-alert log read
                                         not_notified_response,
                                     ],
                                 ):
@@ -328,6 +329,7 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
                                         preferences_response,
                                         gm_stance_response,
                                         gm_untouchable_response,
+                                        not_notified_response,  # injury re-alert log read
                                         not_notified_response,
                                     ],
                                 ):
@@ -537,6 +539,7 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
                                         preferences_response,
                                         gm_stance_response,
                                         gm_untouchable_response,
+                                        not_notified_response,  # injury re-alert log read
                                         not_notified_response,
                                     ],
                                 ):
@@ -567,11 +570,11 @@ def test_fetch_push_preferences_defaults_missing_categories_to_enabled():
         preferences = push_triggers.fetch_push_preferences(_config(), ["u1", "u2"])
     assert preferences["u1"] == {
         "top_priority": True, "watch": True, "recap": True, "injury": False,
-        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True, "weekly_roundup": True,
+        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True, "weekly_roundup": True, "sim_week_ready": False,
     }
     assert preferences["u2"] == {
         "top_priority": True, "watch": True, "recap": True, "injury": True,
-        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True, "weekly_roundup": True,
+        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True, "weekly_roundup": True, "sim_week_ready": False,
     }
 
 
@@ -904,6 +907,7 @@ def test_run_push_trigger_sweep_sends_the_gm_stance_reminder_once():
                                         preferences_response,
                                         gm_stance_response,
                                         gm_untouchable_response,
+                                        not_notified_response,  # injury re-alert log read
                                         not_notified_response,
                                     ],
                                 ):
@@ -1023,7 +1027,7 @@ def _run_injury_sweep(*, preferences_response, expo_ok=True):
                             with patch("modules.push_triggers.recap_push_item", return_value=None):
                                 with patch(
                                     "requests.get",
-                                    side_effect=[tokens, profiles, preferences_response, stance, untouch, notified],
+                                    side_effect=[tokens, profiles, preferences_response, stance, untouch, notified, notified],
                                 ):
                                     with patch("requests.post", return_value=expo) as mock_post:
                                         stats = push_triggers.run_push_trigger_sweep(environ=config_env)

@@ -2944,7 +2944,8 @@ export type PushCategory =
   | 'lineup_lock'
   | 'waiver_reminder'
   | 'trade_deadline'
-  | 'weekly_roundup';
+  | 'weekly_roundup'
+  | 'sim_week_ready';
 
 export interface PushPreferencesResponse {
   ok: boolean;
