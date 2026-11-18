@@ -237,14 +237,10 @@ export function TradeIdeaCardView({
       verdictLabel={idea.value_edge_band || null}
       netValue={idea.trade_gain}
       meta={[`${idea.confidence_label} confidence`]}
+      note={partnerFitLine(idea.partner_fit_reason)}
       defaultOpen={highlighted}
     >
     <div className="flex flex-col gap-3">
-      {partnerFitLine(idea.partner_fit_reason) ? (
-        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="trade-idea-partner-fit">
-          Their side: {partnerFitLine(idea.partner_fit_reason)}
-        </p>
-      ) : null}
       {tags.length > 0 || copy.impactTagHelp(idea.impact_tag) ? (
         <div className="flex items-center gap-2 flex-wrap">
           {tags.map((tag) => (
@@ -312,7 +308,6 @@ export function TradeIdeaCardView({
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-1.5" data-testid="idea-signal-chips">
-        <ToneBadge label={`${idea.confidence_label} confidence`} color={levelColor(confidenceLvl)} />
         <ToneBadge label={`${idea.market_realism_label}`} color={levelColor(realismLvl)} />
       </div>
       <ManagerTendenciesCard leagueId={leagueId} teamName={idea.partner_team_name} />

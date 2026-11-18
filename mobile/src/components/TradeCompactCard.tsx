@@ -81,6 +81,7 @@ export default function TradeCompactCard({
   verdictLabel,
   netValue,
   meta = [],
+  note,
   children,
   defaultOpen = false,
   giveLabel = 'You send',
@@ -97,6 +98,8 @@ export default function TradeCompactCard({
   /** The server's net value for the trade (positive = you win); wins over the asset sums, which can miss pick values. */
   netValue?: number | null;
   meta?: string[];
+  /** One short neutral line under the meta line (a trade idea's partner-fit reason). */
+  note?: string | null;
   children?: ReactNode;
   defaultOpen?: boolean;
   giveLabel?: string;
@@ -127,6 +130,7 @@ export default function TradeCompactCard({
       {resolved ? <TradeResolvedRow kind={resolved.kind} label={resolved.label} /> : <>
       <View>{typeof title === 'string' ? <AppText style={styles.title}>{title}</AppText> : title}</View>
       {meta.length > 0 ? <AppText style={styles.meta}>{meta.join(' · ')}</AppText> : null}
+      {note ? <AppText style={styles.note} testID="trade-idea-partner-fit">Their side: {note}</AppText> : null}
       {side(giveLabel, give)}
       {side(getLabel, get)}
       {meter ? <FairnessMeterRow meter={meter} accessibilityLabel={verdictLabel && mode === 'desk' ? `${meter.description}. Market read: ${verdictLabel}` : undefined} /> : null}
@@ -151,6 +155,7 @@ function createStyles(colors: ThemeColors) {
     card: { gap: spacing.sm, padding: spacing.md, backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, borderRadius: radii.tile },
     title: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
     meta: { fontSize: 12, color: colors.textTertiary },
+    note: { fontSize: 12, color: colors.textSecondary },
     side: { gap: 2 },
     kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
     value: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
