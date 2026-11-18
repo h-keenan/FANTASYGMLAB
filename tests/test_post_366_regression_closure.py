@@ -117,7 +117,7 @@ def test_multiple_future_picks_and_player_receive_a_provisional_grade():
     )
     assert not report["pending"]
     assert report["provisional"]
-    assert "Received" in report["sides"][0]["why"]
+    assert "received" in report["sides"][0]["why"]
 
 
 def test_explicit_and_projected_pick_identity_use_canonical_pick_owner():

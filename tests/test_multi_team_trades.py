@@ -79,7 +79,7 @@ def test_three_team_trade_grades_every_team_on_what_it_sent_and_received():
     tx = normalize(three_team_raw())
     graded = grades.grade_trade(tx, player_lookup=LOOKUP, current_week=12)
     assert [s["team"] for s in graded["sides"]] == ["Team Alpha", "Team Bravo", "Team Charlie"]
-    pick = canonical_pick_identity_value({"round": 1})
+    pick = canonical_pick_identity_value({"season": "2027", "round": 1})
     ratios = [s["ratio"] for s in graded["sides"]]
     # Alpha got p3 (1000) for p1 (5000); Bravo got p1 (5000) for p2 (3000) + pick;
     # Charlie got p2 (3000) + pick for p3 (1000).
@@ -161,7 +161,7 @@ def test_integrity_scores_three_team_trade_per_team_but_never_as_a_pair():
     legs = li.trade_legs([tx], values)
     assert legs[0]["valued"] is True
     assert legs[0]["legs"][1]["sent"] == 5000 and legs[0]["legs"][1]["received"] == 1000
-    assert legs[0]["legs"][2]["sent"] == 3000 + canonical_pick_identity_value({"round": 1})
+    assert legs[0]["legs"][2]["sent"] == 3000 + canonical_pick_identity_value({"season": "2027", "round": 1})
     # Pair logic ignores N-team trades.
     assert li.lopsided_wins_between(legs, 1, 3) == {"1": 0, "3": 0}
     losers = li._lopsided_losers(legs)

@@ -221,17 +221,15 @@ function HistoryGradeBlock({ grade }: { grade: HistoryTransaction["grade"] }) {
         </p>
       );
     }
-    let primaryWhy = "";
-    let provisionalNote = "";
-    for (const side of sides) {
-      const why = side.why || "";
-      if (why && !primaryWhy) {
-        primaryWhy = why.replace(" Future pick value is estimated until the selection is known.", "").trim();
-      }
-      if (why.includes("Future pick value is estimated")) {
-        provisionalNote = "Future pick value is estimated until the selection is known.";
-      }
-    }
+    const PROVISIONAL_NOTE = "Future pick value is estimated until the selection is known.";
+    // One Why per team: each line names its team, so a multi-team trade never
+    // collapses to the first side's explanation.
+    const sideWhys = sides
+      .map((side) => (side.why || "").replace(` ${PROVISIONAL_NOTE}`, "").trim())
+      .filter(Boolean);
+    const provisionalNote = sides.some((side) => (side.why || "").includes("Future pick value is estimated"))
+      ? PROVISIONAL_NOTE
+      : "";
     return (
       <div className="mt-2 flex flex-col gap-1.5">
         <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-secondary)", letterSpacing: "var(--letter-spacing-badge)" }}>
@@ -250,12 +248,12 @@ function HistoryGradeBlock({ grade }: { grade: HistoryTransaction["grade"] }) {
             </span>
           </div>
         ))}
-        {primaryWhy ? (
-          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+        {sideWhys.map((why) => (
+          <p key={why} className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
             <span style={{ color: "var(--color-text-muted)" }}>Why </span>
-            {primaryWhy}
+            {why}
           </p>
-        ) : null}
+        ))}
         {provisionalNote ? (
           <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
             {provisionalNote}

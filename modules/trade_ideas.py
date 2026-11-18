@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import List, Dict, Any, Mapping, Sequence
+from typing import List, Dict, Any, Iterable, Mapping, Sequence
 from collections import defaultdict
 from contextlib import contextmanager
 from copy import deepcopy
@@ -279,29 +279,98 @@ def _round_tier_base_value(round_num: int, tier_bucket: str) -> int:
     return int(round(base * PICK_TIER_MULTIPLIERS.get(tier_bucket, 1.0)))
 
 
-def canonical_pick_identity_value(pick: Mapping[str, Any]) -> int | None:
-    """Resolve an existing pick identity through the canonical pick-value table.
+_PICK_VALUE_KEYS = ("current_value", "value_score", "dynasty_score", "score", "base_score")
+# Slot-percentile stand-ins for a declared early/late projection hint when no
+# league context is available (1.0 = weakest team = earliest pick).
+_PICK_HINT_SLOT_PERCENTILE = {"early": 0.85, "mid": 0.5, "late": 0.15}
 
-    Exact/current values supplied by the canonical asset owner win. Otherwise a
-    declared early/mid/late projection is used, then the round-level midpoint.
-    This is intentionally context-light for retrospective History grading.
+
+def pick_identity_key(pick: Mapping[str, Any]) -> tuple[int, int, int] | None:
+    """(season, round, original_roster_id): the identity a traded pick keeps."""
+
+    season = _safe_int(pick.get("season"), 0)
+    round_num = _safe_int(pick.get("round"), 0)
+    original = _safe_int(pick.get("original_roster_id", pick.get("roster_id")), 0)
+    if season <= 0 or round_num <= 0 or original <= 0:
+        return None
+    return season, round_num, original
+
+
+def index_pick_assets(
+    assets: Iterable[Mapping[str, Any]] | Mapping[Any, Iterable[Mapping[str, Any]]] | None,
+) -> Dict[tuple[int, int, int], Mapping[str, Any]]:
+    """Index league pick assets (``list_draft_pick_assets`` rows, or the
+    ``_build_roster_pick_assets`` owner map) by pick identity so a pick moved
+    in a past trade resolves to the ORIGINAL owner's projected-slot value."""
+
+    if isinstance(assets, Mapping):
+        flat = [a for group in assets.values() for a in (group or ())]
+    else:
+        flat = list(assets or ())
+    index: Dict[tuple[int, int, int], Mapping[str, Any]] = {}
+    for asset in flat:
+        if str(asset.get("asset_type") or "") != "pick":
+            continue
+        key = pick_identity_key(asset)
+        if key:
+            index[key] = asset
+    return index
+
+
+def canonical_pick_identity_value(
+    pick: Mapping[str, Any],
+    pick_index: Mapping[tuple[int, int, int], Mapping[str, Any]] | None = None,
+    *,
+    league_settings: Dict[str, Any] | None = None,
+    next_draft_year: int | None = None,
+) -> int | None:
+    """THE pick price: every surface that values a draft pick resolves it here
+    (History/trade grades, League Integrity, Team Profile, Trade Analyzer, Trade
+    Ideas), all through :func:`pick_value_components`.
+
+    Resolution order:
+    1. an exact value the canonical asset owner already supplied;
+    2. the league's own priced asset for this pick identity (``pick_index``
+       from :func:`index_pick_assets`) -- the ORIGINAL owner's projected
+       finish, slot probabilities, years-out discount, format and class;
+    3. the same model with a neutral league context: a declared early/mid/late
+       projection hint if present, otherwise the neutral mid slot, always with
+       the per-year future discount when the pick's season is known.
     """
 
-    for key in ("current_value", "value_score", "dynasty_score", "score", "base_score"):
+    for key in _PICK_VALUE_KEYS:
         value = _safe_int(pick.get(key), 0)
         if value > 0:
             return value
     round_num = _safe_int(pick.get("round"), 0)
     if round_num <= 0:
         return None
-    projected = str(
+    identity = pick_identity_key(pick)
+    if pick_index and identity and identity in pick_index:
+        indexed = _safe_int(pick_index[identity].get("score"), 0)
+        if indexed > 0:
+            return indexed
+    hint = str(
         pick.get("projected_range")
         or pick.get("projected_slot")
         or pick.get("slot_tier")
         or ""
     ).casefold()
-    tier = next((label for label in ("early", "mid", "late") if label in projected), "mid")
-    return _round_tier_base_value(round_num, tier)
+    tier = next((label for label in ("early", "mid", "late") if label in hint), "mid")
+    season = _safe_int(pick.get("season"), 0)
+    if season <= 0:
+        return _round_tier_base_value(round_num, tier)
+    percentile = _PICK_HINT_SLOT_PERCENTILE[tier]
+    components = pick_value_components(
+        season,
+        round_num,
+        identity[2] if identity else 0,
+        pd.DataFrame(),
+        league_settings=league_settings,
+        team_context={"tier_bucket": tier, "team_modifier": 1.0, "slot_percentile": percentile},
+        next_draft_year=next_draft_year,
+    )
+    return int(components["score"]) or None
 
 
 def _normalize_bucket_probabilities(weights: Dict[str, float]) -> Dict[str, float]:
@@ -586,7 +655,7 @@ def _prospect_rankings_multiplier(
     return max(0.8, min(1.25, parsed))
 
 
-def _pick_value_components(
+def pick_value_components(
     season: int,
     round_num: int,
     original_roster_id: int,
@@ -662,6 +731,10 @@ def _pick_value_components(
         "projection_confidence": float(projection.get("projection_confidence") or 0.0),
         "projection_source": "team_strength_model",
     }
+
+
+# Private name kept for existing importers; pick_value_components is the public one.
+_pick_value_components = pick_value_components
 
 
 def _projected_pick_slot(round_num: int, projected_slot_percentile: float, team_count: int) -> tuple[int, str]:

@@ -386,7 +386,7 @@ def test_pick_price_comes_from_the_trade_analyzer_pick_table():
     from modules.trade_ideas import canonical_pick_identity_value
 
     legs = li.trade_legs([_swap(2, "a", 3, 4, [("pick", 2027, 1, 4)], [("player", "scrub")])], PICK_VALUES)
-    assert legs[0]["legs"][3]["received"] == canonical_pick_identity_value({"round": 1})
+    assert legs[0]["legs"][3]["received"] == canonical_pick_identity_value({"season": "2027", "round": 1})
     assert legs[0]["legs"][3]["sent"] == 500
 
 
