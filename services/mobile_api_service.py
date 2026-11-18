@@ -290,7 +290,7 @@ from modules import drop_candidates, roster_value_model
 from modules import usage_trends
 from modules import bye_cover, gm_plan_outlook
 from modules import team_profile as team_profile_module
-from modules import live_draft_context
+from modules import live_draft_context, playoff_context
 from modules import direction_checkin, trade_cautions, trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
@@ -14511,6 +14511,27 @@ def _gm_plan_outlook_items(
                     )
                 except Exception:
                     bye_tile = None
+        # Handshake item 9: the one shared playoff-odds simulation (GM Plan is Pro, like the
+        # odds screen) feeds pick slots and a buyer / seller lean. In season only.
+        odds_reads: dict[str, dict[str, Any]] = {}
+        odds_picks_block: dict[str, Any] | None = None
+        if in_season and playoff_context.enabled():
+            try:
+                odds = _shared_playoff_odds(league_id, lens)
+                odds_reads = playoff_context.team_reads(odds, profile)
+                pcts = playoff_context.slot_percentiles(odds)
+                if pcts:
+                    all_rosters = sleeper.get_rosters(league_id) or []
+                    df_summary, _capital = league_rankings.build_league_summary_and_draft_capital_cached(
+                        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+                    )
+                    priced = trade_ideas._build_roster_pick_assets(
+                        league_id, all_rosters, df_summary, league_settings=settings, odds_slot_percentiles=pcts
+                    )
+                    odds_picks_block = team_profile_module.build_picks_block(priced.get(int(my_roster_id)), None, [])
+            except Exception:
+                logger.warning("playoff odds context unavailable (league=%s)", league_id, exc_info=True)
+                odds_reads, odds_picks_block = {}, None
         return gm_plan_outlook.build_outlook(
             my_roster_id=my_roster_id,
             profile=profile,
@@ -14520,6 +14541,8 @@ def _gm_plan_outlook_items(
             waiver_adds=adds,
             bye_tile=bye_tile,
             idea_partners=idea_partners,
+            odds_reads=odds_reads,
+            odds_picks_block=odds_picks_block,
         )
     except Exception:
         logger.warning("gm plan outlook unavailable (league=%s)", league_id, exc_info=True)

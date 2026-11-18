@@ -160,7 +160,85 @@ def item8(out: str) -> None:
     print("\n".join(lines))
 
 
-ITEMS = {"7": item7, "8": item8}
+def item9(out: str) -> None:
+    """Playoff odds: projected pick slots and buyer / seller lean."""
+
+    import math
+
+    from modules import playoff_context
+
+    def synthetic_odds(summary: pd.DataFrame, seed: int) -> dict:
+        import random
+
+        rng = random.Random(seed)
+        scores = summary["total_score"].astype(float)
+        z = (scores - scores.mean()) / (scores.std() or 1.0)
+        rows = []
+        # Record luck and schedule: the simulated finish departs from raw roster strength.
+        for (_, r), zi in zip(summary.iterrows(), [v + rng.gauss(0, 0.9) for v in z]):
+            p = 100.0 / (1.0 + math.exp(-1.6 * zi))
+            rows.append({"roster_id": str(r["roster_id"]), "playoff_probability": round(p, 1), "median_final_wins": round(7 + 3 * zi),
+                         "median_seed": int(max(1, min(TEAMS, round(6.5 - 4 * zi)))), "clinched": p > 99, "eliminated": p < 1})
+        return {"ok": True, "teams": rows}
+
+    runs = moved = 0
+    deltas: list[int] = []
+    leans = Counter()
+    disagree = Counter()
+    examples: list[str] = []
+    for seed in SEEDS:
+        players, summary, adapter, _leans = make_league(seed)
+        profile, _lookup = synthetic_profile(seed)
+        odds = synthetic_odds(summary, seed)
+        rosters, league = adapter.get_rosters("x"), adapter.get_league("x")
+        os.environ[playoff_context.PLAYOFF_ODDS_CONTEXT_ENV_KEY] = "0"
+        off_pcts = playoff_context.slot_percentiles(odds)
+        reads_off = playoff_context.team_reads(odds, profile)
+        os.environ.pop(playoff_context.PLAYOFF_ODDS_CONTEXT_ENV_KEY, None)
+        on_pcts = playoff_context.slot_percentiles(odds)
+        reads = playoff_context.team_reads(odds, profile)
+        assert not off_pcts and not reads_off, "flag off returns nothing (today's behaviour)"
+        before = trade_ideas._build_roster_pick_assets("x", rosters, summary, league_settings=SETTINGS, adapter=adapter)
+        after = trade_ideas._build_roster_pick_assets("x", rosters, summary, league_settings=SETTINGS, adapter=adapter, odds_slot_percentiles=on_pcts)
+
+        def first_slot(assets_by_owner, rid):
+            firsts = [a for a in assets_by_owner[rid] if a.get("round") == 1 and a.get("original_roster_id") == rid and a.get("projected_slot_number")]
+            return min(firsts, key=lambda a: a["season"]) if firsts else None
+
+        for rid in range(1, TEAMS + 1):
+            b, a = first_slot(before, rid), first_slot(after, rid)
+            if not b or not a:
+                continue
+            runs += 1
+            delta = a["projected_slot_number"] - b["projected_slot_number"]
+            deltas.append(delta)
+            moved += delta != 0
+            read = reads[str(rid)]
+            leans[read["lean"]] += 1
+            posture = profile["teams"][str(rid)]["posture"]["key"]
+            if (read["lean"] == "seller" and posture in {"contender", "fringe_contender"}) or (read["lean"] == "buyer" and posture in {"rebuild", "tank"}):
+                disagree[posture] += 1
+            if delta and len(examples) < 4:
+                examples.append(
+                    f"seed {seed}, team {rid} ({posture}): next first {b['projected_slot_label']} -> {a['projected_slot_label']} "
+                    f"(value {b['score']} -> {a['score']}); simulated finish {read['expected_finish']} of {TEAMS}, lean {read['lean']}: {'; '.join(read['why'])}"
+                )
+    lines = [
+        "# Handshake 9: playoff odds feed projected pick slots and a buyer / seller lean",
+        "",
+        f"SYNTHETIC seeded 12-team leagues (seeds {list(SEEDS)}); odds are a seeded logistic of roster strength plus seeded record luck (the real simulation needs league history). {runs} teams.",
+        "- Flag off: no slot percentiles and no leans (today's behaviour; asserted in the harness).",
+        f"- Flag on: next-first projected slot changes for {moved}/{runs} teams; average move {sum(abs(d) for d in deltas) / len(deltas):.1f} slots, max {max(abs(d) for d in deltas)} (the simulated finish is 50% of the blend, roster value and record keep the rest).",
+        "- Leans: " + ", ".join(f"{k} {v}" for k, v in sorted(leans.items())) + f"; leans that contradict the roster posture: {sum(disagree.values())} (shown to the user as a disagreement, never silently).",
+        "",
+        "## Examples",
+        *[f"- {e}" for e in examples],
+    ]
+    Path(out).write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
+ITEMS = {"7": item7, "8": item8, "9": item9}
 
 if __name__ == "__main__":
     ITEMS[sys.argv[1]](sys.argv[2] if len(sys.argv) > 2 else f"handshakes_{sys.argv[1]}_diff.md")
