@@ -87,7 +87,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
 
 /** The pre-advance notes as small tappable chips under the header (phones). Each jumps to the tab that fixes it. */
 export function SimStatusChips({ game, onTab }: { game: SimGame; onTab: (tab: SimTab) => void }) {
-  const chips = simStatusChips(game.pending);
+  const chips = simStatusChips(game.pending, game);
   if (chips.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2 md:hidden" role="group" aria-label="Before you advance" data-testid="sim-status-chips">

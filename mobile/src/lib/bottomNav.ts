@@ -82,9 +82,10 @@ export function activeBottomTab(tabs: BottomTab[], active: string): string {
 export type SimStatusChip = { key: string; label: string; tone: "warning" | "accent"; tab: "team" | "trades" };
 
 /** The two pre-advance notes as small tappable chips (a lineup issue and trade offers about to expire). */
-export function simStatusChips(pending: { lineup_warnings?: number; inbox?: number } | null | undefined): SimStatusChip[] {
+export function simStatusChips(pending: { lineup_warnings?: number; inbox?: number } | null | undefined, game?: { auto_manage?: boolean; lineup_edited?: boolean }): SimStatusChip[] {
   const out: SimStatusChip[] = [];
-  const w = pending?.lineup_warnings ?? 0;
+  // Auto-manage sets the best healthy lineup when the week plays (unless this week's was set by hand), so those issues are not counted.
+  const w = game?.auto_manage && !game.lineup_edited ? 0 : (pending?.lineup_warnings ?? 0);
   const inbox = pending?.inbox ?? 0;
   if (w > 0) out.push({ key: "lineup", label: `${w} lineup issue${w === 1 ? "" : "s"}`, tone: "warning", tab: "team" });
   if (inbox > 0) out.push({ key: "offers", label: `${inbox} offer${inbox === 1 ? "" : "s"} expiring`, tone: "accent", tab: "trades" });
