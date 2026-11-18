@@ -571,6 +571,8 @@ his number for the week he returns) and add `"role": {"kind": "starter|fill_in|b
 ```
 `PUT .../lineup` `{"slots": [{"slot": "QB", "player_id": "..."|null}, ...]}` (exactly the league's slots, in order; 422 if a player is not on your roster, wrong position for the slot, or duplicated). Bye/injured starters are allowed (they score 0; shown as warnings). Returns the same as GET.
 `POST .../lineup/auto` -> best projected legal lineup (bye/out excluded), same body.
+
+`PUT .../auto-manage` `{on: bool}` -> the "Auto-manage my lineup" switch (an `auto_manage_set` event; the lineup response and the game carry `auto_manage` and `lineup_edited`). New games default to on (`auto_lineup` true at create; saved games keep their stored setting). When on, each week's play sets the best healthy lineup unless the user set that week's lineup by hand. It only changes the Sim game, never a real league.
 Lineups persist week to week; a player who leaves the roster empties his slot.
 
 ### Waivers and cuts

@@ -111,6 +111,12 @@ def auto_lineup(em: Emitter) -> None:
     em.emit(state.week, "user", "lineup_set", team=user, slots=slots, auto=True)
 
 
+def set_auto_manage(em: Emitter, on: bool) -> None:
+    """Switch "Auto-manage my lineup" on or off for the rest of the game (an event, so replay and undo see it)."""
+
+    em.emit(em.state.week, "user", "auto_manage_set", on=bool(on))
+
+
 def lineup_warnings(ev: Evaluator, lineup: Sequence[Sequence[Any]], week: int) -> list[dict[str, Any]]:
     out = []
     for slot, pid in lineup:
@@ -434,6 +440,6 @@ def respond_offer(em: Emitter, desk: TradeDesk, offer_id: str, action: str) -> d
 
 
 __all__ = [
-    "validate_lineup", "set_lineup", "auto_lineup", "lineup_warnings", "queue_claim", "cancel_claim",
+    "validate_lineup", "set_lineup", "auto_lineup", "set_auto_manage", "lineup_warnings", "queue_claim", "cancel_claim",
     "cut_player", "over_by", "check_roster_room", "preview_trade", "send_trade", "respond_offer", "execute_trade", "enforce_roster_cap",
 ]

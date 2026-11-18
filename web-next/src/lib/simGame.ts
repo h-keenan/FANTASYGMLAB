@@ -335,6 +335,9 @@ export interface SimGame {
   engine_version: string;
   scoring_model?: string;
   settings: SimGameSettings;
+  /** Auto-manage my lineup: the game's switch (absent on an older server), and whether this week's lineup was set by hand. */
+  auto_manage?: boolean;
+  lineup_edited?: boolean;
   /** How the snapshot approximates the real league (league games): "trade_deadline_passed", "schedule_estimated_weeks:9,10", ... */
   notes?: string[];
   you: SimGameTeamLine | null;
@@ -918,6 +921,9 @@ export interface SimLineupResponse extends SimGameEnvelope {
   bench?: SimGamePlayer[];
   projected_total?: number;
   warnings?: SimLineupWarning[];
+  /** Auto-manage my lineup: the game's switch and whether this week's lineup was set by hand (the engine then leaves it). */
+  auto_manage?: boolean;
+  lineup_edited?: boolean;
   roster_size?: number;
   roster_limit?: number;
   opponent?: { team_id: string; name: string } | null;
@@ -1565,7 +1571,7 @@ export function simAdvanceWarnings(game: SimGame | null | undefined): string[] {
   if (!game?.pending) return [];
   const out: string[] = [];
   const w = game.pending.lineup_warnings;
-  if (w > 0) out.push(`${w} lineup issue${w === 1 ? "" : "s"}: a bye or injured starter scores 0.`);
+  if (w > 0 && !(game.auto_manage && !game.lineup_edited)) out.push(`${w} lineup issue${w === 1 ? "" : "s"}: a bye or injured starter scores 0.`);
   if (game.pending.inbox > 0) out.push(`${game.pending.inbox} trade offer${game.pending.inbox === 1 ? "" : "s"} will expire.`);
   return out;
 }
@@ -3873,4 +3879,12 @@ export function simArchiveToYear(a: SimSeasonArchive): SimDynastyYear {
 /** True when the result payload is a dynasty one (grade and review are null there). */
 export function simIsDynastyResult(result: SimGameResult | null | undefined): boolean {
   return result?.mode === "dynasty" || Boolean(result?.dynasty);
+}
+
+/** The "Auto-manage my lineup" switch row: what it does now (a lineup set by hand this week is kept). */
+export function simAutoManageNote(on: boolean, editedThisWeek: boolean): string {
+  if (!on) return "Off. You set the lineup yourself each week.";
+  return editedThisWeek
+    ? "On. This week's lineup is yours; auto-manage resumes next week."
+    : "On. Each week the best healthy lineup is set for you unless you edit it first.";
 }

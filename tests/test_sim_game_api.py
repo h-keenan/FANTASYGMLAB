@@ -617,3 +617,20 @@ def test_cut_stays_available_so_over_limit_is_always_fixable(season):
     mine = client.get(f"/v1/sim/games/{gid}/players?status=mine&page_size=60", headers=hdr()).json()["items"]
     assert len(mine) == 14 and fa  # the cut path stays open at any roster size
     assert client.post(f"/v1/sim/games/{gid}/cut", json={"player_id": mine[-1]["id"]}, headers=hdr()).status_code == 200
+
+
+def test_auto_manage_is_on_for_new_games_and_switchable():
+    client, _, _ = make_app()
+    made = new_game(client)
+    game_id = made["game"]["id"] if "game" in made else made["id"]
+    finish_draft(client, game_id)
+    lineup = client.get(f"/v1/sim/games/{game_id}/lineup", headers=hdr()).json()
+    assert lineup["auto_manage"] is True and lineup["lineup_edited"] is False
+    off = client.put(f"/v1/sim/games/{game_id}/auto-manage", json={"on": False}, headers=hdr())
+    assert off.status_code == 200 and off.json()["auto_manage"] is False
+    assert client.get(f"/v1/sim/games/{game_id}", headers=hdr()).json()["game"]["auto_manage"] is False
+    # An explicit auto_lineup:false at creation stays off (saved games keep their own setting).
+    other = new_game(client, auto_lineup=False)
+    other_id = other["game"]["id"] if "game" in other else other["id"]
+    finish_draft(client, other_id)
+    assert client.get(f"/v1/sim/games/{other_id}/lineup", headers=hdr()).json()["auto_manage"] is False

@@ -5044,6 +5044,8 @@ export const api = {
   getSimLineup: (gameId: string) => authorizedRequest<SimGameTypes.SimLineupResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/lineup`),
   putSimLineup: (gameId: string, body: { slots: { slot: SimGameTypes.SimSlot; player_id: string | null }[] }) =>
     authorizedRequest<SimGameTypes.SimLineupResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/lineup`, { method: "PUT", jsonBody: body }),
+  setSimAutoManage: (gameId: string, on: boolean) =>
+    authorizedRequest<SimGameTypes.SimLineupResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/auto-manage`, { method: "PUT", jsonBody: { on } }),
   autoSimLineup: (gameId: string) =>
     authorizedRequest<SimGameTypes.SimLineupResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/lineup/auto`, { method: "POST", jsonBody: {} }),
   claimSimWaiver: (gameId: string, body: { add: string; drop: string | null; start_slot: SimGameTypes.SimSlot | null }) =>

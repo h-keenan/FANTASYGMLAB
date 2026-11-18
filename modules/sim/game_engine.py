@@ -36,7 +36,7 @@ from modules.sim.game_draft import draft_recap
 from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_posture import update_posture
 from modules.sim.game_scoring import PlayerWeek, ScoringModel, get_model
-from modules.sim.game_state import Emitter, GameState
+from modules.sim.game_state import Emitter, GameState, auto_manage_on
 from modules.sim.game_usage import group_factors
 from modules.sim.game_types import GameError, GameSnapshot, headshot_id, slot_positions
 from modules.sim.injuries import draw_injury_type
@@ -687,7 +687,8 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
     rnd = None if kind == "regular" else W - S.regular_weeks
 
     # 1. the user's optional autopilot lineup
-    if S.auto_lineup and state.lineups[user]:
+    # Auto-manage keeps the best healthy lineup each week, but a lineup the user set by hand THIS week is theirs.
+    if auto_manage_on(snap, state) and state.lineups[user] and state.manual_lineup_week != W:
         ev0 = Evaluator(snap, state)
         slots, _ = ev0.best_lineup(state.rosters[user], W)
         em.emit(W, "engine", "lineup_set", team=user, slots=slots, auto=True)

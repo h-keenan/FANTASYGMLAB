@@ -59,6 +59,12 @@ describe("simLayout", () => {
     expect(simAutoSetMessage(simLineupDiff(after, after, 100, 100))).toBe("Lineup is optimal");
     expect(simAutoSetMessage({ swaps: [{ slot: "QB", out: "A", in: "B" }, { slot: "RB", out: "C", in: "D" }], gain: null })).toBe("Made 2 lineup swaps");
   });
+  it("auto-manage fixes holes at play time, so the Play guard stays quiet unless this week's lineup was set by hand", () => {
+    const zero = [{ name: "Hurt Harry", label: "RB", reason: "out" as const }];
+    expect(simAdvanceState({ phase: "regular_season", week: 4, auto_manage: true }, ["WR2"], zero)).toMatchObject({ warning: null, confirm: null });
+    expect(simAdvanceState({ phase: "regular_season", week: 4, auto_manage: true, lineup_edited: true }, ["WR2"], zero).confirm).not.toBeNull();
+    expect(simAdvanceState({ phase: "regular_season", week: 4, auto_manage: false }, ["WR2"], zero).confirm).not.toBeNull();
+  });
   it("explains why Advance is disabled", () => {
     expect(simAdvanceState({ phase: "regular_season", week: 4 }, 0)).toEqual({ label: "Wk 4 \u2192 5", blocked: false, reason: null, warning: null, confirm: null });
     expect(simAdvanceState({ phase: "regular_season", week: 4 }, 0)).toMatchObject({ blocked: false, warning: null, confirm: null });
