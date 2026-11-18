@@ -69,9 +69,9 @@ export function scanText(rel, src) {
 }
 
 /**
- * A raw `<select>` (or `<Select>` from Input.tsx is fine: it is a form field) used as a view / filter switch slips past the
- * ViewSelect check above. Standing rule: tabs or chips, never dropdowns. A raw `<select>` fails unless it is a labelled form
- * field (carries an `id=`, wired to a <label htmlFor>) or has a `view-select-ok: reason` comment on it or the line above.
+ * A raw `<select>` used as a view / filter switch slips past the ViewSelect check above, so it gets the same rule: a LITERAL list
+ * of 4 or fewer `<option>`s must be tabs/chips; 5 or more literal options are fine; a computed list (`.map(`) needs a
+ * `view-select-ok: reason` comment on the tag or the line above.
  */
 function scanRawSelects(rel, src, lines) {
   const problems = [];
@@ -79,10 +79,16 @@ function scanRawSelects(rel, src, lines) {
   let m;
   while ((m = re.exec(src))) {
     const line = src.slice(0, m.index).split("\n").length;
-    const tag = tagText(src, m.index);
-    const ok = /view-select-ok/.test(tag) || /view-select-ok/.test(lines[line - 1] ?? "") || /view-select-ok/.test(lines[line - 2] ?? "");
-    if (ok || /\sid=/.test(tag)) continue;
-    problems.push(`${rel}:${line}: raw <select> used as a view/filter switch; use chips or ViewTabs (tabs/chips, never dropdowns), or mark a real form field / 5+ list with // view-select-ok: reason`);
+    const end = src.indexOf("</select>", m.index);
+    const body = src.slice(m.index, end === -1 ? undefined : end);
+    const ok = /view-select-ok/.test(tagText(src, m.index)) || /view-select-ok/.test(lines[line - 1] ?? "") || /view-select-ok/.test(lines[line - 2] ?? "");
+    const computed = /\.map\(/.test(body);
+    if (computed) {
+      if (!ok) problems.push(`${rel}:${line}: raw <select> with computed options; use chips/ViewTabs for 4 or fewer, or mark a 5+ list with // view-select-ok: reason`);
+    } else {
+      const count = (body.match(/<option[\s>]/g) ?? []).length;
+      if (count <= MAX_TABS && !ok) problems.push(`${rel}:${line}: raw <select> with ${count} options; ${MAX_TABS} or fewer are chips/ViewTabs, not a dropdown`);
+    }
   }
   return problems;
 }
