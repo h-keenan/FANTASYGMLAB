@@ -203,7 +203,12 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     return map;
   }, [draft?.teams]);
 
-  // Phones: the draft room's panel tabs live in the bottom pill (web twin: SimGameDraft.tsx), so the top row steps aside there.
+  // Phones (concept A; web twin: SimGameDraft.tsx): the panel tabs live in the bottom pill. On the clock the chip is "Draft T. Okafor"
+  // (the suggested pick) and the strip yields to Players | Queue | Picks; otherwise the four panels + Auto-pick.
+  const onClockNow = Boolean(draft?.on_the_clock?.is_you) && draft?.status === 'in_progress';
+  const hintName = hint?.player.name?.trim() ?? '';
+  const hintShort = hintName ? `${hintName[0]}. ${playerSurname(hintName)}` : '';
+  const draftChip = onClockNow && hint && hintShort ? { key: 'draft', label: `Draft ${hintShort}`, busy: busy === 'pick', onPress: () => void pick(hint.player) } : null;
   const pillOwnsTabs = useBottomPillContext(
     loadState === 'ready' && draft
       ? {
@@ -212,12 +217,12 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
           tabs: [
             { key: 'board', label: 'Players', glyph: 'players' },
             { key: 'queue', label: queue.ids.length ? `Queue ${queue.ids.length}` : 'Queue', glyph: 'queue' },
-            { key: 'roster', label: 'Roster', glyph: 'roster' },
+            ...(draftChip && panel !== 'roster' ? [] : [{ key: 'roster', label: 'Roster', glyph: 'roster' as const }]),
             { key: 'picks', label: 'Picks', glyph: 'picks' },
           ],
           activeKey: panel,
           onSelect: (key) => setPanel(key as Panel),
-          primary: { key: 'auto-pick', label: 'Auto-pick', glyph: 'recommended', disabled: draft.status === 'complete' || busy === 'pick', onPress: () => setConfirmAuto(true) },
+          primary: draftChip ?? { key: 'auto-pick', label: 'Auto-pick', glyph: 'recommended', disabled: draft.status === 'complete' || busy === 'pick', onPress: () => setConfirmAuto(true) },
         }
       : null,
   );

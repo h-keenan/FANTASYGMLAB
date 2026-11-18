@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { PillMorph } from "@/components/ui/PillMorph";
-import { simPillPlan } from "@/lib/bottomNav";
+import { simFooterTabs, simPillPlan, type PillContext } from "@/lib/bottomNav";
+import type { SimTab } from "@/lib/simGameFlow";
 import { usePillState } from "@/lib/useBottomPillContext";
 import { Button } from "@/components/Button";
 import type { SimCtx } from "@/components/SimGameParts";
@@ -18,7 +19,7 @@ import { simOffseasonCta, simOffseasonStageLabel, simSeasonLabel, type SimOffsea
  * newer saves only show a compact over-the-limit note: you can start the season over the limit, you just cannot add players). A floating glass pill above the bottom tab bar on phones (no orb), sticky on desktop, same frame as SimActionBar. It reads the offseason
  * itself, so any tab can mount it. Mobile twin: mobile/src/components/SimOffseasonBar.tsx.
  */
-export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab: "home") => void; orb?: ReactNode }) {
+export function SimOffseasonBar({ ctx, onTab, orb, tab }: { ctx: SimCtx; onTab?: (tab: SimTab) => void; orb?: ReactNode; /** The lit page (Offseason / Team / ...): the phone pill lights its tab. */ tab?: string }) {
   const pill = usePillState();
   const { gameId, call } = ctx;
   const [off, setOff] = useState<SimOffseason | null>(null);
@@ -70,6 +71,18 @@ export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab
     }
   }
 
+  // Phones (concept A): orb | Offseason / Team (/ Trades) | the stage chip. A long stage label ("Start next season") yields a tab.
+  const phoneSegment: PillContext | null = pill.barPresent
+    ? {
+        id: "sim-offseason",
+        label: "Fantasy Sim pages",
+        tabs: simFooterTabs({ offseason: true, chipLabel: cta.label }),
+        activeKey: tab ?? "home",
+        onSelect: (key) => onTab?.(key as SimTab),
+        primary: { key: "stage", label: cta.label, busy: busy && !confirmAuto, disabled: Boolean(cta.blocked) || confirmAuto, onPress: press },
+      }
+    : null;
+
   return (
     <div
       className="sim-action-bar action-pill md:sticky md:inset-x-auto md:bottom-4 md:mx-auto md:w-full"
@@ -92,7 +105,7 @@ export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab
       {cta.blocked ? (
         <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status">{cta.blocked}</p>
       ) : null}
-      <PillMorph segment={simPillPlan({ context: pill.barPresent ? pill.ctx : null, simToAvailable: false }).segment} orb={orb}>
+      <PillMorph segment={phoneSegment ?? simPillPlan({ context: pill.barPresent ? pill.ctx : null, simToAvailable: false }).segment} orb={orb}>
       <div className="mx-auto flex max-w-3xl items-center gap-2 max-md:p-0 md:p-1 md:grid md:grid-cols-[1fr_auto]">
         <span className="min-w-0 text-xs font-bold max-md:hidden" style={{ color: "var(--color-text-muted)" }}>
           {simOffseasonStageLabel(off.stage)}
