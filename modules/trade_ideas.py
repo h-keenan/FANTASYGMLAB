@@ -51,7 +51,7 @@ from modules.player_state_authority import (
 )
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
-from modules import age_profile, model_status, runtime_trace
+from modules import age_profile, model_status, partner_context, runtime_trace
 from modules import drop_candidates, trade_cautions, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 
@@ -1976,6 +1976,18 @@ def partner_acceptance_context(
             cap -= 0.03
         elif contending and need_hits:
             cap += 0.01
+    # Partner roster age / pick stash / trade habits (handshakes 3-5): a small,
+    # bounded nudge; it can move the cap only when two factors agree, never past
+    # the max cap, and never past the hard ceiling below.
+    context_adjust = partner_context.adjustment(
+        ctx=shape.get("partner_context"),
+        send_assets=send_assets,
+        receive_assets=receive_assets,
+        incoming_age_band=_asset_age_band(send_assets) if incoming_age else "unknown",
+        existing_age_fit=age_fit,
+        team_count=int(shape.get("partner_team_count") or 12),
+    )
+    cap += float(context_adjust["cap_shift"])
     cap = max(0.0, min(PARTNER_EDGE_MAX_CAP, cap))
 
     # The absolute floor keeps tiny trades from failing on a handful of points,
@@ -2002,6 +2014,7 @@ def partner_acceptance_context(
         "strategy": strategy,
         "age_fit": age_fit,
         "incoming_age": incoming_age,
+        "context_adjust": context_adjust,
     }
 
 
@@ -2022,7 +2035,11 @@ def partner_reason_text(context: Mapping[str, Any]) -> str:
     elif strategy in {"rebuild", "tank"}:
         age_note = {"poor": ", older piece", "good": ", younger piece"}.get(str(context.get("age_fit") or ""), "")
         parts.append(f"they're rebuilding{age_note}")
-    return " · ".join(parts[:2])
+    parts = parts[:2]
+    context_note = str((context.get("context_adjust") or {}).get("note") or "")
+    if context_note:
+        parts.append(context_note)
+    return " · ".join(parts)
 
 
 def evaluate_trade_market_realism(
@@ -2435,6 +2452,7 @@ def evaluate_trade_market_realism(
     )
     if acceptance["penalty"]:
         score -= acceptance["penalty"]
+    score += float(acceptance["context_adjust"]["points"])
     if acceptance["lopsided"]:
         score -= 10
         negatives.append(
@@ -4597,6 +4615,7 @@ def build_trade_ideas(
     require_receive_players: bool = False,
     finder_trace: "FinderSearchTrace | None" = None,
     trade_block_player_ids: Sequence[str] | None = None,
+    team_profiles: Mapping[str, Any] | None = None,
 ) -> List[Dict[str, Any]]:
     profile = _TradePipelineProfile(cache_enabled=_pipeline_cache_enabled)
     try:
@@ -4625,6 +4644,7 @@ def build_trade_ideas(
             require_receive_players=require_receive_players,
             finder_trace=finder_trace,
             trade_block_player_ids=trade_block_player_ids,
+            team_profiles=team_profiles,
         )
     finally:
         profile.emit()
@@ -4894,6 +4914,62 @@ class _UserSideAnalyzerGate:
         return passed
 
 
+def _attach_partner_context(
+    shape: Dict[str, Any], contexts: Mapping[int, Mapping[str, Any]], roster_id: Any
+) -> None:
+    ctx = contexts.get(_safe_int(roster_id)) if contexts else None
+    if ctx:
+        shape["partner_context"] = dict(ctx)
+        shape["partner_team_count"] = int(ctx.get("team_count") or 12)
+
+
+def _partner_contexts(
+    team_frames: Mapping[Any, pd.DataFrame],
+    roster_pick_assets: Mapping[Any, List[Dict[str, Any]]],
+    league_draft_capitals: List[int],
+    score_field: str,
+    team_profiles: Mapping[str, Any] | None = None,
+) -> Dict[int, Dict[str, Any]]:
+    """Per-partner age / pick-stash / trade-habit context (handshakes 3-5).
+
+    Age and picks come from the same shared builders the team profile uses
+    (``team_profile.build_age_block`` / ``build_picks_block``) over the frames and
+    pick assets this search already holds, so the values match the profile and the
+    search's own draft status. The tendency block comes from the cached league
+    team profile when the caller passed it; without it tendencies read neutral.
+    Empty when the kill switch is off."""
+
+    if not partner_context.enabled():
+        return {}
+    from modules import team_profile
+
+    age_blocks: Dict[int, Dict[str, Any]] = {}
+    for rid, frame in team_frames.items():
+        try:
+            age_blocks[_safe_int(rid)] = team_profile.build_age_block(frame, score_field)
+        except Exception:
+            age_blocks[_safe_int(rid)] = {}
+    league_core = partner_context.league_core_age(age_blocks.values())
+    profile_teams = (team_profiles or {}).get("teams") or {}
+    team_count = max(len(roster_pick_assets), len(age_blocks), 1)
+    contexts: Dict[int, Dict[str, Any]] = {}
+    for rid in set(age_blocks) | {_safe_int(k) for k in roster_pick_assets}:
+        picks_block = team_profile.build_picks_block(
+            roster_pick_assets.get(rid, []), None, list(league_draft_capitals or [])
+        )
+        tendency = (profile_teams.get(str(rid)) or {}).get("tendency")
+        ctx = partner_context.build_context(
+            age_block=age_blocks.get(rid),
+            picks_block=picks_block,
+            tendency=tendency,
+            league_core_age=league_core,
+            team_count=team_count,
+        )
+        ctx["team_count"] = team_count
+        contexts[rid] = ctx
+    return contexts
+
+
 def _build_trade_ideas_impl(
     df_players: pd.DataFrame,
     league_id: str,
@@ -4919,6 +4995,7 @@ def _build_trade_ideas_impl(
     require_receive_players: bool = False,
     finder_trace: "FinderSearchTrace | None" = None,
     trade_block_player_ids: Sequence[str] | None = None,
+    team_profiles: Mapping[str, Any] | None = None,
 ) -> List[Dict[str, Any]]:
     profile = _pipeline_profile or _TradePipelineProfile(cache_enabled=False)
     ideas: List[Dict[str, Any]] = []
@@ -4975,6 +5052,9 @@ def _build_trade_ideas_impl(
     for frame in roster_team_frames.values():
         frame.drop(columns=["_trade_owner_id"], inplace=True)
     my_team_df = roster_team_frames.get(my_roster_key, df_players.iloc[0:0].copy())
+    partner_contexts = _partner_contexts(
+        roster_team_frames, roster_pick_assets, league_draft_capitals, score_field, team_profiles
+    )
 
     # Keep every explicit untouchable and every asset that the shared protection
     # predicate recognizes as core. Only an intentional player-focused search may
@@ -5280,6 +5360,7 @@ def _build_trade_ideas_impl(
             league_settings=league_settings,
             league_needs=league_needs,
         )
+        _attach_partner_context(partner_shape, partner_contexts, partner_roster_id)
         partner_mode = str(partner_shape.get("mode") or partner_mode)
         partner_profile = partner_row.to_dict() if hasattr(partner_row, "to_dict") else {}
 
@@ -7495,7 +7576,9 @@ def _build_my_player_fallback_ideas(
     league_settings: Dict[str, Any] | None = None,
     team_frames: Dict[int, pd.DataFrame] | None = None,
     league_needs: "roster_value_model.LeagueNeeds | None" = None,
+    partner_contexts: Mapping[int, Mapping[str, Any]] | None = None,
 ) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
+    partner_contexts = partner_contexts or {}
     diagnostics = _empty_player_search_funnel()
     diagnostics.update(
         {
@@ -7813,6 +7896,7 @@ def _build_my_player_fallback_ideas(
             league_settings=league_settings,
             league_needs=league_needs,
         )
+        _attach_partner_context(partner_shape, partner_contexts, partner_roster_id)
         _add_stage_ms(diagnostics, "stage_ms_team_shape", shape_started)
         partner_mode = str(partner_shape.get("mode") or partner_row.get("mode") or "")
         partner_profile = partner_row.to_dict() if hasattr(partner_row, "to_dict") else {}
@@ -8225,6 +8309,9 @@ def build_player_trade_hub_ideas(
         index_started = time.perf_counter()
         team_frames = _index_roster_team_frames(df_players, roster_players_map)
         roster_index_ms = round((time.perf_counter() - index_started) * 1000, 3)
+    partner_contexts = _partner_contexts(
+        team_frames, roster_pick_assets, league_draft_capitals, score_field
+    )
     my_team_df = team_frames.get(my_roster_key)
     if my_team_df is None or getattr(my_team_df, "empty", True):
         my_team_df = df_players[df_players["player_id"].astype(str).isin(my_player_ids)]
@@ -8349,6 +8436,7 @@ def build_player_trade_hub_ideas(
                 league_settings=league_settings,
                 team_frames=team_frames,
                 league_needs=league_needs,
+                partner_contexts=partner_contexts,
             )
             combined_diag = dict(diagnostics)
             _universe_keys = {
