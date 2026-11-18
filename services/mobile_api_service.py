@@ -290,6 +290,7 @@ from modules import drop_candidates, roster_value_model
 from modules import usage_trends
 from modules import bye_cover, gm_plan_outlook
 from modules import team_profile as team_profile_module
+from modules import live_draft_context
 from modules import direction_checkin, trade_cautions, trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
@@ -4885,6 +4886,70 @@ def _adp_fields(
     }
 
 
+def _live_draft_context(
+    *,
+    user: dict[str, Any],
+    config: Any,
+    league_id: str,
+    lens: str,
+    draft: Mapping[str, Any],
+    my_roster_id: Any,
+) -> dict[str, Any] | None:
+    """The live draft context (modules.live_draft_context) or None; never raises."""
+
+    if not live_draft_context.enabled() or my_roster_id is None:
+        return None
+    try:
+        profile = team_profile_module.league_team_profiles_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+        user_id = str(user.get("id") or "")
+        token = str(user.get("_access_token") or "")
+        declared = _fetch_team_stance(config, user_id, token, league_id) if user_id else ""
+        rookie = live_draft._draft_kind(draft) == "rookie"
+        class_read = None
+        if rookie:
+            season = draft.get("season")
+            try:
+                year = int(season)
+            except (TypeError, ValueError):
+                year = None
+            if year is not None:
+                crowd = (
+                    college_scouting.get_cached_crowd_class_strength_by_year(config, token)
+                    if college_scouting.class_strength_signal_enabled()
+                    else {}
+                )
+                try:
+                    prospects, _err = college_scouting.get_cached_all_prospects(config, token)
+                except Exception:
+                    prospects = []
+                class_read = live_draft_context.class_strength(
+                    year, trade_ideas.DEFAULT_CLASS_STRENGTH_BY_YEAR.get(year), crowd, prospects or []
+                )
+        return live_draft_context.build_context(
+            profile=profile,
+            my_roster_id=my_roster_id,
+            declared_stance=declared,
+            rookie_draft=rookie,
+            class_read=class_read,
+        )
+    except Exception:
+        logger.warning("live draft context unavailable (league=%s)", league_id, exc_info=True)
+        return None
+
+
+def _with_context_notes(rec: dict[str, Any], ctx: dict[str, Any] | None) -> dict[str, Any]:
+    if ctx:
+        rec["context_notes"] = live_draft_context.notes_for(rec, ctx)
+    return rec
+
+
+def _draft_context_payload(ctx: dict[str, Any] | None) -> dict[str, Any]:
+    summary = live_draft_context.summary(ctx)
+    return {"draft_context": summary} if summary else {}
+
+
 def _project_live_draft_recommendation(
     rec: dict[str, Any],
     rating_by_player_id: dict[str, Any] | None = None,
@@ -5075,6 +5140,17 @@ def get_league_live_draft_state(
         else players_df.iloc[0:0].copy()
     )
 
+    # Handshake item 8: team stance, ages and needs from the shared team
+    # profile, plus rookie class strength. None (flag off / no profile) leaves
+    # the draft board exactly as before.
+    draft_ctx = _live_draft_context(
+        user=user,
+        config=config,
+        league_id=league_id,
+        lens=lens,
+        draft=draft,
+        my_roster_id=my_roster_id,
+    )
     state = live_draft.build_live_draft_state(
         draft=draft,
         picks=picks,
@@ -5083,7 +5159,7 @@ def get_league_live_draft_state(
         roster_profiles=roster_profiles,
         rosters=rosters,
         my_roster_id=my_roster_id,
-        league_settings=settings,
+        league_settings=live_draft_context.apply_to_settings(settings, draft_ctx),
         score_field=score_field,
     )
 
@@ -5154,9 +5230,13 @@ def get_league_live_draft_state(
             "league_format": settings.get("league_format"),
         },
         "recommendations": [
-            _project_live_draft_recommendation(rec, rating_by_player_id, adp_players, rank_by_player_id, est_sf)
+            _with_context_notes(
+                _project_live_draft_recommendation(rec, rating_by_player_id, adp_players, rank_by_player_id, est_sf),
+                draft_ctx,
+            )
             for rec in (state.get("recommendations") or [])
         ],
+        **_draft_context_payload(draft_ctx),
         "pick_rows": [_project_live_draft_pick_row(row) for row in pick_rows[-LIVE_DRAFT_MAX_PICK_ROWS:]],
         "rankings": (
             [

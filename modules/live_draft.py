@@ -12,7 +12,7 @@ from typing import Any, Callable, Mapping, MutableMapping
 import pandas as pd
 import requests
 
-from modules import age_profile, performance, player_tier_identity, player_tiers
+from modules import age_profile, live_draft_context, performance, player_tier_identity, player_tiers
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.sleeper import SLEEPER_BASE
 
@@ -488,10 +488,15 @@ def roster_position_needs(roster_df: pd.DataFrame, league_settings: dict[str, An
     phase. The important semantic boundary is that a covered room is a neutral
     fit preference, not a true positional need.
     """
+    settings = league_settings or {}
+    # Handshake item 8: the league need model's true needs (live_draft_context
+    # fills this key); absent, the coarse roster-count model below is unchanged.
+    profile_needs = settings.get("profile_needs")
+    if isinstance(profile_needs, list):
+        return [safe_text(p).upper() for p in profile_needs if safe_text(p).upper() in ("QB", "RB", "WR", "TE")]
     if roster_df is None or roster_df.empty or "position" not in roster_df.columns:
         return ["RB", "WR", "TE", "QB"]
     counts = Counter(safe_text(pos).upper() for pos in roster_df["position"].tolist())
-    settings = league_settings or {}
     qb_slots = safe_int(
         settings.get("qb_slots", settings.get("qb_count")),
         1,
@@ -650,7 +655,7 @@ def _strategy_name(league_settings: dict[str, Any]) -> str:
 
 
 def _age_strategy_adjustment(
-    *, age: int, position: str, dynasty: bool, rookie_draft: bool, strategy: str
+    *, age: int, position: str, dynasty: bool, rookie_draft: bool, strategy: str, room_aging: bool = False
 ) -> float:
     """A deliberately modest dynasty tie-breaker, capped well below one value tier."""
     if not dynasty or rookie_draft or age <= 0:
@@ -663,13 +668,15 @@ def _age_strategy_adjustment(
     delta = age - peak_age
     if delta <= 0:
         youth = min(1.5, abs(delta) * 0.35)
-        return youth * (1.0 if strategy in {"rebuild", "rebuilder", "tank"} else 0.45)
+        base = youth * (1.0 if strategy in {"rebuild", "rebuilder", "tank"} else 0.45)
+        # An aging room of ours wants a younger player at that spot (small, inside the cap).
+        return base + (live_draft_context.AGING_ROOM_YOUTH_BONUS if room_aging else 0.0)
     penalty_rate = 0.65
     if strategy in {"contender", "compete", "win now", "win_now"}:
         penalty_rate = 0.25
     elif strategy in {"rebuild", "rebuilder", "tank"}:
         penalty_rate = 0.8
-    return -min(3.0, delta * penalty_rate)
+    return -min(3.0, delta * penalty_rate + (live_draft_context.AGING_ROOM_OLD_PENALTY if room_aging else 0.0))
 
 
 def _tier_for_rank(rank: int, total: int, existing: str = "") -> str:
@@ -763,7 +770,12 @@ def build_live_draft_rankings(
         scarcity = min(4.0, max(0.0, (starters.get(position, 1) * 2 - counts.get(position, 0)) * 1.25))
         roster_fit = min(5.0, float(need_rank.get(position, 0)) + scarcity * 0.35)
         age_adjustment = _age_strategy_adjustment(
-            age=age, position=position, dynasty=dynasty, rookie_draft=rookie_draft, strategy=strategy
+            age=age,
+            position=position,
+            dynasty=dynasty,
+            rookie_draft=rookie_draft,
+            strategy=strategy,
+            room_aging=live_draft_context.room_is_aging(settings, position),
         )
         availability = 0.0
         if picks_until_mine is not None and picks_until_mine > 0:

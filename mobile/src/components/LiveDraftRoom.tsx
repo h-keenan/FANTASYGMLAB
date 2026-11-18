@@ -7,6 +7,7 @@ import AnimatedCard from './AnimatedCard';
 import AdpLine, { AdpCredit } from './AdpLine';
 import { adpContext } from '../lib/adpPresentation';
 import AppText from './AppText';
+import CompactModule from './CompactModule';
 import CompactPlayerCard from './CompactPlayerCard';
 import { SkeletonList } from './Skeleton';
 import Button from './Button';
@@ -385,6 +386,22 @@ function DraftBoard({
         <AppText style={styles.muted}>Recent run: {state.positional_run}</AppText>
       </AnimatedCard>
 
+      {state.draft_context ? (
+        <CompactModule
+          id="live-draft.context"
+          title="Your draft context"
+          persist={false}
+          parts={state.draft_context.parts.map((text, i) => ({ key: `c${i}`, text, strong: i === 0 }))}
+        >
+          {state.draft_context.lines.map((line) => (
+            <AppText key={line} style={styles.muted}>
+              {'\u2022 '}
+              {line}
+            </AppText>
+          ))}
+        </CompactModule>
+      ) : null}
+
       <View>
         <SectionHeading title="Who should I draft next?" icon="sparkles-outline" />
         {state.recommendations.length === 0 ? (
@@ -536,6 +553,12 @@ function RecommendationCard({
           ) : null}
           {rec.adp_read ? <AppText style={styles.muted}>{rec.adp_read}</AppText> : null}
           <AppText style={styles.muted}>Confidence: {rec.confidence}</AppText>
+          {(rec.context_notes ?? []).map((note) => (
+            <AppText key={note} style={styles.muted}>
+              {'\u2022 '}
+              {note}
+            </AppText>
+          ))}
         </View>
       ) : null}
     </AnimatedCard>
