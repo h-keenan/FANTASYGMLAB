@@ -664,6 +664,20 @@ def _pick_value_components(
     }
 
 
+def _projected_pick_slot(round_num: int, projected_slot_percentile: float, team_count: int) -> tuple[int, str]:
+    """The pick's projected draft slot ("1.04") from its ORIGINAL owner's projected finish.
+
+    `projected_slot_percentile` is 1.0 for the weakest projected team (earliest
+    pick) and 0.0 for the strongest (last pick), the same orientation the pick
+    value model uses, so this is the value model's own slot, not a second guess."""
+
+    teams = max(1, int(team_count or 0))
+    pct = _clamp_float(_safe_float(projected_slot_percentile, 0.5), 0.0, 1.0)
+    slot = 1 + int(round((1.0 - pct) * (teams - 1)))
+    slot = max(1, min(teams, slot))
+    return slot, f"{int(round_num)}.{slot:02d}"
+
+
 def _build_roster_pick_assets(
     league_id: str,
     rosters: List[Dict[str, Any]],
@@ -802,6 +816,9 @@ def _build_roster_pick_assets(
             next_draft_year=next_draft_year,
         )
         value = int(value_details["score"])
+        slot_number, slot_label = _projected_pick_slot(
+            round_num, value_details["projected_slot_percentile"], len(roster_ids)
+        )
         assets_by_owner[owner_id].append(
             {
                 "asset_type": "pick",
@@ -825,6 +842,8 @@ def _build_roster_pick_assets(
                 "prospect_strength_multiplier": value_details["prospect_strength_multiplier"],
                 "slot_percentile": value_details["slot_percentile"],
                 "projected_slot_percentile": value_details["projected_slot_percentile"],
+                "projected_slot_number": slot_number,
+                "projected_slot_label": slot_label,
                 "early_probability": value_details["early_probability"],
                 "mid_probability": value_details["mid_probability"],
                 "late_probability": value_details["late_probability"],
@@ -957,6 +976,8 @@ def _pick_asset(pick: Dict[str, Any], score_multiplier: float = 1.0) -> Dict[str
         "prospect_strength_multiplier": pick.get("prospect_strength_multiplier"),
         "slot_percentile": pick.get("slot_percentile"),
         "projected_slot_percentile": pick.get("projected_slot_percentile"),
+        "projected_slot_number": pick.get("projected_slot_number"),
+        "projected_slot_label": pick.get("projected_slot_label"),
         "early_probability": pick.get("early_probability"),
         "mid_probability": pick.get("mid_probability"),
         "late_probability": pick.get("late_probability"),
@@ -1771,6 +1792,12 @@ def _trade_confidence_context(
         confidence_score = min(confidence_score, TRADE_CONFIDENCE_MEDIUM_MIN - 1)
     if "consolidation_premium" in market_flags:
         confidence_score = min(confidence_score, TRADE_CONFIDENCE_HIGH_MIN - 1)
+    # A lopsided offer is never "High": the partner is the one who has to say yes.
+    edge_ratio = float(market.get("user_edge_ratio") or 0.0)
+    if bool(market.get("partner_lopsided")):
+        confidence_score = min(confidence_score, TRADE_CONFIDENCE_MEDIUM_MIN - 1)
+    elif edge_ratio > PARTNER_EDGE_HIGH_CONFIDENCE_RATIO:
+        confidence_score = min(confidence_score, TRADE_CONFIDENCE_HIGH_MIN - 1)
 
     confidence_score = max(0, min(100, confidence_score))
     confidence_label = _trade_confidence_label(confidence_score)
@@ -1839,6 +1866,131 @@ def posture_surface_sort_key(idea: Dict[str, Any]) -> tuple:
     that cost it last. Ungraded ideas rank neutral, i.e. the plain surface key."""
 
     return (*trade_posture.sort_rank(idea), *_trade_surface_sort_key(idea))
+
+
+# Mutual acceptability: the partner's side of the same trade.
+#
+# A trade idea is only worth showing if the other manager could say yes. The
+# partner's value loss (what they give up minus what they get, as a share of
+# what they give up) is judged against a cap that moves with three real
+# signals: does the partner NEED what they would receive (position need /
+# surplus), what their posture is (contender / rebuilder, the same strategy the
+# rest of the engine reads), and the age fit of the players they would receive.
+PARTNER_EDGE_BASE_CAP = 0.06
+PARTNER_EDGE_MAX_CAP = 0.09
+PARTNER_EDGE_SOFT_RATIO = 0.04
+PARTNER_EDGE_MIN_ABS = 200
+PARTNER_EDGE_HIGH_CONFIDENCE_RATIO = 0.05
+
+
+def partner_acceptance_context(
+    *,
+    send_assets: List[Dict[str, Any]],
+    receive_assets: List[Dict[str, Any]],
+    partner_shape: Mapping[str, Any],
+    send_score: int,
+    receive_score: int,
+) -> Dict[str, Any]:
+    """The partner's view: how much they lose, how much they could tolerate, and why.
+
+    `send_assets` is what the USER sends (the partner receives); `receive_assets`
+    is what the user gets (the partner gives up)."""
+
+    shape = dict(partner_shape or {})
+    strategy = normalize_team_strategy(shape.get("strategy") or shape.get("mode"))
+    rebuilding = strategy in {"rebuild", "tank"}
+    contending = strategy in {"contender", "fringe_contender"}
+    partner_needs = {str(p).upper() for p in (shape.get("needs") or [])}
+    surplus_ids = shape.get("surplus_player_ids") or {}
+
+    incoming_players = _player_assets(send_assets)
+    incoming_positions = _asset_positions(send_assets)
+    need_hits = incoming_positions & partner_needs
+    surplus_positions = {
+        pos for pos in incoming_positions
+        if pos not in partner_needs and (surplus_ids.get(pos) or ())
+    }
+    incoming_age = _asset_avg_age(send_assets)
+    gives_picks = bool(_pick_assets(receive_assets))
+    gets_picks = bool(_pick_assets(send_assets))
+
+    user_edge = int(receive_score) - int(send_score)
+    ratio = (user_edge / receive_score) if receive_score > 0 else 0.0
+
+    cap = PARTNER_EDGE_BASE_CAP
+    age_fit = "unknown"
+    if incoming_players:
+        if need_hits:
+            cap += 0.03
+        else:
+            cap -= 0.02
+            if surplus_positions:
+                cap -= 0.02
+    if incoming_age:
+        if rebuilding:
+            if incoming_age >= 28:
+                cap -= 0.03
+                age_fit = "poor"
+            elif incoming_age <= 25:
+                cap += 0.02
+                age_fit = "good"
+        elif contending:
+            if incoming_age <= 24 and not need_hits:
+                cap -= 0.01
+                age_fit = "poor"
+            elif 25 <= incoming_age <= 30:
+                age_fit = "good"
+    # A rebuilder parting with a pick for a player, no pick back, is the
+    # hardest sell; a contender spending a pick on a need is the easiest.
+    if gives_picks and not gets_picks and incoming_players:
+        if rebuilding:
+            cap -= 0.03
+        elif contending and need_hits:
+            cap += 0.01
+    cap = max(0.0, min(PARTNER_EDGE_MAX_CAP, cap))
+
+    allowed_edge = max(PARTNER_EDGE_MIN_ABS, int(round(cap * max(0, receive_score))))
+    lopsided = user_edge > allowed_edge
+    penalty = 0
+    if ratio > PARTNER_EDGE_SOFT_RATIO:
+        penalty = int(round((ratio - PARTNER_EDGE_SOFT_RATIO) * 100 * 1.5))
+    if incoming_players and not need_hits and ratio > 0.02:
+        penalty += 4
+
+    return {
+        "user_edge": user_edge,
+        "user_edge_ratio": round(float(ratio), 4),
+        "edge_cap": round(float(cap), 4),
+        "allowed_edge": allowed_edge,
+        "lopsided": lopsided,
+        "penalty": int(penalty),
+        "need_hits": sorted(need_hits),
+        "no_need_positions": sorted(incoming_positions - partner_needs),
+        "surplus_positions": sorted(surplus_positions),
+        "strategy": strategy,
+        "age_fit": age_fit,
+        "incoming_age": incoming_age,
+    }
+
+
+def partner_reason_text(context: Mapping[str, Any]) -> str:
+    """One short, neutral line on why the idea does or does not fit the partner."""
+
+    parts: List[str] = []
+    need_hits = list(context.get("need_hits") or [])
+    if need_hits:
+        parts.append(f"Fills their {_format_pos_list(need_hits)} hole")
+    else:
+        light = list(context.get("surplus_positions") or []) or list(context.get("no_need_positions") or [])
+        if light:
+            parts.append(f"Light fit: no {_format_pos_list(light)} need")
+    strategy = str(context.get("strategy") or "")
+    if strategy in {"contender", "fringe_contender"}:
+        parts.append("they're contending")
+    elif strategy in {"rebuild", "tank"}:
+        age_note = {"poor": ", older piece", "good": ", younger piece"}.get(str(context.get("age_fit") or ""), "")
+        parts.append(f"they're rebuilding{age_note}")
+    return " · ".join(parts[:2])
 
 
 def evaluate_trade_market_realism(
@@ -2242,6 +2394,23 @@ def evaluate_trade_market_realism(
             score += 4
             positives.append(f"{partner_name} typically values younger upside profiles.")
 
+    acceptance = partner_acceptance_context(
+        send_assets=send_assets,
+        receive_assets=receive_assets,
+        partner_shape=partner_shape,
+        send_score=send_score,
+        receive_score=receive_score,
+    )
+    if acceptance["penalty"]:
+        score -= acceptance["penalty"]
+    if acceptance["lopsided"]:
+        score -= 10
+        negatives.append(
+            f"{partner_name} would give up about {int(round(acceptance['user_edge_ratio'] * 100))}% more value than they get back."
+        )
+        flags.append("partner_value_loss")
+        hard_fail_flags.append("partner_value_loss")
+
     deduped_hard_fail_flags = list(dict.fromkeys(hard_fail_flags))
     if deduped_hard_fail_flags:
         score = min(score, MARKET_REALISM_THIN_MIN - 1)
@@ -2267,6 +2436,10 @@ def evaluate_trade_market_realism(
         "consolidation_premium": int(consolidation_premium),
         "consolidation_premium_required": int(consolidation_premium_required),
         "positional_market_adjustment": int(positional_market_adjustment),
+        "partner_acceptance": acceptance,
+        "partner_reason": partner_reason_text(acceptance),
+        "user_edge_ratio": acceptance["user_edge_ratio"],
+        "partner_lopsided": bool(acceptance["lopsided"]),
     }
 
 
@@ -2296,6 +2469,8 @@ def _attach_trade_assessment_fields(
     idea["market_realism_score"] = int(market.get("score") or 0)
     idea["market_realism_label"] = str(market.get("label") or "Thin")
     idea["market_realism_summary"] = str(market.get("summary") or "")
+    idea["partner_fit_reason"] = str(market.get("partner_reason") or "")
+    idea["user_edge_ratio"] = float(market.get("user_edge_ratio") or 0.0)
     idea["market_realism_flags"] = list(market.get("flags") or [])
     idea["market_realism_hard_fail"] = bool(market.get("hard_fail"))
     idea["market_realism_hard_fail_flags"] = list(market.get("hard_fail_flags") or [])

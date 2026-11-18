@@ -25,6 +25,7 @@ import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { tradeIdeaGainText } from '../lib/tradeIdeaSummary';
+import { partnerFitLine, pickProjectionLine } from '../lib/tradeIdeaPick';
 import type { DraftPickAsset, PresentationAsset, RankedPlayer, TradeIdea, TradeVerdict } from '../lib/api';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -301,7 +302,7 @@ export default function TradeIdeaCard({
   // included), a fairness meter; the former card body is the expand-in-place details. Web twin: ui/TradeCompactCard.
   const toCardAsset = (asset: PresentationAsset, index: number): TradeCardAsset =>
     asset.asset_type === 'pick'
-      ? { key: `pick-${index}`, pickLabel: asset.label || 'Draft pick', value: asset.score ?? null, onPress: () => openPick(asset) }
+      ? { key: `pick-${index}`, pickLabel: asset.label || 'Draft pick', pickDetail: pickProjectionLine(asset), value: asset.score ?? null, onPress: () => openPick(asset) }
       : {
           key: asset.player_id ?? `p-${index}`,
           player: { id: asset.player_id ?? null, name: asset.name || 'Player', position: asset.position, team: asset.team, age: asset.age, tier: asset.tier },
@@ -363,6 +364,11 @@ export default function TradeIdeaCard({
         <View style={styles.postureBlock}>
           <IdeaPosture idea={idea} />
         </View>
+      ) : null}
+      {partnerFitLine(idea.partner_fit_reason) ? (
+        <AppText style={styles.partnerFitReason} numberOfLines={2} testID="trade-idea-partner-fit">
+          Their side: {partnerFitLine(idea.partner_fit_reason)}
+        </AppText>
       ) : null}
       {idea.roster_overflow ? <RosterOverflowNote overflow={idea.roster_overflow} compact /> : null}
       {/* Header hierarchy: recommendation type (the category/impact badges
@@ -545,6 +551,7 @@ function createStyles(colors: ThemeColors) {
   landedTargetRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   postureBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
   landedTargetText: { fontSize: 12.5, fontWeight: '600', color: colors.accent, flexShrink: 1 },
+  partnerFitReason: { fontSize: 12.5, color: colors.textSecondary },
   sourceTeamLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.6 },
   categoryBadge: {
     alignSelf: 'flex-start',

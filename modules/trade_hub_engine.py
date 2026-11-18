@@ -347,6 +347,10 @@ class TradeIdeaCard:
     # Roster-full check (modules.drop_candidates): set only when the trade would
     # overfill the roster; the idea's numbers already include the forced cuts.
     roster_overflow: dict[str, Any] | None = None
+    # One short, neutral line on why the idea fits (or does not fit) the PARTNER:
+    # their position need, their posture, the age fit ("Fills their TE hole ·
+    # they're contending"). From trade_ideas.partner_acceptance_context.
+    partner_fit_reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -370,6 +374,7 @@ class TradeIdeaCard:
             "posture_alignment": self.posture_alignment,
             "lineup_points": self.lineup_points,
             "roster_overflow": self.roster_overflow,
+            "partner_fit_reason": self.partner_fit_reason,
         }
 
 
@@ -415,6 +420,7 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
         posture_alignment=_safe_text(idea.get("posture_alignment")),
         lineup_points=idea.get("posture_lineup_points"),
         roster_overflow=dict(idea["roster_overflow"]) if isinstance(idea.get("roster_overflow"), Mapping) else None,
+        partner_fit_reason=_safe_text(idea.get("partner_fit_reason")),
     )
 
 
