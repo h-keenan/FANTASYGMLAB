@@ -241,7 +241,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, resolved, onRespond }: {
             </View>
           </View>
           <AppText style={common.small}>
-            <AppText style={{ fontWeight: '800', color: colors.danger, fontSize: 13 }}>Give</AppText> {names(item.you_give)}{' \u00b7 '}
+            <AppText style={{ fontWeight: '800', color: colors.textTertiary, fontSize: 13 }}>Give</AppText> {names(item.you_give)}{' \u00b7 '}
             <AppText style={{ fontWeight: '800', color: colors.success, fontSize: 13 }}>Get</AppText> {names(item.you_get)}
           </AppText>
         </Pressable>

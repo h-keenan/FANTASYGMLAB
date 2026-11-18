@@ -484,11 +484,11 @@ export function SimNotice({ message, tone = 'warning', onDismiss }: { message: s
   );
 }
 
-/** "You give" / "You get" label: fixed semantic color (red out, green in) with a small swap glyph. */
+/** "You give" / "You get" label: fixed semantic color (muted out, green in) with a small swap glyph. */
 export function SimSideLabel({ side }: { side: 'give' | 'get' }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const color = simToneColor(side === 'give' ? 'danger' : 'success', colors);
+  const color = side === 'give' ? colors.textTertiary : simToneColor('success', colors); // Give is neutral grey, never red
   return (
     <View style={styles.sideLabel}>
       <Ionicons name="swap-horizontal" size={14} color={color} />

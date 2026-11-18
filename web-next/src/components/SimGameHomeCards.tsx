@@ -184,7 +184,7 @@ export function SimInboxCard({ inbox, onTab }: { ctx?: SimCtx; inbox: SimHomeRes
                 <span className="shrink-0 text-xs" style={{ color: "var(--color-text-muted)" }}>expires wk {o.expires_week}</span>
               </div>
               <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                <span style={{ color: "var(--color-danger)" }} className="font-bold">Give</span> {names(o.you_give)}
+                <span style={{ color: "var(--color-text-muted)" }} className="font-bold">Give</span> {names(o.you_give)}
                 {" · "}
                 <span style={{ color: "var(--color-success)" }} className="font-bold">Get</span> {names(o.you_get)}
               </p>

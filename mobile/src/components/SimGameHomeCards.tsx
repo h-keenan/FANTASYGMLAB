@@ -180,7 +180,7 @@ export function SimInboxCard({ inbox, onTab }: { ctx?: SimCtx; inbox: SimHomeRes
               <AppText style={common.muted}>expires wk {o.expires_week}</AppText>
             </View>
             <AppText style={common.small}>
-              <AppText style={{ color: colors.danger, fontWeight: '800' }}>Give</AppText> {names(o.you_give)}
+              <AppText style={{ color: colors.textTertiary, fontWeight: '800' }}>Give</AppText> {names(o.you_give)}
               {' · '}
               <AppText style={{ color: colors.success, fontWeight: '800' }}>Get</AppText> {names(o.you_get)}
             </AppText>

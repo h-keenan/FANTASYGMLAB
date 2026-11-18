@@ -22,7 +22,7 @@ export function SimDraftBar({ model, onOpen, grade, action }: { model: SimDraftB
           <span className="min-w-0 break-words text-sm font-bold">{model.name}</span>
           <PositionBadge position={model.position} />
         </span>
-        <span className="truncate text-xs" style={{ color: "var(--color-text-muted)" }}>
+        <span className="line-clamp-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
           {["Best available", model.adp, model.fit].filter(Boolean).join(" · ")}
         </span>
       </span>
