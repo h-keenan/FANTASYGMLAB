@@ -165,3 +165,14 @@ def test_roster_matches_producers_by_name_and_team_when_ids_differ():
     counts = {}
     out = parse_roster([row], season=2026, producers=producers, draft_years=(2027, 2028), counts=counts)
     assert out and out[0]["draft_year"] == 2028 and counts["producer_ok"] == 1
+
+
+def test_recruit_year_beats_stale_roster_year():
+    """A deprecated roster ``year`` of 1 must not override the linked recruiting class."""
+    from modules.college_prospect_ingest import parse_roster
+
+    row = {"id": "5", "firstName": "C", "lastName": "D", "team": "Ohio State", "position": "WR", "year": 1, "recruitIds": ["r5"]}
+    counts = {}
+    out = parse_roster([row], season=2026, producers={"5"}, draft_years=(2027, 2028), recruit_years={"r5": 2023}, counts=counts)
+    assert out and out[0]["class_year"] == 4 and out[0]["draft_year"] == 2027
+    assert counts["draft_year_hist"] == {"2027": 1} and counts["raw_year_hist"] == {"1": 1}
