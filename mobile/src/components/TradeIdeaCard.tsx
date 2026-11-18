@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import TradeCompactCard, { type TradeCardAsset } from './TradeCompactCard';
 import InfoMark from './InfoMark';
-import MeterRow, { CONFIDENCE_LEVELS } from './ConfidenceMeter';
+import MeterRow from './ConfidenceMeter';
 import ManagerTendenciesChips from './ManagerTendenciesChips';
 import TeamAvatar from './TeamAvatar';
 import ManagerProfileModal from './ManagerProfileModal';
@@ -269,7 +269,6 @@ export default function TradeIdeaCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { showExplanations } = useDensity();
   const copy = useExperienceCopy();
-  const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
   const [shareOpen, setShareOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -322,6 +321,7 @@ export default function TradeIdeaCard({
       verdictLabel={idea.value_edge_band || null}
       netValue={idea.trade_gain}
       meta={[`${idea.confidence_label} confidence`]}
+      note={partnerFitLine(idea.partner_fit_reason)}
     >
       {idea.category || idea.impact_tag || ideaHelpLines.length > 0 ? (
         <View style={[styles.categoryRow, styles.categoryRowSpread]}>
@@ -364,11 +364,6 @@ export default function TradeIdeaCard({
         <View style={styles.postureBlock}>
           <IdeaPosture idea={idea} />
         </View>
-      ) : null}
-      {partnerFitLine(idea.partner_fit_reason) ? (
-        <AppText style={styles.partnerFitReason} numberOfLines={2} testID="trade-idea-partner-fit">
-          Their side: {partnerFitLine(idea.partner_fit_reason)}
-        </AppText>
       ) : null}
       {idea.roster_overflow ? <RosterOverflowNote overflow={idea.roster_overflow} compact /> : null}
       {/* Header hierarchy: recommendation type (the category/impact badges
@@ -504,7 +499,6 @@ export default function TradeIdeaCard({
       />
 
       <View style={styles.footerRow}>
-        <MeterRow label="CONFIDENCE" value={idea.confidence_label} level={confidenceLevel} color={colors.accent} />
         {idea.market_realism_label ? (
           <MeterRow
             label={copy.label('ideaRealism', 'REALISM').toUpperCase()}
@@ -551,7 +545,6 @@ function createStyles(colors: ThemeColors) {
   landedTargetRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   postureBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
   landedTargetText: { fontSize: 12.5, fontWeight: '600', color: colors.accent, flexShrink: 1 },
-  partnerFitReason: { fontSize: 12.5, color: colors.textSecondary },
   sourceTeamLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.6 },
   categoryBadge: {
     alignSelf: 'flex-start',

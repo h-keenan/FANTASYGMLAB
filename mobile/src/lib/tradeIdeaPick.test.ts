@@ -19,3 +19,7 @@ test('partner fit line passes through, empty is null', () => {
   assert.equal(partnerFitLine(''), null);
   assert.equal(partnerFitLine(undefined), null);
 });
+
+test('uses a bare apostrophe for names ending in s', () => {
+  assert.equal(pickProjectionLine({ projected_slot_label: '1.04', original_team_name: 'Bay Area Bandits', owner_team_name: 'Me' }), "proj. 1.04 · Bay Area Bandits' pick");
+});

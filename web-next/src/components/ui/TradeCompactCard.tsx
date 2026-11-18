@@ -96,6 +96,7 @@ export function TradeCompactCard({
   giveLabel = "You send",
   getLabel = "You get",
   meta = [],
+  note,
   meter: meterOverride,
   resolved,
 }: {
@@ -115,6 +116,8 @@ export function TradeCompactCard({
   getLabel?: string;
   /** Short facts under the title (e.g. "High confidence"). */
   meta?: string[];
+  /** One short neutral line under the meta line (a trade idea's partner-fit reason). */
+  note?: string | null;
   /** Replaces the computed fairness meter; null hides it (a card whose verdict is stated elsewhere, e.g. their counter). */
   meter?: FairnessMeter | null;
   /** The card was answered (accepted / declined): it collapses into one `TradeResolvedRow` instead of vanishing. */
@@ -131,6 +134,7 @@ export function TradeCompactCard({
       {resolved ? <TradeResolvedRow kind={resolved.kind} label={resolved.label} /> : <>
       <div className="min-w-0 text-sm font-extrabold">{title}</div>
       {meta.length > 0 ? <div className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="trade-card-meta">{meta.join(" · ")}</div> : null}
+      {note ? <div className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="trade-idea-partner-fit">Their side: {note}</div> : null}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Side label={giveLabel} assets={give} mode={mode} />
         <Side label={getLabel} assets={get} mode={mode} />

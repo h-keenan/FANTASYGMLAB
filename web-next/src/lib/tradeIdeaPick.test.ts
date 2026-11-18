@@ -11,6 +11,9 @@ describe("tradeIdeaPick", () => {
     expect(pickProjectionLine({ projected_range: "Early 1st" })).toBe("proj. Early 1st");
     expect(pickProjectionLine({})).toBeNull();
   });
+  it("uses a bare apostrophe for names ending in s", () => {
+    expect(pickProjectionLine({ projected_slot_label: "1.04", original_team_name: "Bay Area Bandits", owner_team_name: "Me" })).toBe("proj. 1.04 \u00b7 Bay Area Bandits' pick");
+  });
   it("passes the partner-fit line through, empty as null", () => {
     expect(partnerFitLine(" Fills their TE hole · they're contending ")).toBe("Fills their TE hole · they're contending");
     expect(partnerFitLine("")).toBeNull();

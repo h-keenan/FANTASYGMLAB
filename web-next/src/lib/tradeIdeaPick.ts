@@ -16,7 +16,7 @@ export function pickProjectionLine(asset: IdeaPickFields): string | null {
   const slot = asset.projected_slot_label ? `proj. ${asset.projected_slot_label}` : asset.projected_range ? `proj. ${asset.projected_range}` : null;
   const original = asset.original_team_name?.trim();
   const owner = asset.owner_team_name?.trim();
-  const whose = original && original !== owner ? `${original}'s pick` : null;
+  const whose = original && original !== owner ? `${original}${original.endsWith('s') ? "'" : "'s"} pick` : null;
   const line = [slot, whose].filter(Boolean).join(' · ');
   return line || null;
 }
