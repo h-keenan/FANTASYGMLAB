@@ -30,7 +30,7 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
-from modules import derived_cache, player_eligibility, rankings, redis_cache, sleeper, swr_cache
+from modules import derived_cache, player_eligibility, rankings, redis_cache, sleeper, swr_cache, valuation_anchors
 from modules.player_tiers import assign_player_tiers
 from modules.rankings import current_availability_multiplier
 
@@ -832,6 +832,19 @@ def apply_valuation_lens(
         + base_scores * 0.05
     ) * pd.to_numeric(current_risk_multiplier, errors="coerce").fillna(risk_multiplier)
     value_pre_league = current_scores.clip(lower=0)
+    # Trade-advice audit P1-1/P1-2 (flags default OFF): role/opportunity credit
+    # only for players the league actually starts, and no anchor credit for a
+    # no-market, no-evidence player. Never touches the canonical base_score.
+    anchor_adjust = pd.Series(0.0, index=df.index, dtype="float64")
+    if valuation_anchors.starting_demand_enabled():
+        anchor_adjust = anchor_adjust + valuation_anchors.starting_demand_adjustment(
+            df, league_settings, risk=current_risk_multiplier
+        )
+    if valuation_anchors.no_market_floor_enabled():
+        anchor_adjust = anchor_adjust + valuation_anchors.no_market_floor_adjustment(df)
+    if anchor_adjust.any():
+        value_pre_league = (value_pre_league + anchor_adjust).clip(lower=0)
+        base_scores = (base_scores + anchor_adjust).clip(lower=0)
 
     league_format = str((league_settings or {}).get("league_format") or "Dynasty")
     keeper_mode = bool((league_settings or {}).get("_keeper_mode"))
@@ -929,6 +942,7 @@ def _valued_players_inputs_fingerprint(league_id: str, players_db_path: str) -> 
             league,
             rankings.public_player_source_fingerprint(players_db_path),
             rankings.reconciled_valuation_cache_versions(),
+            *valuation_anchors.fingerprint_parts(),
         )
     except Exception:  # Unfingerprintable input, or an unreadable file/season probe
         # An input with no stable content identity: fall back to the old clock bucket (fresh window only, never stale).
