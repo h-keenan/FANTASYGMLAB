@@ -1,21 +1,15 @@
 import { TERMS } from "@/lib/terms";
-import type { TabIconName } from "@/lib/tabIcons";
-import { ModuleMore } from "@/components/ui/ModuleMore";
 import Link from "next/link";
 
 import { InfoMark } from "@/components/ui/InfoMark";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { IconRow } from "@/components/IconRow";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { statStripParts } from "@/lib/moduleTemplates";
 import { ToneBadge } from "@/components/ToneBadge";
-import { ValueRing } from "@/components/ValueRing";
-import { SnapshotTileGlyph, type SnapshotGlyphName } from "@/components/SnapshotTileGlyph";
 import { TEAM_STANCE_OPTIONS, type TeamStance } from "@/lib/api";
-import type { DeadlineBanner, PlanSnapshotTile } from "@/lib/gmPlanSnapshot";
+import type { DeadlineBanner } from "@/lib/gmPlanSnapshot";
 import { SkeletonBlock } from "@/components/Skeleton";
 import { PageTitle } from "@/components/PageTitle";
-import { ProgressFill } from "@/components/Motion";
 
 export const GM_PLAN_TABS = [
   { label: "Overview", value: "overview", glyph: "overview" },
@@ -204,78 +198,6 @@ function DeadlineLink({ href, children }: { href?: string; children: React.React
     <div className={cls} style={style} data-testid="deadline-banner">
       {children}
     </div>
-  );
-}
-
-const TILE_GLYPH: Record<PlanSnapshotTile["key"], SnapshotGlyphName> = {
-  power: "power",
-  capital: "franchise",
-  odds: "power",
-  record: "record",
-  starter: "starter",
-  bench: "bench",
-  age: "age",
-};
-
-function ringTone(percent: number): "low" | "mid" | "high" {
-  return percent < 33 ? "low" : percent < 66 ? "mid" : "high";
-}
-
-function SnapshotCell({ tile }: { tile: PlanSnapshotTile }) {
-  const percent = tile.fill === null ? null : Math.round(tile.fill * 100);
-  return (
-    <div className="glass-surface flex items-center gap-2 p-3 min-w-0" data-testid={`plan-tile-${tile.key}`}>
-      <div className="flex flex-col gap-1 min-w-0 flex-1">
-        <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
-          <SnapshotTileGlyph name={TILE_GLYPH[tile.key]} />
-          <span className="break-words min-w-0">{tile.label}</span>
-        </span>
-        <span style={{ font: "var(--type-primary-metric)", color: "var(--color-text-primary)", fontSize: "1.25rem" }}>
-          {tile.value}
-        </span>
-        {tile.note ? (
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {tile.note}
-          </span>
-        ) : null}
-        {tile.key !== "odds" && percent !== null ? (
-          <div
-            role="progressbar"
-            aria-label={tile.label}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-            className="h-1.5 w-full"
-            style={{ background: "var(--color-surface-muted)" }}
-          >
-            <ProgressFill percent={percent} color="var(--color-accent)" />
-          </div>
-        ) : null}
-      </div>
-      {tile.key === "odds" && percent !== null ? (
-        <ValueRing percent={percent} tone={ringTone(percent)} display={`${percent}`} ariaLabel={`${tile.label} ${tile.value}`} size="sm" />
-      ) : null}
-    </div>
-  );
-}
-
-/** Plan Snapshot: Playoff Odds / Roster Power / Draft Capital lead, then the rest. */
-export function PlanSnapshotGrid({ tiles, analysisHref }: { tiles: PlanSnapshotTile[]; analysisHref?: string }) {
-  if (tiles.length === 0) return null;
-  const short: Record<string, string> = { power: TERMS.thisSeason, capital: "Capital", odds: "Odds", record: "Record", starter: "Starters", bench: "Bench", age: "Age" };
-  return (
-    <CompactModule
-      id="gmplan.snapshot"
-      title="Plan Snapshot"
-      parts={statStripParts(tiles.map((tile) => ({ label: short[tile.key] ?? tile.label, value: tile.value })), 4)}
-    >
-      <div className="grid grid-cols-2 gap-2" aria-label="Plan Snapshot">
-        {tiles.map((tile) => (
-          <SnapshotCell key={tile.key} tile={tile} />
-        ))}
-      </div>
-      {analysisHref ? <ModuleMore href={analysisHref}>Full analysis</ModuleMore> : null}
-    </CompactModule>
   );
 }
 

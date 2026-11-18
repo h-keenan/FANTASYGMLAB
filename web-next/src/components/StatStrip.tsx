@@ -25,11 +25,11 @@ export type StatStripItem = {
  * strip and its Team Snapshot row both render through this, so a tile looks
  * the same in both.
  */
-export function StatStrip({ items, columns, league }: { items: StatStripItem[]; columns: 3 | 4; league?: { id: string; name: string } }) {
+export function StatStrip({ items, columns, league, dense = false }: { items: StatStripItem[]; columns: 3 | 4; league?: { id: string; name: string }; /** Half-height tiles (SnapshotTile `dense`). */ dense?: boolean }) {
   return (
     <div className={`grid gap-2 ${columns === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
       {items.map(({ insight, why: _why, ...item }) => { // eslint-disable-line @typescript-eslint/no-unused-vars
-        const tile = <SnapshotTile key={item.label} compact wrapNote reserveLabelLines={columns === 4} {...item} />;
+        const tile = <SnapshotTile key={item.label} compact dense={dense} wrapNote reserveLabelLines={columns === 4 && !dense} {...item} />;
         if (!insight || !league) return tile;
         return (
           <InsightLink key={item.label} insight={insight} league={league} spoken={[item.label, item.value, item.note]}>

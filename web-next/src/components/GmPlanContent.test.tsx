@@ -199,13 +199,11 @@ const MY_TEAM: MyTeamResponse = {
 };
 
 describe("GmPlanContent", () => {
-  it("renders the hero phase/stance badges, headline, and league name", () => {
+  it("renders the league name and the numbered action steps (a generic trade step without a declared stance)", () => {
     render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     expect(screen.getByRole("heading", { name: "GM Plan" })).toBeInTheDocument();
-    expect(screen.getByText("Trade Deadline Approaching")).toBeInTheDocument();
-    expect(screen.getByText("Rebuilding")).toBeInTheDocument();
-    expect(screen.getByText("The trade market is most active right now.")).toBeInTheDocument();
+    expect(screen.getByTestId("plan-step-trades")).toHaveTextContent("Review your trade ideas");
   });
 
   it("renders Where You Stand facts including a flagged weak spot", () => {
@@ -219,9 +217,9 @@ describe("GmPlanContent", () => {
 
   it("renders a trade opportunity's give/get player identity and value delta", () => {
     render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
-    expandAll();
+    fireEvent.click(screen.getByTestId("plan-trade-row").querySelector("button")!);
 
-    expect(screen.getByText("Rival GM")).toBeInTheDocument();
+    expect(screen.getAllByText("Rival GM").length).toBeGreaterThan(0);
     expect(screen.getByText("My Running Back")).toBeInTheDocument();
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
     expect(screen.getByText("You gain +237")).toBeInTheDocument();
@@ -238,9 +236,9 @@ describe("GmPlanContent", () => {
       ),
     };
     render(<GmPlanContent leagueName="Dynasty Overlords" data={textOnly} />);
-    expandAll();
-
-    expect(screen.getByText("My Running Back → Opp Wide Receiver")).toBeInTheDocument();
+    const row = screen.getByTestId("plan-trade-row");
+    expect(row).toHaveTextContent("Rival GM");
+    expect(row).not.toHaveTextContent("You gain");
   });
 
   it("renders the roster injury-exposure fact with real player identity", () => {
@@ -595,24 +593,30 @@ describe("GmPlanContent concept structure", () => {
     expect(screen.getAllByText("Past the trade deadline").length).toBeGreaterThan(0);
   });
 
-  it("renders snapshot tiles with progress bars and a playoff ring, and no tiles without data", () => {
+  it("renders the four dense stat tiles from the snapshot, and none without data", () => {
     const snapshot = [
       { key: "power" as const, label: "Roster Power", value: "3 of 12", fill: 0.83 },
       { key: "odds" as const, label: "Playoff Odds", value: "55%", fill: 0.55, note: "Proj. 6-seed" },
     ];
     const { unmount } = render(<GmPlanContent leagueName="L" data={BASE_RESPONSE} snapshot={snapshot} {...props} />);
-    expandAll();
-    expect(screen.getByRole("progressbar", { name: "Roster Power" })).toHaveAttribute("aria-valuenow", "83");
-    expect(screen.getByRole("img", { name: "Playoff Odds 55%" })).toBeInTheDocument();
-    expect(screen.getByText("Proj. 6-seed")).toBeInTheDocument();
+    expect(screen.getByText("This season")).toBeInTheDocument();
+    expect(screen.getByText("3rd")).toBeInTheDocument();
+    expect(screen.getByText("55%")).toBeInTheDocument();
     unmount();
     render(<GmPlanContent leagueName="L" data={BASE_RESPONSE} snapshot={[]} {...props} />);
-    expect(screen.queryByText("Plan Snapshot")).not.toBeInTheDocument();
+    expect(screen.queryByText("This season")).not.toBeInTheDocument();
+  });
+
+  it("explains the declared stance in a Why line", () => {
+    const snapshot = [{ key: "odds" as const, label: "Playoff Odds", value: "0%", fill: 0 }, { key: "record" as const, label: "Record", value: "3 - 7", fill: null }];
+    render(<GmPlanContent leagueName="L" data={BASE_RESPONSE} snapshot={snapshot} {...props} />);
+    expect(screen.getByTestId("plan-step-trades")).toHaveTextContent("Sell aging vets for picks");
+    expect(screen.getByText("0% playoff odds, 3-7: sell now, buy youth")).toBeInTheDocument();
   });
 
   it("links trade ideas to Trade Hub", () => {
     render(<GmPlanContent leagueName="L" data={BASE_RESPONSE} {...props} />);
-    expandAll();
+    fireEvent.click(screen.getByTestId("plan-trade-row").querySelector("button")!);
     expect(screen.getAllByRole("link", { name: "View details" })[0].getAttribute("href")).toContain("/trade-hub/league-1");
   });
 

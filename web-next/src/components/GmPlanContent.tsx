@@ -18,7 +18,7 @@ import { InfoMark } from "@/components/ui/InfoMark";
 import { useRouter } from "next/navigation";
 import { useUndoableRemoval } from "@/components/ui/UndoToast";
 import { useMemo, useState } from "react";
-import { GM_PLAN_TABS, type GmPlanTab, isGmPlanTab, PlanSnapshotGrid, TeamSituationCard } from "@/components/GmPlanSections";
+import { GM_PLAN_TABS, type GmPlanTab, isGmPlanTab, TeamSituationCard } from "@/components/GmPlanSections";
 import { deadlineBanner, type PlanSnapshotTile } from "@/lib/gmPlanSnapshot";
 import type { ReactNode } from "react";
 import {
@@ -39,7 +39,10 @@ import {
 } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
 import { OvrGauge } from "@/components/OvrGauge";
-import { PillRow } from "@/components/PillRow";
+import { ViewTabs } from "@/components/ui/ViewTabs";
+import { StatStrip } from "@/components/StatStrip";
+import { PlanSteps } from "@/components/GmPlanSteps";
+import { buildPlanSteps, buildPlanWhy, planFacts, planStatTiles, type PlanStance } from "@/lib/gmPlanPlan";
 import { PlayerCard } from "@/components/PlayerCardKit";
 import { playerCardFromStarter } from "@/lib/playerCard";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -596,6 +599,19 @@ export function GmPlanContent({
   const tradeItems = (tradeArea?.items ?? []).filter((item): item is GmPlanTradeItem => "partner_team_name" in item);
   const otherAreas = (data.focus_areas ?? []).filter((area) => area.key !== "trade_opportunities");
 
+  const facts = planFacts(snapshot ?? []);
+  const statTiles = planStatTiles(snapshot ?? []);
+  const stanceKey = (stance || "") as PlanStance;
+  const planSteps = buildPlanSteps({
+    stance: stanceKey,
+    tradeCount: tradeItems.length,
+    partners: tradeItems.map((t) => t.partner_team_name).filter(Boolean),
+    topConfidence: tradeItems.find((t) => t.trade_confidence_label)?.trade_confidence_label ?? null,
+    capital: facts.capital,
+    areas: otherAreas.map((a) => ({ key: a.key, title: a.title, framing: a.framing ?? "", count: a.items.length, hasSignal: a.status !== "no_signal" && a.items.length > 0 })),
+  });
+  const planWhy = buildPlanWhy(stanceKey, facts, banner ? banner.week : null);
+
   const planGate = notice ? (
     <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
       {notice}
@@ -677,11 +693,11 @@ export function GmPlanContent({
         <PageTitle page="GM Plan" leagueName={leagueName} />
       </header>
 
-      <PillRow
-        fullWidth
-        options={GM_PLAN_TABS.map((t) => ({ label: t.label, value: t.value, glyph: t.glyph }))}
-        active={tab}
-        onSelect={(value) => isGmPlanTab(value) && setTab(value)}
+      <ViewTabs
+        label="GM Plan section"
+        value={tab}
+        options={GM_PLAN_TABS.map((t) => ({ value: t.value, label: t.label }))}
+        onChange={(value) => isGmPlanTab(value) && setTab(value)}
       />
 
       {tab === "overview" ? (
@@ -696,56 +712,47 @@ export function GmPlanContent({
             />
           ) : null}
 
-          <PlanSnapshotGrid
-            tiles={snapshot ?? []}
-            analysisHref={leagueId ? `/my-team/${base}?${q}` : undefined}
-          />
-
-          {!planGate && (data.season_phase_label || data.team_stance_label || data.headline) ? (
-            <section className="glass-surface flex flex-col gap-2 p-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                {data.season_phase_label ? (
-                  <span
-                    className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
-                    style={{
-                      color: "var(--color-information)",
-                      background: "var(--color-information-soft)",
-                      letterSpacing: "var(--letter-spacing-badge)",
-                    }}
-                  >
-                    {data.season_phase_label}
-                  </span>
-                ) : null}
-                {data.team_stance_label && !teamStance ? (
-                  <span
-                    className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
-                    style={{
-                      color: "var(--color-accent)",
-                      background: "var(--color-accent-soft)",
-                      letterSpacing: "var(--letter-spacing-badge)",
-                    }}
-                  >
-                    {data.team_stance_label}
-                  </span>
-                ) : null}
-              </div>
-              {data.headline ? (
-                <p className="text-base font-bold" style={{ color: "var(--color-text-primary)" }}>
-                  {data.headline}
-                </p>
-              ) : null}
-            </section>
+          {statTiles.length > 0 ? (
+            <StatStrip
+              columns={4}
+              dense
+              items={statTiles.map((t) => ({ glyph: t.glyph, label: t.label, value: t.value, note: t.note }))}
+            />
           ) : null}
 
-          <CompactModule
-            id="gmplan.overview.trades"
-            title="Trade ideas"
-            parts={tradeIdeasParts(tradeItems, Boolean(planGate), tradeArea?.watch_for)}
-            defaultOpen
-          >
-            {tradesBlock(tradeItems, 2)}
-            {tradeHubHref ? <ModuleMore href={tradeHubHref}>View all trade ideas</ModuleMore> : null}
-          </CompactModule>
+          {planGate ? (
+            <CompactModule id="gmplan.overview.trades" title="Trade ideas" parts={tradeIdeasParts(tradeItems, true)} defaultOpen>
+              {planGate}
+            </CompactModule>
+          ) : (
+            <PlanSteps
+              steps={planSteps}
+              tradeItems={tradeItems}
+              detailsHref={detailsHref}
+              tradeEmpty={tradesBlock([])}
+              renderArea={(key) => {
+                const area = otherAreas.find((x) => x.key === key);
+                return area ? (
+                  <div className="flex flex-col gap-3">
+                    {area.items.map((item, index) => (
+                      <FocusItem key={focusItemKey(item, index)} item={item} detailsHref={detailsHref} />
+                    ))}
+                  </div>
+                ) : null;
+              }}
+            />
+          )}
+
+          {!planGate && planWhy ? (
+            <CompactModule id="gmplan.overview.why" persist={false} title={planWhy.title} parts={[{ key: "w", text: planWhy.headline }]}>
+              <ul className="list-disc pl-4 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                {planWhy.bullets.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              {leagueId ? <ModuleMore href={`/my-team/${base}?${q}`}>Full analysis</ModuleMore> : null}
+            </CompactModule>
+          ) : null}
 
           {myTeam && leagueId && !noRoster ? (
             <CompactModule
