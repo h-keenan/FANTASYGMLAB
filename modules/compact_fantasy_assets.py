@@ -207,6 +207,8 @@ def presentation_asset(asset: Mapping[str, Any] | None) -> dict[str, Any]:
             "prospect_strength_multiplier": asset.get("prospect_strength_multiplier"),
             "slot_percentile": asset.get("slot_percentile"),
             "projected_slot_percentile": asset.get("projected_slot_percentile"),
+            "projected_slot_number": asset.get("projected_slot_number"),
+            "projected_slot_label": _text(asset.get("projected_slot_label")),
             "early_probability": asset.get("early_probability"),
             "mid_probability": asset.get("mid_probability"),
             "late_probability": asset.get("late_probability"),

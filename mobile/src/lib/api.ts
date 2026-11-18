@@ -3509,6 +3509,9 @@ export interface PresentationAsset {
   prospect_strength_multiplier?: number | null;
   slot_percentile?: number | null;
   projected_slot_percentile?: number | null;
+  /** Projected draft slot from the ORIGINAL owner's projected finish, e.g. "1.04". */
+  projected_slot_label?: string | null;
+  projected_slot_number?: number | null;
   early_probability?: number | null;
   mid_probability?: number | null;
   late_probability?: number | null;
@@ -3579,6 +3582,8 @@ export interface TeamSheetResponse {
 }
 
 export interface TradeIdea {
+  /** Short neutral line on why the idea fits (or not) the partner: need, posture, age. */
+  partner_fit_reason?: string;
   /** Set when the idea would overfill the roster; its numbers already include the cuts. */
   roster_overflow?: RosterOverflow | null;
   partner_team_name: string;

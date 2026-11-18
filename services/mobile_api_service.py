@@ -4426,6 +4426,8 @@ def get_league_draft_picks(
             "prospect_strength_multiplier": _clean_json_value(pick.get("prospect_strength_multiplier")),
             "slot_percentile": _clean_json_value(pick.get("slot_percentile")),
             "projected_slot_percentile": _clean_json_value(pick.get("projected_slot_percentile")),
+            "projected_slot_number": _clean_json_value(pick.get("projected_slot_number")),
+            "projected_slot_label": _clean_json_value(pick.get("projected_slot_label")),
             "early_probability": _clean_json_value(pick.get("early_probability")),
             "mid_probability": _clean_json_value(pick.get("mid_probability")),
             "late_probability": _clean_json_value(pick.get("late_probability")),

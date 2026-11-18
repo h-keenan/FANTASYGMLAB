@@ -1192,6 +1192,10 @@ export interface TradeAsset {
   pick_no?: number;
   projected_range?: string;
   owner_team_name?: string;
+  original_team_name?: string;
+  /** Projected draft slot from the ORIGINAL owner's projected finish, e.g. "1.04". */
+  projected_slot_label?: string | null;
+  projected_slot_number?: number | null;
 }
 
 export interface TradePackage {
@@ -1207,6 +1211,8 @@ export interface TradePackage {
  * `receive_score` are the real, untruncated per-side totals (added in
  * Revision 3 for this page's lean bar — see that endpoint's docstring). */
 export interface TradeIdea {
+  /** Short neutral line on why the idea fits (or not) the partner: need, posture, age. */
+  partner_fit_reason?: string;
   /** Share card only: a caution tag that travels with a softened verdict label. */
   caution_tag?: string;
   /** Set when the idea would overfill the roster; its numbers already include the cuts. */

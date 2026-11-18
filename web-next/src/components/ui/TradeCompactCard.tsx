@@ -56,7 +56,11 @@ export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode
     <PickTap label={a.pickLabel ?? ""} id={a.pickId} detail={a.pickDetail} onOpen={a.onOpenPick} nonInteractive={a.nonInteractive}>
       <div className="flex items-center gap-2 text-sm font-bold" style={{ minHeight: 44 }} data-testid="trade-pick-row">
         <span className="shrink-0"><PickAvatar label={a.pickLabel} size={avatarSize("row")} /></span>
-        <span className="min-w-0 flex-1 [overflow-wrap:normal]">{a.pickLabel}</span>
+        <span className="min-w-0 flex-1 [overflow-wrap:normal]">
+          {a.pickLabel}
+          {a.pickDetail ? <span className="block text-xs font-normal" style={{ color: "var(--color-text-secondary)" }}>{a.pickDetail}</span> : null}
+        </span>
+        {mode === "desk" && a.value != null ? <span>{Math.round(a.value).toLocaleString()}</span> : null}
       </div>
     </PickTap>
   );

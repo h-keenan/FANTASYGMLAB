@@ -59,7 +59,11 @@ export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode
     <PickTap label={a.pickLabel ?? ''} id={a.pickId} detail={a.pickDetail} onOpen={a.onOpenPick} nonInteractive={a.nonInteractive}>
       <View style={styles.pickRow} testID="trade-pick-row">
         <PickAvatar label={a.pickLabel} size={avatarSize('row')} />
-        <AppText style={styles.pick}>{a.pickLabel}</AppText>
+        <View style={styles.pickText}>
+          <AppText style={styles.pick}>{a.pickLabel}</AppText>
+          {a.pickDetail ? <AppText style={styles.pickDetail}>{a.pickDetail}</AppText> : null}
+        </View>
+        {mode === 'desk' && a.value != null ? <AppText style={styles.value}>{Math.round(a.value).toLocaleString('en-US')}</AppText> : null}
       </View>
     </PickTap>
   );
@@ -151,7 +155,9 @@ function createStyles(colors: ThemeColors) {
     kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
     value: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
     pickRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
-    pick: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    pickText: { flex: 1 },
+    pick: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    pickDetail: { fontSize: 12, color: colors.textSecondary },
     toggle: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
     toggleText: { fontSize: 12, fontWeight: '700', color: colors.accent },
   });

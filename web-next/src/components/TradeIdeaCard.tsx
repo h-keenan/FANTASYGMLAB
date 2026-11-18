@@ -4,6 +4,7 @@ import { bandColorVar } from "@/lib/verdictToneCss";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { TradeCompactCard, type TradeCardAsset } from "@/components/ui/TradeCompactCard";
 import { tradeIdeaGainText } from "@/lib/tradeIdeaSummary";
+import { partnerFitLine, pickProjectionLine } from "@/lib/tradeIdeaPick";
 import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
@@ -155,7 +156,7 @@ export function ReasoningTags({ tags }: { tags: string[] }) {
 
 export function tradeCardAsset(asset: TradeAsset, index: number, open?: (asset: TradeAsset) => void): TradeCardAsset {
   if (asset.asset_type === "pick") {
-    return { key: `pick-${index}`, pickLabel: asset.label || [asset.season, asset.round ? `R${asset.round}` : null].filter(Boolean).join(" ") || "Draft pick", value: asset.score ?? null };
+    return { key: `pick-${index}`, pickLabel: asset.label || [asset.season, asset.round ? `R${asset.round}` : null].filter(Boolean).join(" ") || "Draft pick", pickDetail: pickProjectionLine(asset), value: asset.score ?? null };
   }
   return {
     key: asset.player_id ?? `p-${index}`,
@@ -239,6 +240,11 @@ export function TradeIdeaCardView({
       defaultOpen={highlighted}
     >
     <div className="flex flex-col gap-3">
+      {partnerFitLine(idea.partner_fit_reason) ? (
+        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="trade-idea-partner-fit">
+          Their side: {partnerFitLine(idea.partner_fit_reason)}
+        </p>
+      ) : null}
       {tags.length > 0 || copy.impactTagHelp(idea.impact_tag) ? (
         <div className="flex items-center gap-2 flex-wrap">
           {tags.map((tag) => (
