@@ -7736,6 +7736,30 @@ def get_league_history(
     # constant across a season switch — grading "how recent is this" is
     # always relative to now, not to whichever past season is being browsed.
     current_week = league_recaps.last_scored_week(league)
+    # Price traded picks with the shared canonical pick model (original owner's
+    # projected slot + per-year discount) -- the same one Trade Ideas, the
+    # Analyzer and Team Profile use -- not a flat per-round price. The league's
+    # priced picks only exist for the current league; older seasons (and any
+    # pick outside the live window) fall back to the neutral-slot model.
+    pick_index: dict[Any, Any] = {}
+    pick_settings: dict[str, Any] = {}
+    if selected_league_id == league_id:
+        try:
+            pick_settings = league_value_settings.detect_league_value_settings_from_payload(league)
+            pick_summary, _ = league_rankings.build_league_summary_and_draft_capital_cached(
+                league_id=league_id, lens="Dynasty", players_db_path=PLAYERS_DB_PATH
+            )
+            if not pick_summary.empty:
+                pick_index = trade_ideas.index_pick_assets(
+                    trade_ideas.list_draft_pick_assets(
+                        league_id, pick_summary, league_settings=pick_settings
+                    )
+                )
+        except Exception:  # best-effort: grading falls back to the neutral-slot model
+            logger.warning("history pick pricing context unavailable", exc_info=True)
+    transaction_grades.price_trade_picks(
+        normalized, pick_index, league_settings=pick_settings
+    )
     for item in normalized:
         event_id = item.get("transaction_id")
         later_events = [

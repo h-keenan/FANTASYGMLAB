@@ -244,6 +244,72 @@ def _coverage(
     }
 
 
+_ROUND_WORDS = {1: "first", 2: "second", 3: "third", 4: "fourth"}
+_ROUND_ORDINALS = {1: "1st", 2: "2nd", 3: "3rd"}
+_DESCRIBE_LIMIT = 3
+
+
+def _round_ordinal(round_num: int) -> str:
+    return _ROUND_ORDINALS.get(round_num, f"{round_num}th")
+
+
+def _describe_assets(assets: Sequence[Mapping[str, Any]]) -> str:
+    """Short human summary of one side's assets: players by name, picks grouped
+    by round ("2 firsts") or by year when only one of that round moved."""
+
+    parts = [_asset_label(a) for a in assets if not _is_pick(a)]
+    by_round: dict[int, list[Mapping[str, Any]]] = {}
+    for pick in (a for a in assets if _is_pick(a)):
+        by_round.setdefault(_int(pick.get("round"), 0), []).append(pick)
+    for round_num in sorted(by_round):
+        group = by_round[round_num]
+        if round_num > 0 and len(group) > 1:
+            word = _ROUND_WORDS.get(round_num)
+            parts.append(f"{len(group)} {word + 's' if word else _round_ordinal(round_num) + 's'}")
+        elif round_num > 0:
+            season = _text(group[0].get("season"))
+            parts.append(f"{season} {_round_ordinal(round_num)}".strip())
+        else:
+            parts.extend(_asset_label(p) for p in group)
+    if len(parts) > _DESCRIBE_LIMIT:
+        parts = parts[:_DESCRIBE_LIMIT] + [f"+{len(parts) - _DESCRIBE_LIMIT} more"]
+    return ", ".join(parts) if parts else "nothing recorded"
+
+
+def price_trade_picks(
+    transactions: Sequence[Mapping[str, Any]],
+    pick_index: Mapping[Any, Mapping[str, Any]] | None = None,
+    *,
+    league_settings: Mapping[str, Any] | None = None,
+) -> None:
+    """Stamp every un-valued pick asset in ``transactions`` (in place) with the
+    shared canonical pick value, so a traded pick is graded on its ORIGINAL
+    owner's projected slot instead of a flat round price. ``pick_index`` is
+    ``trade_ideas.index_pick_assets(...)`` for the league; picks it does not
+    cover fall back to the neutral-slot, year-discounted model."""
+
+    from modules.trade_ideas import canonical_pick_identity_value, pick_identity_key
+
+    settings = dict(league_settings or {}) or None
+    for transaction in transactions:
+        for side in transaction.get("sides") or []:
+            if not isinstance(side, Mapping):
+                continue
+            for key in ("receives", "drops", "sent"):
+                for asset in side.get(key) or []:
+                    if not isinstance(asset, dict) or not _is_pick(asset):
+                        continue
+                    if _float(asset.get("current_value")):
+                        continue
+                    value = canonical_pick_identity_value(asset, pick_index, league_settings=settings)
+                    if value and value > 0:
+                        asset["current_value"] = float(value)
+                    identity = pick_identity_key(asset)
+                    indexed = (pick_index or {}).get(identity) if identity else None
+                    if indexed and indexed.get("projected_slot_label"):
+                        asset["projected_slot_label"] = indexed.get("projected_slot_label")
+
+
 def _tone_for_letter(letter: str) -> str:
     if letter == PENDING:
         return "pending"
@@ -408,7 +474,10 @@ def grade_trade(
             confidence = CONFIDENCE_LOW
         else:
             confidence = CONFIDENCE_PENDING
-        why = f"Received {now_in:.0f} current value against {now_out:.0f} sent."
+        why = (
+            f"{team}: received {_describe_assets(received[index])} (~{now_in:,.0f}) "
+            f"for {_describe_assets(given[index])} (~{now_out:,.0f}) sent."
+        )
         if coverage["provisional_pick"]:
             why += " Future pick value is estimated until the selection is known."
         graded_sides.append(
