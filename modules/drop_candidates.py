@@ -33,7 +33,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 import pandas as pd
 
-from modules import model_status, roster_value_model as rvm
+from modules import age_profile, model_status, roster_value_model as rvm
 from modules.frame_records import frame_records
 
 MODEL_VERSION = "drop-candidates-v1"
@@ -55,6 +55,9 @@ YOUTH_PROTECTION = {
     "fringe_contender": (23.0, 2.0, 0.28),
     "contender": (23.0, 2.0, 0.35),
 }
+# Reference window-opening age the legacy YOUTH_PROTECTION ages were tuned against
+# (the skill-position prime window opens around 23).
+YOUTH_RUNWAY_BASE_AGE = 23.0
 CANDIDATES_PER_ADD = 6
 FREE_STANDALONE_LIMIT = 2
 MAX_STANDALONE = 8
@@ -121,7 +124,12 @@ def protection_reason(
     max_age, qb_bump, floor_share = YOUTH_PROTECTION.get(rvc.strategy, YOUTH_PROTECTION["retool"])
     age = profile.age
     age_cut = max_age + (qb_bump if profile.position == "QB" else 0.0)
-    if age is not None and age <= age_cut and healthy >= floor_share * max(rvc.high_value, 1.0):
+    # Canonical: the same posture-tuned runway, measured from where this
+    # position's prime window opens (so QBs and RBs are not judged on one age).
+    runway = max_age - YOUTH_RUNWAY_BASE_AGE
+    if age is not None and age_profile.runway_ok(
+        profile.position, age, years_past_start=runway, legacy_max=age_cut
+    ) and healthy >= floor_share * max(rvc.high_value, 1.0):
         return ("young_upside", "Young with real upside for your team's direction.")
     return None
 

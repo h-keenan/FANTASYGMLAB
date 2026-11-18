@@ -51,7 +51,7 @@ from modules.player_state_authority import (
 )
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
-from modules import model_status, runtime_trace
+from modules import age_profile, model_status, runtime_trace
 from modules import drop_candidates, trade_cautions, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 
@@ -1534,6 +1534,30 @@ def _asset_avg_age(assets: List[Dict[str, Any]]) -> float | None:
     return float(sum(ages) / len(ages))
 
 
+def _asset_age_pairs(assets: List[Dict[str, Any]]) -> List[tuple[str, Any]]:
+    """(position, age) for each player asset with a usable age (the canonical
+    age curve is position-aware, so positions travel with the ages)."""
+
+    pairs: List[tuple[str, Any]] = []
+    for asset in _player_assets(assets):
+        try:
+            age = float(asset.get("age") or 0)
+        except Exception:
+            age = 0
+        if 0 < age <= MAX_KNOWN_PLAYER_AGE:
+            pairs.append((str(asset.get("position") or "").upper(), age))
+    return pairs
+
+
+def _asset_age_band(assets: List[Dict[str, Any]]) -> str:
+    """young / prime / old / unknown for a package, from the canonical age curve
+    (legacy 24/25 and 28 cutoffs when DYNASTYGM_CANONICAL_AGE_CURVE is off)."""
+
+    return age_profile.group_band(
+        _asset_age_pairs(assets), legacy_avg=_asset_avg_age(assets), legacy_old=28.0, legacy_young=25.0
+    )
+
+
 def _asset_age(asset: Dict[str, Any]) -> float:
     try:
         return float(asset.get("age") or 0.0)
@@ -1929,18 +1953,21 @@ def partner_acceptance_context(
             if surplus_positions:
                 cap -= 0.02
     if incoming_age:
+        age_band = _asset_age_band(send_assets)
         if rebuilding:
-            if incoming_age >= 28:
+            if age_band == "old":
                 cap -= 0.03
                 age_fit = "poor"
-            elif incoming_age <= 25:
+            elif age_band == "young":
                 cap += 0.02
                 age_fit = "good"
         elif contending:
-            if incoming_age <= 24 and not need_hits:
+            if age_band == "young" and not need_hits:
                 cap -= 0.01
                 age_fit = "poor"
-            elif 25 <= incoming_age <= 30:
+            elif age_band == "prime" or (
+                not age_profile.enabled() and 25 <= incoming_age <= 30
+            ):
                 age_fit = "good"
     # A rebuilder parting with a pick for a player, no pick back, is the
     # hardest sell; a contender spending a pick on a need is the easiest.
@@ -3983,9 +4010,19 @@ def _stance_framing_supported_by_trade(
     younger_return = bool(
         send_age and receive_age and receive_age + _STANCE_YOUNGER_RETURN_YEARS <= send_age
     )
-    older_return = bool(receive_age and receive_age >= _STANCE_OLDER_RETURN_AGE_FLOOR)
+    older_return = bool(
+        receive_age
+        and age_profile.group_band(
+            _asset_age_pairs(receive_assets),
+            legacy_avg=receive_age,
+            legacy_old=_STANCE_OLDER_RETURN_AGE_FLOOR,
+            legacy_young=0.0,
+        )
+        == "old"
+    )
     sheds_aging_player = any(
-        _asset_age(asset) >= _STANCE_SHEDS_AGING_AGE_FLOOR for asset in _player_assets(send_assets)
+        age_profile.is_aging(asset.get("position"), asset.get("age"), legacy_min=_STANCE_SHEDS_AGING_AGE_FLOOR)
+        for asset in _player_assets(send_assets)
     )
     send_top = _top_player_score(send_assets)
     receive_top = _top_player_score(receive_assets)
@@ -4161,11 +4198,15 @@ def _trade_reasoning_context(
     partner_injury_positions = set(partner_shape.get("injured_starter_positions") or [])
     my_injury_relief = receive_injury["healthy_positions"] & my_injury_positions
     partner_injury_relief = send_injury["healthy_positions"] & partner_injury_positions
-    if send_avg_age and receive_avg_age and receive_avg_age + 1.25 <= send_avg_age:
+    if send_avg_age and receive_avg_age and receive_avg_age + age_profile.YOUNGER_RETURN_YEARS <= send_avg_age:
         tags.append("Age Optimization")
         score += 16 if my_strategy in {"rebuild", "tank", "retool"} else 10
         explanations.append("The return gets younger without relying only on raw value.")
-    elif my_strategy in {"contender", "fringe_contender"} and receive_avg_age and 26 <= receive_avg_age <= 30:
+    elif my_strategy in {"contender", "fringe_contender"} and receive_avg_age and (
+        _asset_age_band(receive_assets) == "prime"
+        if age_profile.enabled() and _asset_age_pairs(receive_assets)
+        else 26 <= receive_avg_age <= 30
+    ):
         tags.append("Age Optimization")
         score += 5
         explanations.append("The age profile fits a win-now window.")

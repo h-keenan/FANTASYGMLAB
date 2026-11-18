@@ -12,7 +12,7 @@ from typing import Any, Callable, Mapping, MutableMapping
 import pandas as pd
 import requests
 
-from modules import performance, player_tier_identity, player_tiers
+from modules import age_profile, performance, player_tier_identity, player_tiers
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.sleeper import SLEEPER_BASE
 
@@ -656,6 +656,10 @@ def _age_strategy_adjustment(
     if not dynasty or rookie_draft or age <= 0:
         return 0.0
     peak_age = 27 if position == "QB" else 25 if position == "RB" else 26
+    if age_profile.enabled():
+        # The calibrated curve's own peak for this position (QB ~28.6, RB ~24.4,
+        # WR ~26.0, TE ~26.4); unknown positions keep the legacy peak.
+        peak_age = age_profile.peak_age(position) or peak_age
     delta = age - peak_age
     if delta <= 0:
         youth = min(1.5, abs(delta) * 0.35)

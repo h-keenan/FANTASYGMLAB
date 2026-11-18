@@ -44,7 +44,7 @@ import numpy as np
 
 import pandas as pd
 
-from modules import model_status, trade_lineup_model as tlm
+from modules import age_profile, model_status, trade_lineup_model as tlm
 from modules.frame_records import frame_records
 from modules.injury_status import is_ruled_out
 from modules.rankings import injury_level
@@ -866,7 +866,8 @@ def assess_needs(
         aging = [p for p in mine[pos][:starters_n] if _aging(p)]
         young_cover = [
             p for p in rvc.profiles.values()
-            if p.position == pos and p.age is not None and p.age <= YOUNG_COVER_AGE[pos]
+            if p.position == pos and p.age is not None
+            and age_profile.is_young(pos, p.age, legacy_max=YOUNG_COVER_AGE[pos])
             and p.player_id not in {a.player_id for a in aging}
         ]
         future_gap = bool(dynasty and aging and not young_cover)

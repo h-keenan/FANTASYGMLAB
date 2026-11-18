@@ -13,6 +13,7 @@ function so a caller only needs a league_id and a valued players frame.
 
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime
 from typing import Any
@@ -20,15 +21,18 @@ from typing import Any
 import pandas as pd
 from modules import prefetch
 
-from modules import league_value_settings, rankings, redis_cache, sleeper, swr_cache, trade_ideas
+from modules import experimental_graduation, league_value_settings, rankings, redis_cache, sleeper, swr_cache, trade_ideas
 from modules.league_value_settings import _safe_float, _safe_positive_int
 from modules.rank_tie_metadata import add_rank_tie_metadata
 from modules.team_eval import (
     build_league_summary,
+    refine_team_directions,
     normalize_team_strategy,
     suggest_optimal_lineup,
     team_strategy_label,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["add_rank_tie_metadata"]  # re-exported: see modules/rank_tie_metadata.py's
 # docstring for why this lives in its own module (team_eval.py needs it too,
@@ -328,6 +332,122 @@ LEAGUE_RANKINGS_FRAME_TTL_SECONDS = 120
 LEAGUE_RANKINGS_FRAME_STALE_TTL_SECONDS = 1800
 
 
+
+# --- One contender/rebuilder classifier ------------------------------------
+#
+# Trade and waiver math used to read ``strategy`` from the RAW rankings frame
+# (team_eval._classify_team_strategy only), while the League screens and the
+# dashboard showed the REFINED label (team_eval.refine_team_directions), so a
+# team could be "Contender" in the math and "Retooling" on screen. The refined
+# classifier (with the real per-roster health inputs the League screens use) is
+# now computed once, inside the cached rankings frame, and every reader sees it.
+#
+# Kill switch: DYNASTYGM_CANONICAL_POSTURE (default ON). Off restores the
+# previous per-surface behaviour exactly (raw frame for math, each display site
+# refining on its own).
+CANONICAL_POSTURE_ENV_KEY = "DYNASTYGM_CANONICAL_POSTURE"
+_POSTURE_COLUMNS = (
+    "strategy",
+    "strategy_label",
+    "mode",
+    "archetype",
+    "archetype_label",
+    "archetype_explanation",
+    "archetype_strengths",
+    "archetype_risks",
+    "archetype_recommendations",
+)
+_HEALTH_COLUMNS = (
+    "roster_id",
+    "injury_burden",
+    "injured_starters",
+    "health_flag",
+    "top_heavy_ratio",
+    "impact_tier_starters",
+    "elite_tier_count",
+)
+
+
+def canonical_posture_enabled() -> bool:
+    return experimental_graduation.graduated_kill_switch_enabled(CANONICAL_POSTURE_ENV_KEY, default=True)
+
+
+def merge_health_metrics(frame: pd.DataFrame, health_metrics: pd.DataFrame) -> pd.DataFrame:
+    """Left-merge the per-roster health inputs the refine step needs onto ``frame``."""
+
+    if frame.empty or health_metrics is None or health_metrics.empty:
+        return frame
+    health = health_metrics[[c for c in _HEALTH_COLUMNS if c in health_metrics.columns]].copy()
+    health["roster_id"] = pd.to_numeric(health["roster_id"], errors="coerce")
+    out = frame.drop(columns=[c for c in _HEALTH_COLUMNS if c != "roster_id" and c in frame.columns])
+    out["__roster_id_key__"] = pd.to_numeric(out["roster_id"], errors="coerce")
+    return out.merge(health.rename(columns={"roster_id": "__roster_id_key__"}), on="__roster_id_key__", how="left").drop(
+        columns=["__roster_id_key__"]
+    )
+
+
+def _canonical_posture_frame(frame: pd.DataFrame, league_id: str, lens: str, players_db_path: str) -> pd.DataFrame:
+    """``frame`` refined with the real health inputs. Fails open to the raw frame:
+    a health-pass failure refines on the neutral defaults (what the dashboard
+    always did) and a refine failure keeps the unrefined classification."""
+
+    if frame.empty:
+        return frame
+    try:
+        health = build_roster_health_metrics_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=players_db_path
+        )
+        merged = merge_health_metrics(frame, health)
+    except Exception:
+        logger.warning("canonical posture: health metrics unavailable (league=%s)", league_id, exc_info=True)
+        merged = frame
+    try:
+        return refine_team_directions(merged)
+    except Exception:
+        logger.warning("canonical posture: refine failed (league=%s)", league_id, exc_info=True)
+        return frame
+
+
+def apply_canonical_posture(
+    frame: pd.DataFrame, *, league_id: str, lens: str, players_db_path: str
+) -> pd.DataFrame:
+    """The ONE entry point display sites use instead of calling
+    ``refine_team_directions`` themselves. Canonical (default): copy the
+    classification from the cached canonical rankings frame, matched by
+    roster_id (a roster missing from it is refined locally). Switch off: the
+    legacy local refine on ``frame``."""
+
+    if frame.empty:
+        return frame
+    if not canonical_posture_enabled():
+        return refine_team_directions(frame)
+    canonical = build_league_rankings_frame_cached(league_id=league_id, lens=lens, players_db_path=players_db_path)
+    if canonical.empty or "strategy" not in canonical.columns:
+        return refine_team_directions(frame)
+    return overlay_posture(frame, canonical)
+
+
+def overlay_posture(frame: pd.DataFrame, canonical: pd.DataFrame) -> pd.DataFrame:
+    """Copy the posture columns from ``canonical`` onto ``frame`` by roster_id."""
+
+    cols = [c for c in _POSTURE_COLUMNS if c in canonical.columns]
+    out = frame.copy()
+    keyed = canonical.assign(__k__=canonical["roster_id"].astype(str)).set_index("__k__")
+    keys = out["roster_id"].astype(str)
+    known = keys.isin(keyed.index)
+    if not bool(known.all()):
+        # Rosters the canonical frame doesn't know keep a local refine.
+        local = refine_team_directions(out)
+        for column in cols:
+            out[column] = local[column] if column in local.columns else out.get(column)
+    for column in cols:
+        mapped = keys[known].map(keyed[column])
+        if column not in out.columns:
+            out[column] = None
+        out.loc[known, column] = mapped.values if hasattr(mapped, "values") else mapped
+    return out
+
+
 def _league_rankings_frame_cache_bucket() -> int:
     return int(time.time() // LEAGUE_RANKINGS_FRAME_TTL_SECONDS)
 
@@ -405,6 +525,7 @@ def build_league_summary_and_draft_capital_cached(
     league_id: str,
     lens: str,
     players_db_path: str,
+    canonical_posture: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Cached front door for `build_league_summary_and_draft_capital` — same
     30s live-time-bucket idiom as `build_league_rankings_frame_cached`
@@ -435,7 +556,20 @@ def build_league_summary_and_draft_capital_cached(
         compute=lambda: _build_league_summary_and_draft_capital_cached(*key),
         lock_timeout_seconds=_LEAGUE_RANKINGS_LOCK_TIMEOUT_SECONDS,
     )
-    return df_summary.copy(), draft_capital_summary.copy()
+    df_summary = df_summary.copy()
+    if canonical_posture and canonical_posture_enabled() and not df_summary.empty:
+        # Trade ideas read each PARTNER's strategy off this summary: give them the
+        # same canonical classification the League screens show. (The rankings
+        # frame's own compute passes canonical_posture=False: it IS the source.)
+        try:
+            canonical = build_league_rankings_frame_cached(
+                league_id=league_id, lens=lens, players_db_path=players_db_path
+            )
+            if not canonical.empty and "strategy" in canonical.columns:
+                df_summary = overlay_posture(df_summary, canonical)
+        except Exception:
+            logger.warning("canonical posture overlay failed (league=%s)", league_id, exc_info=True)
+    return df_summary, draft_capital_summary.copy()
 
 
 def _build_league_rankings_frame_cached(
@@ -473,15 +607,18 @@ def _build_league_rankings_frame_cached(
     # entry instead (same inputs: same get_league settings, same cached
     # `valued` frame, same score_field).
     summary_and_draft_capital = build_league_summary_and_draft_capital_cached(
-        league_id=league_id, lens=lens, players_db_path=players_db_path
+        league_id=league_id, lens=lens, players_db_path=players_db_path, canonical_posture=False
     )
-    return build_league_rankings_frame(
+    frame = build_league_rankings_frame(
         valued,
         league_id,
         score_field=score_field,
         league_settings=settings,
         summary_and_draft_capital=summary_and_draft_capital,
     )
+    if canonical_posture_enabled():
+        frame = _canonical_posture_frame(frame, league_id, lens, players_db_path)
+    return frame
 
 
 def build_league_rankings_frame_cached(
@@ -503,7 +640,9 @@ def build_league_rankings_frame_cached(
     Redis: see modules.redis_cache.redis_single_flight_cache and this
     module's own comment above `_build_league_summary_and_draft_capital_cached`."""
 
-    key = (league_id, lens, players_db_path, league_value_settings.league_state_fingerprint(league_id, players_db_path))
+    fingerprint = league_value_settings.league_state_fingerprint(league_id, players_db_path)
+    # The switch is part of the key: flipping it never serves the other mode's frame.
+    key = (league_id, lens, players_db_path, f"{fingerprint}|posture={int(canonical_posture_enabled())}")
     cache_key = redis_cache.build_cache_key("league_rankings_frame", *key)
     frame = swr_cache.redis_swr_cache(
         cache_key=cache_key,
