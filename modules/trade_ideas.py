@@ -1878,6 +1878,8 @@ def posture_surface_sort_key(idea: Dict[str, Any]) -> tuple:
 # rest of the engine reads), and the age fit of the players they would receive.
 PARTNER_EDGE_BASE_CAP = 0.06
 PARTNER_EDGE_MAX_CAP = 0.09
+# Hard ceiling on partner loss no matter the adjustments or the absolute floor.
+PARTNER_EDGE_HARD_CEILING = 0.12
 PARTNER_EDGE_SOFT_RATIO = 0.04
 PARTNER_EDGE_MIN_ABS = 200
 PARTNER_EDGE_HIGH_CONFIDENCE_RATIO = 0.05
@@ -1949,7 +1951,10 @@ def partner_acceptance_context(
             cap += 0.01
     cap = max(0.0, min(PARTNER_EDGE_MAX_CAP, cap))
 
+    # The absolute floor keeps tiny trades from failing on a handful of points,
+    # but it may never let the partner lose more than the hard ceiling.
     allowed_edge = max(PARTNER_EDGE_MIN_ABS, int(round(cap * max(0, receive_score))))
+    allowed_edge = min(allowed_edge, int(round(PARTNER_EDGE_HARD_CEILING * max(0, receive_score))))
     lopsided = user_edge > allowed_edge
     penalty = 0
     if ratio > PARTNER_EDGE_SOFT_RATIO:

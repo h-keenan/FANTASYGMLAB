@@ -214,3 +214,67 @@ def test_projected_slot_survives_pick_asset_and_presentation():
     shown = presentation_asset(asset)
     assert shown["projected_slot_label"] == raw["projected_slot_label"]
     assert shown["projected_slot_number"] == raw["projected_slot_number"]
+
+
+# --- partner-loss ceiling regression --------------------------------------------------------
+
+
+def _rb(score, age):
+    asset = te("RB Starter", score, age)
+    asset["position"] = "RB"
+    return asset
+
+
+def test_screenshot_case_rb_2600_for_2027_r1_3220_is_rejected_in_every_posture():
+    # Owner screenshot: "+620 / You win by ~19% / Medium". Partner loses 620 of 3,220 (19.25%).
+    for strategy in ("contender", "fringe_contender", "rebuild", "retool"):
+        for needs in (("RB",), ()):
+            market, idea = _run([_rb(2600, 26)], [r1(3220)], partner(strategy, needs))
+            pa = market["partner_acceptance"]
+            assert pa["user_edge"] == 620
+            assert pa["user_edge_ratio"] > 0.19
+            assert pa["lopsided"] is True, (strategy, needs)
+            assert "partner_value_loss" in market["hard_fail_flags"]
+            assert idea["trade_confidence_label"] == "Low"
+
+
+def test_no_adjustment_combination_lets_the_partner_lose_more_than_twelve_percent():
+    ceiling = trade_ideas.PARTNER_EDGE_HARD_CEILING
+    assert ceiling <= 0.12
+    for receive in (600, 1000, 1500, 2692, 3220, 5000):
+        for strategy in ("contender", "rebuild"):
+            for needs in (("RB",), ()):
+                for age in (23, 26, 30):
+                    send_score = int(receive * 0.85)  # partner loses 15%
+                    ctx = partner_acceptance_context(
+                        send_assets=[_rb(send_score, age)],
+                        receive_assets=[r1(receive)],
+                        partner_shape=partner(strategy, needs),
+                        send_score=send_score,
+                        receive_score=receive,
+                    )
+                    assert ctx["lopsided"] is True, (receive, strategy, needs, age)
+                    assert ctx["allowed_edge"] <= round(ceiling * receive)
+
+
+def test_most_generous_cap_still_passes_a_small_loss_and_rejects_the_screenshot():
+    gen = partner_acceptance_context(
+        send_assets=[_rb(2600, 26)], receive_assets=[r1(3220)],
+        partner_shape=partner("contender", ("RB",)), send_score=2600, receive_score=3220,
+    )
+    assert gen["edge_cap"] == trade_ideas.PARTNER_EDGE_MAX_CAP == 0.09
+    ok = partner_acceptance_context(
+        send_assets=[_rb(3000, 26)], receive_assets=[r1(3220)],
+        partner_shape=partner("contender", ("RB",)), send_score=3000, receive_score=3220,
+    )
+    assert ok["lopsided"] is False  # 220 / 3,220 = 6.8%
+
+
+def test_displayed_win_percent_uses_the_same_denominator_as_the_loss_cap():
+    # UI tradeEdge() = (get - give) / max(give, get); when the user wins, get (what the partner
+    # gives up) is the larger side, so this equals user_edge / receive_score used by the cap.
+    ctx = partner_acceptance_context(
+        send_assets=[_rb(3000, 26)], receive_assets=[r1(3220)],
+        partner_shape=partner("contender", ("RB",)), send_score=3000, receive_score=3220,
+    )
+    assert ctx["user_edge_ratio"] == round((3220 - 3000) / max(3000, 3220), 4)

@@ -322,6 +322,7 @@ function RankingsBoard({
       ]}
     >
       <div className="flex items-center justify-end gap-3">
+        {/* view-select-ok: Overall + 5+ position filters; pre-existing, candidate for chips */}
         <select aria-label="Position filter"
           value={options.includes(filter) ? filter : "Overall"}
           onChange={(event) => setFilter(event.target.value as LiveDraftRankFilter)}
@@ -445,6 +446,7 @@ export function LiveDraftContent({
       ) : (
         <>
           {liveOrPaused.length > 1 ? (
+            // view-select-ok: picker over a variable list of live drafts (computed, can exceed 4)
             <select aria-label="Draft"
               value={selectedDraftId}
               onChange={(event) => onSelectDraft(event.target.value)}

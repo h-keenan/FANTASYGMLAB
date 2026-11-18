@@ -13,6 +13,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TREES = ["web-next/src", "mobile/src"];
 const MAX_TABS = 4;
 const SKIP = /(\.test\.|check_view_select|components\/ui\/ViewSelect\.tsx|components\/PageControlRow\.tsx)/;
+// The shared form <Select> wrapper itself; its callers are what get judged.
+const RAW_SELECT_SKIP = /components\/Input\.tsx$/;
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -60,6 +62,32 @@ export function scanText(rel, src) {
       problems.push(`${rel}:${line}: ViewSelect with ${count} options; ${MAX_TABS} or fewer are the shared compact tabs (ViewTabs), not a dropdown`);
     } else if (count === null && !ok) {
       problems.push(`${rel}:${line}: ViewSelect with computed options; use ViewTabs for 4 or fewer, or mark a 5+ list (weeks, seasons) with // view-select-ok: reason`);
+    }
+  }
+  if (!RAW_SELECT_SKIP.test(rel)) problems.push(...scanRawSelects(rel, src, lines));
+  return problems;
+}
+
+/**
+ * A raw `<select>` used as a view / filter switch slips past the ViewSelect check above, so it gets the same rule: a LITERAL list
+ * of 4 or fewer `<option>`s must be tabs/chips; 5 or more literal options are fine; a computed list (`.map(`) needs a
+ * `view-select-ok: reason` comment on the tag or the line above.
+ */
+function scanRawSelects(rel, src, lines) {
+  const problems = [];
+  const re = /<select(?=[\s>])/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const line = src.slice(0, m.index).split("\n").length;
+    const end = src.indexOf("</select>", m.index);
+    const body = src.slice(m.index, end === -1 ? undefined : end);
+    const ok = /view-select-ok/.test(tagText(src, m.index)) || /view-select-ok/.test(lines[line - 1] ?? "") || /view-select-ok/.test(lines[line - 2] ?? "");
+    const computed = /\.map\(/.test(body);
+    if (computed) {
+      if (!ok) problems.push(`${rel}:${line}: raw <select> with computed options; use chips/ViewTabs for 4 or fewer, or mark a 5+ list with // view-select-ok: reason`);
+    } else {
+      const count = (body.match(/<option[\s>]/g) ?? []).length;
+      if (count <= MAX_TABS && !ok) problems.push(`${rel}:${line}: raw <select> with ${count} options; ${MAX_TABS} or fewer are chips/ViewTabs, not a dropdown`);
     }
   }
   return problems;

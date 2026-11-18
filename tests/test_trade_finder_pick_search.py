@@ -82,8 +82,9 @@ def test_any_single_owned_pick_finds_a_realistic_option_on_a_full_roster(strateg
     ideas = _search(fixture, [_pick_id(fixture, season, round_num)], strategy=strategy, trace=trace)
     if not ideas:
         # Verdict cuts are a share of the deal, so a ~500-point late pick cannot give up
-        # ~15% (a COUNTER at any deal size). The search must then say why with a closest option.
-        assert round_num >= 4 and trace.closest_ideas(), (strategy, season, round_num)
+        # ~15% (a COUNTER at any deal size). The search must then say why: a closest option, or
+        # packages the partner-loss ceiling (12%, even on tiny deals) rejected, which the funnel reports.
+        assert round_num >= 4 and (trace.closest_ideas() or trace.funnel.get("market_hard")), (strategy, season, round_num)
     for idea in ideas:
         assert all(a["asset_type"] == "pick" for a in idea["send_assets"])
         assert idea["analyzer_verdict"] in trade_ideas.trade_grade.PASSING_UI_VERDICTS

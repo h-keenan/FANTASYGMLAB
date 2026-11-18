@@ -592,6 +592,7 @@ export function MultiTeamTradeContent({
               <label htmlFor="multi-add-team" className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
                 Add a team
               </label>
+              {/* view-select-ok: form field picking a team from the league list (computed, 5+), not a view switch */}
               <select
                 id="multi-add-team"
                 value={addChoice}
