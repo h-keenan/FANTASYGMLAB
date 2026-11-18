@@ -12,6 +12,7 @@ import { api } from '../lib/api';
 import { usePillState } from '../lib/useBottomPillContext.ts';
 import { isSelectionAction, simAdvanceChip, simFooterTabs, simPillPlan, type PillContext, type PillContextAction } from '../lib/bottomNav';
 import type { SimTab } from '../lib/simGameFlow';
+import { shortPlayerName } from '../lib/playerNameDisplay';
 import { simAdvanceLabel } from '../lib/simGame';
 import { simAdvanceState, simLineupIssues, type SimZeroStarter } from '../lib/simLayout';
 import { BAR_METRICS } from '../lib/bottomBarMetrics';
@@ -54,7 +55,7 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
     }
     // Concept A: the amber "Set lineup" chip opens this confirm (web twin: the "Set your lineup first?" sheet). Fix now goes to the Team page's
     // lineup (Auto-set lives there), Play anyway keeps the old "Advance anyway" guard.
-    Alert.alert('Set your lineup first?', state.confirm.replace(/ Advance anyway\?$/, ''), [
+    Alert.alert('Set your lineup first?', issues.zero.reduce((t, z) => t.split(z.name).join(shortPlayerName(z.name)), state.confirm.replace(/ Advance anyway\?$/, '')), [
       { text: 'Cancel', style: 'cancel' },
       ...(onTab ? [{ text: 'Fix now', onPress: () => onTab('team') }] : []),
       { text: 'Play anyway', style: 'destructive' as const, onPress: onAdvance },

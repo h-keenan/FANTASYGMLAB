@@ -39,7 +39,7 @@ import {
   type SimDraftState,
   type SimGamePlayer,
 } from "@/lib/simGame";
-import { playerSurname } from "@/lib/playerNameDisplay";
+import { playerSurname, shortPlayerName } from "@/lib/playerNameDisplay";
 import { SIM_LOAD_ERROR } from "@/lib/simErrorCopy";
 
 type Panel = "board" | "queue" | "roster" | "picks";
@@ -202,7 +202,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   // bar suggests) and the strip yields to Players | Queue | Picks (your Roster strip stays in the header); otherwise the four panels + Auto-pick.
   const onClockNow = Boolean(draft?.on_the_clock?.is_you) && draft?.status === "in_progress";
   const hintName = hint?.player.name?.trim() ?? "";
-  const hintShort = hintName ? `${hintName[0]}. ${playerSurname(hintName)}` : "";
+  const hintShort = hintName ? shortPlayerName(hintName) : "";
   const draftChip = onClockNow && hint && hintShort ? { key: "draft", label: `Draft ${hintShort}`, busy: busy === "pick", onPress: () => void pick(hint.player) } : null;
   const pillOwnsTabs = useBottomPillContext(
     loadState === "ready" && draft

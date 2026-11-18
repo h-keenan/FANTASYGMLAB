@@ -6,6 +6,7 @@ import { PillMorph } from "@/components/ui/PillMorph";
 import { Sheet } from "@/components/ui/Sheet";
 import { isSelectionAction, simAdvanceChip, simFooterTabs, simPillPlan, type PillContext, type PillContextAction } from "@/lib/bottomNav";
 import type { SimTab } from "@/lib/simGameFlow";
+import { shortPlayerName } from "@/lib/playerNameDisplay";
 import { usePillState } from "@/lib/useBottomPillContext";
 import { Button, ButtonLink } from "@/components/Button";
 import { SimGlyph } from "@/components/SimGlyph";
@@ -79,7 +80,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
     ? { id: selection ? "sim-selection" : "sim-season", label: "Fantasy Sim pages", tabs: selection ? [] : simFooterTabs({ chipLabel: primary.label }), activeKey: tab ?? "home", onSelect: (key) => onTab?.(key as SimTab), primary }
     : null;
   const lineupText = [
-    ...issues.zero.map((z) => `${z.name} (${z.label}) ${z.reason === "bye" ? "is on a bye" : "is out"} and will score 0 this week.`),
+    ...issues.zero.map((z) => `${shortPlayerName(z.name)} (${z.label}) ${z.reason === "bye" ? "is on a bye" : "is out"} and will score 0 this week.`),
     ...(issues.empty.length > 0 ? [`${issues.empty.join(", ")} ${issues.empty.length === 1 ? "is" : "are"} empty and will score 0 unless a healthy bench player fits.`] : []),
   ].join(" ");
   const reasonId = "sim-advance-reason";
