@@ -163,19 +163,23 @@ describe("MyTeamContent need links", () => {
   });
 });
 
-describe("MyTeamContent Team Analytics (the app's tiles, on web)", () => {
-  it("shows the six rank tiles with links and the archetype read once opened", () => {
+describe("MyTeamContent Team Snapshot (one tile set: the app's analytics merged in)", () => {
+  it("has one set of tiles incl. Draft Capital, links to the boards, and the archetype read when opened", () => {
     const ranking = { ...TEAM_RANKING, archetype_explanation: "Built to win now.", archetype_strengths: ["RB depth"], archetype_risks: ["Thin at TE"], archetype_recommendations: ["Add a TE"], trade_tendency: "Buyer", trade_tendency_buy_count: 3, trade_tendency_sell_count: 1 };
     render(<MyTeamContent leagueId="L1" leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={ranking} leagueSize={10} />);
-    const header = screen.getByTestId("team-analytics").querySelector("button[aria-expanded]") as HTMLElement;
-    expect(header).toHaveTextContent("Roster Power #2");
-    fireEvent.click(header);
-    const analytics = screen.getByTestId("team-analytics");
-    for (const label of ["Roster Power", "Draft Capital", "Starters", "Bench", "Age"]) expect(within(analytics).getByText(label)).toBeInTheDocument();
-    expect(within(analytics).getAllByRole("link").some((a) => (a.getAttribute("href") ?? "").includes("draft_capital"))).toBe(true);
-    expect(within(analytics).getByText("Built to win now.")).toBeInTheDocument();
-    expect(within(analytics).getByText("Add a TE")).toBeInTheDocument();
-    expect(within(analytics).getByText(/Trade behavior: Buyer \(3 acquired · 1 sent\)/)).toBeInTheDocument();
+    expect(screen.queryByTestId("team-analytics")).toBeNull();
+    const snapshot = screen.getByTestId("stat-strip-team.snapshot");
+    for (const label of [/Record/, /Draft Capital/, /Starter/, /Bench/]) expect(snapshot).toHaveTextContent(label);
+    expect(within(snapshot).getAllByRole("link").some((a) => (a.getAttribute("href") ?? "").includes("draft_capital"))).toBe(true);
+    fireEvent.click(snapshot.querySelector("button[aria-controls]") as HTMLElement);
+    expect(within(snapshot).getByText("Built to win now.")).toBeInTheDocument();
+    expect(within(snapshot).getByText("Add a TE")).toBeInTheDocument();
+    expect(within(snapshot).getByText(/Trade behavior: Buyer \(3 acquired · 1 sent\)/)).toBeInTheDocument();
+  });
+
+  it("does not show a percentile against a tiny league", () => {
+    render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={{ ...TEAM_RANKING, power_rank: 2 }} leagueSize={2} />);
+    expect(screen.getByTestId("team-hero")).not.toHaveTextContent("percentile");
   });
 });
 

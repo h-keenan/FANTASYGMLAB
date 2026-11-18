@@ -50,8 +50,8 @@ const DANGER_TONE = /(["'])danger\1|var\(--color-danger\)|\bcolors\.danger\b/;
 const STRIPE_DANGER = /\baccent\s*=\s*\{?[^;]*injur[^;]*\?[^;]*(var\(--color-danger\)|colors\.danger|["']danger["'])/i;
 
 const SEND_DANGER = /(You (?:send|sent)\b|side\s*===\s*['"]send['"]).*(var\(--color-danger\)|colors\.danger\b)/;
-// A "Give" / "You give" label is neutral grey ("Get" may stay green): giving a player is not a loss verdict, so it is never red.
-const GIVE_LABEL = />\s*(You give|Give)\s*<|["'`]You give["'`]|\bside\s*===?\s*["']give["']\s*\?\s*(["']danger["']|var\(--color-danger\)|colors\.danger)/;
+// A "Give" / "You give" label (or its dot: side === "give" ? "var(--color-danger)") is neutral grey ("Get" may stay green): giving a player is not a loss verdict, so it is never red.
+const GIVE_LABEL = />\s*(You give|Give)\s*<|["'`]You give["'`]|\bside\s*===?\s*["']give["']\s*\?\s*(["']danger["']|["'`]?var\(--color-danger\)|colors\.danger)/;
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {

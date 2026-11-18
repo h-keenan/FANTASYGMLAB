@@ -36,7 +36,7 @@ function Column({
   return (
     <div className="glass-surface flex min-w-0 flex-col gap-1 p-2" data-testid={`scale-${side}`} style={{ borderRadius: "var(--radius-panel)" }}>
       <span className="flex items-center gap-1.5 text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-        <span aria-hidden="true" className="inline-block" style={{ width: 6, height: 6, borderRadius: "50%", background: side === "give" ? "var(--color-danger)" : "var(--color-success)" }} />
+        <span aria-hidden="true" className="inline-block" style={{ width: 6, height: 6, borderRadius: "50%", background: side === "give" ? "var(--color-text-muted)" : "var(--color-success)" }} />
         {label}
         <span className="tabular-nums">{tradeScaleCount(assets.length, max)}</span>
       </span>

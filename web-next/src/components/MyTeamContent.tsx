@@ -29,7 +29,7 @@ import { percentileFromRank, positionTextClass } from "@/lib/playerPresentation"
 import { buildRosterBasis } from "@/lib/rosterBasis";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { NextSteps } from "@/components/NextSteps";
-import { TeamAnalyticsModule, hasRosterAnalysis } from "@/components/TeamAnalyticsModule";
+import { TeamArchetypeRead, hasArchetypeRead } from "@/components/TeamArchetypeRead";
 import { PageTitle } from "@/components/PageTitle";
 
 /**
@@ -74,6 +74,9 @@ function winShare(wins: number | null, losses: number | null, ties: number | nul
   const games = w + (losses ?? 0) + (ties ?? 0);
   return games > 0 ? (w + (ties ?? 0) / 2) / games : null;
 }
+
+/** Fewest teams for which a league percentile is shown (mobile twin: MyTeamScreen). */
+const MIN_TEAMS_FOR_PERCENTILE = 4;
 
 const KEEPER_BASIS_LABEL: Record<string, string> = {
   league_setting: "from the league setting",
@@ -130,7 +133,8 @@ export function MyTeamContent({
   const teamTotalValue = sumScore(starters) + sumScore(bench);
 
   const showFranchiseConstruction = needs?.show_franchise_construction ?? false;
-  const valuePercentile = teamRanking ? percentileFromRank(teamRanking.power_rank, leagueSize) : null;
+  // A percentile against a tiny league ("0th percentile of 2 teams") says nothing: show it only with enough teams.
+  const valuePercentile = teamRanking && leagueSize >= MIN_TEAMS_FOR_PERCENTILE ? percentileFromRank(teamRanking.power_rank, leagueSize) : null;
 
   const observations = needs
     ? buildConstructionObservations({
@@ -207,6 +211,9 @@ export function MyTeamContent({
           },
         ]
       : []),
+    ...(showFranchiseConstruction && teamRanking?.draft_capital_rank != null
+      ? [{ glyph: "draft" as const, insight: "draft_capital" as const, label: "Draft Capital", value: formatRank(teamRanking.draft_capital_rank, teamRanking.draft_capital_rank_tied ?? false), fill: rankFill(teamRanking.draft_capital_rank, leagueSize) }]
+      : []),
     { glyph: "starter", insight: "starter", why: "starter_strength", label: "Starter Strength", value: formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false), fill: rankFill(teamRanking?.starter_rank, leagueSize) },
     { glyph: "bench", insight: "bench", why: "bench_strength", label: "Bench Strength", value: formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false), fill: rankFill(teamRanking?.bench_rank, leagueSize) },
     { glyph: "age", insight: "age", label: "Avg Age", value: teamRanking?.average_age != null ? teamRanking.average_age.toFixed(1) : "—" },
@@ -262,16 +269,13 @@ export function MyTeamContent({
         title="Team Snapshot"
         items={snapshotItems}
         league={{ id: leagueId, name: leagueName }}
+        footer={teamRanking && hasArchetypeRead(teamRanking) ? <TeamArchetypeRead team={teamRanking} /> : undefined}
         infoGlossary={
           showFranchiseConstruction
             ? ["powerRank", "franchiseRank", "starterStrength", "benchStrength", "averageAge", "draftPicks", "pqv", "superflex", "tep"]
             : ["powerRank", "starterStrength", "benchStrength", "averageAge"]
         }
       />
-
-      {teamRanking && hasRosterAnalysis(teamRanking) ? (
-        <TeamAnalyticsModule team={teamRanking} leagueSize={leagueSize} leagueId={leagueId} leagueName={leagueName} />
-      ) : null}
 
       {analysisRows.length > 0 ? (
         <CompactModule id="team.analysis" title="Team Analysis" testId="team-analysis" parts={analysisParts}>
