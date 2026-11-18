@@ -152,14 +152,39 @@ describe("MyTeamContent need links", () => {
   it("makes every Team Snapshot tile a link to the rank board that explains it, Avg Age included", () => {
     render(<MyTeamContent leagueId="L1" leagueName="My League" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
     // The compact tiles are links without expanding anything.
-    expect(screen.getByRole("link", { name: /Avg Age.*open the Roster Age rankings/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#board-age");
     expect(screen.getByRole("link", { name: /Record.*open your league standing/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#your-standing");
     expect(screen.getByRole("link", { name: /Bench Strength.*Bench Depth rankings/ })).toBeInTheDocument();
+    // Average age is in the expanded body now (no Age tile): open the module, then its line links to the Roster Age board.
+    fireEvent.click(screen.getByTestId("stat-strip-team.snapshot").querySelector("button[aria-controls]") as HTMLElement);
+    expect(screen.getByRole("link", { name: /Average age.*open the Roster Age rankings/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#board-age");
   });
 
   it("shows no links without a league id", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
     expect(screen.queryByRole("link", { name: /Find a waiver add/ })).toBeNull();
+  });
+});
+
+describe("MyTeamContent Team Snapshot (one tile set: the app's analytics merged in)", () => {
+  it("has one set of tiles incl. Draft Capital, links to the boards, and the archetype read when opened", () => {
+    const ranking = { ...TEAM_RANKING, archetype_explanation: "Built to win now.", archetype_strengths: ["RB depth"], archetype_risks: ["Thin at TE"], archetype_recommendations: ["Add a TE"], trade_tendency: "Buyer", trade_tendency_buy_count: 3, trade_tendency_sell_count: 1 };
+    render(<MyTeamContent leagueId="L1" leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={ranking} leagueSize={10} />);
+    expect(screen.queryByTestId("team-analytics")).toBeNull();
+    const snapshot = screen.getByTestId("stat-strip-team.snapshot");
+    for (const label of [/Record/, /Draft Capital/, /Starter/, /Bench/]) expect(snapshot).toHaveTextContent(label);
+    // Six tiles (2x3), no Age tile: average age lives in the expanded body.
+    expect(within(snapshot).getByTestId("stat-strip-tiles").children).toHaveLength(6);
+    expect(within(snapshot).getAllByRole("link").some((a) => (a.getAttribute("href") ?? "").includes("draft_capital"))).toBe(true);
+    fireEvent.click(snapshot.querySelector("button[aria-controls]") as HTMLElement);
+    expect(within(snapshot).getByTestId("team-average-age")).toHaveTextContent("Average age 26.4 · age rank #4");
+    expect(within(snapshot).getByText("Built to win now.")).toBeInTheDocument();
+    expect(within(snapshot).getByText("Add a TE")).toBeInTheDocument();
+    expect(within(snapshot).getByText(/Trade behavior: Buyer \(3 acquired · 1 sent\)/)).toBeInTheDocument();
+  });
+
+  it("does not show a percentile against a tiny league", () => {
+    render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={{ ...TEAM_RANKING, power_rank: 2 }} leagueSize={2} />);
+    expect(screen.getByTestId("team-hero")).not.toHaveTextContent("percentile");
   });
 });
 

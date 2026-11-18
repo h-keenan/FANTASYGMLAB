@@ -20,8 +20,11 @@ export function PlayerName({
   as: Tag = "span",
   className = "",
   style,
+  short = false,
 }: {
   name: string | null | undefined;
+  /** Trade cards: always the short form ("J. Surname"), never the full name; the ladder still steps down further if even that does not fit. */
+  short?: boolean;
   as?: ElementType;
   className?: string;
   style?: CSSProperties;
@@ -30,9 +33,12 @@ export function PlayerName({
   const ref = useRef<HTMLElement | null>(null);
   // Width the box had when the current stage was seen overflowing (0 = not overflowing).
   const failedAt = useRef(0);
+  // The one-time restart after web fonts load (a later effect run must not restart again).
+  const fontsSettled = useRef(false);
   // Tie the stage to the name it was measured for so recycled rows restart from the full name.
-  const [fit, setFit] = useState<{ name: string; index: number }>({ name: text, index: 0 });
-  const index = fit.name === text ? fit.index : 0;
+  const base = short ? 1 : 0;
+  const [fit, setFit] = useState<{ name: string; index: number }>({ name: text, index: base });
+  const index = fit.name === text ? fit.index : base;
   const stage = playerNameStage(text, index);
 
   useLayoutEffect(() => {
@@ -47,18 +53,28 @@ export function PlayerName({
     };
     check();
     // Web fonts swap in without resizing the box, so re-measure once they load.
-    void document.fonts?.ready.then(check);
+    // A stage chosen with the fallback font can be too short once the real font is in: start over from the full name (the ladder walks down again if it still overflows).
+    void document.fonts?.ready.then(() => {
+      if (!fontsSettled.current && index > base) {
+        fontsSettled.current = true;
+        failedAt.current = 0;
+        setFit({ name: text, index: base });
+      } else {
+        fontsSettled.current = true;
+        check();
+      }
+    });
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
       // Room appeared since a stage failed: start again from the full name.
-      if (index > 0 && failedAt.current > 0 && el.clientWidth > failedAt.current + 1) {
+      if (index > base && failedAt.current > 0 && el.clientWidth > failedAt.current + 1) {
         failedAt.current = 0;
-        setFit({ name: text, index: 0 });
+        setFit({ name: text, index: base });
       } else check();
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [text, index, stage.wrap]);
+  }, [text, index, stage.wrap, base]);
 
   const label = text.trim();
   return (

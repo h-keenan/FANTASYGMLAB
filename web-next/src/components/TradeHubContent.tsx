@@ -22,6 +22,8 @@ import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
 import { ValueSignalsCard } from "@/components/ValueSignalsCard";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
+import { PillRow } from "@/components/PillRow";
+import { AllTradesSection } from "@/components/AllTradesSection";
 
 /**
  * Ports modules/trade_hub_ui.py's render_trade_idea_card (the "You Send /
@@ -82,6 +84,8 @@ export function TradeHubContent({
   highlightPlayerId?: string;
 }) {
   const [filter, setFilter] = useState<{ impact: string | null; position: string | null }>({ impact: null, position: null });
+  // "For You" (your own ideas) / "All Trades" (ideas across every roster in the league): the app's Trade Hub tabs.
+  const [viewMode, setViewMode] = useState<"for_you" | "all_trades">("for_you");
   const visibleIdeas = useMemo(() => filterTradeIdeas(data.ideas, filter), [data.ideas, filter]);
   // The header ribbon (UI pass 7): the glanceable fact of this page.
   useHeaderContext(data.ideas.length > 0 ? [{ key: "ideas", text: `${data.ideas.length} trade ${data.ideas.length === 1 ? "idea" : "ideas"}` }] : []);
@@ -112,11 +116,25 @@ export function TradeHubContent({
   return (
     <main className="page-shell">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
+      <PillRow
+        variant="fill"
+        ariaLabel="Trade Hub view"
+        options={[
+          { value: "for_you", label: "For You", glyph: "suggested" },
+          { value: "all_trades", label: "All Trades", glyph: "feed" },
+        ]}
+        active={viewMode}
+        onSelect={(value) => setViewMode(value === "all_trades" ? "all_trades" : "for_you")}
+      />
       <PageTitle
         page="Trade Hub"
         leagueName={leagueName}
         info={<TradeHubInfo sentence={data.posture_sentence} />}
       />
+      {viewMode === "all_trades" ? (
+        <AllTradesSection key={`${data.team_strategy}-${lens}`} leagueId={leagueId} leagueName={leagueName} strategy={data.team_strategy} lens={lens} />
+      ) : (
+      <>
       {data.ideas.length > 0 ? (
         <Hero
           label="Trade ideas"
@@ -200,6 +218,8 @@ export function TradeHubContent({
           </ButtonLink>
         </div>
       ) : null}
+      </>
+      )}
       <ValueSignalsCard leagueId={leagueId} />
       <ValuesCredit />
     </main>

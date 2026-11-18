@@ -84,16 +84,21 @@ const TONE_VAR: Record<SemanticTone, string> = {
 const BALANCE_TONE: Record<string, SemanticTone> = { balanced: "success", tilted: "warning", lopsided: "danger" };
 
 /** Two teams (the standard Analyzer) or a 3 to 6 team trade. */
-export function TradeModeToggle({ mode, onChange }: { mode: "two" | "multi"; onChange: (mode: "two" | "multi") => void }) {
+export type TradeMode = "two" | "quick" | "multi";
+
+/** Full Analysis / Quick Compare / Multi-team: the same three modes as the app's Trade Analyzer (mobile TradeAnalyzerScreen). */
+export function TradeModeToggle({ mode, onChange }: { mode: TradeMode; onChange: (mode: TradeMode) => void }) {
   return (
     <PillRow
+      variant="fill"
       ariaLabel="Trade type"
       options={[
-        { label: "Two teams", value: "two" },
-        { label: "Multi-team trade", value: "multi" },
+        { label: "Full Analysis", value: "two" },
+        { label: "Quick Compare", value: "quick" },
+        { label: "Multi-team", value: "multi" },
       ]}
       active={mode}
-      onSelect={(value) => onChange(value === "multi" ? "multi" : "two")}
+      onSelect={(value) => onChange(value === "multi" ? "multi" : value === "quick" ? "quick" : "two")}
     />
   );
 }

@@ -81,7 +81,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
 export function SimStatusChips({ game, onTab }: { game: SimGame; onTab: (tab: SimTab) => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const chips = simStatusChips(game.pending);
+  const chips = simStatusChips(game.pending, game);
   if (chips.length === 0) return null;
   return (
     <View style={styles.chips} accessibilityLabel="Before you advance" testID="sim-status-chips">

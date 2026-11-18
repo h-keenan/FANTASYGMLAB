@@ -835,3 +835,22 @@ describe("TradeAnalyzerContent", () => {
     });
   });
 });
+
+describe("Quick Compare (the app's instant players-only readout, on web)", () => {
+  it("offers Full Analysis / Quick Compare / Multi-team and shows an instant value read without calling the verdict API", () => {
+    vi.mocked(api.postTradeAnalyzer).mockClear();
+    renderPage();
+    expect(screen.getByRole("tab", { name: "Full Analysis" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Quick Compare" }));
+    expect(screen.getByRole("heading", { name: "Quick Compare" })).toBeInTheDocument();
+    expect(screen.getByText("Add players on both sides for an instant value read.")).toBeInTheDocument();
+    addVia("You send", "My RB");
+    addVia("You receive", "Their WR");
+    expect(screen.getByTestId("quick-compare")).toBeInTheDocument();
+    expect(screen.getByTestId("trade-value-bar")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Analyze Trade/ })).toBeNull();
+    expect(api.postTradeAnalyzer).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab", { name: "Full Analysis" }));
+    expect(screen.queryByTestId("quick-compare")).toBeNull();
+  });
+});

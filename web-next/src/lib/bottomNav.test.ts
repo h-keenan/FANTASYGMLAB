@@ -37,6 +37,9 @@ describe("status chips and compact labels", () => {
       { key: "offers", label: "1 offer expiring", tone: "accent", tab: "trades" },
     ]);
     expect(simStatusChips({ lineup_warnings: 0, inbox: 0 })).toEqual([]);
+    // Auto-manage fixes those at play time, unless this week's lineup was set by hand.
+    expect(simStatusChips({ lineup_warnings: 2, inbox: 0 }, { auto_manage: true })).toEqual([]);
+    expect(simStatusChips({ lineup_warnings: 2, inbox: 0 }, { auto_manage: true, lineup_edited: true })).toHaveLength(1);
     expect(simStatusChips(null)).toEqual([]);
   });
   it("formats the one-line header", () => {

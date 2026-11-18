@@ -28,7 +28,7 @@ import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAcco
 import { badgeFromInjury } from '../lib/playerBadges';
 import { SkeletonCard, SkeletonRows } from '../components/Skeleton';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysisPanel';
+import { TeamArchetypeRead, hasArchetypeRead } from '../components/TeamAnalysisPanel';
 import ToneBadge from '../components/ToneBadge';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import ValuesCredit from '../components/ValuesCredit';
@@ -286,32 +286,6 @@ export default function MyTeamScreen({ route, navigation }: Props) {
           onOpenLineup={() => navigation.navigate('Matchup', { leagueId, leagueName })}
         />
         <TeamSnapshotModule team={myTeam} leagueSize={leagueSize} open={(key) => openInsight(navigation.navigate as never, key, leagueId, leagueName)} />
-        {myTeam && hasRosterAnalysis(myTeam) ? (
-          <CompactModule
-            id="team.analytics"
-            title="Team Analytics"
-            tone="muted"
-            parts={listSummaryParts({
-              count: analysisRows.length,
-              noun: 'position room',
-              none: 'Roster analysis ready',
-              highlights: analysisRows.slice(0, 2).map((row) => `${row.position} ${row.status}`),
-            })}
-          >
-            <TeamAnalysisPanel
-              team={myTeam}
-              leagueSize={leagueSize}
-              showExplanations={false}
-              onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
-              onOpenFranchise={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'franchise' })}
-              onOpenDraftCenter={() => navigation.navigate('DraftCenter', { leagueId, leagueName })}
-              onOpenStarters={() => setRosterTab('starters')}
-              onOpenBench={() => setRosterTab('bench')}
-              onOpenAge={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'age' })}
-            />
-          </CompactModule>
-        ) : null}
-
         {analysisRows.length > 0 ? (
           <CompactModule
             id="team.analysis"
@@ -422,7 +396,8 @@ function TeamHero({
   onOpenLineup: () => void;
 }) {
   const { colors } = useThemeMode();
-  const valuePercentile = team ? percentileFromRank(team.power_rank, leagueSize) : null;
+  // A percentile against a tiny league ("0th percentile of 2 teams") says nothing: show it only with enough teams (web twin: MyTeamContent).
+  const valuePercentile = team && leagueSize >= 4 ? percentileFromRank(team.power_rank, leagueSize) : null;
   const outlook = team ? team.archetype_label || team.strategy_label : null;
   const context = [
     valuePercentile != null ? `${ordinal(valuePercentile)} percentile of ${leagueSize} teams` : null,
@@ -470,10 +445,13 @@ function TeamSnapshotModule({ team, open, leagueSize }: { team: TeamRanking | nu
         { label: 'Record', icon: 'ribbon-outline', value: record, fill: team ? winShare(team.wins, team.losses, team.ties) : null, onPress: open('record') },
         { label: TERMS.thisSeason, icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied), fill: rankFill(team?.power_rank, leagueSize), onPress: open('power') },
         { label: TERMS.longTerm, icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied), fill: rankFill(team?.franchise_rank, leagueSize), onPress: open('franchise') },
+        ...(team?.draft_capital_rank != null
+          ? [{ label: 'Draft Capital', icon: 'file-tray-stacked-outline' as const, value: rank(team.draft_capital_rank, team.draft_capital_rank_tied), fill: rankFill(team.draft_capital_rank, leagueSize), onPress: open('draft_capital') }]
+          : []),
         { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied), fill: rankFill(team?.starter_rank, leagueSize), onPress: open('starter') },
         { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied), fill: rankFill(team?.bench_rank, leagueSize), onPress: open('bench') },
-        { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—', onPress: open('age') },
       ]}
+      footer={team && hasArchetypeRead(team) ? <TeamArchetypeRead team={team} onOpenAge={open('age')} /> : undefined}
       info={{
         lines: [copy.help('myTeamIntro'), copy.help('myTeamValueTiers')],
         glossary: ['powerRank', 'franchiseRank', 'starterStrength', 'benchStrength', 'averageAge', 'draftPicks', 'pqv', 'superflex', 'tep'],

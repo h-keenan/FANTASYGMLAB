@@ -28,5 +28,8 @@ describe("verdict colour guard", () => {
     // Trade History "-12 pts" in red and its red verdict stripe (2026-11-17).
     expect(run('{ key: "pts", tone: netPts > 0 ? "success" : netPts < 0 ? "danger" : undefined }')).toHaveLength(1);
     expect(run("const accent = verdict ? verdictToneColorVar(verdict) : outcomeToneColorVar(o);")).toHaveLength(1);
+    // The "You send" dot of the shared TradeScale was pink/red (a quoted var(--color-danger) slipped past the Give rule).
+    expect(run('background: side === "give" ? "var(--color-danger)" : "var(--color-success)"')).toHaveLength(1);
+    expect(run('background: side === "give" ? "var(--color-text-muted)" : "var(--color-success)"')).toHaveLength(0);
   });
 });

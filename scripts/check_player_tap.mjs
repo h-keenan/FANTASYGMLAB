@@ -67,7 +67,6 @@ export const RAW_ALLOWLIST = {
   "mobile/src/components/SuggestedDrop.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "mobile/src/components/TradePickerSheet.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "mobile/src/components/TradeShareCard.tsx": "exempt: a rendered share-card image, not interactive UI",
-  "mobile/src/components/WaiverSuggestionsStrip.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "mobile/src/screens/PlayerCompareScreen.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "mobile/src/screens/WaiversScreen.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "web-next/src/components/AlertsContent.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",

@@ -26,6 +26,13 @@ describe("PlayerName", () => {
     expect(container.firstElementChild?.className).toMatch(/(^|\s)relative(\s|$)/);
   });
 
+  it("short (trade cards) always shows initial + surname, even when the full name would fit", () => {
+    setWidths(100, 140);
+    const { container } = render(<PlayerName name="Saquon Barkley" short />);
+    expect(container).toHaveTextContent("S. Barkley");
+    expect(container.querySelector("[data-player-name-stage]")?.getAttribute("data-player-name-stage")).toBe("1");
+  });
+
   it("renders the full name when it fits", () => {
     setWidths(100, 140);
     render(<PlayerName name="Saquon Barkley" />);
