@@ -8,7 +8,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { Collapse } from "@/components/ui/Presence";
-import { type GmPlanTradeItem, type TradeAsset } from "@/lib/api";
+import { type GmPlanOutlookItem, type GmPlanTradeItem, type TradeAsset } from "@/lib/api";
 import { abbreviatePlayerName } from "@/lib/formatPlayerName";
 import type { PlanStep } from "@/lib/gmPlanPlan";
 import { deltaBand } from "@/lib/verdictTone";
@@ -89,6 +89,44 @@ function TradeRow({ item, detailsHref }: { item: GmPlanTradeItem; detailsHref?: 
             ) : null}
           </div>
         </div>
+      </Collapse>
+    </div>
+  );
+}
+
+const OUTLOOK_TONE = { success: "var(--color-success)", muted: "var(--color-text-muted)", accent: "var(--color-accent)" } as const;
+
+/** One Team Outlook fact (handshake item 7): avatars, the label and headline, and the reasons behind it on tap. */
+export function OutlookRow({ item }: { item: GmPlanOutlookItem }) {
+  const [open, setOpen] = useState(false);
+  const people = item.players.map((p) => ({ id: p.player_id || null, name: p.name, position: p.position, team: p.team }));
+  return (
+    <div style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }} data-testid="plan-outlook-row" data-topic={item.outlook_topic}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`${item.label}: ${item.headline}`}
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-3 py-2 text-left"
+        style={{ minHeight: "var(--touch-target-min)" }}
+      >
+        {people.length > 0 ? <Avatars people={people} /> : null}
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: OUTLOOK_TONE[item.tone] ?? OUTLOOK_TONE.accent, letterSpacing: "var(--letter-spacing-badge)" }}>
+            {item.label}
+          </span>
+          <span className="break-words text-sm font-semibold">{item.headline}</span>
+        </span>
+        <svg aria-hidden="true" width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: "var(--color-text-muted)", transform: open ? "rotate(180deg)" : "none" }}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      <Collapse open={open}>
+        <ul className="list-disc pb-2 pl-5 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          {item.why.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
       </Collapse>
     </div>
   );

@@ -35,7 +35,7 @@ import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import { ViewTabs } from '../components/PageControlRow';
 import DashboardStatRow from '../components/DashboardStatRow';
-import PlanSteps from '../components/GmPlanSteps';
+import PlanSteps, { OutlookRow } from '../components/GmPlanSteps';
 import { buildPlanSteps, buildPlanWhy, planFacts, planStatTiles, type PlanStance } from '../lib/gmPlanPlan';
 import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/Skeleton';
 import SharedTradeIdeaCard from '../components/TradeIdeaCard';
@@ -789,6 +789,7 @@ function FocusAreaBody({ focusArea }: { focusArea: GmPlanFocusArea }) {
         <AnimatedCard style={styles.listCard}>
           {focusArea.items.map((item, index) => {
             const last = index === focusArea.items.length - 1;
+            if ('outlook_topic' in item) return <OutlookRow key={`${focusArea.key}-${index}`} item={item} />;
             if ('injury_need_positions' in item) {
               const positions = item.injury_need_positions.join(', ');
               return (

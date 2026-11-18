@@ -1897,15 +1897,34 @@ export interface GmPlanInjuryItem {
   source: string;
 }
 
+/** One Team Outlook fact (modules.gm_plan_outlook, handshake item 7): a headline,
+ * the reasons behind it, and the players it is about (for avatars). */
+export interface GmPlanOutlookPlayer {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+}
+
+export interface GmPlanOutlookItem {
+  outlook_topic: string;
+  label: string;
+  headline: string;
+  why: string[];
+  players: GmPlanOutlookPlayer[];
+  tone: 'success' | 'muted' | 'accent';
+}
+
 export type GmPlanFocusItem =
   | GmPlanRankItem
   | GmPlanRecordItem
   | GmPlanPlayoffOddsItem
   | GmPlanTradeItem
-  | GmPlanInjuryItem;
+  | GmPlanInjuryItem
+  | GmPlanOutlookItem;
 
 export interface GmPlanFocusArea {
-  key: 'standing' | 'trade_opportunities' | 'roster_construction';
+  key: 'standing' | 'trade_opportunities' | 'roster_construction' | 'team_outlook';
   title: string;
   framing?: string;
   status: GmPlanFocusStatus;
