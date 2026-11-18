@@ -37,6 +37,9 @@ PARTNER_CONTEXT_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_V1"
 FINDER_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_FINDER_V1"
 DASHBOARD_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_DASHBOARD_V1"
 SEARCH_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_SEARCH_V1"
+# Surfaces that default OFF until their realism shift is proven inside
+# COMBINED_MAX_POINTS (player search overshot it; explicit "1" opts in).
+SURFACE_DEFAULT_ON = {SEARCH_ENV_KEY: False}
 ASK_PICK_ENV_KEY = "DYNASTYGM_ASK_PICK_IDEA_V1"
 ASK_PICK_TITLE = "Ask for their pick"
 ASK_PICK_MAX_PER_PARTNER = 2
@@ -64,7 +67,9 @@ def enabled() -> bool:
 def surface_enabled(env_key: str) -> bool:
     """A surface flag counts only while the master flag is on too."""
 
-    return enabled() and experimental_graduation.graduated_kill_switch_enabled(env_key, default=True)
+    return enabled() and experimental_graduation.graduated_kill_switch_enabled(
+        env_key, default=SURFACE_DEFAULT_ON.get(env_key, True)
+    )
 
 
 def team_profiles_for_surface(
