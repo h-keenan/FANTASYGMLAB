@@ -145,3 +145,12 @@ def test_freshness_entry(tmp_path):
     assert data_freshness.college_prospects_row(now, str(tmp_path), True)["status"] == "fail"
     report = data_freshness.build_report(now, str(tmp_path))
     assert "college_prospects" in {r["name"] for r in report["datasets"]}
+
+
+def test_roster_class_year_derived_from_recruit_year_when_year_is_season():
+    from modules.college_prospect_ingest import parse_roster
+
+    row = {"id": "9", "firstName": "A", "lastName": "B", "team": "Texas", "position": "QB", "year": 2026, "recruitIds": ["r1"]}
+    out = parse_roster([row], season=2026, producers={"9"}, draft_years=(2027, 2028), recruit_years={"r1": 2024})
+    assert out and out[0]["class_year"] == 3 and out[0]["draft_year"] == 2027
+    assert parse_roster([row], season=2026, producers={"9"}, draft_years=(2027, 2028)) == []
