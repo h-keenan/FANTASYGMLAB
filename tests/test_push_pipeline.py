@@ -23,6 +23,9 @@ NOON_NY = datetime(2026, 10, 21, 17, 0, tzinfo=timezone.utc)
 @pytest.fixture(autouse=True)
 def _base(monkeypatch):
     notification_events.reset_for_tests()
+    # Team-profile prefetch is exercised by its own tests; the rest of the sweep
+    # tests stay off the (heavy) real profile build.
+    monkeypatch.setenv("DYNASTYGM_PARTNER_CONTEXT_DASHBOARD_V1", "0")
     monkeypatch.setattr(push_triggers, "fetch_push_timezones", lambda config: {})
     monkeypatch.setattr(push_triggers, "count_recent_pushes", lambda config, user_id, now=None: 0)
     monkeypatch.setattr(push_triggers, "count_pushes_today", lambda config, user_id, now=None: 0)
@@ -204,6 +207,48 @@ def test_league_payload_and_rosters_are_fetched_once_per_league_per_run():
     stats, _posts, counters = _run(users=("u1", "u2", "u3"))
     assert stats["pushes_sent"] == 3
     assert counters == {"get_league": 1, "get_rosters": 1}
+
+
+def test_team_profiles_are_prefetched_once_per_league_per_run_without_extra_sleeper_reads(monkeypatch):
+    from modules import team_profile
+
+    built, seen = [], []
+
+    def fake_profiles(*, league_id, lens, players_db_path):
+        from modules import sleeper
+
+        # The build must read the league from the sweep's snapshot, not Sleeper.
+        sleeper.get_league(league_id)
+        sleeper.get_rosters(league_id)
+        built.append((league_id, lens))
+        return {"teams": {"1": {}}}
+
+    monkeypatch.setattr(team_profile, "league_team_profiles_cached", fake_profiles)
+    monkeypatch.setenv("DYNASTYGM_PARTNER_CONTEXT_DASHBOARD_V1", "1")
+    original = push_triggers.league_briefing_push_items
+
+    def spy(**kwargs):
+        seen.append(kwargs.get("team_profiles"))
+        return original(**kwargs)
+
+    monkeypatch.setattr(push_triggers, "league_briefing_push_items", spy)
+    stats, _posts, counters = _run(users=("u1", "u2", "u3"))
+    assert len(built) == 1
+    assert seen == [{"teams": {"1": {}}}] * 3
+    assert counters == {"get_league": 1, "get_rosters": 1}
+    assert not stats["errors"]
+
+
+def test_team_profiles_prefetch_respects_the_dashboard_flag(monkeypatch):
+    from modules import partner_context, team_profile
+
+    def boom(**kw):
+        raise AssertionError("flag off must not build")
+
+    monkeypatch.setattr(team_profile, "league_team_profiles_cached", boom)
+    monkeypatch.setenv(partner_context.DASHBOARD_ENV_KEY, "0")
+    stats, _posts, counters = _run(users=("u1", "u2"))
+    assert counters == {"get_league": 1, "get_rosters": 1} and not stats["errors"]
 
 
 def test_sharding_partitions_users_stably():

@@ -27,6 +27,7 @@ def _daytime_no_history(monkeypatch):
     """Default every sweep test to mid-day New York with no prior pushes, so
     the older tests keep their exact request sequence. Quiet-hours / cap /
     timezone behavior is covered by tests that override these."""
+    monkeypatch.setattr(push_triggers, "league_team_profiles_for_sweep", lambda *a, **k: None)
 
     monkeypatch.setattr(push_triggers, "fetch_push_timezones", lambda config: {})
     monkeypatch.setattr(push_triggers, "count_recent_pushes", lambda config, user_id, now=None: 0)

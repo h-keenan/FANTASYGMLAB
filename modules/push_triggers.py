@@ -33,9 +33,10 @@ import requests
 
 import hashlib
 import time
+from contextlib import contextmanager
 
 from modules import injury_status as injury_table
-from modules import notification_decider, notification_events, notification_prefs
+from modules import notification_decider, notification_events, notification_prefs, partner_context
 from modules import alert_presentation, app_config, dashboard_engine, faab, gm_targets, league_calendar, league_recaps, league_value_settings, nfl_schedule, player_eligibility, push_tokens, rankings, roster_value_model, sleeper, sleeper_leagues, team_stance, weekly_roundup
 
 
@@ -932,8 +933,12 @@ def league_briefing_push_items(
     untouchable_player_ids: tuple[str, ...] = (),
     league: Mapping[str, Any] | None = None,
     rosters: list[dict] | None = None,
+    team_profiles: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """The subset of one league's "Next Move" briefing worth pushing about.
+
+    `team_profiles` is the shared league team profile (partner trade habits)
+    the sweep prefetches once per league per run; None reads tendency neutral.
 
     `league` / `rosters` let the sweep pass the per-run cached league payload
     and rosters (one fetch per league per run however many users share it);
@@ -994,6 +999,7 @@ def league_briefing_push_items(
         league=league,
         untouchable_player_ids=untouchable_player_ids,
         team_strategy=team_strategy,
+        team_profiles=team_profiles,
     )
     league_name = _safe_text(league.get("name"), "Your league")
     # Push-safety (#1493): no league/team/manager names in push text. A trade
@@ -1480,6 +1486,47 @@ def _local_hour(tz_name: str, now: datetime) -> int:
     return now.astimezone(_resolve_tzinfo(tz_name)).hour
 
 
+@contextmanager
+def _pinned_league_snapshot(league_id: str, payload: Mapping[str, Any], rosters: list[dict]):
+    """For the duration of one team-profile build, answer ``sleeper.get_league`` /
+    ``get_rosters`` for ``league_id`` from the sweep's already-fetched snapshot, so
+    the prefetch costs no extra Sleeper reads. Other leagues pass through. The
+    sweep is single-threaded; the originals are always restored."""
+
+    original_league, original_rosters = sleeper.get_league, sleeper.get_rosters
+
+    def get_league(lid):
+        return payload if str(lid) == league_id else original_league(lid)
+
+    def get_rosters(lid):
+        return rosters if str(lid) == league_id else original_rosters(lid)
+
+    sleeper.get_league, sleeper.get_rosters = get_league, get_rosters
+    try:
+        yield
+    finally:
+        sleeper.get_league, sleeper.get_rosters = original_league, original_rosters
+
+
+def league_team_profiles_for_sweep(
+    league_id: str, lens: str, payload: Mapping[str, Any], rosters: list[dict] | None
+) -> Mapping[str, Any] | None:
+    """The league team profile for the dashboard direct path (flag
+    ``DYNASTYGM_PARTNER_CONTEXT_DASHBOARD_V1``), built from the snapshot the sweep
+    already holds. None when the flag is off, the snapshot is incomplete, or the
+    build fails: the briefing then reads tendency neutral exactly as before."""
+
+    if not payload or not rosters or not partner_context.surface_enabled(partner_context.DASHBOARD_ENV_KEY):
+        return None
+    try:
+        with _pinned_league_snapshot(league_id, payload, rosters):
+            return partner_context.team_profiles_for_surface(
+                partner_context.DASHBOARD_ENV_KEY, league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+            )
+    except Exception:
+        return None
+
+
 def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) -> dict[str, Any]:
     """One sweep: check every registered account's leagues, push what's new.
 
@@ -1548,6 +1595,8 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
     # Per-run league cache: friends share leagues, and every detector needs the
     # same payload + rosters, so each is fetched once per league per run.
     league_cache: dict[str, tuple[dict[str, Any], list[dict] | None, str]] = {}
+    # Per-run team profiles, one build per (league, lens) however many users share it.
+    profile_cache: dict[tuple[str, str], Mapping[str, Any] | None] = {}
 
     def league_snapshot(league_id: str) -> tuple[dict[str, Any], list[dict] | None, str]:
         if league_id not in league_cache:
@@ -1615,6 +1664,10 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             league_payload, league_rosters, snapshot_problem = league_snapshot(league_id)
             if snapshot_problem:
                 stats["errors"].append(f"{user_id}/{league_id}: {snapshot_problem}")
+            if (league_id, league_lens) not in profile_cache:
+                profile_cache[(league_id, league_lens)] = league_team_profiles_for_sweep(
+                    league_id, league_lens, league_payload, league_rosters
+                )
             try:
                 push_items = league_briefing_push_items(
                     league_id=league_id,
@@ -1626,6 +1679,7 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                     ),
                     league=league_payload,
                     rosters=league_rosters,
+                    team_profiles=profile_cache[(league_id, league_lens)],
                 )
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: briefing failed ({exc})")
