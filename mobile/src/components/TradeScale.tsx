@@ -32,7 +32,7 @@ function Column({ side, label, assets, mode, max, editing, addHint, onAdd, onRem
   return (
     <View style={styles.column} testID={`scale-${side}`}>
       <View style={styles.head}>
-        <View style={[styles.dot, { backgroundColor: side === 'give' ? colors.danger : colors.success }]} />
+        <View style={[styles.dot, { backgroundColor: side === 'give' ? colors.textTertiary : colors.success }]} />
         <AppText style={styles.kicker}>{label} {tradeScaleCount(assets.length, max)}</AppText>
       </View>
       {/* Rows added or removed grow in / collapse out in place (Presence); the rows already there are simply there. */}

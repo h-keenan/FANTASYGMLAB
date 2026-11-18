@@ -323,6 +323,7 @@ export function PillContextLayer({
           aria-busy={primary.busy || undefined}
           data-testid="pill-primary"
           data-selection={isSelectionAction(primary) ? "" : undefined}
+          data-tone={primary.tone}
           onClick={primary.onPress}
         >
           {primary.glyph ? <TabGlyph name={primary.glyph} size={16} /> : null}

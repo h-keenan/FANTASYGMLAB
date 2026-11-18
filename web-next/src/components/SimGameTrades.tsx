@@ -220,7 +220,7 @@ function OfferCard({ item, index, count, defaultOpen, busy, canTrade, resolved, 
             </span>
           </span>
           <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-            <span className="font-bold" style={{ color: "var(--color-danger)" }}>Give</span> {names(item.you_give)}
+            <span className="font-bold" style={{ color: "var(--color-text-muted)" }}>Give</span> {names(item.you_give)}
             {" · "}
             <span className="font-bold" style={{ color: "var(--color-success)" }}>Get</span> {names(item.you_get)}
           </span>

@@ -8,7 +8,7 @@ import TabIcon from './TabIcon';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import ToneBadge from './ToneBadge';
-import { normalizePillContext, pillActiveIndex, tabShowsPro, pillPrimaryCompact, pillScrollTarget, pillTabText, type PillContext } from '../lib/bottomNav';
+import { isSelectionAction, normalizePillContext, pillActiveIndex, tabShowsPro, pillPrimaryCompact, pillScrollTarget, pillTabText, type PillContext } from '../lib/bottomNav';
 import { BAR_METRICS } from '../lib/bottomBarMetrics';
 import { EASE, MOTION_MS } from '../lib/motion';
 import { radii, type ThemeColors } from '../theme';
@@ -113,7 +113,7 @@ export default function BottomPill({ children, segment: rawContext, orb, style, 
                 <TabIcon name={context.primary.glyph!} color={colors.onAccent} size={18} />
               </PressableScale>
             ) : (
-              <PressableScale accessibilityRole="button" accessibilityLabel={context.primary.label} disabled={context.primary.disabled || context.primary.busy} onPress={context.primary.onPress} style={[styles.primary, (context.primary.disabled || context.primary.busy) && { opacity: 0.5 }]} testID="pill-primary">
+              <PressableScale accessibilityRole="button" accessibilityLabel={context.primary.label} disabled={context.primary.disabled || context.primary.busy} onPress={context.primary.onPress} style={[styles.primary, isSelectionAction(context.primary) && styles.primarySelection, context.primary.tone === 'warning' && { backgroundColor: colors.warning }, (context.primary.disabled || context.primary.busy) && { opacity: 0.5 }]} testID="pill-primary">
                 <AppText style={styles.primaryText} numberOfLines={1} ellipsizeMode="tail" maxFontSizeMultiplier={1.25}>
                   {context.primary.label}
                 </AppText>
@@ -164,6 +164,7 @@ function createStyles(colors: ThemeColors) {
     tabText: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
     tabTextOn: { color: colors.textPrimary },
     primary: { minHeight: target, paddingHorizontal: 14, justifyContent: 'center', borderRadius: radii.pill, backgroundColor: colors.accentStrong },
+    primarySelection: { flex: 1, alignItems: 'center' },
     primaryIcon: { width: 44, height: 44, minHeight: 44, paddingHorizontal: 0, alignItems: 'center' },
     primaryText: { fontSize: 12, fontWeight: '800', color: colors.onAccent },
   });

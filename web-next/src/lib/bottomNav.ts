@@ -128,7 +128,7 @@ export function simOrbAriaLabel(currentLabel: string, inbox: number | null | und
 export type PillContextTab = { key: string; label: string; /** Paid tab: wears the Pro marker for anyone not on Pro. */ pro?: boolean; /** Short form for the tight pill ("Hist."); the full label stays the accessible name. */ short?: string; glyph?: TabIconName; badge?: number; /** App only: a long-press quick action ("Trades" -> "New trade"). Web tabs are links (iOS long-press opens the preview sheet), so web ignores it. */ shortcut?: TabShortcut; /** Web: the tab is a route, rendered as a link (client navigation, opens in a new tab on demand). onSelect still fires. */ href?: string };
 
 /** The one primary action of a page (Auto-set, New trade, Claim). Rendered as the accent chip at the end of the segment. */
-export type PillContextAction = { key: string; label: string; glyph?: TabIconName; disabled?: boolean; busy?: boolean; onPress: () => void; /** Web: render as a link to this route (onPress still fires). */ href?: string };
+export type PillContextAction = { key: string; label: string; glyph?: TabIconName; disabled?: boolean; busy?: boolean; onPress: () => void; /** Web: render as a link to this route (onPress still fires). */ href?: string; /** "warning": the chip is amber (a lineup issue to see BEFORE advancing). Never red. */ tone?: "warning" };
 
 /**
  * What a page registers with the pill: its page tabs, which one is lit, and one primary action. The page owns the
@@ -252,6 +252,39 @@ export function simPillPlan(opts: { context: PillContext | null | undefined; sim
   const p = ctx?.primary;
   const inlineAction = p && (!p.disabled || p.busy) ? p : null;
   return { segment: null, inlineAction, simTo: opts.simToAvailable && !opts.paywalled && !inlineAction, advance: true };
+}
+
+// ---- Sim footer, concept A (2026-11-18, owner pick): orb + page tabs + ONE primary chip ----
+
+/** A chip longer than this (characters) cannot sit next to four text tabs at 390px: the strip yields a tab. */
+export const SIM_CHIP_SHORT_MAX = 13;
+
+/**
+ * The Fantasy Sim page tabs the pill carries next to the primary chip. In season: Home / Team / Players / Trades (League and
+ * More are one orb tap away, the trade count rides on the orb badge); a long chip ("⚠ 1 · Set lineup") takes the room of one
+ * tab. The offseason has no Players tab and its stage chips are always long ("Start rookie draft", "Start S2 2027"), so it
+ * carries Offseason / Team (Trades and League via the orb). Labels never clip: tabs yield instead of scrolling behind the chip.
+ */
+export function simFooterTabs(opts: { offseason?: boolean; chipLabel: string }): PillContextTab[] {
+  if (opts.offseason) {
+    return [
+      { key: "home", label: "Offseason", glyph: "home" },
+      { key: "team", label: "Team", glyph: "team" },
+    ];
+  }
+  const all: PillContextTab[] = [
+    { key: "home", label: "Home", glyph: "home" },
+    { key: "team", label: "Team", glyph: "team" },
+    { key: "players", label: "Players", glyph: "players" },
+    { key: "trades", label: "Trades", glyph: "trades" },
+  ];
+  return opts.chipLabel.length > SIM_CHIP_SHORT_MAX ? all.slice(0, 3) : all;
+}
+
+/** The in-season primary chip: "Play Wk 6 ▸" ("Play round ▸" in the playoffs), or the amber "⚠ 1 · Set lineup" when starters will score 0. */
+export function simAdvanceChip(opts: { phase?: string; week: number; issues: number }): { label: string; warn: boolean } {
+  if (opts.issues > 0) return { label: `\u26A0\uFE0E ${opts.issues} \u00B7 Set lineup`, warn: true };
+  return { label: opts.phase === "playoffs" ? "Play round \u25B8" : `Play Wk ${opts.week} \u25B8`, warn: false };
 }
 
 // ---- Selection mode, hide on scroll, reselect to top (2026-11-17, owner-approved smart footer upgrade) ----

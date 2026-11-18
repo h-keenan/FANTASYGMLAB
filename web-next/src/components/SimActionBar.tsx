@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { PillMorph } from "@/components/ui/PillMorph";
-import { simPillPlan } from "@/lib/bottomNav";
+import { Sheet } from "@/components/ui/Sheet";
+import { isSelectionAction, simAdvanceChip, simFooterTabs, simPillPlan, type PillContext, type PillContextAction } from "@/lib/bottomNav";
+import type { SimTab } from "@/lib/simGameFlow";
+import { shortPlayerName } from "@/lib/playerNameDisplay";
 import { usePillState } from "@/lib/useBottomPillContext";
 import { Button, ButtonLink } from "@/components/Button";
 import { SimGlyph } from "@/components/SimGlyph";
@@ -21,11 +24,12 @@ import { simAdvanceState, simLineupIssues, type SimZeroStarter } from "@/lib/sim
  * (.action-pill; Auto-set lives on Home "What to do this week") docked at the bottom of the game's in-flow
  * sticky `.bottom-stack` (one row: icon-only Sim to, the game orb, Advance; no position:fixed); sticky inside the page on desktop. Mobile twin: mobile/src/components/SimActionBar.tsx.
  */
-export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onTab, orb }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onTab?: (tab: "team" | "players") => void; orb?: ReactNode }) {
+export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onTab, orb, tab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onTab?: (tab: SimTab) => void; orb?: ReactNode; /** The lit page (Home / Team / ...): the phone pill lights its tab. */ tab?: string }) {
   const pill = usePillState();
   const { gameId, game } = ctx;
   const [issues, setIssues] = useState<{ empty: string[]; zero: SimZeroStarter[] }>({ empty: [], zero: [] });
   const [confirming, setConfirming] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const auto = useSimAutoSet(ctx);
   const issuesSig = useRef("");
 
@@ -59,6 +63,26 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
     }
   };
   const plan = simPillPlan({ context: pill.barPresent ? pill.ctx : null, simToAvailable: Boolean(onSimTo), paywalled });
+  // Phones (concept A): orb | Home / Team / Players / Trades | ONE chip. The chip is the advance control on every page; with lineup
+  // problems it is amber ("1 . Set lineup") and opens a confirm sheet (the same guard as the desktop "Advance anyway"). A page's
+  // selection submit ("3 selected . Claim") takes the chip and the tabs step aside.
+  const issueCount = issues.empty.length + issues.zero.length;
+  const chip = simAdvanceChip({ phase: game.phase, week: game.week, issues: state.confirm ? issueCount : 0 });
+  const selection = pill.barPresent && isSelectionAction(pill.ctx?.primary) ? pill.ctx?.primary ?? null : null;
+  const tapChip = () => {
+    if (state.confirm) setSheetOpen(true);
+    else onAdvance();
+  };
+  const primary: PillContextAction = selection ?? (paywalled
+    ? { key: "go-pro", label: "Go Pro", href: "/premium", onPress: () => {} }
+    : { key: "advance", label: chip.label, tone: chip.warn ? "warning" : undefined, busy: advancing, disabled: state.blocked, onPress: tapChip });
+  const phoneSegment: PillContext | null = pill.barPresent
+    ? { id: selection ? "sim-selection" : "sim-season", label: "Fantasy Sim pages", tabs: selection ? [] : simFooterTabs({ chipLabel: primary.label }), activeKey: tab ?? "home", onSelect: (key) => onTab?.(key as SimTab), primary }
+    : null;
+  const lineupText = [
+    ...issues.zero.map((z) => `${shortPlayerName(z.name)} (${z.label}) ${z.reason === "bye" ? "is on a bye" : "is out"} and will score 0 this week.`),
+    ...(issues.empty.length > 0 ? [`${issues.empty.join(", ")} ${issues.empty.length === 1 ? "is" : "are"} empty and will score 0 unless a healthy bench player fits.`] : []),
+  ].join(" ");
   const reasonId = "sim-advance-reason";
   // The accessible name starts with the visible text (WCAG 2.5.3), then adds the plain-language detail.
   const advanceText = confirming ? "Advance anyway" : game.phase === "playoffs" ? "Play round" : `Advance ${state.label}`;
@@ -91,7 +115,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
           <span style={{ color: auto.optimal ? "var(--color-success)" : undefined }}>{auto.optimal ? "Lineup optimal" : "Lineup can improve"}</span>
         </p>
       )}
-      <PillMorph segment={plan.segment} orb={orb}>
+      <PillMorph segment={phoneSegment ?? plan.segment} orb={orb}>
       <div className="mx-auto flex max-w-3xl items-center gap-2 max-md:p-0 md:mx-0 md:max-w-none md:flex-none md:gap-2 md:p-0">
         {plan.simTo ? (
           <Button variant="secondary" size="sm" className="min-w-0 shrink-0 max-md:flex-col max-md:gap-0 max-md:self-stretch max-md:px-2" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
@@ -118,6 +142,12 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
         )}
       </div>
       </PillMorph>
+      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Set your lineup first?" description={lineupText}>
+        <div className="flex flex-col gap-2" data-testid="sim-lineup-confirm">
+          <Button fullWidth loading={auto.busy} onClick={() => { void Promise.resolve(auto.run()).finally(() => setSheetOpen(false)); }}>Fix now (Auto-set best lineup)</Button>
+          <Button fullWidth variant="secondary" onClick={() => { setSheetOpen(false); onAdvance(); }}>Play anyway</Button>
+        </div>
+      </Sheet>
     </div>
   );
 }

@@ -10,6 +10,7 @@
 //   3. an inline win-percent threshold ladder (winPercent >= 55 ? "success" ...) instead of percentBand;
 //   4. a value delta (gain / balance / edge / net value / margin) coloured danger or tone "danger" (a negative delta is muted);
 //   5. a card accent stripe chosen with a ternary that can turn red;
+//   9. a Give / "You give" label coloured danger (Give is neutral grey);
 //
 // A line that already goes through the map (probabilityBand, percentBand, verdictBand, bandColor, bandColorVar,
 // probabilityColor*, percentColor*, verdictColor*, bandSimTone, bandCompactTone) is fine. Use `// verdict-color-ok: reason`
@@ -49,6 +50,8 @@ const DANGER_TONE = /(["'])danger\1|var\(--color-danger\)|\bcolors\.danger\b/;
 const STRIPE_DANGER = /\baccent\s*=\s*\{?[^;]*injur[^;]*\?[^;]*(var\(--color-danger\)|colors\.danger|["']danger["'])/i;
 
 const SEND_DANGER = /(You (?:send|sent)\b|side\s*===\s*['"]send['"]).*(var\(--color-danger\)|colors\.danger\b)/;
+// A "Give" / "You give" label is neutral grey ("Get" may stay green): giving a player is not a loss verdict, so it is never red.
+const GIVE_LABEL = />\s*(You give|Give)\s*<|["'`]You give["'`]|\bside\s*===?\s*["']give["']\s*\?\s*(["']danger["']|var\(--color-danger\)|colors\.danger)/;
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -67,6 +70,10 @@ export function scanText(rel, text) {
     if (OK.test(line) || (i > 0 && OK.test(lines[i - 1]))) return;
     if (LADDER.test(line)) {
       problems.push(`${rel}:${i + 1}: inline probability threshold ladder; use percentBand / probabilityBand from verdictTone.ts`);
+      return;
+    }
+    if (GIVE_LABEL.test(line) && DANGER_TONE.test(line)) {
+      problems.push(`${rel}:${i + 1}: a Give / "You give" label is coloured red (${line.trim().slice(0, 80)}); Give is neutral grey, only Get may be green`);
       return;
     }
     if (STRIPE_DANGER.test(line)) {

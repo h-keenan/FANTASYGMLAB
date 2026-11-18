@@ -2806,8 +2806,15 @@ def get_league_team_rankings(
     # Cached the same way as the rankings frame itself (30s live-time-bucket
     # Redis single-flight), so this doesn't add per-request latency beyond
     # the first caller in each window.
-    health_metrics = league_rankings.build_roster_health_metrics_frame_cached(
-        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    # (With DYNASTYGM_CANONICAL_POSTURE on, the cached rankings frame already
+    # carries this merge and the refined classification; this block only runs
+    # for the legacy path.)
+    health_metrics = (
+        pd.DataFrame()
+        if league_rankings.canonical_posture_enabled()
+        else league_rankings.build_roster_health_metrics_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
     )
     if not health_metrics.empty:
         health_cols = [
@@ -2831,7 +2838,9 @@ def get_league_team_rankings(
             how="left",
         ).drop(columns=["__roster_id_key__"])
 
-    rankings_frame = refine_team_directions(rankings_frame)
+    rankings_frame = league_rankings.apply_canonical_posture(
+        rankings_frame, league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
 
     rosters = sleeper.get_rosters(league_id)
     roster_profiles = sleeper.get_league_roster_profiles(league_id)
@@ -4239,7 +4248,9 @@ def get_league_draft_center(
     intel_frame = league_rankings.add_league_detail_ranks(
         league_rankings.build_league_display_frame(df_summary, draft_capital_summary, include_picks=False)
     )
-    intel_frame = refine_team_directions(intel_frame)
+    intel_frame = league_rankings.apply_canonical_posture(
+        intel_frame, league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
     intel_frame["strategy_display"] = intel_frame.get("strategy_label", "")
 
     draft_workspace = league_rankings.build_draft_workspace_frame(draft_capital_summary, intel_frame)

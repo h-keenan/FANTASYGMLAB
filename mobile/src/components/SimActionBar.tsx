@@ -10,7 +10,9 @@ import type { SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { usePillState } from '../lib/useBottomPillContext.ts';
-import { simPillPlan } from '../lib/bottomNav';
+import { isSelectionAction, simAdvanceChip, simFooterTabs, simPillPlan, type PillContext, type PillContextAction } from '../lib/bottomNav';
+import type { SimTab } from '../lib/simGameFlow';
+import { shortPlayerName } from '../lib/playerNameDisplay';
 import { simAdvanceLabel } from '../lib/simGame';
 import { simAdvanceState, simLineupIssues, type SimZeroStarter } from '../lib/simLayout';
 import { BAR_METRICS } from '../lib/bottomBarMetrics';
@@ -23,7 +25,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * "What to do this week". An in-flow glass pill: the screen's bottom stack docks
  * it at the bottom with the game orb inside its one row (orb | Sim to or a page action | Advance), and pads the content to match.
  */
-export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onGoPro, onTab, orb }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onGoPro: () => void; onTab?: (tab: 'team' | 'players') => void; orb?: React.ReactNode }) {
+export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onGoPro, onTab, orb, tab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onGoPro: () => void; onTab?: (tab: SimTab) => void; orb?: React.ReactNode; /** The lit page (Home / Team / ...). */ tab?: string }) {
   const pill = usePillState();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -51,12 +53,25 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
       onAdvance();
       return;
     }
-    Alert.alert('Empty starting slot', state.confirm, [
+    // Concept A: the amber "Set lineup" chip opens this confirm (web twin: the "Set your lineup first?" sheet). Fix now goes to the Team page's
+    // lineup (Auto-set lives there), Play anyway keeps the old "Advance anyway" guard.
+    Alert.alert('Set your lineup first?', issues.zero.reduce((t, z) => t.split(z.name).join(shortPlayerName(z.name)), state.confirm.replace(/ Advance anyway\?$/, '')), [
       { text: 'Cancel', style: 'cancel' },
-      ...(onTab ? [{ text: 'Fill from bench', onPress: () => onTab('team') }, { text: 'Free agents', onPress: () => onTab('players') }] : []),
-      { text: 'Advance anyway', style: 'destructive' as const, onPress: onAdvance },
+      ...(onTab ? [{ text: 'Fix now', onPress: () => onTab('team') }] : []),
+      { text: 'Play anyway', style: 'destructive' as const, onPress: onAdvance },
     ]);
   };
+  // Concept A: orb | Home / Team / Players / Trades | ONE chip (amber "⚠ 1 · Set lineup" when starters will score 0). A page's selection
+  // submit ("3 selected · Claim") takes the chip and the tabs step aside.
+  const issueCount = issues.empty.length + issues.zero.length;
+  const chip = simAdvanceChip({ phase: game.phase, week: game.week, issues: state.confirm ? issueCount : 0 });
+  const selection = pill.barPresent && isSelectionAction(pill.ctx?.primary) ? pill.ctx?.primary ?? null : null;
+  const primary: PillContextAction = selection ?? (paywalled
+    ? { key: 'go-pro', label: 'Go Pro', onPress: onGoPro }
+    : { key: 'advance', label: chip.label, tone: chip.warn ? 'warning' : undefined, busy: advancing, disabled: state.blocked, onPress: tapAdvance });
+  const phoneSegment: PillContext | null = pill.barPresent
+    ? { id: selection ? 'sim-selection' : 'sim-season', label: 'Fantasy Sim pages', tabs: selection ? [] : simFooterTabs({ chipLabel: primary.label }), activeKey: tab ?? 'home', onSelect: (key) => onTab?.(key as SimTab), primary }
+    : null;
   return (
     <View style={styles.bar} testID="sim-action-bar">
       {/* No standing "will score 0" line here (web's phone pill hides it too): it came and went with every lineup refetch, resizing the pill
@@ -66,7 +81,7 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
           {state.reason}
         </AppText>
       ) : null}
-      <BottomPill bare segment={plan.segment} orb={orb}>
+      <BottomPill bare segment={phoneSegment ?? plan.segment} orb={orb}>
       <View style={styles.row}>
         {plan.simTo && onSimTo ? (
           <Pressable onPress={onSimTo} disabled={advancing} accessibilityRole="button" accessibilityLabel="Sim to..." style={[styles.simTo, advancing && { opacity: 0.5 }]} testID="sim-to-button">

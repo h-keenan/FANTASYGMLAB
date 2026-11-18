@@ -1,6 +1,7 @@
 import time
 from typing import Any, Mapping
 import pandas as pd
+from modules import age_profile
 from modules import derived_cache
 from modules import injury_status
 from modules import league_calendar
@@ -351,9 +352,9 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
         parts = [p for p in lead if p]
         if ppw is not None and ppw >= FILLS_NEED_MIN_PPW:
             parts.append(f"worth about +{ppw:.1f} pts/wk in your lineup")
-        if age and age <= 24:
+        if age and age_profile.is_young(pos, age, legacy_max=24):
             parts.append(f"age {int(age)} with room to grow")
-        elif age and age >= 31:
+        elif age and age_profile.is_aging(pos, age, legacy_min=31):
             parts.append(f"age {int(age)}, short shelf life")
         if opportunity:
             parts.append(opportunity.lower())
@@ -374,7 +375,11 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
     # this week. Hold him only where holding makes sense (a long-term format
     # and a rebuilding team or a young / role-driven player); otherwise watch.
     if out_now:
-        held = (not redraft) and bool(lean == "rebuild" or (age and age <= 26) or opportunity in _STASH_OPPORTUNITIES)
+        held = (not redraft) and bool(
+            lean == "rebuild"
+            or (age and age_profile.is_young(pos, age, legacy_max=26))
+            or opportunity in _STASH_OPPORTUNITIES
+        )
         why = (
             f"Listed {injury_label}, so he cannot fill a lineup hole this week"
             if injury_label
@@ -399,7 +404,7 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
 
     need_fit = bool(row.get("priority_need_fit")) or bool(row.get("injury_replacement_fit"))
     bigger = bool(row.get("priority_bigger_upgrade"))
-    older_rebuild = bool(lean == "rebuild" and age and age >= 29)
+    older_rebuild = bool(lean == "rebuild" and age and age_profile.is_aging(pos, age, legacy_min=29))
     stance_note = ""
     if lean == "contend" and (need_fit or bigger):
         stance_note = "helps you now, which fits a contending team"
@@ -425,7 +430,7 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
         if lean == "contend":
             lead += " (a contender can wait on this)"
         return ("Stash", "information", "Medium", ctx(lead, availability_note))
-    young = bool(age and age <= 24) and not redraft
+    young = bool(age and age_profile.is_young(pos, age, legacy_max=24)) and not redraft
     if young or opportunity in _STASH_OPPORTUNITIES:
         lead = "Cheap upside for later, no need today"
         conf = "Low" if computed else ""
