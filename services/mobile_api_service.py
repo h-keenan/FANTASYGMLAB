@@ -13147,6 +13147,7 @@ def get_league_dashboard(
                 gm_target_player_ids=gm_target_ids,
                 team_stance=declared_team_stance,
                 keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+                usage_roles_pro=_is_pro_caller(user),
                 posture=posture,
             )
         except (TypeError, ValueError, model_status.KeeperPricingUnavailable):
@@ -14720,6 +14721,7 @@ def get_gm_plan(
                 gm_target_player_ids=gm_target_ids,
                 team_stance=declared_team_stance,
                 keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+                usage_roles_pro=_is_pro_caller(user),
                 posture=posture,
             )
         except (TypeError, ValueError, model_status.KeeperPricingUnavailable):
@@ -18452,6 +18454,7 @@ def get_trade_hub_ideas(
         gm_target_player_ids=gm_target_ids,
         team_stance=declared_team_stance,
         keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+        usage_roles_pro=_is_pro_caller(user),
         posture=posture,
     )
 
@@ -18601,6 +18604,7 @@ def get_trade_hub_idea_share_card(
         gm_target_player_ids=gm_target_ids,
         team_stance=declared_team_stance,
         keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+        usage_roles_pro=_is_pro_caller(user),
         posture=posture,
     )
     idea = next(
@@ -19099,6 +19103,7 @@ def get_league_all_trades(
                 gm_target_player_ids=gm_target_ids if is_my_roster else (),
                 team_stance=declared_team_stance if is_my_roster else "",
                 keeper_round_penalty=_trade_idea_keeper_round_penalty(user, league_id),
+                usage_roles_pro=_is_pro_caller(user),
                 posture=roster_posture,
             )
         except (model_status.KeeperPricingUnavailable, *model_status.LOOKUP_ERRORS):
