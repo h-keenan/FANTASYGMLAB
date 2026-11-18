@@ -29,6 +29,18 @@ from typing import Any, Iterable, Mapping, Sequence
 from modules import age_profile, experimental_graduation
 
 PARTNER_CONTEXT_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_V1"
+# Extension flags (each default ON, 0/false/off restores the previous output
+# exactly). The first three decide whether a surface hands the shared league
+# team profile (partner trade tendency) to the idea engine; with the flag off the
+# surface reads tendency neutral exactly as before. All of them also require the
+# master flag above.
+FINDER_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_FINDER_V1"
+DASHBOARD_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_DASHBOARD_V1"
+SEARCH_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_SEARCH_V1"
+ASK_PICK_ENV_KEY = "DYNASTYGM_ASK_PICK_IDEA_V1"
+ASK_PICK_TITLE = "Ask for their pick"
+ASK_PICK_MAX_PER_PARTNER = 2
+ASK_PICK_MIN_FACTORS = 2
 
 AGE_MAX_POINTS = 3.0
 PICK_MAX_POINTS = 3.0
@@ -47,6 +59,85 @@ NOTE_MIN_POINTS = 1.5
 
 def enabled() -> bool:
     return experimental_graduation.graduated_kill_switch_enabled(PARTNER_CONTEXT_ENV_KEY, default=True)
+
+
+def surface_enabled(env_key: str) -> bool:
+    """A surface flag counts only while the master flag is on too."""
+
+    return enabled() and experimental_graduation.graduated_kill_switch_enabled(env_key, default=True)
+
+
+def team_profiles_for_surface(
+    env_key: str, *, league_id: str, lens: str, players_db_path: str
+) -> Mapping[str, Any] | None:
+    """The cached league team profile for a surface, or None (neutral tendency,
+    today's output) when the surface flag is off or the profile is unavailable."""
+
+    if not surface_enabled(env_key):
+        return None
+    try:
+        from modules import team_profile
+
+        return team_profile.league_team_profiles_cached(
+            league_id=league_id, lens=lens, players_db_path=players_db_path
+        )
+    except Exception:
+        return None
+
+
+def ask_pick_enabled() -> bool:
+    return surface_enabled(ASK_PICK_ENV_KEY)
+
+
+def _short_name(label: Any) -> str:
+    parts = str(label or "").split()
+    return f"{parts[0][0]}. {' '.join(parts[1:])}" if len(parts) > 1 else str(label or "")
+
+
+def ask_pick_plan(
+    ctx: Mapping[str, Any] | None,
+    *,
+    partner_strategy: str,
+    partner_needs: Iterable[str],
+    send_assets: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Should we propose asking this partner for a pick, and why?
+
+    Needs real surplus pick capital (a stash of early firsts, or 2+ firsts and
+    not short on picks) AND at least ``ASK_PICK_MIN_FACTORS`` plausibility
+    factors: the partner is contending, the player we send fills a position they
+    need, their core is older than the league's (picks are the currency an older
+    core spends), or they lean buyer lately. One signal alone never proposes the
+    idea. Pricing is not done here: the pick's value is the shared pick price
+    already on the asset (``trade_ideas.pick_value_components``)."""
+
+    if not ctx or not ask_pick_enabled():
+        return None
+    if ctx.get("pick_short"):
+        return None
+    firsts = int(ctx.get("firsts") or 0)
+    if not (ctx.get("pick_stash") or firsts >= 2):
+        return None
+    needs = {str(p).upper() for p in partner_needs or ()}
+    players = [a for a in send_assets if a.get("asset_type") == "player"]
+    if not players:
+        return None
+    reasons: list[str] = []
+    if str(partner_strategy or "").lower() in {"contender", "fringe_contender"}:
+        reasons.append("they are contending")
+    fills = [a for a in players if str(a.get("position") or "").upper() in needs]
+    if fills:
+        who = _short_name(fills[0].get("label") or fills[0].get("name"))
+        reasons.append(f"{who} fills a {str(fills[0].get('position')).upper()} need")
+    delta = ctx.get("core_age_delta")
+    if delta is not None and float(delta) >= CORE_AGE_MIN_DELTA:
+        reasons.append("their core runs older")
+    if str(ctx.get("lean") or "").lower() == "buyer" and int(ctx.get("buy_count") or 0) >= 2:
+        reasons.append("they have been buying")
+    if len(reasons) < ASK_PICK_MIN_FACTORS:
+        return None
+    capital = "are deep in early picks" if ctx.get("pick_stash") else f"hold {firsts} firsts"
+    return {"reasons": reasons, "capital": capital, "rationale": f"They {capital}; " + ", ".join(reasons) + "."}
 
 
 def _clamp(value: float, low: float, high: float) -> float:

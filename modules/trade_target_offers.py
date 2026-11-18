@@ -378,6 +378,7 @@ def build_target_offers(
     adapter=None,
     max_offers: int = MAX_OFFERS,
     platform: str = "sleeper",
+    team_profiles: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """2-3 ranked, Analyzer-graded offers for a player on another roster.
 
@@ -427,6 +428,7 @@ def build_target_offers(
         prefetched_roster_map=roster_players_map,
         prefetched_pick_assets=roster_pick_assets,
         priced_search=True,
+        team_profiles=team_profiles,
     )
     diagnostics = dict(result.get("diagnostics") or {})
     ideas = [

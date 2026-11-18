@@ -5953,6 +5953,65 @@ def _build_trade_ideas_impl(
                         add_idea(idea)
                         break
 
+        # 4b. Ask for their pick (handshakes extension, DYNASTYGM_ASK_PICK_IDEA_V1):
+        # when the partner holds surplus pick capital and several real signals
+        # (posture, need, age, habits) make a pick plausible, offer a movable
+        # player for ONE of their picks. Picks keep the shared pick price already
+        # on the asset (pick_value_components); acceptance, the 9% cap and the
+        # 12% hard ceiling are the same gates every other package passes.
+        if (
+            partner_pick_assets
+            and not selection_driven
+            and not require_receive_players
+            and not require_receive_picks
+            and partner_context.ask_pick_enabled()
+        ):
+            ask_picks = sorted(
+                (p for p in partner_pick_assets if int(p.get("round") or 99) <= 2),
+                key=lambda p: -int(p.get("score") or 0),
+            )[:4]
+            ask_found = 0
+            for player in my_player_assets[:outgoing_cap]:
+                if not ask_picks or ask_found >= partner_context.ASK_PICK_MAX_PER_PARTNER:
+                    break
+                player_pos = str(player.get("position") or "").upper()
+                if player_pos in my_needs and player_pos not in my_surplus:
+                    continue
+                plan = partner_context.ask_pick_plan(
+                    partner_shape.get("partner_context"),
+                    partner_strategy=str(partner_shape.get("strategy") or partner_shape.get("mode") or ""),
+                    partner_needs=partner_shape.get("needs") or [],
+                    send_assets=[player],
+                )
+                if not plan:
+                    continue
+                for pick in ask_picks:
+                    send_assets = make_package(player)
+                    receive_assets = make_package(pick)
+                    if not _value_fits(player["score"], profile.score(receive_assets), low=-1100, high=900):
+                        continue
+                    fit_bonus = package_fit_priority(send_assets, receive_assets)
+                    if fit_bonus < 0:
+                        continue
+                    fit_context = package_fit_context(send_assets, receive_assets)
+                    if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                        continue
+                    idea = make_reasoned_idea(
+                        send_assets,
+                        receive_assets,
+                        partner_context.ASK_PICK_TITLE,
+                        f"{plan['rationale']} {fit_context['rationale']}".strip(),
+                        74 + fit_bonus + fit_context["score"],
+                        min_reason_score=8,
+                        min_acceptance_score=56,
+                        fit_context=fit_context,
+                    )
+                    if idea:
+                        idea["ask_pick_reasons"] = list(plan["reasons"])
+                        add_idea(idea)
+                        ask_found += 1
+                        break
+
         # 5. Trade Finder: shop the WHOLE selection. Every asset the caller
         # ticked (players and picks) goes out together in ONE package -- a
         # selection is a hard constraint, never a menu the engine may drop
@@ -8291,6 +8350,7 @@ def build_player_trade_hub_ideas(
     prefetched_pick_assets=None,
     hot_path_state=None,
     priced_search: bool = False,
+    team_profiles: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     mode_key = str(mode or "").strip().lower()
     player_id = str(selected_player_id or "").strip()
@@ -8383,7 +8443,7 @@ def build_player_trade_hub_ideas(
         team_frames = _index_roster_team_frames(df_players, roster_players_map)
         roster_index_ms = round((time.perf_counter() - index_started) * 1000, 3)
     partner_contexts = _partner_contexts(
-        team_frames, roster_pick_assets, league_draft_capitals, score_field
+        team_frames, roster_pick_assets, league_draft_capitals, score_field, team_profiles
     )
     my_team_df = team_frames.get(my_roster_key)
     if my_team_df is None or getattr(my_team_df, "empty", True):
@@ -8637,6 +8697,10 @@ def build_player_trade_hub_ideas(
         league_settings=league_settings,
         league_needs=league_needs,
     )
+    # The main target-player search also reads the partner's shared team
+    # profile (age, picks, habits) behind its own flag; off = shape unchanged.
+    if partner_context.surface_enabled(partner_context.SEARCH_ENV_KEY):
+        _attach_partner_context(partner_shape, partner_contexts, target_roster_id)
     partner_mode = str(partner_shape.get("mode") or "")
     partner_profile = partner_row_df.iloc[0].to_dict() if not partner_row_df.empty else {}
 
