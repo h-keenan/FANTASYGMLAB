@@ -620,11 +620,12 @@ export function SimNotice({ message, tone = "warning", onDismiss }: { message: s
   );
 }
 
-/** "You give" / "You get" label: fixed semantic color (red out, green in) with a small swap glyph. */
+/** "You give" / "You get" label: fixed semantic color (muted out, green in) with a small swap glyph. */
 export function SimSideLabel({ side, note }: { side: "give" | "get"; note?: string }) {
-  const tone: SimGameTone = side === "give" ? "danger" : "success";
+  // Give is neutral grey (no red verdicts); Get stays green.
+  const color = side === "give" ? "var(--color-text-muted)" : simToneColor("success");
   return (
-    <p className="flex items-center gap-1 text-xs uppercase font-extrabold" style={{ color: simToneColor(tone), letterSpacing: "var(--letter-spacing-badge)" }}>
+    <p className="flex items-center gap-1 text-xs uppercase font-extrabold" style={{ color, letterSpacing: "var(--letter-spacing-badge)" }}>
       <ReviewGlyphIcon glyph="trade" size={14} />
       {side === "give" ? "You give" : "You get"}
       {note ? <span className="normal-case font-medium" style={{ color: "var(--color-text-muted)" }}>{note}</span> : null}
