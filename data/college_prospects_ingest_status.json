@@ -1,19 +1,29 @@
 {
   "cfbd_usage": {
-    "calls": 436,
+    "calls": 597,
     "month": "2026-11"
   },
   "classes": {
-    "fetched": 0,
-    "status": "empty"
+    "extended_columns": true,
+    "fetched": 832,
+    "status": "ok",
+    "upserted": 832
   },
-  "ok": false,
-  "ran_at": "2026-11-18T18:31:17+00:00",
+  "ok": true,
+  "ran_at": "2026-11-18T18:57:55+00:00",
   "retire": {
     "picks_seen": 514,
     "retired": 0,
     "status": "ok"
   },
   "season": 2026,
-  "stats": {}
+  "stats": {
+    "calls": 14,
+    "errors": [
+      "game_log:HTTPError"
+    ],
+    "rows": 832,
+    "slow": true,
+    "status": "ok"
+  }
 }
