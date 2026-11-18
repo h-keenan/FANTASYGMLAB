@@ -165,14 +165,17 @@ def roster_class_year(row: Mapping[str, Any], season: int, recruit_years: Option
     returns the season (or nothing), so only a value in 1..5 is trusted; otherwise the
     class is derived from the player's high-school recruiting year."""
 
-    raw = _int_or_none(row.get("year"))
-    if raw is not None and 1 <= raw <= 5:
-        return raw
+    # The high-school recruiting class is authoritative when we can link it: the
+    # deprecated roster ``year`` can hold a stale or default value (e.g. 1 for
+    # everyone), which would push every player out of the target draft years.
     ids = [str(row.get("id"))] + [str(r) for r in (row.get("recruitIds") or [])]
     for rid in ids:
         rec_year = (recruit_years or {}).get(rid)
         if rec_year and 1 <= season - rec_year + 1 <= 5:
             return season - rec_year + 1
+    raw = _int_or_none(row.get("year"))
+    if raw is not None and 1 <= raw <= 5:
+        return raw
     return None
 
 
@@ -218,6 +221,12 @@ def parse_roster(
         bump("producer_ok")
         class_year = roster_class_year(row, season, recruit_years)
         year = draft_year_for(class_year, season)
+        # Distribution diagnostics (counts only, no names) for the run log.
+        raw_hist = c.setdefault("raw_year_hist", {})
+        raw_key = str(row.get("year"))
+        raw_hist[raw_key] = raw_hist.get(raw_key, 0) + 1
+        dy_hist = c.setdefault("draft_year_hist", {})
+        dy_hist[str(year)] = dy_hist.get(str(year), 0) + 1
         if class_year is None:
             bump("no_class_year")
             samples = c.setdefault("samples", [])
