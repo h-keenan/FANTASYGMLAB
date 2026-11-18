@@ -1,6 +1,6 @@
 {
   "cfbd_usage": {
-    "calls": 289,
+    "calls": 436,
     "month": "2026-11"
   },
   "classes": {
@@ -8,7 +8,7 @@
     "status": "empty"
   },
   "ok": false,
-  "ran_at": "2026-11-18T18:04:08+00:00",
+  "ran_at": "2026-11-18T18:31:17+00:00",
   "retire": {
     "picks_seen": 514,
     "retired": 0,
