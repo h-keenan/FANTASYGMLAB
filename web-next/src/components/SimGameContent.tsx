@@ -18,6 +18,9 @@ import { SimPickSheet } from "@/components/SimPickSheet";
 import type { PickTapRef } from "@/components/ui/PlayerOpenContext";
 import { BottomDock } from "@/components/ui/BottomDock";
 import { SimPillHost } from "@/components/SimPillHost";
+import { isSelectionAction } from "@/lib/bottomNav";
+import { useFooterHideOnScroll } from "@/lib/useFooterHideOnScroll";
+import { usePillState } from "@/lib/useBottomPillContext";
 import { SimActionBar } from "@/components/SimActionBar";
 import { SimGameHeader, SimStatusChips } from "@/components/SimGameHeader";
 import { SimGameOrb } from "@/components/SimGameOrb";
@@ -1007,6 +1010,8 @@ function GameScreen({
   const showBar = inSeason && !recap && !simToResult;
   const showOffBar = stage === "offseason" && !draftRecap && !recap;
   const [moreOpen, setMoreOpen] = useState(false);
+  // Phones: the footer slides away scrolling down and returns scrolling up (stays while a selection submit is showing).
+  useFooterHideOnScroll(isSelectionAction(usePillState().ctx?.primary));
   // Phones: the game orb (docked above the Advance pill) is the page navigator; the top PillRows render from md up.
   const showOrb = showBar || showOffBar || (stage === "draft" && !draftRecap && !recap);
   const orbNode = showOrb ? (
@@ -1124,8 +1129,8 @@ function GameScreen({
       )}
       <BottomDock testId="sim-bottom-stack">
         <SimPillHost standalone={!showBar && !showOffBar} orb={orbNode} />
-        {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} orb={orbNode} /> : null}
-        {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onSimTo={onSimTo} onTab={onTab} orb={orbNode} /> : null}
+        {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} orb={orbNode} tab={flow.tab} /> : null}
+        {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onSimTo={onSimTo} onTab={onTab} orb={orbNode} tab={flow.tab} /> : null}
       </BottomDock>
       <SimToSheet ctx={ctx} open={simToOpen} onClose={onSimToClose} onRun={onRunSimTo} />
       {simToBusy ? (

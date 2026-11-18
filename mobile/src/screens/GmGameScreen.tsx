@@ -517,9 +517,9 @@ export default function GmGameScreen({ navigation }: Props) {
           {pillOnly ? (
             <BottomPill contextOnly segment={pill.ctx} orb={orbNode}>{null}</BottomPill>
           ) : showBar ? (
-            <SimActionBar orb={orbNode} ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onSimTo={() => setSimToOpen(true)} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
+            <SimActionBar orb={orbNode} ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onSimTo={() => setSimToOpen(true)} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} tab={flow.tab} />
           ) : (
-            <SimOffseasonBar orb={orbNode} ctx={ctx} onTab={(tab) => dispatch({ type: 'tab', tab })} />
+            <SimOffseasonBar orb={orbNode} ctx={ctx} onTab={(tab) => dispatch({ type: 'tab', tab })} tab={flow.tab} />
           )}
         </View>
       ) : null}

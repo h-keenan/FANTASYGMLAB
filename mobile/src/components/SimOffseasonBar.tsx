@@ -7,7 +7,8 @@ import Button from './Button';
 import type { SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import { simPillPlan } from '../lib/bottomNav';
+import { simFooterTabs, simPillPlan, type PillContext } from '../lib/bottomNav';
+import type { SimTab } from '../lib/simGameFlow';
 import { usePillState } from '../lib/useBottomPillContext.ts';
 import { simTabAfterStageAction, type SimStageAction } from '../lib/simScroll';
 import { simOffseasonCta, simOffseasonStageLabel, simSeasonLabel, type SimOffseason, type SimOffseasonResponse } from '../lib/simGame';
@@ -22,7 +23,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * offseason itself so any tab can mount it. An in-flow glass pill like
  * SimActionBar: the screen's bottom stack docks it with the game orb above it.
  */
-export default function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab: 'home') => void; orb?: React.ReactNode }) {
+export default function SimOffseasonBar({ ctx, onTab, orb, tab }: { ctx: SimCtx; onTab?: (tab: SimTab) => void; orb?: React.ReactNode; /** The lit page (Offseason / Team / ...). */ tab?: string }) {
   const pill = usePillState();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -75,6 +76,18 @@ export default function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTa
     }
   }
 
+  // Concept A: orb | Offseason / Team (/ Trades) | the stage chip; a long label ("Start next season") yields a tab.
+  const phoneSegment: PillContext | null = pill.barPresent
+    ? {
+        id: 'sim-offseason',
+        label: 'Fantasy Sim pages',
+        tabs: simFooterTabs({ offseason: true, chipLabel: cta.label }),
+        activeKey: tab ?? 'home',
+        onSelect: (key) => onTab?.(key as SimTab),
+        primary: { key: 'stage', label: cta.label, busy: busy && !confirmAuto, disabled: Boolean(cta.blocked) || confirmAuto, onPress: press },
+      }
+    : null;
+
   return (
     <View style={styles.bar} testID="sim-offseason-bar">
       {off.stage === 'rookie_draft' && confirmAuto ? (
@@ -106,7 +119,7 @@ export default function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTa
           {cta.blocked}
         </AppText>
       ) : null}
-      <BottomPill bare segment={simPillPlan({ context: pill.barPresent ? pill.ctx : null, simToAvailable: false }).segment} orb={orb}>
+      <BottomPill bare segment={phoneSegment ?? simPillPlan({ context: pill.barPresent ? pill.ctx : null, simToAvailable: false }).segment} orb={orb}>
         <View style={styles.row}>
         <View style={[styles.cta, cta.blocked ? styles.ctaBlocked : null]}>
           <Button label={cta.label} loading={busy && !confirmAuto} disabled={Boolean(cta.blocked) || confirmAuto} onPress={press} />
