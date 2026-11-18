@@ -336,3 +336,4 @@ captured_at,season,week,player_id,team,position,status,injury_status,body_part,p
 2026-11-17T01:59:35Z,2026,10,13380,LAC,WR,Active,Out,Hamstring,,,sleeper_live
 2026-11-17T01:59:35Z,2026,10,4033,LAC,TE,Active,,,,,sleeper_live
 2026-11-17T01:59:35Z,2026,10,9756,MIN,WR,Inactive,Out,Thumb,,,sleeper_live
+2026-11-18T02:17:03Z,2026,11,8126,TEN,WR,Inactive,IR,Ankle,,,sleeper_live
