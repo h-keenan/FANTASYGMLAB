@@ -2060,14 +2060,24 @@ def partner_acceptance_context(
         existing_age_fit=age_fit,
         team_count=int(shape.get("partner_team_count") or 12),
     )
+    base_cap = max(0.0, min(PARTNER_EDGE_MAX_CAP, cap))
     cap += float(context_adjust["cap_shift"])
     cap = max(0.0, min(PARTNER_EDGE_MAX_CAP, cap))
 
     # The absolute floor keeps tiny trades from failing on a handful of points,
     # but it may never let the partner lose more than the hard ceiling.
-    allowed_edge = max(PARTNER_EDGE_MIN_ABS, int(round(cap * max(0, receive_score))))
-    allowed_edge = min(allowed_edge, int(round(PARTNER_EDGE_HARD_CEILING * max(0, receive_score))))
-    lopsided = user_edge > allowed_edge
+    def _allowed(edge_cap: float) -> int:
+        out = max(PARTNER_EDGE_MIN_ABS, int(round(edge_cap * max(0, receive_score))))
+        return min(out, int(round(PARTNER_EDGE_HARD_CEILING * max(0, receive_score))))
+
+    allowed_edge = _allowed(cap)
+    # The lopsided verdict (a -10 realism penalty plus a hard fail) is a cliff, so
+    # it is decided on the cap WITHOUT the partner-context shift. Otherwise a +1pp
+    # cap move could flip it and swing realism by 10+ points, breaking the
+    # documented +/-COMBINED_MAX_POINTS budget on partner context. The shift is
+    # already expressed in ``context_adjust["points"]`` (cap_shift = points * k),
+    # so the context still counts once, inside its bound.
+    lopsided = user_edge > _allowed(base_cap)
     penalty = 0
     if ratio > PARTNER_EDGE_SOFT_RATIO:
         penalty = int(round((ratio - PARTNER_EDGE_SOFT_RATIO) * 100 * 1.5))
@@ -2079,6 +2089,7 @@ def partner_acceptance_context(
         "user_edge_ratio": round(float(ratio), 4),
         "edge_cap": round(float(cap), 4),
         "allowed_edge": allowed_edge,
+        "allowed_edge_base": _allowed(base_cap),
         "lopsided": lopsided,
         "penalty": int(penalty),
         "need_hits": sorted(need_hits),

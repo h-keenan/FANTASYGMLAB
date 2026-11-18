@@ -37,9 +37,11 @@ PARTNER_CONTEXT_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_V1"
 FINDER_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_FINDER_V1"
 DASHBOARD_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_DASHBOARD_V1"
 SEARCH_ENV_KEY = "DYNASTYGM_PARTNER_CONTEXT_SEARCH_V1"
-# Surfaces that default OFF until their realism shift is proven inside
-# COMBINED_MAX_POINTS (player search overshot it; explicit "1" opts in).
-SURFACE_DEFAULT_ON = {SEARCH_ENV_KEY: False}
+# Surfaces that default OFF (explicit "1" opts in) until their realism shift is
+# proven inside COMBINED_MAX_POINTS. Player search was parked here while the
+# lopsided cliff could swing it up to 15 points; it is back ON now that the
+# cliff is decided on the base cap (see trade_ideas.partner_acceptance_context).
+SURFACE_DEFAULT_ON: dict[str, bool] = {}
 ASK_PICK_ENV_KEY = "DYNASTYGM_ASK_PICK_IDEA_V1"
 ASK_PICK_TITLE = "Ask for their pick"
 ASK_PICK_MAX_PER_PARTNER = 2
