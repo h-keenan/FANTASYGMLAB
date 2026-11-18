@@ -70,7 +70,9 @@ import { ShareToCommunityToggle } from "@/components/ShareToCommunityToggle";
 import { NextSteps } from "@/components/NextSteps";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
-import { MultiTeamTradeContent, TradeModeToggle } from "@/components/MultiTeamTradeContent";
+import { MultiTeamTradeContent, TradeModeToggle, type TradeMode } from "@/components/MultiTeamTradeContent";
+import { TradeValueBar } from "@/components/TradeValueBar";
+import { dealSizeFor, valueDirectionLabel } from "@/lib/tradeValueBands.generated";
 import { isEspnLeagueId } from "@/lib/leaguePlatform";
 import type { MultiTransfer } from "@/lib/multiTeamTrade";
 
@@ -709,8 +711,20 @@ export function TradeAnalyzerContent({
   const [rosterOverflow, setRosterOverflow] = useState<RosterOverflow | null>(null);
   // Two teams (this builder) or a 3 to 6 team trade (MultiTeamTradeContent).
   // Imported (ESPN, MFL, ...) leagues only get the two team Analyzer.
-  const [tradeMode, setTradeMode] = useState<"two" | "multi">(multiPrefill?.length ? "multi" : "two");
+  const [tradeMode, setTradeMode] = useState<TradeMode>(multiPrefill?.length ? "multi" : "two");
+  // Quick Compare: an instant, client-side players-only value readout (no server verdict). Picks never entered it, so they are cleared on entry.
+  const quickMode = tradeMode === "quick";
   const multiTeamAvailable = !isEspnLeagueId(leagueId);
+
+  // Entering Quick Compare drops staged picks and any stale verdict, so it never shows an ambiguous state.
+  function changeTradeMode(next: TradeMode) {
+    if (next === "quick") {
+      setSendPicks([]);
+      setReceivePicks([]);
+      setVerdict(null);
+    }
+    setTradeMode(next);
+  }
 
   const hasAnyAssets = sendPlayers.length > 0 || receivePlayers.length > 0 || sendPicks.length > 0 || receivePicks.length > 0;
 
@@ -740,9 +754,10 @@ export function TradeAnalyzerContent({
           : picks.filter((p) => p.owner_roster_id === selectedTeamId);
     const held = sheetSide === "send" ? { players: sendPlayers, picks: sendPicks } : { players: receivePlayers, picks: receivePicks };
     const playerItems = [...new Map([...players, ...held.players].map((p) => [p.player_id, p])).values()].map(playerToSheetItem);
+    if (quickMode) return playerItems;
     const pickItems = [...new Map([...pickPool, ...held.picks].map((p) => [p.pick_id, p])).values()].map(pickToSheetItem);
     return [...playerItems, ...pickItems];
-  }, [sheetSide, pool, picks, myRosterIds, myRosterId, otherTeams, selectedTeamId, sendPlayers, sendPicks, receivePlayers, receivePicks]);
+  }, [sheetSide, pool, picks, myRosterIds, myRosterId, otherTeams, selectedTeamId, sendPlayers, sendPicks, receivePlayers, receivePicks, quickMode]);
 
   function openSheet(side: "send" | "receive") {
     setSheetSearch("");
@@ -855,6 +870,7 @@ export function TradeAnalyzerContent({
   }
 
   async function analyze() {
+    if (quickMode) return;
     setAnalyzeError(null);
     setLimitWall(null);
     setAnalyzing(true);
@@ -933,7 +949,7 @@ export function TradeAnalyzerContent({
         rosters={rosters}
         teamProfiles={teamProfiles}
         lens={lens}
-        modeToggle={<TradeModeToggle mode={tradeMode} onChange={setTradeMode} />}
+        modeToggle={<TradeModeToggle mode={tradeMode} onChange={changeTradeMode} />}
         prefill={multiPrefill ?? undefined}
       />
     );
@@ -956,13 +972,17 @@ export function TradeAnalyzerContent({
   const sendScaleAssets = [...sendPlayers.map(scalePlayer), ...sendPicks.map(scalePick)];
   const receiveScaleAssets = [...receivePlayers.map(scalePlayer), ...receivePicks.map(scalePick)];
 
+  // Quick Compare's instant readout: what you receive minus what you send, players only, never server-computed.
+  const sendTotal = sendPlayers.reduce((sum, p) => sum + (p.score ?? 0), 0);
+  const receiveTotal = receivePlayers.reduce((sum, p) => sum + (p.score ?? 0), 0);
+  const quickDelta = receiveTotal - sendTotal;
   const canAnalyze = hasAnyAssets;
   const analyzeLabel = canAnalyze
     ? `Analyze Trade (${sendAssets.length} for ${receiveAssets.length})`
     : "Analyze Trade";
 
   // Selection mode: once assets are picked the footer's primary IS the submit ("3 selected · Analyze trade").
-  const footerPrimary = selectionPrimary({ count: canAnalyze ? sendAssets.length + receiveAssets.length : 0, verb: "Analyze trade", glyph: "analyzer", busy: analyzing, onPress: () => void analyze() });
+  const footerPrimary = quickMode ? undefined : selectionPrimary({ count: canAnalyze ? sendAssets.length + receiveAssets.length : 0, verb: "Analyze trade", glyph: "analyzer", busy: analyzing, onPress: () => void analyze() });
 
   const activeTeamLabel = otherTeams.find((t) => t.rosterId === selectedTeamId)?.label ?? "team";
 
@@ -970,8 +990,8 @@ export function TradeAnalyzerContent({
     <main className="page-shell">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_analyzer" primary={footerPrimary} />
       <header className="flex flex-col gap-1">
-        <PageTitle page="Trade Analyzer" leagueName={leagueName} />
-        {multiTeamAvailable ? <TradeModeToggle mode={tradeMode} onChange={setTradeMode} /> : null}
+        <PageTitle page={quickMode ? "Quick Compare" : "Trade Analyzer"} leagueName={leagueName} />
+        {multiTeamAvailable ? <TradeModeToggle mode={tradeMode} onChange={changeTradeMode} /> : null}
       </header>
 
       {bridgeMessage ? (
@@ -1008,12 +1028,12 @@ export function TradeAnalyzerContent({
         addHint={{ give: "Add from your roster", get: selectedTeamId === ALL_TEAMS_ID ? "Add from any team" : `Add from ${activeTeamLabel}` }}
         onAdd={(side) => openSheet(side === "give" ? "send" : "receive")}
         onRemove={(side, key) => removeFromSide(side === "give" ? "send" : "receive", key)}
-        onSend={analyze}
+        onSend={quickMode ? undefined : analyze}
         sending={analyzing}
         canSend={canAnalyze}
         sendLabel={analyzing ? "Analyzing…" : analyzeLabel}
         buildingAction={
-          canAnalyze ? (
+          quickMode ? null : canAnalyze ? (
             barPresent ? null : <Button onClick={analyze} loading={analyzing}>
               {analyzing ? "Analyzing…" : analyzeLabel}
             </Button>
@@ -1029,6 +1049,20 @@ export function TradeAnalyzerContent({
           rosterId={selectedTeamId}
           teamName={teamProfiles[selectedTeamId]?.team_name ?? undefined}
         />
+      ) : null}
+
+      {quickMode ? (
+        hasAnyAssets ? (
+          <div className="flex flex-col gap-2" data-testid="quick-compare">
+            <p className="m-0 text-sm font-bold">{valueDirectionLabel(quickDelta, dealSizeFor(sendTotal, receiveTotal))}</p>
+            <TradeValueBar delta={quickDelta} />
+            <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Raw asset value only. Doesn&apos;t weigh roster fit or strategy; use Full Analysis for the verdict.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Add players on both sides for an instant value read.</p>
+        )
       ) : null}
 
       <div className="flex flex-col gap-2">
@@ -1055,7 +1089,7 @@ export function TradeAnalyzerContent({
         </div>
       ) : null}
 
-      {verdict ? (
+      {verdict && !quickMode ? (
         <>
         <VerdictCard
           verdict={verdict}
@@ -1090,7 +1124,7 @@ export function TradeAnalyzerContent({
           }}
         />
         </>
-      ) : hasAnyAssets ? (
+      ) : hasAnyAssets && !quickMode ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           When both sides are ready, tap Analyze Trade for the verdict.
         </p>

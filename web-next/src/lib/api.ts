@@ -892,6 +892,8 @@ export interface TeamRanking {
   archetype_risks: string[];
   archetype_recommendations: string[];
   trade_tendency: string;
+  trade_tendency_buy_count?: number;
+  trade_tendency_sell_count?: number;
   transaction_activity_count: number;
   firsts_acquired: number;
   firsts_sent: number;
@@ -1269,6 +1271,26 @@ export interface TradeHubHold {
   why: { factor: string; text: string }[];
   /** True when ideas below are still worth a look, but optional. */
   ideas_optional: boolean;
+}
+
+/** Mobile twin: mobile/src/lib/api.ts AllTradesEntitlement / AllTradesResponse (GET .../all-trades, ideas across every roster). */
+export interface AllTradesEntitlement {
+  is_premium: boolean;
+  free_limit: number;
+  ad_bonus_per_unlock: number;
+  max_ad_unlocks: number;
+  ad_unlocks_applied: number;
+  /** Free-only ideas remaining after this page, carried forward via shownCount on the next "Load more". */
+  remaining_free: number;
+}
+
+export interface AllTradesResponse {
+  ok: true;
+  ideas: TradeIdea[];
+  has_more: boolean;
+  next_cursor: number;
+  total_teams: number;
+  entitlement: AllTradesEntitlement;
 }
 
 export interface TradeHubResponse {
@@ -4716,6 +4738,21 @@ export const api = {
     authorizedRequest<TradeHubResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,
     ),
+
+  getAllTrades: (
+    leagueId: string,
+    options: { strategy?: string; lens?: string; cursor?: number; pageSize?: number; shownCount?: number; adUnlocks?: number } = {},
+  ) => {
+    const params = new URLSearchParams({
+      strategy: options.strategy ?? "retool",
+      lens: options.lens ?? "Dynasty",
+      cursor: String(options.cursor ?? 0),
+      page_size: String(options.pageSize ?? 3),
+      shown_count: String(options.shownCount ?? 0),
+      ad_unlocks: String(options.adUnlocks ?? 0),
+    });
+    return authorizedRequest<AllTradesResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/all-trades?${params.toString()}`);
+  },
 
   // Branded 1080x1350 PNG for one Trade Hub idea, drawn by web-next itself
   // (app/share-card/trade, lib/shareCard) from the app's own design tokens.

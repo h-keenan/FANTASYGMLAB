@@ -50,6 +50,7 @@ const GLYPH_ACCENT: Record<SnapshotGlyphName, string> = {
   bench: "var(--color-opportunity)",
   age: "var(--color-text-secondary)",
   injury: "var(--color-danger)",
+  draft: "var(--color-opportunity)",
 };
 
 export function SnapshotTile({

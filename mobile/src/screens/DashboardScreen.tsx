@@ -40,9 +40,7 @@ import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
 import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusPositions, buildTeamStatusStanding } from '../lib/teamStatus';
 import { todayRoomChips, todayTiles, todayTradeIdea } from '../lib/todayView';
 import StorylineSummaryCard from '../components/StorylineSummaryCard';
-import WaiverSuggestionsStrip from '../components/WaiverSuggestionsStrip';
 import LeagueStandingStrips from '../components/LeagueStandingStrips';
-import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
 import {
   api,
   type DashboardEntitlementInfo,
@@ -56,7 +54,6 @@ import {
 import type { SignalPlayer } from '../lib/portfolioSignals';
 import { categoryMeta } from '../lib/dashboardItemPresentation';
 import MetricCard from '../components/MetricCard';
-import PremiumLock from '../components/PremiumLock';
 import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
 import FreeLimitNote from '../components/FreeLimitNote';
 import AlertsSection from '../components/AlertsSection';
@@ -283,15 +280,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
     queryFn: () => api.getLeagueRecap(leagueId),
     enabled: !isRestoring && firstPaintDone,
   });
-
-  // Waiver Suggestions (moved from the retired League Overview): the same
-  // Priority Adds the Waivers screen leads with.
-  const waiversQuery = useQuery({
-    queryKey: queryKeys.waivers(leagueId),
-    queryFn: () => api.getLeagueWaivers(leagueId),
-    enabled: !isRestoring && firstPaintDone,
-  });
-  const priorityAdds = waiversQuery.data?.priority_adds ?? [];
 
   const dashboardData = dashboardQuery.data;
   const items: DashboardItem[] | null = dashboardData?.items ?? null;
@@ -599,6 +587,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       {guillotine ? <GuillotineCard data={guillotine} /> : null}
 
+      <NextSteps title="Plan ahead" steps={['gm-plan', 'waivers', 'trade-hub']} leagueId={leagueId} leagueName={leagueName} />
+
       <View
         onLayout={(event) => {
           alertsY.current = event.nativeEvent.layout.y;
@@ -623,33 +613,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
           }
         />
       </View>
-      <WaiverSuggestionsStrip
-        adds={priorityAdds}
-        onPressPlayer={(player) =>
-          openQuickView(rankedPlayerFromWaiverPlayer(player), { leagueId, leagueName })
-        }
-      />
-
-      {/* GM Plan lives in More (the orb), so Today carries it as a standing next step. */}
-      <NextSteps title="Plan ahead" steps={['gm-plan', 'waivers', 'trade-hub']} leagueId={leagueId} leagueName={leagueName} />
+      {/* GM Plan lives in More (the orb), so Today carries it as a standing next step. Same slot as web: after Team summary, before Alerts. */}
 
       {/* Secondary modules stay collapsed behind "More" so the actionable ones
           above are reachable without scrolling past them. */}
       <DashboardMore>
         {teamRankings && leaguePulseHighlights(teamRankings).length > 0 ? (
           <View style={styles.activityRow}>
-            {entitlement && !entitlement.is_premium ? (
-              <View style={styles.activityCell}>
-                <PremiumLock
-                  title="League Activity"
-                  description="See contender, rebuilder, draft-capital, and activity leaders across the whole league."
-                />
-              </View>
-            ) : (
-              <View style={styles.activityCell}>
-                <LeaguePulseCard teams={teamRankings} onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} />
-              </View>
-            )}
+            {/* League Activity is free on web and in the app. */}
+            <View style={styles.activityCell}>
+              <LeaguePulseCard teams={teamRankings} onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} />
+            </View>
           </View>
         ) : null}
         {readyRecap ? (

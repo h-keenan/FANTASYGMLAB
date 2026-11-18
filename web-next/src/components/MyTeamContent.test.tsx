@@ -163,6 +163,22 @@ describe("MyTeamContent need links", () => {
   });
 });
 
+describe("MyTeamContent Team Analytics (the app's tiles, on web)", () => {
+  it("shows the six rank tiles with links and the archetype read once opened", () => {
+    const ranking = { ...TEAM_RANKING, archetype_explanation: "Built to win now.", archetype_strengths: ["RB depth"], archetype_risks: ["Thin at TE"], archetype_recommendations: ["Add a TE"], trade_tendency: "Buyer", trade_tendency_buy_count: 3, trade_tendency_sell_count: 1 };
+    render(<MyTeamContent leagueId="L1" leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={ranking} leagueSize={10} />);
+    const header = screen.getByTestId("team-analytics").querySelector("button[aria-expanded]") as HTMLElement;
+    expect(header).toHaveTextContent("Roster Power #2");
+    fireEvent.click(header);
+    const analytics = screen.getByTestId("team-analytics");
+    for (const label of ["Roster Power", "Draft Capital", "Starters", "Bench", "Age"]) expect(within(analytics).getByText(label)).toBeInTheDocument();
+    expect(within(analytics).getAllByRole("link").some((a) => (a.getAttribute("href") ?? "").includes("draft_capital"))).toBe(true);
+    expect(within(analytics).getByText("Built to win now.")).toBeInTheDocument();
+    expect(within(analytics).getByText("Add a TE")).toBeInTheDocument();
+    expect(within(analytics).getByText(/Trade behavior: Buyer \(3 acquired · 1 sent\)/)).toBeInTheDocument();
+  });
+});
+
 describe("MyTeamContent", () => {
   it("has one hero, no second tab row, and no collapsed module that is an empty header", () => {
     const { container } = render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);

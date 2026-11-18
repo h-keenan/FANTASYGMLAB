@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { TradeHubContent } from "./TradeHubContent";
+import { api } from "@/lib/api";
 import type { TradeAsset, TradeHubResponse, TradeIdea } from "@/lib/api";
 
 // Posture popover is what this file asserts; an unanswered account also gets
@@ -21,6 +22,11 @@ vi.mock("@/components/MultiTeamIdeasSection", () => ({
     <div data-testid="multi-team-ideas-stub">{`${leagueId}:${lens}`}</div>
   ),
 }));
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return { ...actual, api: { ...actual.api, getAllTrades: vi.fn() } };
+});
 
 function asset(overrides: Partial<TradeAsset>): TradeAsset {
   return {
@@ -79,6 +85,35 @@ function openIdeaCards() {
     if (header) fireEvent.click(header);
   }
 }
+
+describe("TradeHubContent For You / All Trades tabs (the app's Trade Hub views)", () => {
+  it("opens on For You, loads All Trades on demand, pages with Load more teams and gates free past the cap", async () => {
+    const page = (n: number, hasMore: boolean, remainingFree: number) => ({
+      ok: true as const,
+      ideas: [idea({ partner_team_name: `Team ${n}`, recommendation_id: `r${n}` })],
+      has_more: hasMore,
+      next_cursor: n,
+      total_teams: 12,
+      entitlement: { is_premium: false, free_limit: 3, ad_bonus_per_unlock: 0, max_ad_unlocks: 0, ad_unlocks_applied: 0, remaining_free: remainingFree },
+    });
+    vi.mocked(api.getAllTrades).mockResolvedValueOnce(page(1, true, 2)).mockResolvedValueOnce(page(2, true, 0));
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} lens="Dynasty" />);
+    expect(screen.getByRole("tab", { name: /For You/ })).toHaveAttribute("aria-selected", "true");
+    expect(api.getAllTrades).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab", { name: /All Trades/ }));
+    await waitFor(() => expect(screen.getByTestId("all-trades")).toBeInTheDocument());
+    expect(screen.getByText("Team 1")).toBeInTheDocument();
+    expect(screen.queryByTestId("trade-hub-hero")).toBeNull();
+    expect(vi.mocked(api.getAllTrades).mock.calls[0][1]).toMatchObject({ strategy: "retool", lens: "Dynasty", cursor: 0, shownCount: 0 });
+    fireEvent.click(screen.getByRole("button", { name: "Load more teams" }));
+    await waitFor(() => expect(screen.getByText("Team 2")).toBeInTheDocument());
+    expect(vi.mocked(api.getAllTrades).mock.calls[1][1]).toMatchObject({ cursor: 1, shownCount: 1 });
+    expect(screen.getByTestId("all-trades-gate")).toHaveTextContent("Free shows 3 ideas across All Trades");
+    expect(screen.queryByRole("button", { name: "Load more teams" })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /For You/ }));
+    expect(screen.getByTestId("trade-hub-hero")).toBeInTheDocument();
+  });
+});
 
 describe("TradeHubContent", () => {
   it("shows the 3-team ideas section for the league and lens, but not for imported leagues", () => {

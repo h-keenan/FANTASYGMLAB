@@ -29,6 +29,7 @@ import { percentileFromRank, positionTextClass } from "@/lib/playerPresentation"
 import { buildRosterBasis } from "@/lib/rosterBasis";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { NextSteps } from "@/components/NextSteps";
+import { TeamAnalyticsModule, hasRosterAnalysis } from "@/components/TeamAnalyticsModule";
 import { PageTitle } from "@/components/PageTitle";
 
 /**
@@ -267,6 +268,10 @@ export function MyTeamContent({
             : ["powerRank", "starterStrength", "benchStrength", "averageAge"]
         }
       />
+
+      {teamRanking && hasRosterAnalysis(teamRanking) ? (
+        <TeamAnalyticsModule team={teamRanking} leagueSize={leagueSize} leagueId={leagueId} leagueName={leagueName} />
+      ) : null}
 
       {analysisRows.length > 0 ? (
         <CompactModule id="team.analysis" title="Team Analysis" testId="team-analysis" parts={analysisParts}>

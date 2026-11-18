@@ -1,4 +1,4 @@
-export type SnapshotGlyphName = "record" | "power" | "franchise" | "starter" | "bench" | "age" | "injury";
+export type SnapshotGlyphName = "record" | "power" | "franchise" | "starter" | "bench" | "age" | "injury" | "draft";
 
 /**
  * Small glyph per Team Snapshot tile — coridian_, 2026-10-17: "the dashboard
@@ -67,6 +67,14 @@ export function SnapshotTileGlyph({ name, size = 13 }: { name: SnapshotGlyphName
       return (
         <svg {...common}>
           <path d="M4 2h8M4 14h8M4.5 2c0 3 2.5 3.5 3.5 4.5 1-1 3.5-1.5 3.5-4.5M4.5 14c0-3 2.5-3.5 3.5-4.5 1 1 3.5 1.5 3.5 4.5" />
+        </svg>
+      );
+    case "draft":
+      // Stacked tray — the picks a team holds.
+      return (
+        <svg {...common}>
+          <path d="M2.5 9.5h11v4h-11z" />
+          <path d="M4 9.5V6.5h8v3M5.5 6.5V3.5h5v3" />
         </svg>
       );
     case "injury":
