@@ -2640,6 +2640,8 @@ export interface UsageTrend {
   confidence_label: string;
   arrow: string;
   tone: "positive" | "negative";
+  /** Games in the recent window the percentage compares with the earlier-season baseline. */
+  window?: number;
   /** modules.rankings.recency_trend_display's own human-readable scope,
    * e.g. "Weighted last 4 games 55.0 vs 42.0 baseline (6 usable games)." —
    * already computed and returned by the backend, just never declared here
@@ -3647,7 +3649,7 @@ export interface TradePostureAssessment {
  * instead" section) — included here for parity with the page this ports. */
 export interface TradeVerdict {
   band: string;
-  ui_verdict: "ACCEPT" | "DECLINE" | "COUNTER" | "FAIR";
+  ui_verdict: "ACCEPT" | "LEAN ACCEPT" | "DECLINE" | "COUNTER" | "FAIR";
   confidence: string;
   rationale: string;
   value_summary: string;

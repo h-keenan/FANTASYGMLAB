@@ -28,6 +28,8 @@ import {
 import { trackUse } from "@/lib/analytics";
 import { isCompletedShare } from "@/lib/shareImage";
 import { cautionDetail, cautionShareLine, verdictCautions } from "@/lib/tradeCautions";
+import { teamPickerLabel } from "@/lib/teamLabel";
+import { pickCompactLabel, pickProjectionLine } from "@/lib/tradeIdeaPick";
 import { useShareImage } from "@/lib/useShareImage";
 import { isPrivacyMode } from "@/lib/privacy";
 import { shareCardCacheKey } from "@/lib/shareCard/cacheKey";
@@ -307,7 +309,7 @@ function VerdictCard({
         </span>
         <span className="flex items-center gap-2">
           <span
-            className="px-2.5 py-0.5 text-lg font-black uppercase"
+            className="inline-flex min-h-[var(--touch-target-min)] items-center px-3 text-sm font-black uppercase"
             style={{ color: toneColor, borderRadius: "var(--radius-pill)", background: `color-mix(in srgb, ${toneColor} 14%, transparent)` }}
             data-testid="verdict-chip"
           >
@@ -680,8 +682,7 @@ export function TradeAnalyzerContent({
         const rosterId = String((roster.roster_id as string | number | undefined) ?? "");
         const rosterPlayers = Array.isArray(roster.players) ? (roster.players as unknown[]) : [];
         const profile = teamProfiles[rosterId];
-        const label =
-          [profile?.team_name, profile?.owner_name].filter(Boolean).join(" · ") || `Team ${rosterId}`;
+        const label = teamPickerLabel(profile?.team_name, profile?.owner_name, `Team ${rosterId}`);
         return { rosterId, label, playerIds: new Set(rosterPlayers.map(String)) };
       })
       .filter((team) => team.rosterId && team.rosterId !== myRosterId)
@@ -968,7 +969,13 @@ export function TradeAnalyzerContent({
     ovr: p.overall_rating ?? null,
     onOpen: () => openPlayer({ ...p, leagueId, leagueName, sourceLabel: "Trade Analyzer" }),
   });
-  const scalePick = (p: DraftPickAsset): TradeCardAsset => ({ key: `pick:${p.pick_id}`, pickLabel: p.label ?? "Draft pick", value: p.score });
+  // Same short pick label and projection line the Ideas cards use ("2027 2nd", "proj. 2.05 · Owner's pick").
+  const scalePick = (p: DraftPickAsset): TradeCardAsset => ({
+    key: `pick:${p.pick_id}`,
+    pickLabel: pickCompactLabel(p.label, p.season, p.round),
+    pickDetail: pickProjectionLine({ projected_range: p.projected_pick_range, original_team_name: p.original_team_name, owner_team_name: p.owner_team_name }),
+    value: p.score,
+  });
   const sendScaleAssets = [...sendPlayers.map(scalePlayer), ...sendPicks.map(scalePick)];
   const receiveScaleAssets = [...receivePlayers.map(scalePlayer), ...receivePicks.map(scalePick)];
 
@@ -977,9 +984,8 @@ export function TradeAnalyzerContent({
   const receiveTotal = receivePlayers.reduce((sum, p) => sum + (p.score ?? 0), 0);
   const quickDelta = receiveTotal - sendTotal;
   const canAnalyze = hasAnyAssets;
-  const analyzeLabel = canAnalyze
-    ? `Analyze Trade (${sendAssets.length} for ${receiveAssets.length})`
-    : "Analyze Trade";
+  // One short word: the counts already sit on both sides, and a long label wrapped next to Tweak.
+  const analyzeLabel = "Analyze";
 
   // Selection mode: once assets are picked the footer's primary IS the submit ("3 selected · Analyze trade").
   const footerPrimary = quickMode ? undefined : selectionPrimary({ count: canAnalyze ? sendAssets.length + receiveAssets.length : 0, verb: "Analyze trade", glyph: "analyzer", busy: analyzing, onPress: () => void analyze() });
@@ -1028,7 +1034,8 @@ export function TradeAnalyzerContent({
         addHint={{ give: "Add from your roster", get: selectedTeamId === ALL_TEAMS_ID ? "Add from any team" : `Add from ${activeTeamLabel}` }}
         onAdd={(side) => openSheet(side === "give" ? "send" : "receive")}
         onRemove={(side, key) => removeFromSide(side === "give" ? "send" : "receive", key)}
-        onSend={quickMode ? undefined : analyze}
+        // One Analyze path: the footer chip carries it when it is on screen; the in-page button is only for layouts without the footer (desktop).
+        onSend={quickMode || barPresent ? undefined : analyze}
         sending={analyzing}
         canSend={canAnalyze}
         sendLabel={analyzing ? "Analyzing…" : analyzeLabel}
@@ -1126,7 +1133,7 @@ export function TradeAnalyzerContent({
         </>
       ) : hasAnyAssets && !quickMode ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          When both sides are ready, tap Analyze Trade for the verdict.
+          When both sides are ready, tap Analyze for the verdict.
         </p>
       ) : null}
       {sheetSide ? (

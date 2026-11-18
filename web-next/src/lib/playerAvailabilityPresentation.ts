@@ -33,11 +33,11 @@ export function availabilityDetailParts(availability: PlayerAvailability): strin
 }
 
 /** Bye pill copy. For a healthy player the "On bye this week" badge carries
- * the current-week flag, so the pill stays "Bye: Wk 9". For a player who is
+ * the current-week flag, so the pill stays "Bye 9". For a player who is
  * also out/IR the bye is secondary: no competing warning badge, and the pill
  * itself says "(this week)". */
 export function byePillText(byeWeek: number, onByeThisWeek: boolean, unavailable: boolean): string {
-  return onByeThisWeek && unavailable ? `Bye: Wk ${byeWeek} (this week)` : `Bye: Wk ${byeWeek}`;
+  return onByeThisWeek && unavailable ? `Bye ${byeWeek} (this week)` : `Bye ${byeWeek}`;
 }
 
 /** Calendar-day age so "3d ago" matches what the News screen shows. */

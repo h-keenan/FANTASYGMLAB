@@ -96,8 +96,10 @@ export function InjuryHistorySection({ record, idPrefix = 'pqv' }: { record: Inj
             <View key={row.key} style={styles.tr} testID="pqv-injury-row">
               <AppText style={styles.season}>{row.seasonLabel}</AppText>
               <View style={styles.what}>
-                <AppText style={styles.body}>{row.injury}</AppText>
-                {row.weeks ? <AppText style={styles.muted}>{row.weeks}</AppText> : null}
+                <AppText style={styles.body}>
+                  {row.injury}
+                  {row.weeks ? <AppText style={styles.muted}> · {row.weeks}</AppText> : null}
+                </AppText>
               </View>
               <AppText style={styles.games}>{row.games}</AppText>
             </View>
@@ -120,12 +122,12 @@ function createStyles(colors: ThemeColors) {
     list: { gap: 4 },
     row: { borderRadius: 8, paddingHorizontal: spacing.xs },
     self: { backgroundColor: `${colors.accent}24`, borderLeftWidth: 2, borderLeftColor: colors.accent },
-    table: { gap: spacing.xs },
+    table: { gap: 2 },
     tr: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
     season: { width: 72, fontSize: 14, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
     what: { flex: 1, minWidth: 0 },
     games: { fontSize: 14, color: colors.textPrimary, textAlign: 'right', fontVariant: ['tabular-nums'] },
-    total: { marginTop: spacing.xs, justifyContent: 'space-between' },
+    total: { marginTop: 2, justifyContent: 'space-between' },
     career: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
   });
 }

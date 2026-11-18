@@ -34,7 +34,7 @@ export interface TradeCardAsset {
 }
 
 /** One asset as a compact player card (avatar included, tap opens the sheet) or a pick row with the round pick avatar. Shared by the trade card and the builder. */
-export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode: PlayerMode }) {
+export function TradeAssetCard({ asset: a, mode, stacked = false }: { asset: TradeCardAsset; mode: PlayerMode; /** Narrow two-column sides: name / pick label on one line, badge or detail left and ring + value right-aligned below. */ stacked?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (a.player) {
@@ -42,6 +42,7 @@ export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode
       <CompactPlayerCard
         player={a.player}
         shortName
+        stacked={stacked}
         onOpen={a.onPress}
         nonInteractive={a.nonInteractive}
         detail={a.detail}
@@ -56,16 +57,30 @@ export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode
       />
     );
   }
+  const value = mode === 'desk' && a.value != null ? Math.round(a.value).toLocaleString('en-US') : null;
   return (
     <PickTap label={a.pickLabel ?? ''} id={a.pickId} detail={a.pickDetail} onOpen={a.onOpenPick} nonInteractive={a.nonInteractive}>
-      <View style={styles.pickRow} testID="trade-pick-row">
-        <PickAvatar label={a.pickLabel} size={avatarSize('row')} />
-        <View style={styles.pickText}>
-          <AppText style={styles.pick}>{a.pickLabel}</AppText>
-          {a.pickDetail ? <AppText style={styles.pickDetail}>{a.pickDetail}</AppText> : null}
+      {stacked ? (
+        <View style={styles.pickStack} testID="trade-pick-row">
+          <View style={[styles.pickRow, styles.pickRowTight]}>
+            <PickAvatar label={a.pickLabel} size={avatarSize('row')} />
+            <AppText style={[styles.pick, styles.pickFlex]} numberOfLines={1}>{a.pickLabel}</AppText>
+          </View>
+          <View style={styles.pickFoot}>
+            <AppText style={[styles.pickDetail, styles.pickFlex]} numberOfLines={1}>{a.pickDetail ?? ''}</AppText>
+            {value ? <AppText style={styles.value}>{value}</AppText> : null}
+          </View>
         </View>
-        {mode === 'desk' && a.value != null ? <AppText style={styles.value}>{Math.round(a.value).toLocaleString('en-US')}</AppText> : null}
-      </View>
+      ) : (
+        <View style={styles.pickRow} testID="trade-pick-row">
+          <PickAvatar label={a.pickLabel} size={avatarSize('row')} />
+          <View style={styles.pickText}>
+            <AppText style={styles.pick} numberOfLines={1}>{a.pickLabel}</AppText>
+            {a.pickDetail ? <AppText style={styles.pickDetail} numberOfLines={1}>{a.pickDetail}</AppText> : null}
+          </View>
+          {value ? <AppText style={styles.value}>{value}</AppText> : null}
+        </View>
+      )}
     </PickTap>
   );
 }
@@ -161,7 +176,11 @@ function createStyles(colors: ThemeColors) {
     kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
     value: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
     pickRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
-    pickText: { flex: 1 },
+    pickText: { flex: 1, minWidth: 0 },
+    pickRowTight: { minHeight: 0 },
+    pickFlex: { flex: 1, minWidth: 0 },
+    pickStack: { gap: 2, paddingVertical: 2 },
+    pickFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     pick: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     pickDetail: { fontSize: 12, color: colors.textSecondary },
     toggle: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },

@@ -44,6 +44,7 @@ export function toSharedTradeAssets(assets: SharedCommunityTrade["send"]): Trade
 export function sharedTradeGradeColor(grade: string): string {
   switch (grade) {
     case "ACCEPT":
+    case "LEAN ACCEPT":
       return "var(--color-success)";
     case "DECLINE":
       return "var(--color-danger)";

@@ -16,8 +16,22 @@ import type { PlayerRef } from "@/lib/playerAnatomy";
  * (a picker row that selects). A `trailing` that is itself a control needs `nonInteractive` on the card and its own
  * tap target beside it. Mobile twin: components/CompactPlayerCard.tsx.
  */
-export function CompactPlayerCard({ player, detail, trailing, testId = "compact-player-card", onOpen, nonInteractive, shortName = false }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testId?: string; onOpen?: () => void; nonInteractive?: string; /** Trade cards: always "J. Surname" (PlayerName `short`). */ shortName?: boolean }) {
-  const card = (
+export function CompactPlayerCard({ player, detail, trailing, testId = "compact-player-card", onOpen, nonInteractive, shortName = false, stacked = false }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testId?: string; onOpen?: () => void; nonInteractive?: string; /** Trade cards: always "J. Surname" (PlayerName `short`). */ shortName?: boolean; /** Two-column sides (the trade scale): name on line one, position badge left and the trailing chips right-aligned on line two, so both sides share one column layout. */ stacked?: boolean }) {
+  const card = stacked ? (
+    <div className="flex min-w-0 flex-col gap-0.5 py-0.5" data-testid={testId}>
+      <span className="flex min-w-0 items-center gap-2">
+        <PlayerAvatarSlot player={player} tier="dense" nonInteractive="the whole card is the tap target" />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <PlayerName name={player.name} short={shortName} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+          {detail ? <span className="text-xs leading-4" style={{ color: "var(--color-text-muted)" }}>{detail}</span> : null}
+        </span>
+      </span>
+      <span className="flex min-w-0 items-center justify-between gap-2">
+        <PositionBadge position={player.position} />
+        {trailing ? <span className="ml-auto shrink-0 text-sm font-extrabold tabular-nums">{trailing}</span> : null}
+      </span>
+    </div>
+  ) : (
     // Principled narrow-width layout: the identity block (avatar + name + pill) keeps a 10rem floor, and the trailing
     // chips (grade ring + value) wrap onto a second line instead of squeezing the name to a sliver.
     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5" style={{ minHeight: 40 }} data-testid={testId}>

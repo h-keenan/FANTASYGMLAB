@@ -91,30 +91,30 @@ export function InjuryHistorySection({ record, idPrefix = "pqv" }: { record: Inj
       {rows.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No missed games on record.</p>
       ) : (
-        <table className="w-full border-collapse text-sm" data-testid="pqv-injury-rows">
+        <table className="w-full border-collapse text-sm leading-snug" data-testid="pqv-injury-rows">
           <thead>
             <tr className="text-left text-xs" style={{ color: "var(--color-text-muted)" }}>
-              <th scope="col" className="py-1 font-bold">Season</th>
-              <th scope="col" className="py-1 font-bold">Injury</th>
-              <th scope="col" className="py-1 text-right font-bold">Missed</th>
+              <th scope="col" className="py-0.5 font-bold">Season</th>
+              <th scope="col" className="py-0.5 font-bold">Injury</th>
+              <th scope="col" className="py-0.5 text-right font-bold">Missed</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.key} data-testid="pqv-injury-row">
-                <td className="py-1 tabular-nums">{row.seasonLabel}</td>
-                <td className="py-1">
+                <td className="py-0.5 tabular-nums">{row.seasonLabel}</td>
+                <td className="py-0.5">
                   {row.injury}
-                  <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>{row.weeks}</span>
+                  {row.weeks ? <span className="text-xs" style={{ color: "var(--color-text-muted)" }}> · {row.weeks}</span> : null}
                 </td>
-                <td className="py-1 text-right tabular-nums">{row.games}</td>
+                <td className="py-0.5 text-right tabular-nums">{row.games}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="font-extrabold">
-              <td className="pt-2" colSpan={2}>Career games missed</td>
-              <td className="pt-2 text-right tabular-nums" data-testid="pqv-injury-career">{record.career_games_missed}</td>
+              <td className="pt-1.5" colSpan={2}>Career games missed</td>
+              <td className="pt-1.5 text-right tabular-nums" data-testid="pqv-injury-career">{record.career_games_missed}</td>
             </tr>
           </tfoot>
         </table>

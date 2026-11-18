@@ -183,6 +183,7 @@ export const PLAIN_COPY = {
 
 const VERDICT_HELP_KEY: Record<string, BeginnerHelpKey> = {
   ACCEPT: "verdictAccept",
+  "LEAN ACCEPT": "verdictAccept",
   COUNTER: "verdictCounter",
   DECLINE: "verdictDecline",
   FAIR: "verdictFair",

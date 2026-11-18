@@ -40,6 +40,7 @@ import {
 } from '../lib/commissionerIntegrity';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { spacing, type ThemeColors } from '../theme';
+import { teamPickerLabel } from '../lib/teamLabel';
 
 /**
  * Commissioner: Trade veto calculator. The commissioner enters a proposed
@@ -459,7 +460,7 @@ export default function VetoCalculator({ leagueId, lens }: { leagueId: string; l
             const rosterId = String(roster.roster_id ?? '');
             const players = Array.isArray(roster.players) ? roster.players : [];
             const profile = profiles.profiles?.[rosterId];
-            const label = [profile?.team_name, profile?.owner_name].filter(Boolean).join(' · ') || `Team ${rosterId}`;
+            const label = teamPickerLabel(profile?.team_name, profile?.owner_name, `Team ${rosterId}`);
             return { rosterId, label, playerIds: new Set(players.map(String)) };
           })
           .filter((t) => t.rosterId)

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { sentenceCase, usageConfidenceBars, usageTrendTone } from './usageTrendPresentation.ts';
+import { sentenceCase, usageConfidenceBars, usageTrendSummary, usageTrendTone } from './usageTrendPresentation.ts';
 
 const RISING = { direction: 'up' as const, trend_pct: 13, confidence_label: 'high confidence' };
 const FALLING = { direction: 'down' as const, trend_pct: -37, confidence_label: 'high confidence' };
@@ -29,4 +29,9 @@ test('confidence maps to signal bars', () => {
 test('sentenceCase capitalizes the first letter only', () => {
   assert.equal(sentenceCase('high confidence'), 'High confidence');
   assert.equal(sentenceCase('  '), '');
+});
+
+test('usageTrendSummary labels the window', () => {
+  assert.equal(usageTrendSummary({ arrow: '▲', trend_pct: 8, window: 4 }), '▲ 8% last 4 gm');
+  assert.equal(usageTrendSummary({ arrow: '▼', trend_pct: -12 }), '▼ 12% recent');
 });

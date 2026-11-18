@@ -80,6 +80,7 @@ import ValuesCredit from '../components/ValuesCredit';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { pickCompactLabel, pickProjectionLine } from '../lib/tradeIdeaPick';
 
 // Prop-driven now (TradesScreen owns the single `Trades` route and hosts
 // this screen as one of its tabs) — leagueId/leagueName/navigation arrive as
@@ -479,11 +480,16 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
     ovr: p.overall_rating ?? null,
     onPress: () => openQuickView(p, { leagueId, leagueName, sourceLabel: 'Trade Analyzer' }),
   });
-  const scalePick = (p: DraftPickAsset): TradeCardAsset => ({ key: `pick:${p.pick_id}`, pickLabel: p.label ?? 'Draft pick', value: p.score });
+  const scalePick = (p: DraftPickAsset): TradeCardAsset => ({
+    key: `pick:${p.pick_id}`,
+    pickLabel: pickCompactLabel(p.label, p.season, p.round),
+    pickDetail: pickProjectionLine({ projected_range: p.projected_pick_range, original_team_name: p.original_team_name, owner_team_name: p.owner_team_name }),
+    value: p.score,
+  });
   const sendScaleAssets = [...sendIds.map(scalePlayer), ...sendPicks.map(scalePick)];
   const receiveScaleAssets = [...receiveIds.map(scalePlayer), ...receivePicks.map(scalePick)];
   const canAnalyze = hasAnyAssets;
-  const analyzeLabel = canAnalyze ? `Analyze Trade (${sendCount} for ${receiveCount})` : 'Analyze Trade';
+  const analyzeLabel = 'Analyze';
 
   const analyze = async () => {
     if (quickMode) return;
@@ -611,7 +617,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         addHint={{ give: 'Add from your roster', get: selectedTeamId === ALL_TEAMS_ID ? 'Add from any team' : `Add from ${otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? 'team'}` }}
         onAdd={(side) => openSheet(side === 'give' ? 'send' : 'receive')}
         onRemove={(side, key) => removeFromSide(side === 'give' ? 'send' : 'receive', key.slice(key.indexOf(':') + 1))}
-        onSend={quickMode ? undefined : analyze}
+        // The sticky SelectionActionBar is the one Analyze path (a second button here duplicated it).
+        onSend={undefined}
         sending={analyzing}
         canSend={canAnalyze}
         sendLabel={analyzing ? 'Analyzing…' : analyzeLabel}

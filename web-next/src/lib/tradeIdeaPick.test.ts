@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { partnerFitLine, pickProjectionLine } from "./tradeIdeaPick";
+import { partnerFitLine, pickCompactLabel, pickProjectionLine } from "./tradeIdeaPick";
 
 describe("tradeIdeaPick", () => {
   it("shows the projected slot and whose pick it is", () => {
@@ -18,5 +18,16 @@ describe("tradeIdeaPick", () => {
     expect(partnerFitLine(" Fills their TE hole · they're contending ")).toBe("Fills their TE hole · they're contending");
     expect(partnerFitLine("")).toBeNull();
     expect(partnerFitLine(undefined)).toBeNull();
+  });
+
+  it("pickCompactLabel gives one short label for every spelling", () => {
+    expect(pickCompactLabel("2027 Round 2")).toBe("2027 2nd");
+    expect(pickCompactLabel("2028 R1")).toBe("2028 1st");
+    expect(pickCompactLabel("2027 3rd round")).toBe("2027 3rd");
+    expect(pickCompactLabel("2027 Round 11")).toBe("2027 11th");
+    expect(pickCompactLabel(null, 2027, 4)).toBe("2027 4th");
+    expect(pickCompactLabel("2027 Round 1 (Pick 1.04)")).toBe("2027 1st");
+    expect(pickCompactLabel("Mystery pick")).toBe("Mystery pick");
+    expect(pickCompactLabel("")).toBe("Draft pick");
   });
 });

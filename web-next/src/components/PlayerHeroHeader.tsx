@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 
 import type { UsageTrend } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
@@ -9,7 +9,7 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { byePillText } from "@/lib/playerAvailabilityPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
-import { heroInitials, sentenceCase, usageConfidenceBars, usageTrendTone } from "@/lib/playerQuickViewPresentation";
+import { heroInitials, sentenceCase, usageConfidenceBars, usageTrendSummary, usageTrendTone } from "@/lib/playerQuickViewPresentation";
 import { SkeletonBlock } from "@/components/Skeleton";
 import { TapForWhy } from "@/components/ui/TapForWhy";
 
@@ -113,9 +113,10 @@ export function PlayerHeroHeader({
     : [
         overallRating != null ? `Score ${overallRating}` : null,
         score != null ? `${valueLabel ?? "Value"} ${formatScore(score)}` : null,
-        usageTrend ? `${usageTrend.arrow} ${Math.abs(usageTrend.trend_pct)}%` : null,
+        usageTrend ? usageTrendSummary(usageTrend) : null,
       ].filter((b): b is string => b != null);
-  const compactSummary = summaryBits.length > 0 ? summaryBits.join(" · ") : null;
+  // Each figure stays whole ("▲ 8% last 4 gm" never splits); the line wraps between figures.
+  const compactSummary = summaryBits.length > 0 ? summaryBits.map((bit, i) => <Fragment key={bit}>{i > 0 ? " · " : ""}<span className="whitespace-nowrap">{bit}</span></Fragment>) : null;
   const tierIdentity = tier ? resolvePlayerTier(tier) : null;
   const rankBits = [
     overallRank ? `Overall ${formatRank(overallRank)}` : null,
@@ -130,7 +131,7 @@ export function PlayerHeroHeader({
       <header className="pqv-hero">
         <div className="pqv-hero-avatar-col">
           <span className="pqv-avatar-glow">
-            <PlayerAvatar playerId={avatarId === undefined ? playerId : avatarId} tier={tier} size={112} fallbackLabel={heroInitials(name)} />
+            <PlayerAvatar playerId={avatarId === undefined ? playerId : avatarId} tier={tier} size={88} fallbackLabel={heroInitials(name)} />
           </span>
           {tier ? (
             <span
@@ -154,14 +155,15 @@ export function PlayerHeroHeader({
               <span>{team || (loadingIdentity ? "—" : "FA")}</span>
               <span aria-hidden="true">•</span>
               <span>{metaLine ?? `Age ${age ?? (loadingIdentity ? "—" : "N/A")}`}</span>
+              {byeWeek != null ? (
+                <>
+                  <span aria-hidden="true">•</span>
+                  <span data-testid="pqv-bye-pill">{byePillText(byeWeek, onByeThisWeek, unavailable)}</span>
+                </>
+              ) : null}
             </span>
             {rookie ? (
               <span data-testid="pqv-rookie-badge" title={rookie.detail ?? undefined}><PlayerBadge kind="rookie" detail={rookie.detail} /></span>
-            ) : null}
-            {byeWeek != null ? (
-              <span className="pqv-meta-pill" data-testid="pqv-bye-pill">
-                {byePillText(byeWeek, onByeThisWeek, unavailable)}
-              </span>
             ) : null}
             {byeWeek != null && onByeThisWeek && !unavailable ? (
               <ToneBadge label="On bye this week" color="var(--color-warning)" />

@@ -4,5 +4,5 @@ export function byePills(
   onByeThisWeek: boolean | null | undefined,
 ): { label: string | null; thisWeek: boolean } {
   if (byeWeek == null) return { label: null, thisWeek: false };
-  return { label: `Bye: Wk ${byeWeek}`, thisWeek: onByeThisWeek === true };
+  return { label: `Bye ${byeWeek}`, thisWeek: onByeThisWeek === true };
 }

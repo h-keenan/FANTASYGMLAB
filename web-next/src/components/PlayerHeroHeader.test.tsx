@@ -136,12 +136,12 @@ describe("PlayerHeroHeader bye week", () => {
   });
   it("shows the bye pill only when it is not this week", () => {
     renderHero({ byeWeek: 9, onByeThisWeek: false });
-    expect(screen.getByTestId("pqv-bye-pill").textContent).toBe("Bye: Wk 9");
+    expect(screen.getByTestId("pqv-bye-pill").textContent).toBe("Bye 9");
     expect(screen.queryByText("On bye this week")).toBeNull();
   });
   it("keeps the bye secondary (pill only) when the player is also out", () => {
     renderHero({ byeWeek: 8, onByeThisWeek: true, unavailable: true });
-    expect(screen.getByTestId("pqv-bye-pill").textContent).toBe("Bye: Wk 8 (this week)");
+    expect(screen.getByTestId("pqv-bye-pill").textContent).toBe("Bye 8 (this week)");
     expect(screen.queryByText("On bye this week")).toBeNull();
   });
   it("adds the warning pill on the bye week", () => {

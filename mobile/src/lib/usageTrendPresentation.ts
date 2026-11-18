@@ -20,6 +20,18 @@ export function usageTrendTone(trend: {
   return 'neutral';
 }
 
+/** What window a usage-trend percentage covers, from the server's own `window` (the recent games weighed against the
+ * earlier-season baseline, modules.rankings.recency_trend_display). "last 4 gm", or "recent" when the server sent none. */
+export function usageWindowLabel(trend: { window?: number | null } | null | undefined): string {
+  const games = Math.round(Number(trend?.window ?? 0));
+  return games > 0 ? `last ${games} gm` : 'recent';
+}
+
+/** The labeled trend for one-line summaries: "▲ 8% last 4 gm". */
+export function usageTrendSummary(trend: { arrow: string; trend_pct: number; window?: number | null }): string {
+  return `${trend.arrow} ${Math.abs(trend.trend_pct)}% ${usageWindowLabel(trend)}`;
+}
+
 /** Lit bars (of 3) for the confidence glyph: the backend only narrates
  * "high" or "moderate" reads, so 3 or 2; anything else shows 1. */
 export function usageConfidenceBars(confidenceLabel: string): 1 | 2 | 3 {

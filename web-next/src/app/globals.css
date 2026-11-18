@@ -1342,8 +1342,8 @@ a {
 .pqv-hero {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  column-gap: var(--space-lg);
-  row-gap: var(--space-md);
+  column-gap: var(--space-md);
+  row-gap: var(--space-sm);
   align-items: start;
 }
 .pqv-hero-avatar-col {
@@ -1407,12 +1407,12 @@ a {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-sm);
+  gap: var(--space-xs) var(--space-sm);
 }
 .pqv-meta-pill {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   padding: 2px var(--space-md);
   border-radius: var(--radius-pill);
   border: var(--border-width-default) solid var(--color-border);
@@ -1956,7 +1956,7 @@ a {
   /* The wrapper is the ONLY node that changes size (width and height together, so it is a circle at every frame); the headshot
      / initials circle inside simply fills it. Never scale the child: a transformed 112px child in a 56px flex item got squeezed
      into a narrow oval with a ghost ring behind it (coridian_, "still glitched pqv", 2026-11-14). */
-  .pqv-modal .pqv-avatar-glow { flex: none; width: 112px; height: 112px; aspect-ratio: 1 / 1; transition: width 240ms var(--ease-out, ease-out), height 240ms var(--ease-out, ease-out), box-shadow 240ms var(--ease-out, ease-out); }
+  .pqv-modal .pqv-avatar-glow { flex: none; width: 88px; height: 88px; aspect-ratio: 1 / 1; transition: width 240ms var(--ease-out, ease-out), height 240ms var(--ease-out, ease-out), box-shadow 240ms var(--ease-out, ease-out); }
   .pqv-modal .pqv-avatar-glow > *, .pqv-modal .pqv-avatar-glow > .prestige-glow > * { box-sizing: border-box; flex: none; width: 100% !important; height: 100% !important; aspect-ratio: 1 / 1; min-width: 0; object-fit: cover; transition: border-width 240ms var(--ease-out, ease-out); }
   .pqv-modal .pqv-peek-fold { max-height: 14rem; opacity: 1; transition: max-height 240ms var(--ease-out, ease-out), opacity 180ms linear, margin 240ms var(--ease-out, ease-out); }
   .pqv-modal .pqv-hero { transition: row-gap 240ms var(--ease-out, ease-out); }

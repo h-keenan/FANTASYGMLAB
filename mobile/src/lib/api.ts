@@ -2009,7 +2009,7 @@ export interface SharedCommunityTradesResponse {
 
 export interface TradeVerdict {
   band: string;
-  ui_verdict: 'ACCEPT' | 'DECLINE' | 'COUNTER' | 'FAIR' | 'IDEA';
+  ui_verdict: 'ACCEPT' | 'LEAN ACCEPT' | 'DECLINE' | 'COUNTER' | 'FAIR' | 'IDEA';
   confidence: string;
   rationale: string;
   value_summary: string;

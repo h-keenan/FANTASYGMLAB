@@ -15,10 +15,24 @@ import { spacing, type ThemeColors } from '../theme';
  * quick view by default (role button, 44pt, PressableScale feedback); `onOpen` opens something else, `nonInteractive="reason"`
  * is for a card inside a control that already acts. Twin of ui/CompactPlayerCard.tsx.
  */
-export default function CompactPlayerCard({ player, detail, trailing, testID = 'compact-player-card', onOpen, nonInteractive, shortName = false }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testID?: string; onOpen?: () => void; nonInteractive?: string; /** Trade cards: always "J. Surname" (PlayerName `short`). */ shortName?: boolean }) {
+export default function CompactPlayerCard({ player, detail, trailing, testID = 'compact-player-card', onOpen, nonInteractive, shortName = false, stacked = false }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testID?: string; onOpen?: () => void; nonInteractive?: string; /** Trade cards: always "J. Surname" (PlayerName `short`). */ shortName?: boolean; /** Two-column sides (the trade scale): name on line one, position badge left and trailing chips right-aligned on line two. */ stacked?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const card = (
+  const card = stacked ? (
+    <View style={styles.stack} testID={testID}>
+      <View style={styles.identityStacked}>
+        <PlayerAvatarSlot player={player} tier="dense" nonInteractive="the whole card is the tap target" />
+        <View style={styles.main}>
+          <PlayerName name={player.name} short={shortName} style={styles.name} />
+          {detail ? <AppText style={styles.detail}>{detail}</AppText> : null}
+        </View>
+      </View>
+      <View style={styles.stackFoot}>
+        <PositionBadge position={player.position} />
+        {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
+      </View>
+    </View>
+  ) : (
     <View style={styles.row} testID={testID}>
       <View style={styles.identity}>
         <PlayerAvatarSlot player={player} tier="dense" nonInteractive="the whole card is the tap target" />
@@ -46,6 +60,9 @@ function createStyles(colors: ThemeColors) {
     row: { minHeight: 44, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm, rowGap: 2 },
     identity: { flex: 1, flexBasis: 160, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     badge: { flexShrink: 0 },
+    stack: { gap: 2, paddingVertical: 2 },
+    identityStacked: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 0 },
+    stackFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     main: { flex: 1, minWidth: 0 },
     line: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     name: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },

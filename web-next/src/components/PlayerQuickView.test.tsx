@@ -630,7 +630,7 @@ describe("PlayerQuickView", () => {
       // No raw "Ir" chip, and bye is a single secondary pill (no warning badge).
       expect(screen.queryByText("Health: Ir")).not.toBeInTheDocument();
       expect(screen.queryByText("On bye this week")).not.toBeInTheDocument();
-      expect(screen.getByTestId("pqv-bye-pill")).toHaveTextContent("Bye: Wk 8 (this week)");
+      expect(screen.getByTestId("pqv-bye-pill")).toHaveTextContent("Bye 8 (this week)");
     });
 
     it("does not repeat the injury headline in Latest news", async () => {

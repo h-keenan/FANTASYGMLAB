@@ -16,7 +16,7 @@ import type { UsageTrend } from '../lib/api';
 import { byePills } from '../lib/playerByePresentation';
 import { heroInitials } from '../lib/playerQuickViewPresentation';
 import { byePillText } from '../lib/playerAvailability';
-import { sentenceCase, usageConfidenceBars, usageTrendTone } from '../lib/usageTrendPresentation';
+import { sentenceCase, usageConfidenceBars, usageTrendSummary, usageTrendTone } from '../lib/usageTrendPresentation';
 import { radii, spacing, type ThemeColors } from '../theme';
 import PlayerName from './PlayerName';
 
@@ -134,7 +134,7 @@ export default function PlayerHero({
     : [
         overallRating != null ? `Score ${overallRating}` : null,
         score != null ? `${valueLabel ?? 'Value'} ${Math.round(score).toLocaleString()}` : null,
-        usageTrend ? `${usageTrend.arrow} ${Math.abs(usageTrend.trend_pct)}%` : null,
+        usageTrend ? usageTrendSummary(usageTrend) : null,
       ].filter((b): b is string => b != null)
   ).join(' · ');
 
@@ -159,7 +159,7 @@ export default function PlayerHero({
       <View style={styles.identityRow}>
         <View style={styles.avatarCol}>
           <View style={[styles.avatarGlow, { shadowColor: colors.accent, backgroundColor: colors.surfaceSolid }]}>
-            <PlayerAvatar playerId={avatarId === undefined ? playerId : avatarId} size={compact ? 56 : 100} tier={tier} fallbackLabel={heroInitials(name)} />
+            <PlayerAvatar playerId={avatarId === undefined ? playerId : avatarId} size={compact ? 56 : 84} tier={tier} fallbackLabel={heroInitials(name)} />
           </View>
           {tierLabel && !compact ? (
             <View style={[styles.archetypePill, { borderColor: tierColor }]}>
@@ -182,16 +182,17 @@ export default function PlayerHero({
               <AppText style={styles.metaPillText}>{team || (usageLoading ? '—' : 'FA')}</AppText>
               <AppText style={styles.metaPillDot}>•</AppText>
               <AppText style={styles.metaPillText}>{metaLine ?? `Age ${age ?? (usageLoading ? '—' : 'N/A')}`}</AppText>
+              {bye.label ? (
+                <>
+                  <AppText style={styles.metaPillDot}>•</AppText>
+                  <AppText style={styles.metaPillText} testID="pqv-bye-pill">{byeWeek != null ? byePillText(byeWeek, onByeThisWeek === true, unavailable) : bye.label}</AppText>
+                </>
+              ) : null}
             </View>
             {rookie ? <PlayerBadge kind="rookie" detail={rookie.detail} /> : null}
-            {bye.label ? (
-              <View style={styles.metaPill} testID="pqv-bye-pill">
-                <AppText style={styles.metaPillText}>{byeWeek != null ? byePillText(byeWeek, onByeThisWeek === true, unavailable) : bye.label}</AppText>
-              </View>
-            ) : null}
             {bye.thisWeek && !unavailable ? <ToneBadge label="On bye this week" color={colors.premium} /> : null}
           </View>
-          {compact && summary ? <AppText style={styles.peekSummary} numberOfLines={1} testID="pqv-peek-summary">{summary}</AppText> : null}
+          {compact && summary ? <AppText style={styles.peekSummary} numberOfLines={2} testID="pqv-peek-summary">{summary}</AppText> : null}
           {rookie?.detail && !compact ? <AppText style={styles.rookieLine}>Rookie · {rookie.detail}</AppText> : null}
         </View>
       </View>

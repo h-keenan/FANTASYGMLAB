@@ -30,10 +30,10 @@ export function availabilityDetailParts(availability: PlayerAvailability): strin
   return [availability.body_part, availability.return_note].filter((part): part is string => Boolean(part));
 }
 
-/** Healthy: "On bye this week" badge carries the flag, pill stays "Bye: Wk N".
+/** Healthy: "On bye this week" badge carries the flag, pill stays "Bye N".
  * Out/IR: the bye is secondary, so the pill itself says "(this week)". */
 export function byePillText(byeWeek: number, onByeThisWeek: boolean, unavailable: boolean): string {
-  return onByeThisWeek && unavailable ? `Bye: Wk ${byeWeek} (this week)` : `Bye: Wk ${byeWeek}`;
+  return onByeThisWeek && unavailable ? `Bye ${byeWeek} (this week)` : `Bye ${byeWeek}`;
 }
 
 export function newsAgeLabel(publishedTs: number | null, nowMs: number = Date.now()): string {

@@ -69,14 +69,34 @@ def test_owner_scenario_tags_and_softens_one_step_without_touching_numbers():
     assert v.to_public_dict()["cautions"][0]["tag"] == c["tag"]
 
 
-def test_already_accept_keeps_label_but_shows_tag():
+def test_accept_with_material_caution_steps_down_to_lean_accept():
+    # The screenshot case: a plain ACCEPT above the pick-glut warning.
     v = _verdict(value_delta=900, trade_score=900)
-    assert v.band == "ACCEPT" and v.cautions and v.cautions[0]["softened"] is False
+    assert v.band == "LEAN ACCEPT" and v.ui_verdict == "LEAN ACCEPT" and v.tone == "accept"
+    assert v.cautions[0]["softened"] is True and v.cautions[0]["softened_from"] == "ACCEPT"
+    assert v.value_delta == 900 and v.trade_score == 900  # numbers untouched
 
 
-def test_never_more_than_one_step_and_not_on_bad_verdicts():
+def test_step_down_is_multi_factor_not_one_string():
+    base = {"held_premium_picks": 5, "pick_share_of_incoming": 0.3, "current_value_out": 1600, "lineup_points": -6}
+    caution = lambda **f: {"code": "pick_glut", "tag": "x", "facts": {**base, **f}, "softened": False}
+    assert trade_cautions.severity(caution()) == 0
+    # Same tag, but one heavy fact is not enough for a second step...
+    _, one = trade_cautions.apply_cautions("SMASH ACCEPT", caution(pick_share_of_incoming=0.6))
+    assert one == "ACCEPT"
+    # ...three independent confirmations are.
+    heavy = caution(pick_share_of_incoming=0.6, held_premium_picks=7, current_value_out=4000)
+    assert trade_cautions.severity(heavy) == 3
+    assert trade_cautions.apply_cautions("SMASH ACCEPT", heavy)[1] == "LEAN ACCEPT"
+    assert trade_cautions.apply_cautions("ACCEPT", heavy)[1] == "LEAN ACCEPT"
+    # FAIR keeps its label (already neutral); declines carry no caution.
+    assert trade_cautions.apply_cautions("FAIR / PREFERENCE", heavy)[1] == "FAIR / PREFERENCE"
+    assert trade_cautions.apply_cautions("DECLINE", heavy) == ([], "DECLINE")
+
+
+def test_never_more_than_two_steps_and_not_on_bad_verdicts():
     assert _verdict(value_delta=-800, trade_score=-800).cautions == ()
-    assert _verdict(value_delta=3000, trade_score=3000).band == "ACCEPT"  # one step only
+    assert _verdict(value_delta=3000, trade_score=3000).band == "ACCEPT"  # moderate severity: one step
 
 
 @pytest.mark.parametrize(
