@@ -34,7 +34,7 @@ import re
 import math
 from typing import Any, Mapping, Sequence
 
-from modules import projection_calibration
+from modules import age_profile, projection_calibration
 from modules.team_eval import normalize_team_strategy, team_strategy_label
 from modules.trade_lineup_model import STATIC_VALUE_PER_POINT
 
@@ -577,7 +577,8 @@ def young_core_for_picks_caution(
         a
         for a in sent
         if a.get("asset_type") == "player"
-        and _num(a.get("age")) and 0 < _num(a.get("age")) <= _YOUNG_CORE_MAX_AGE
+        and _num(a.get("age"))
+        and age_profile.is_young(a.get("position"), a.get("age"), legacy_max=_YOUNG_CORE_MAX_AGE)
     ]
     picks = [a for a in got if a.get("asset_type") == "pick"]
     if not young or not picks or not sent:

@@ -63,7 +63,7 @@ import time
 from datetime import date, datetime, timezone
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
-from modules import league_history, redis_cache, sleeper
+from modules import age_profile, league_history, redis_cache, sleeper
 
 # --- Scope and caching -----------------------------------------------------
 
@@ -127,6 +127,7 @@ POSTURE_RECENT_SEASONS = 2
 MIN_POSTURE_LEANING_TRADES = 2
 POSTURE_MIN_SHARE = 0.3
 POSTURE_TRADE_MARGIN = 2
+# Legacy cutoffs: used only when DYNASTYGM_CANONICAL_AGE_CURVE is off (see modules.age_profile).
 YOUNG_MAX_AGE = 24.0
 VETERAN_MIN_AGE = {"QB": 32.0, "RB": 27.0, "WR": 28.0, "TE": 28.0}
 # Waiver/FAAB activity.
@@ -510,16 +511,20 @@ def _trade_sides(
 
 def _is_veteran(asset: Mapping[str, Any]) -> bool:
     age = asset.get("age_at_transaction")
-    threshold = VETERAN_MIN_AGE.get(_text(asset.get("position")))
-    return age is not None and threshold is not None and age >= threshold
+    position = _text(asset.get("position"))
+    threshold = VETERAN_MIN_AGE.get(position)
+    if age is None or threshold is None:
+        return False
+    return age_profile.is_aging(position, age, legacy_min=threshold)
 
 
 def _is_young(asset: Mapping[str, Any]) -> bool:
     age = asset.get("age_at_transaction")
+    position = _text(asset.get("position"))
     return (
         age is not None
-        and _text(asset.get("position")) in VETERAN_MIN_AGE
-        and age <= YOUNG_MAX_AGE
+        and position in VETERAN_MIN_AGE
+        and age_profile.is_young(position, age, legacy_max=YOUNG_MAX_AGE)
     )
 
 

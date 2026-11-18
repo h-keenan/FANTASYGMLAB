@@ -1181,7 +1181,9 @@ def build_league_summary(
         # roster_value_rank is already present too: build_league_rankings_frame
         # (which build_league_rankings_frame_cached wraps) runs
         # add_league_detail_ranks before returning.
-        rankings_frame = refine_team_directions(rankings_frame)
+        rankings_frame = league_rankings.apply_canonical_posture(
+            rankings_frame, league_id=league_id, lens=lens, players_db_path=players_db_path
+        )
         match = rankings_frame[rankings_frame["roster_id"].astype(str) == str(roster_id or "")]
         if not match.empty:
             row = match.iloc[0]
