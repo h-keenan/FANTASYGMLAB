@@ -2,9 +2,11 @@ import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
+import PressableScale from './PressableScale';
 import InsightRow from './InsightRow';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { TeamRanking } from '../lib/api';
+import { formatRank } from '../lib/percentile';
 import { spacing, type ThemeColors } from '../theme';
 
 /**
@@ -14,12 +16,27 @@ import { spacing, type ThemeColors } from '../theme';
  * The rank tiles that used to sit in a separate "Team Analytics" module now live in the one Team Snapshot strip.
  * Web twin: components/TeamArchetypeRead.tsx.
  */
-export function TeamArchetypeRead({ team }: { team: TeamRanking }) {
+export function TeamArchetypeRead({ team, onOpenAge }: { team: TeamRanking; onOpenAge?: () => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const hasTradeContext = team.trade_tendency && team.trade_tendency !== 'Neutral';
   return (
     <View testID="team-archetype-read">
+      {team.average_age != null ? (
+        <PressableScale
+          onPress={onOpenAge}
+          disabled={!onOpenAge}
+          accessibilityRole={onOpenAge ? 'link' : 'text'}
+          accessibilityLabel={`Average age ${team.average_age.toFixed(1)}${team.age_rank != null ? `, age rank ${formatRank(team.age_rank, team.age_rank_tied)}` : ''}${onOpenAge ? ', open the Roster Age rankings' : ''}`}
+          style={{ minHeight: 44, justifyContent: 'center' }}
+          testID="team-average-age"
+        >
+          <AppText style={styles.ageLine}>
+            Average age {team.average_age.toFixed(1)}
+            {team.age_rank != null ? <AppText style={styles.ageRank}> {'·'} age rank {formatRank(team.age_rank, team.age_rank_tied)}</AppText> : null}
+          </AppText>
+        </PressableScale>
+      ) : null}
       {team.archetype_explanation ? <AppText style={styles.explanation}>{team.archetype_explanation}</AppText> : null}
       {team.archetype_strengths.length > 0 ? (
         <DetailList label="Strengths" items={team.archetype_strengths} color={colors.success} icon="checkmark-circle-outline" />
@@ -42,7 +59,8 @@ export function TeamArchetypeRead({ team }: { team: TeamRanking }) {
 /** Whether `team` has an archetype read worth showing under the snapshot tiles. */
 export function hasArchetypeRead(team: TeamRanking): boolean {
   return Boolean(
-    team.archetype_explanation ||
+    team.average_age != null ||
+      team.archetype_explanation ||
       team.archetype_strengths.length > 0 ||
       team.archetype_risks.length > 0 ||
       team.archetype_recommendations.length > 0 ||
@@ -85,6 +103,8 @@ function createStyles(colors: ThemeColors) {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
     },
+    ageLine: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs },
+    ageRank: { fontWeight: '400', color: colors.textTertiary },
     detailGroup: { marginTop: spacing.sm },
     detailLabel: {
       fontSize: 12.5,

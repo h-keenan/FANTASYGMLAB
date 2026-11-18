@@ -21,16 +21,20 @@ export default function PlayerName({
   style,
   // Deprecated: fit is decided by measuring, not a length guess.
   threshold: _threshold,
+  short = false,
   ...rest
 }: {
   name: string | null | undefined;
   threshold?: number;
+  /** Trade cards: always the short form ("J. Surname"), never the full name; the ladder still steps down further if even that does not fit. */
+  short?: boolean;
 } & Omit<TextProps, 'children' | 'numberOfLines' | 'onTextLayout' | 'onLayout'>) {
   const full = (name ?? '').replace(/\s+/g, ' ').trim();
   const [width, setWidth] = useState(0);
   // Tied to the name it was measured for so recycled rows restart from the full name.
-  const [fit, setFit] = useState<{ name: string; index: number; failedAt: number }>({ name: full, index: 0, failedAt: 0 });
-  const live = fit.name === full ? fit : { name: full, index: 0, failedAt: 0 };
+  const base = short ? 1 : 0;
+  const [fit, setFit] = useState<{ name: string; index: number; failedAt: number }>({ name: full, index: base, failedAt: 0 });
+  const live = fit.name === full ? fit : { name: full, index: base, failedAt: 0 };
   const stage = playerNameStage(full, live.index);
 
   const flat = (StyleSheet.flatten(style) ?? {}) as TextStyle;
@@ -58,7 +62,7 @@ export default function PlayerName({
           const next = Math.round(event.nativeEvent.layout.width);
           setWidth((prev) => (prev !== next ? next : prev));
           // Room appeared since a stage failed: start again from the full name.
-          if (live.index > 0 && live.failedAt > 0 && next > live.failedAt + 1) setFit({ name: full, index: 0, failedAt: 0 });
+          if (live.index > base && live.failedAt > 0 && next > live.failedAt + 1) setFit({ name: full, index: base, failedAt: 0 });
         }}
       >
         {stage.text}

@@ -16,7 +16,7 @@ import type { PlayerRef } from "@/lib/playerAnatomy";
  * (a picker row that selects). A `trailing` that is itself a control needs `nonInteractive` on the card and its own
  * tap target beside it. Mobile twin: components/CompactPlayerCard.tsx.
  */
-export function CompactPlayerCard({ player, detail, trailing, testId = "compact-player-card", onOpen, nonInteractive }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testId?: string; onOpen?: () => void; nonInteractive?: string }) {
+export function CompactPlayerCard({ player, detail, trailing, testId = "compact-player-card", onOpen, nonInteractive, shortName = false }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testId?: string; onOpen?: () => void; nonInteractive?: string; /** Trade cards: always "J. Surname" (PlayerName `short`). */ shortName?: boolean }) {
   const card = (
     // Principled narrow-width layout: the identity block (avatar + name + pill) keeps a 10rem floor, and the trailing
     // chips (grade ring + value) wrap onto a second line instead of squeezing the name to a sliver.
@@ -25,7 +25,7 @@ export function CompactPlayerCard({ player, detail, trailing, testId = "compact-
       <PlayerAvatarSlot player={player} tier="dense" nonInteractive="the whole card is the tap target" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 items-center gap-1.5">
-          <PlayerName name={player.name} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+          <PlayerName name={player.name} short={shortName} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
           <PositionBadge position={player.position} />
         </span>
         {detail ? <span className="text-xs leading-4" style={{ color: "var(--color-text-muted)" }}>{detail}</span> : null}

@@ -216,7 +216,6 @@ export function MyTeamContent({
       : []),
     { glyph: "starter", insight: "starter", why: "starter_strength", label: "Starter Strength", value: formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false), fill: rankFill(teamRanking?.starter_rank, leagueSize) },
     { glyph: "bench", insight: "bench", why: "bench_strength", label: "Bench Strength", value: formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false), fill: rankFill(teamRanking?.bench_rank, leagueSize) },
-    { glyph: "age", insight: "age", label: "Avg Age", value: teamRanking?.average_age != null ? teamRanking.average_age.toFixed(1) : "—" },
   ];
 
   const openSlots = openSlotsMessage(myTeam.open_slots);
@@ -269,7 +268,7 @@ export function MyTeamContent({
         title="Team Snapshot"
         items={snapshotItems}
         league={{ id: leagueId, name: leagueName }}
-        footer={teamRanking && hasArchetypeRead(teamRanking) ? <TeamArchetypeRead team={teamRanking} /> : undefined}
+        footer={teamRanking && hasArchetypeRead(teamRanking) ? <TeamArchetypeRead team={teamRanking} league={leagueId ? { id: leagueId, name: leagueName } : undefined} /> : undefined}
         infoGlossary={
           showFranchiseConstruction
             ? ["powerRank", "franchiseRank", "starterStrength", "benchStrength", "averageAge", "draftPicks", "pqv", "superflex", "tep"]

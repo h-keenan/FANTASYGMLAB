@@ -15,7 +15,7 @@ import { spacing, type ThemeColors } from '../theme';
  * quick view by default (role button, 44pt, PressableScale feedback); `onOpen` opens something else, `nonInteractive="reason"`
  * is for a card inside a control that already acts. Twin of ui/CompactPlayerCard.tsx.
  */
-export default function CompactPlayerCard({ player, detail, trailing, testID = 'compact-player-card', onOpen, nonInteractive }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testID?: string; onOpen?: () => void; nonInteractive?: string }) {
+export default function CompactPlayerCard({ player, detail, trailing, testID = 'compact-player-card', onOpen, nonInteractive, shortName = false }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testID?: string; onOpen?: () => void; nonInteractive?: string; /** Trade cards: always "J. Surname" (PlayerName `short`). */ shortName?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const card = (
@@ -24,7 +24,7 @@ export default function CompactPlayerCard({ player, detail, trailing, testID = '
         <PlayerAvatarSlot player={player} tier="dense" nonInteractive="the whole card is the tap target" />
         <View style={styles.main}>
           <View style={styles.line}>
-            <PlayerName name={player.name} style={styles.name} />
+            <PlayerName name={player.name} short={shortName} style={styles.name} />
             <View style={styles.badge}><PositionBadge position={player.position} /></View>
           </View>
           {detail ? <AppText style={styles.detail}>{detail}</AppText> : null}

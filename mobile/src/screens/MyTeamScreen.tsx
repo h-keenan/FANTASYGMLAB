@@ -450,9 +450,8 @@ function TeamSnapshotModule({ team, open, leagueSize }: { team: TeamRanking | nu
           : []),
         { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied), fill: rankFill(team?.starter_rank, leagueSize), onPress: open('starter') },
         { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied), fill: rankFill(team?.bench_rank, leagueSize), onPress: open('bench') },
-        { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—', onPress: open('age') },
       ]}
-      footer={team && hasArchetypeRead(team) ? <TeamArchetypeRead team={team} /> : undefined}
+      footer={team && hasArchetypeRead(team) ? <TeamArchetypeRead team={team} onOpenAge={open('age')} /> : undefined}
       info={{
         lines: [copy.help('myTeamIntro'), copy.help('myTeamValueTiers')],
         glossary: ['powerRank', 'franchiseRank', 'starterStrength', 'benchStrength', 'averageAge', 'draftPicks', 'pqv', 'superflex', 'tep'],

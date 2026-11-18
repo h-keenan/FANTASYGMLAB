@@ -38,6 +38,7 @@ export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode
     return (
       <CompactPlayerCard
         player={a.player}
+        shortName
         onOpen={a.onOpen}
         nonInteractive={a.nonInteractive}
         detail={a.detail}
