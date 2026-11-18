@@ -68,6 +68,21 @@ describe("TradeHubFilters", () => {
   });
 });
 
+describe("TradeHubFilters position chips", () => {
+  it("renders position chips, no select, and toggles a chip off when tapped again", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<TradeHubFilters ideas={DATA.ideas} filter={{ impact: null, position: null }} onChange={onChange} />);
+    expect(screen.queryByLabelText("Positions")).not.toBeInTheDocument();
+    expect(document.querySelector("select")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Position QB" }));
+    expect(onChange).toHaveBeenLastCalledWith({ impact: null, position: "QB" });
+    rerender(<TradeHubFilters ideas={DATA.ideas} filter={{ impact: null, position: "QB" }} onChange={onChange} />);
+    expect(screen.getByRole("button", { name: "Position QB" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Position QB" }));
+    expect(onChange).toHaveBeenLastCalledWith({ impact: null, position: null });
+  });
+});
+
 describe("TradeHubContent filtering and states", () => {
   it("tags cards from engine category and impact tag, and filters by chip and position", () => {
     render(<TradeHubContent leagueId="1" leagueName="L" data={DATA} />);
@@ -82,7 +97,7 @@ describe("TradeHubContent filtering and states", () => {
     expect(screen.queryByText("Bravo")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "All (3)" }));
-    fireEvent.change(screen.getByLabelText("Positions"), { target: { value: "QB" } });
+    fireEvent.click(screen.getByRole("button", { name: "Position QB" }));
     expect(screen.getByText("Charlie")).toBeInTheDocument();
     expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
   });
@@ -90,7 +105,7 @@ describe("TradeHubContent filtering and states", () => {
   it("offers a way back when filters match nothing", () => {
     render(<TradeHubContent leagueId="1" leagueName="L" data={DATA} />);
     fireEvent.click(screen.getByRole("button", { name: "Sell High (1)" }));
-    fireEvent.change(screen.getByLabelText("Positions"), { target: { value: "QB" } });
+    fireEvent.click(screen.getByRole("button", { name: "Position QB" }));
     expect(screen.getByText("No ideas match these filters")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Show all" }));
     expect(screen.getByText("Alpha")).toBeInTheDocument();

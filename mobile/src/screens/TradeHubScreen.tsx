@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import Button from '../components/Button';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
-import FilterDropdownButton from '../components/FilterDropdownButton';
 import ErrorState from '../components/ErrorState';
 import MeterRow, { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
@@ -671,14 +670,29 @@ function PositionFilterRow({
   }, [ideas]);
   if (positions.length < 2) return null;
   return (
-    <View style={styles.positionChipRow}>
-      <FilterDropdownButton
-        label="Position"
-        options={['ALL', ...positions]}
-        value={active ?? 'ALL'}
-        onChange={(next) => onSelect(next === 'ALL' ? null : next)}
-      />
-    </View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.positionChipRow}
+      contentContainerStyle={styles.positionChipContent}
+      accessibilityLabel="Filter by position"
+    >
+      {positions.map((pos) => {
+        const isActive = active === pos;
+        return (
+          <PressableScale
+            key={pos}
+            style={[styles.positionChip, isActive && styles.summaryTileActive]}
+            onPress={() => onSelect(isActive ? null : pos)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={`Filter trade ideas by ${pos}`}
+          >
+            <AppText style={styles.summaryLabel}>{pos}</AppText>
+          </PressableScale>
+        );
+      })}
+    </ScrollView>
   );
 }
 
@@ -749,6 +763,17 @@ function createStyles(colors: ThemeColors) {
   },
   summaryValue: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
   summaryLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
-  positionChipRow: { paddingBottom: spacing.md, alignItems: 'flex-start' },
+  positionChipRow: { flexGrow: 0, marginBottom: spacing.md },
+  positionChipContent: { gap: spacing.sm, alignItems: 'center' },
+  positionChip: {
+    minHeight: 36,
+    minWidth: 52,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
   });
 }

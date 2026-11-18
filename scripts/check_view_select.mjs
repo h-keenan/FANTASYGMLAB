@@ -13,6 +13,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TREES = ["web-next/src", "mobile/src"];
 const MAX_TABS = 4;
 const SKIP = /(\.test\.|check_view_select|components\/ui\/ViewSelect\.tsx|components\/PageControlRow\.tsx)/;
+// The shared form <Select> wrapper itself; its callers are what get judged.
+const RAW_SELECT_SKIP = /components\/Input\.tsx$/;
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -61,6 +63,26 @@ export function scanText(rel, src) {
     } else if (count === null && !ok) {
       problems.push(`${rel}:${line}: ViewSelect with computed options; use ViewTabs for 4 or fewer, or mark a 5+ list (weeks, seasons) with // view-select-ok: reason`);
     }
+  }
+  if (!RAW_SELECT_SKIP.test(rel)) problems.push(...scanRawSelects(rel, src, lines));
+  return problems;
+}
+
+/**
+ * A raw `<select>` (or `<Select>` from Input.tsx is fine: it is a form field) used as a view / filter switch slips past the
+ * ViewSelect check above. Standing rule: tabs or chips, never dropdowns. A raw `<select>` fails unless it is a labelled form
+ * field (carries an `id=`, wired to a <label htmlFor>) or has a `view-select-ok: reason` comment on it or the line above.
+ */
+function scanRawSelects(rel, src, lines) {
+  const problems = [];
+  const re = /<select(?=[\s>])/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const line = src.slice(0, m.index).split("\n").length;
+    const tag = tagText(src, m.index);
+    const ok = /view-select-ok/.test(tag) || /view-select-ok/.test(lines[line - 1] ?? "") || /view-select-ok/.test(lines[line - 2] ?? "");
+    if (ok || /\sid=/.test(tag)) continue;
+    problems.push(`${rel}:${line}: raw <select> used as a view/filter switch; use chips or ViewTabs (tabs/chips, never dropdowns), or mark a real form field / 5+ list with // view-select-ok: reason`);
   }
   return problems;
 }

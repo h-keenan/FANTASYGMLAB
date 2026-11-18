@@ -722,6 +722,7 @@ export function WaiversContent({
           onChange={(value) => setTab(value as WaiverTab)}
         />
         {tab === "recommended" && secondaryPriority.length > 0 ? (
+          // view-select-ok: pre-existing recommendation filter; candidate for chips, tracked as follow-up
           <select
             aria-label="Recommendation filter"
             value={recFilter}

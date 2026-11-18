@@ -15,7 +15,7 @@ function chipStyle(active: boolean) {
 
 /**
  * Trade Hub filter chips: All (N), one chip per engine impact tag present on
- * the board (Buy Low / Sell High / High Impact), and a Positions picker. There
+ * the board (Buy Low / Sell High / High Impact), and one chip per position on the board (tap an active chip to clear it). There
  * is no My Trades chip (every idea is built around the user's own players) and
  * no Leagues picker (Trade Hub is one league per view).
  */
@@ -64,22 +64,24 @@ export function TradeHubFilters({
           </button>
         );
       })}
-      {positions.length > 1 ? (
-        <select
-          aria-label="Positions"
-          value={filter.position ?? ""}
-          onChange={(event) => onChange({ ...filter, position: event.target.value || null })}
-          className="px-3 text-sm font-bold shrink-0"
-          style={chipStyle(Boolean(filter.position))}
-        >
-          <option value="">Positions</option>
-          {positions.map((pos) => (
-            <option key={pos} value={pos}>
-              {pos}
-            </option>
-          ))}
-        </select>
-      ) : null}
+      {positions.length > 1
+        ? positions.map((pos) => {
+            const active = filter.position === pos;
+            return (
+              <button
+                key={pos}
+                type="button"
+                onClick={() => onChange({ ...filter, position: active ? null : pos })}
+                aria-pressed={active}
+                aria-label={`Position ${pos}`}
+                className="px-4 text-sm font-bold shrink-0 whitespace-nowrap"
+                style={chipStyle(active)}
+              >
+                {pos}
+              </button>
+            );
+          })
+        : null}
     </div>
   );
 }
