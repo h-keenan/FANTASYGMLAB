@@ -113,3 +113,29 @@ def test_build_gm_plan_adds_area_only_when_enabled(monkeypatch):
     monkeypatch.setenv(gm_plan_outlook.OUTLOOK_ENV_KEY, "0")
     off = gm_plan.build_gm_plan(season_phase="offseason_adjacent", outlook_items=items)
     assert off == base, "flag off restores today's exact output"
+
+
+def _flag(key):
+    return {"flags": [{"key": key}]}
+
+
+def test_roles_item_reads_rising_and_shrinking_roles():
+    flags = {"1": _flag("role_shrinking"), "4": _flag("role_expanding"), "2": _flag("positive_regression")}
+    built = gm_plan_outlook.roles_item(["1", "2", "4"], LOOKUP, flags, "rebuild")
+    assert built["outlook_topic"] == "roles"
+    assert built["headline"] == "1 rising · 1 shrinking"
+    assert len(built["why"]) >= 2
+    assert {p["player_id"] for p in built["players"]} == {"1", "4"}
+    assert any("sell" in w for w in built["why"])
+
+
+def test_roles_item_silent_without_a_corroborated_flag():
+    assert gm_plan_outlook.roles_item(["1"], LOOKUP, {}, "contend") is None
+    assert gm_plan_outlook.roles_item(["1"], LOOKUP, {"1": _flag("unsustainable")}, "contend") is None
+
+
+def test_roles_item_only_in_season():
+    kwargs = dict(my_roster_id=1, profile=profile(), players_by_id=LOOKUP, usage_flags={"1": _flag("role_shrinking")}, my_player_ids=["1"])
+    off = [i["outlook_topic"] for i in gm_plan_outlook.build_outlook(**kwargs)]
+    on = [i["outlook_topic"] for i in gm_plan_outlook.build_outlook(in_season=True, **kwargs)]
+    assert "roles" not in off and "roles" in on

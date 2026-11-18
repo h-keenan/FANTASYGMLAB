@@ -14475,7 +14475,9 @@ def _gm_plan_outlook_items(
             league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
         )
         my_roster_id = str(my_roster.get("roster_id") or "")
-        lookup = gm_plan_outlook.player_lookup(valued, gm_plan_outlook.referenced_ids(profile))
+        lookup = gm_plan_outlook.player_lookup(
+            valued, gm_plan_outlook.referenced_ids(profile) | {str(p) for p in (my_roster.get("players") or []) if p is not None}
+        )
         in_season = league_calendar.is_in_season(league)
         adds: list[dict[str, Any]] = []
         bye_tile: dict[str, Any] | None = None
@@ -14511,6 +14513,24 @@ def _gm_plan_outlook_items(
                     )
                 except Exception:
                     bye_tile = None
+        # Handshake item 10: rising / shrinking roles on my skill players, from the same
+        # usage_trends profiles the waiver guard uses. In season only; context, never a price.
+        usage_flags: dict[str, dict[str, Any]] = {}
+        my_player_ids = [str(p) for p in (my_roster.get("players") or []) if p is not None]
+        if in_season and my_player_ids:
+            try:
+                season_stats = sleeper.get_season_player_stats(season=sleeper.default_player_stats_season(), retain_weekly=True)
+                skill = gm_plan_outlook.player_lookup(valued, my_player_ids)
+                my_player_ids = [p for p in my_player_ids if p in skill]
+                for pid in my_player_ids:
+                    pos = str(skill[pid].get("position") or "").upper()
+                    if pos in usage_trends.COVERED_POSITIONS:
+                        built = usage_trends.profile_from_season_stats(pid, pos, season_stats)
+                        if built:
+                            usage_flags[pid] = built
+            except Exception:
+                logger.warning("usage roles unavailable (league=%s)", league_id, exc_info=True)
+                usage_flags = {}
         # Handshake item 9: the one shared playoff-odds simulation (GM Plan is Pro, like the
         # odds screen) feeds pick slots and a buyer / seller lean. In season only.
         odds_reads: dict[str, dict[str, Any]] = {}
@@ -14543,6 +14563,8 @@ def _gm_plan_outlook_items(
             idea_partners=idea_partners,
             odds_reads=odds_reads,
             odds_picks_block=odds_picks_block,
+            usage_flags=usage_flags,
+            my_player_ids=my_player_ids,
         )
     except Exception:
         logger.warning("gm plan outlook unavailable (league=%s)", league_id, exc_info=True)

@@ -278,6 +278,54 @@ def lean_item(me_id: str, me: Mapping[str, Any], reads: Mapping[str, Mapping[str
     return item("lean", "Season lean", label, why, (), tone)
 
 
+def roles_item(
+    my_ids: Iterable[Any],
+    lookup: Mapping[str, Mapping[str, Any]],
+    usage_flags: Mapping[str, Mapping[str, Any]] | None,
+    side: str,
+) -> dict[str, Any] | None:
+    """Handshake item 10: rising / shrinking roles on my roster (``usage_trends`` flags).
+
+    ``usage_flags`` is ``player_id -> usage profile``. Only a corroborated
+    ``role_expanding`` / ``role_shrinking`` flag counts, so a thin sample never
+    reads as a call. Context only: nothing here prices a player."""
+
+    if not usage_flags:
+        return None
+    rising: list[str] = []
+    shrinking: list[str] = []
+    for pid in my_ids:
+        keys = {f.get("key") for f in (usage_flags.get(str(pid)) or {}).get("flags") or ()}
+        if "role_expanding" in keys:
+            rising.append(str(pid))
+        elif "role_shrinking" in keys:
+            shrinking.append(str(pid))
+    up, down = _players(rising, lookup), _players(shrinking, lookup)
+    if not up and not down:
+        return None
+    bits = []
+    why: list[str] = []
+    if up:
+        bits.append(f"{len(rising)} rising")
+        why.append(f"Role growing: {names(up)}. Snaps and looks are up over the last 4 games")
+    if down:
+        bits.append(f"{len(shrinking)} shrinking")
+        why.append(f"Role shrinking: {names(down)}. Snaps and looks are down over the last 4 games")
+    if down and side == "rebuild":
+        why.append("On a rebuild, a fading role is a reason to sell before the value follows")
+    elif down and side == "contend":
+        why.append("Contending, a fading starter role is worth a backup plan or an upgrade")
+    elif down:
+        why.append("A fading role usually shows up in value later, so weigh selling or replacing him")
+    elif up and side == "rebuild":
+        why.append("A rising role raises a young player's value, a reason to hold")
+    elif up:
+        why.append("A rising role is production you can lean on, a reason to hold")
+    if len(why) < 2:
+        return None
+    return item("roles", "Roles", " · ".join(bits), why, [*down, *up][:MAX_PLAYERS_PER_ITEM], "muted" if down and not up else "success")
+
+
 def waivers_item(adds: Sequence[Mapping[str, Any]], me: Mapping[str, Any], side: str) -> dict[str, Any] | None:
     if not adds:
         return None
@@ -405,6 +453,8 @@ def build_outlook(
     idea_partners: Iterable[str] = (),
     odds_reads: Mapping[str, Mapping[str, Any]] | None = None,
     odds_picks_block: Mapping[str, Any] | None = None,
+    usage_flags: Mapping[str, Mapping[str, Any]] | None = None,
+    my_player_ids: Iterable[Any] = (),
 ) -> list[dict[str, Any]]:
     """The Team Outlook items, or [] when the profile is missing."""
 
@@ -425,7 +475,15 @@ def build_outlook(
         if built
     ]
     if in_season:
-        items.extend(b for b in (waivers_item(waiver_adds, me, side), byes_item(bye_tile)) if b)
+        items.extend(
+            b
+            for b in (
+                roles_item(my_player_ids, players_by_id, usage_flags, side),
+                waivers_item(waiver_adds, me, side),
+                byes_item(bye_tile),
+            )
+            if b
+        )
     items.extend(call_items(me_id, teams, players_by_id, side, idea_partners, odds_reads))
     return items
 
