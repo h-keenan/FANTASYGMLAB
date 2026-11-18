@@ -60,6 +60,7 @@ export function SnapshotTile({
   glyph,
   wrapNote = false,
   compact = false,
+  dense = false,
   reserveLabelLines = false,
   fill,
 }: {
@@ -87,10 +88,35 @@ export function SnapshotTile({
   wrapNote?: boolean;
   /** Equal-column strip form: no min width, tighter padding, smaller value. */
   compact?: boolean;
+  /** Half-height strip tile (GM Plan overview): tight label (no glyph, so a full label fits four-up at 390px) over a one-line value with its note inline. */
+  dense?: boolean;
   /** Reserves two label lines so wrapped labels (Power Rank) and one-line
    * ones (Record) keep their values on the same line across a 4-up strip. */
   reserveLabelLines?: boolean;
 }) {
+  if (dense) {
+    return (
+      <div
+        className="glass-surface flex min-w-0 flex-col items-center gap-0.5 px-1 py-1.5 text-center"
+        style={tone === "premium" ? { borderColor: "var(--color-accent)" } : undefined}
+        data-dense-tile=""
+      >
+        <span data-tile-label="" className="flex max-w-full items-center gap-0.5 text-[0.6875rem] leading-tight" style={{ color: "var(--color-text-muted)" }}>
+          <span className="truncate">{label}</span>
+        </span>
+        <span className="flex max-w-full items-baseline justify-center gap-1 whitespace-nowrap tabular-nums leading-none">
+          <span style={{ font: "var(--type-primary-metric)", fontSize: "1rem", color: tone === "risk" ? "var(--color-danger)" : tone === "positive" ? "var(--color-success)" : "var(--color-text-primary)" }}>
+            <Money>{value}</Money>
+          </span>
+          {note ? (
+            <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>
+              <Money>{note}</Money>
+            </span>
+          ) : null}
+        </span>
+      </div>
+    );
+  }
   const toneColor =
     tone === "risk"
       ? "var(--color-danger)"

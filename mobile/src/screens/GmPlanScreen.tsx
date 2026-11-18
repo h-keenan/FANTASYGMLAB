@@ -15,12 +15,11 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AccentCard from '../components/AccentCard';
 import CompactModule from '../components/CompactModule';
 import { LinkModule } from '../components/ModuleTemplates';
-import { listSummaryParts, statStripParts } from '../lib/moduleTemplates';
+import { listSummaryParts } from '../lib/moduleTemplates';
 import { abbreviatePlayerName } from '../lib/formatPlayerName';
 import { tradeIdeaSummaryParts } from '../lib/tradeIdeaSummary';
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
-import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
@@ -34,7 +33,10 @@ import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import { PLAIN_COPY } from '../lib/experienceCopy';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
-import SegmentedTabBar from '../components/SegmentedTabBar';
+import { ViewTabs } from '../components/PageControlRow';
+import DashboardStatRow from '../components/DashboardStatRow';
+import PlanSteps from '../components/GmPlanSteps';
+import { buildPlanSteps, buildPlanWhy, planFacts, planStatTiles, type PlanStance } from '../lib/gmPlanPlan';
 import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/Skeleton';
 import SharedTradeIdeaCard from '../components/TradeIdeaCard';
 import ExchangeSide from '../components/ExchangeSide';
@@ -63,7 +65,6 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
-import GlassCard from '../components/GlassCard';
 import { PresenceList } from '../components/Presence';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GmPlan'>;
@@ -77,14 +78,11 @@ const TABS: Array<{ key: Tab; label: string; glyph: TabIconName }> = [
   { key: 'watching', label: TERMS.watchlist, glyph: 'watching' },
 ];
 
-const TILE_ICON: Record<PlanSnapshotTile['key'], IconName> = {
+const TILE_ICON: Record<'power' | 'capital' | 'odds' | 'record', IconName> = {
   power: 'stats-chart-outline',
   capital: 'layers-outline',
   odds: 'trophy-outline',
-  record: 'document-text-outline',
-  starter: 'people-outline',
-  bench: 'albums-outline',
-  age: 'person-outline',
+  record: 'flag-outline',
 };
 
 /**
@@ -97,7 +95,6 @@ const TILE_ICON: Record<PlanSnapshotTile['key'], IconName> = {
  * section with no data is omitted or says so honestly. Mirrors web-next's
  * GmPlanContent.
  */
-const SNAPSHOT_SHORT: Record<string, string> = { power: TERMS.thisSeason, capital: 'Capital', odds: 'Odds', record: 'Record', starter: 'Starters', bench: 'Bench', age: 'Age' };
 
 export default function GmPlanScreen({ route, navigation }: Props) {
   const { openPlayer: openQuickView } = usePlayerQuickView();
@@ -312,6 +309,19 @@ export default function GmPlanScreen({ route, navigation }: Props) {
     </AnimatedCard>
   ) : null;
 
+  const facts = planFacts(snapshot);
+  const statTiles = planStatTiles(snapshot);
+  const stanceKey = (stance || '') as PlanStance;
+  const planSteps = buildPlanSteps({
+    stance: stanceKey,
+    tradeCount: tradeItems.length,
+    partners: tradeItems.map((t) => t.partner_team_name).filter(Boolean),
+    topConfidence: tradeItems.find((t) => t.trade_confidence_label)?.trade_confidence_label ?? null,
+    capital: facts.capital,
+    areas: otherAreas.map((a) => ({ key: a.key, title: a.title, framing: a.framing ?? '', count: a.items.length, hasSignal: a.status !== 'no_signal' && a.items.length > 0 })),
+  });
+  const planWhy = buildPlanWhy(stanceKey, facts, weekAhead);
+
   const tradeIdeasParts = () =>
     gateNotice
       ? [{ key: 'gate', text: 'Locked until GM Plan is available for this league', tone: 'muted' as const }]
@@ -410,7 +420,13 @@ export default function GmPlanScreen({ route, navigation }: Props) {
       >
         {error ? <AppText style={styles.error}>{error}</AppText> : null}
         <View style={styles.tabs}>
-          <SegmentedTabBar options={TABS} active={tab} onChange={setTab} />
+          <ViewTabs<string>
+            label="GM Plan section"
+            options={TABS.map((t) => t.label)}
+            value={TABS.find((t) => t.key === tab)?.label ?? 'Overview'}
+            onChange={(label) => setTab(TABS.find((t) => t.label === label)?.key ?? 'overview')}
+            testID="gm-plan-view-tabs"
+          />
         </View>
 
         {tab === 'overview' ? (
@@ -482,34 +498,41 @@ export default function GmPlanScreen({ route, navigation }: Props) {
             </View>
             </CompactModule>
 
-            {snapshot.length > 0 ? (
-              <CompactModule
-                id="gmplan.snapshot"
-                title="Plan Snapshot"
-                parts={statStripParts(snapshot.map((tile) => ({ label: SNAPSHOT_SHORT[tile.key] ?? tile.label, value: tile.value })), 4)}
-              >
-                <View style={styles.grid}>
-                  {snapshot.map((tile) => (
-                    <SnapshotCell key={tile.key} tile={tile} styles={styles} colors={colors} />
-                  ))}
-                </View>
+            {statTiles.length > 0 ? (
+              <DashboardStatRow
+                dense
+                items={statTiles.map((t) => ({ label: t.label, icon: TILE_ICON[t.key], value: t.value, note: t.note }))}
+              />
+            ) : null}
+
+            {gateNotice ? (
+              <CompactModule id="gmplan.overview.trades" title="Trade ideas" parts={tradeIdeasParts()} defaultOpen>
+                {gateNotice}
+              </CompactModule>
+            ) : (
+              <PlanSteps
+                steps={planSteps}
+                tradeItems={tradeItems}
+                onViewDetails={openTradeHub}
+                tradeEmpty={tradeCards()}
+                renderArea={(key) => {
+                  const area = otherAreas.find((x) => x.key === key);
+                  return area ? <FocusAreaBody focusArea={area} /> : null;
+                }}
+              />
+            )}
+
+            {!gateNotice && planWhy ? (
+              <CompactModule id="gmplan.overview.why" persist={false} title={planWhy.title} parts={[{ key: 'w', text: planWhy.headline }]}>
+                {planWhy.bullets.map((line) => (
+                  <AppText key={line} style={styles.caption}>
+                    {'\u2022 '}
+                    {line}
+                  </AppText>
+                ))}
                 <ModuleMore label="Full analysis" onPress={() => navigation.navigate('MyTeam', { leagueId, leagueName })} />
               </CompactModule>
             ) : null}
-
-            {!gateNotice && (plan?.season_phase_label || plan?.headline) ? (
-              <AnimatedCard style={styles.hero} glow>
-                {plan?.season_phase_label ? (
-                  <AppText style={styles.phaseLabel}>{plan.season_phase_label.toUpperCase()}</AppText>
-                ) : null}
-                {plan?.headline ? <AppText style={styles.headline}>{plan.headline}</AppText> : null}
-              </AnimatedCard>
-            ) : null}
-
-            <CompactModule id="gmplan.overview.trades" title="Trade ideas" parts={tradeIdeasParts()} defaultOpen>
-              {tradeCards(2)}
-              <ModuleMore label="View all trade ideas" onPress={openTradeHub} />
-            </CompactModule>
 
             {roster.length > 0 ? (
               <CompactModule
@@ -664,38 +687,6 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   );
 }
 
-function SnapshotCell({
-  tile,
-  styles,
-  colors,
-}: {
-  tile: PlanSnapshotTile;
-  styles: ReturnType<typeof createStyles>;
-  colors: ThemeColors;
-}) {
-  const percent = tile.fill === null ? null : Math.round(tile.fill * 100);
-  return (
-    <GlassCard radius="md" style={styles.cell}>
-      <View style={styles.cellBody}>
-        <View style={styles.cellLabelRow}>
-          <Ionicons name={TILE_ICON[tile.key]} size={13} color={colors.textTertiary} />
-          <AppText style={styles.cellLabel} numberOfLines={1}>
-            {tile.label}
-          </AppText>
-        </View>
-        <AppText style={styles.cellValue}>{tile.value}</AppText>
-        {tile.note ? <AppText style={styles.cellNote}>{tile.note}</AppText> : null}
-        {tile.key !== 'odds' && percent !== null ? (
-          <View style={styles.bar}>
-            <View style={[styles.barFill, { width: `${percent}%` }]} />
-          </View>
-        ) : null}
-      </View>
-      {tile.key === 'odds' && percent !== null ? <CircularProgressRing percent={percent} size={44} strokeWidth={5} /> : null}
-    </GlassCard>
-  );
-}
-
 /** GM Plan trade items are a trimmed Trade Hub idea; map them onto the full
  * TradeIdea shape the shared card renders (absent fields stay empty and the
  * card hides them). */
@@ -762,9 +753,6 @@ function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewD
 }
 
 function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
   const names = focusArea.items.filter((i): i is GmPlanTradeItem => 'partner_team_name' in i).map((i) => i.partner_team_name).filter(Boolean);
   const parts =
     focusArea.status === 'no_signal'
@@ -773,6 +761,18 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
 
   return (
     <CompactModule id={`gmplan.area.${focusArea.key}`} title={focusArea.title} parts={parts} defaultOpen={focusArea.status !== 'no_signal'}>
+      <FocusAreaBody focusArea={focusArea} />
+    </CompactModule>
+  );
+}
+
+/** A focus area's framing line and items, without the module around it (the Overview steps nest it). */
+function FocusAreaBody({ focusArea }: { focusArea: GmPlanFocusArea }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  return (
+    <>
       {focusArea.framing ? <AppText style={styles.caption}>{focusArea.framing}</AppText> : null}
 
       {focusArea.status === 'no_signal' ? (
@@ -844,7 +844,7 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
           })}
         </AnimatedCard>
       )}
-    </CompactModule>
+    </>
   );
 }
 

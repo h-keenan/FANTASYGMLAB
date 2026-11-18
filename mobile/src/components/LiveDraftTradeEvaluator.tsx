@@ -250,7 +250,7 @@ export default function LiveDraftTradeEvaluator({
     setPicks: React.Dispatch<React.SetStateAction<Set<string>>>;
     setPlayers: React.Dispatch<React.SetStateAction<Set<string>>>;
   }> = [
-    { title: 'You send', color: colors.danger, picks: sendPicks, players: sendPlayers, setPicks: setSendPicks, setPlayers: setSendPlayers },
+    { title: 'You send', color: colors.textTertiary, picks: sendPicks, players: sendPlayers, setPicks: setSendPicks, setPlayers: setSendPlayers },
     { title: 'You receive', color: colors.success, picks: receivePicks, players: receivePlayers, setPicks: setReceivePicks, setPlayers: setReceivePlayers },
   ];
 

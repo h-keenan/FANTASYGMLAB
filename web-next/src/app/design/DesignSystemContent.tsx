@@ -727,7 +727,7 @@ export function DesignSystemContent() {
         </Spec>
         <Spec name="TradeAssetRow / ExchangeSide" path="web-next/src/components/TradeAssetExchange.tsx" note="Give/get columns with a faint tint of the side color.">
           <div className="grid grid-cols-1 gap-3">
-            <ExchangeSide label="You send" dotColor="var(--color-danger)" assets={[PLAYER_INJURED, PICK_ASSET]} total={{ text: "6,310", color: "var(--color-danger)" }} />
+            <ExchangeSide label="You send" dotColor="var(--color-text-muted)" assets={[PLAYER_INJURED, PICK_ASSET]} total={{ text: "6,310", color: "var(--color-text-muted)" }} />
             <ExchangeSide label="You get" dotColor="var(--color-success)" assets={[PLAYER]} total={{ text: "8,120", color: "var(--color-success)" }} />
           </div>
         </Spec>

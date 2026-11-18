@@ -33,7 +33,7 @@ export type StatStripItem = {
  * Dashboard's Record / Power Rank / Franchise Rank / Avg Age strip and its
  * Team Snapshot row both render through it.
  */
-export default function DashboardStatRow({ items, style, info }: { items: StatStripItem[]; style?: StyleProp<ViewStyle>; info?: Omit<InfoMarkProps, 'label' | 'metrics'> }) {
+export default function DashboardStatRow({ items, style, info, dense = false }: { items: StatStripItem[]; style?: StyleProp<ViewStyle>; info?: Omit<InfoMarkProps, 'label' | 'metrics'>; /** Half-height tiles (MetricCard `dense`). */ dense?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const whyMetrics = items.map((i) => i.why).filter((w): w is WhyMetricId => Boolean(w));
@@ -54,6 +54,7 @@ export default function DashboardStatRow({ items, style, info }: { items: StatSt
           note={item.note}
           onPress={item.onPress}
           centered
+          dense={dense}
           style={styles.tile}
           labelAccessory={index === infoIndex ? <InfoMark label="this summary" metrics={whyMetrics} testID={whyMetrics[0] ? `why-${whyMetrics[0]}` : undefined} {...info} /> : undefined}
         />

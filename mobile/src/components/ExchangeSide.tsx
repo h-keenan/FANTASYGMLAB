@@ -9,7 +9,7 @@ import { SIDE_TINT_ALPHA, TRADE_SIDE_LABEL, withAlpha } from '../lib/tradeSideLa
 import { spacing, type ThemeColors } from '../theme';
 
 /**
- * One side of a trade package: send (red dot) or get (green dot), an
+ * One side of a trade package: send (neutral grey dot, never red: nothing the user gives up is a verdict) or get (green dot), an
  * uppercase label, an optional side total, and the asset rows on a faint
  * wash of the side's own color. Mirrors web-next's `ExchangeSide`
  * (components/TradeAssetExchange.tsx) so Dashboard, GM Plan, Trade Hub,
@@ -35,7 +35,7 @@ export default function ExchangeSide({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const dot = side === 'send' ? colors.danger : colors.success;
+  const dot = side === 'send' ? colors.textTertiary : colors.success;
   return (
     <View style={[styles.side, style]}>
       <View style={styles.labelRow}>

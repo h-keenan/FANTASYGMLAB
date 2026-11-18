@@ -38,6 +38,8 @@ const TEMPLATE_FILES = [
 // Files allowed to render a raw <PlayerAvatar>/<PlayerName>: path (relative to repo root) -> reason.
 export const RAW_ALLOWLIST = {
   "web-next/src/components/ui/TradeSummaryRow.tsx": "the collapsed summary avatars are decorative (aria-hidden); every player opens PQV from the expanded exchange rows (ExchangeSide)",
+  "web-next/src/components/GmPlanSteps.tsx": "the avatars sit inside a trade row's expand toggle and are decorative; every player opens PQV from the expanded exchange rows (ExchangeSide)",
+  "mobile/src/components/GmPlanSteps.tsx": "the avatars sit inside a trade row's expand toggle and are decorative; every player opens PQV from the expanded exchange rows (ExchangeSide)",
   "mobile/src/components/TradeSummaryRow.tsx": "the collapsed summary avatars are decorative; every player opens PQV from the expanded exchange rows (CompactPlayerModule)",
   "web-next/src/components/NewsDigest.tsx": "exempt: the player chips are filter toggles that select a player to filter by (picker rule); the story rows use PlayerAccordionRow, tappable by default",
   "mobile/src/components/NewsDigest.tsx": "exempt: the player chips are filter toggles that select a player to filter by (picker rule); the story rows use PlayerAccordionRow, tappable by default",

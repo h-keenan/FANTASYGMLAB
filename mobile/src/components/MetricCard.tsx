@@ -36,6 +36,7 @@ export default function MetricCard({
   fill,
   onPress,
   centered = false,
+  dense = false,
   labelAccessory,
   amount,
   style,
@@ -83,6 +84,8 @@ export default function MetricCard({
    * value shrinks to fit instead of touching the tile edge ("36,414" in a 4-up
    * row at phone width). Off by default so every other caller is unchanged. */
   centered?: boolean;
+  /** Half-height strip tile (GM Plan overview; web SnapshotTile `dense`): tight label over a one-line value with its note inline. */
+  dense?: boolean;
   /** Inline after the label (e.g. the "?" explainer chip): it takes its own space in the label row, so a
    * long label truncates instead of being covered by a corner badge (coridian_ 2026-11-16: "question marks
    * look bad and clip"). */
@@ -98,6 +101,34 @@ export default function MetricCard({
   const display = value === null || value === undefined || value === '' ? '—' : value;
   const pctl = percentileLabel(percentile);
   const trendIcon = percentileTrendIcon(percentile);
+  if (dense) {
+    const denseBody = (
+      <>
+        <View style={styles.denseLabelRow}>
+          <AppText style={styles.denseLabel} numberOfLines={1}>
+            {label}
+          </AppText>
+        </View>
+        <View style={styles.denseValueRow}>
+          <AppText style={[styles.denseValue, valueColor ? { color: valueColor } : null]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            <Money>{typeof display === 'string' ? display : String(display)}</Money>
+          </AppText>
+          {note ? (
+            <AppText style={styles.denseNote} numberOfLines={1}>
+              {note}
+            </AppText>
+          ) : null}
+        </View>
+      </>
+    );
+    return onPress ? (
+      <PressableScale style={[styles.card, styles.denseCard, style]} onPress={onPress}>
+        {denseBody}
+      </PressableScale>
+    ) : (
+      <View style={[styles.card, styles.denseCard, style]}>{denseBody}</View>
+    );
+  }
   const content = (
     <>
       <View style={[styles.labelRow, centered && styles.labelRowCentered]}>
@@ -181,6 +212,12 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.xs,
       marginBottom: 3,
     },
+    denseCard: { alignItems: 'center', paddingHorizontal: spacing.xs, paddingVertical: 6, gap: 2 },
+    denseLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 3, maxWidth: '100%' },
+    denseLabel: { flexShrink: 1, fontSize: 11, color: colors.textTertiary },
+    denseValueRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 4, maxWidth: '100%' },
+    denseValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, fontVariant: ['tabular-nums'] },
+    denseNote: { fontSize: 11, color: colors.textTertiary },
     labelRowCentered: { justifyContent: 'center' },
     centeredText: { textAlign: 'center', justifyContent: 'center' },
     valueCentered: { textAlign: 'center', fontVariant: ['tabular-nums'] },
