@@ -151,12 +151,41 @@ def parse_production(stat_rows: Iterable[Mapping[str, Any]]) -> set:
     return keep
 
 
+def roster_class_year(row: Mapping[str, Any], season: int, recruit_years: Optional[Mapping[str, int]] = None) -> Optional[int]:
+    """Class year (1=freshman..5). CFBD's roster ``year`` field is deprecated and now
+    returns the season (or nothing), so only a value in 1..5 is trusted; otherwise the
+    class is derived from the player's high-school recruiting year."""
+
+    raw = _int_or_none(row.get("year"))
+    if raw is not None and 1 <= raw <= 5:
+        return raw
+    ids = [str(row.get("id"))] + [str(r) for r in (row.get("recruitIds") or [])]
+    for rid in ids:
+        rec_year = (recruit_years or {}).get(rid)
+        if rec_year and 1 <= season - rec_year + 1 <= 5:
+            return season - rec_year + 1
+    return None
+
+
+def recruit_year_map(rows: Iterable[Mapping[str, Any]]) -> Dict[str, int]:
+    out: Dict[str, int] = {}
+    for row in rows or []:
+        year = _int_or_none(row.get("year"))
+        if not year:
+            continue
+        for k in ("id", "athleteId"):
+            if row.get(k) is not None:
+                out[str(row[k])] = year
+    return out
+
+
 def parse_roster(
     roster_rows: Iterable[Mapping[str, Any]],
     *,
     season: int,
     producers: set,
     draft_years: Sequence[int],
+    recruit_years: Optional[Mapping[str, int]] = None,
 ) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for row in roster_rows or []:
@@ -169,7 +198,8 @@ def parse_roster(
             continue
         name = " ".join(str(row.get(k) or "").strip() for k in ("firstName", "lastName")).strip()
         school = str(row.get("team") or "").strip()
-        year = draft_year_for(row.get("year"), season)
+        class_year = roster_class_year(row, season, recruit_years)
+        year = draft_year_for(class_year, season)
         if not name or not school or year not in draft_years:
             continue
         city = str(row.get("homeCity") or "").strip()
@@ -181,7 +211,7 @@ def parse_roster(
                 "school": school,
                 "draft_year": year,
                 "cfbd_id": str(pid),
-                "class_year": _int_or_none(row.get("year")),
+                "class_year": class_year,
                 "height_in": _int_or_none(row.get("height")),
                 "weight_lb": _int_or_none(row.get("weight")),
                 "hometown": ", ".join(p for p in (city, state) if p) or None,
@@ -249,7 +279,7 @@ def fetch_candidates(
     if sink is not None:
         sink["season_stat_rows"] = stat_rows
         sink["logos"] = {t.get("school"): (t.get("logos") or [None])[0] for t in teams if t.get("school")}
-    candidates: List[Dict[str, Any]] = []
+    rosters: List[Any] = []
     for team in teams:
         school = team.get("school")
         if not school:
@@ -259,8 +289,27 @@ def fetch_candidates(
         except Exception as exc:  # one bad team must not sink the run
             log(f"roster fetch failed for {school}: {type(exc).__name__}")
             continue
-        candidates.extend(parse_roster(roster, season=season, producers=producers, draft_years=draft_years))
+        rosters.append(roster or [])
         time.sleep(delay)
+    recruit_years: Dict[str, int] = {}
+    needs_recruits = any(
+        not (_int_or_none(r.get("year")) and 1 <= _int_or_none(r.get("year")) <= 5) for roster in rosters for r in roster
+    )
+    if needs_recruits:  # roster class year unusable: derive it from recruiting year (5 extra calls)
+        for y in range(season - 4, season + 1):
+            try:
+                recruit_years.update(recruit_year_map(getter("/recruiting/players", {"year": y, "classification": "HighSchool"}, key)))
+            except Exception as exc:
+                log(f"recruiting fetch failed for {y}: {type(exc).__name__}")
+    candidates: List[Dict[str, Any]] = []
+    for roster in rosters:
+        candidates.extend(
+            parse_roster(roster, season=season, producers=producers, draft_years=draft_years, recruit_years=recruit_years)
+        )
+    log(
+        f"candidates: producers={len(producers)} teams={len(teams)} rosters={len(rosters)} "
+        f"recruit_years={len(recruit_years)} candidates={len(candidates)}"
+    )
     return candidates
 
 
