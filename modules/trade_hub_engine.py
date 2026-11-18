@@ -901,7 +901,7 @@ def generate_trade_idea_records_cached(
         # Round 4: the league-state fingerprint (settings, rosters, traded picks, players/values files) replaces the clock
         # bucket, so the entry is served stale-while-revalidate and a real change is a different key.
         f"{league_value_settings.league_state_fingerprint(league_id, players_db_path)}"
-        f"|pc={int(partner_context_module.enabled())}",
+        f"|pc={int(partner_context_module.enabled())}{int(partner_context_module.ask_pick_enabled())}",
     )
     cache_key = redis_cache.build_cache_key("trade_hub_ideas", *key)
     records = swr_cache.redis_swr_cache(
@@ -1068,6 +1068,11 @@ def generate_trade_finder_records(
         require_receive_picks=require_receive_picks,
         require_receive_players=require_receive_players,
         finder_trace=finder_trace,
+        # Shared league team profile (partner trade habits); None when the
+        # Finder flag is off, which reads tendency neutral as before.
+        team_profiles=partner_context_module.team_profiles_for_surface(
+            partner_context_module.FINDER_ENV_KEY, league_id=league_id, lens=lens, players_db_path=players_db_path
+        ),
     )
     if finder_trace is not None and posture:
         finder_trace.enforced_closest = trade_posture_module.stamp_records(
@@ -1137,6 +1142,9 @@ def generate_target_offer_result(
         score_field=score_field,
         pick_score_multiplier=strategy_adjusted_pick_score_multiplier(1.0, strategy),
         team_strategy=strategy,
+        team_profiles=partner_context_module.team_profiles_for_surface(
+            partner_context_module.SEARCH_ENV_KEY, league_id=league_id, lens=lens, players_db_path=players_db_path
+        ),
     )
 
 

@@ -619,6 +619,7 @@ def compose_next_move_briefing(
     gm_target_player_ids: tuple[str, ...] = (),
     include_trade_and_waiver: bool = True,
     include_bye_cover: bool = False,
+    team_profiles: Mapping[str, Any] | None = None,
 ) -> daily_gm_briefing.DailyGmBriefing:
     """The mobile "Next Move" briefing — same composition pipeline
     (organize_dashboard_items -> compose_daily_gm_briefing) app.py uses,
@@ -784,6 +785,9 @@ def compose_next_move_briefing(
                 team_stance=team_stance,
                 untouchable_player_ids=untouchable_player_ids,
                 gm_target_player_ids=gm_target_player_ids,
+                # Shared league team profile (partner trade habits) for the
+                # direct path; None (flag off / not provided) reads neutral.
+                team_profiles=team_profiles,
             )
         )
         ranked_records = trade_hub_presentation.order_trade_hub_visible_ideas(list(records))
