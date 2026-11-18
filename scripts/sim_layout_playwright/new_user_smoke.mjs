@@ -213,11 +213,11 @@ for (const [plan, entitlement] of [["Pro", "premium"], ["Free", "free"]]) {
   const env = await newPage(browser, world({ signedIn: true, entitlement, saved: [{ league_id: LID, league_name: LEAGUE_NAME }] }));
   await goto(env, `/gm-plan/${LID}?name=${encodeURIComponent(LEAGUE_NAME)}`);
   if (plan === "Pro") {
-    await check(env, "6a Pro: GM Plan module", { app: true, expectText: [FIX["gm-plan"].headline] });
+    await check(env, "6a Pro: GM Plan module", { app: true, expectSel: ['[data-testid="plan-step-trades"]'] });
     if (await env.page.locator('[data-testid="paid-preview"]').count()) { console.log("FAIL 6a Pro sees the paywall"); results.push({ name: "6a", fails: ["Pro sees paywall"] }); }
   } else {
     await check(env, "6b Free: GM Plan paywall", { app: true, expectSel: ['[data-testid="paid-preview"]', '[data-testid="gm-plan-pro-preview"]'] });
-    if (await env.page.getByText(FIX["gm-plan"].headline).count()) { console.log("FAIL 6b Free sees the Pro module"); results.push({ name: "6b", fails: ["Free sees Pro module"] }); }
+    if (await env.page.locator('[data-testid="plan-step-trades"]').count()) { console.log("FAIL 6b Free sees the Pro module"); results.push({ name: "6b", fails: ["Free sees Pro module"] }); }
   }
   await goto(env, "/account");
   await check(env, `6c Account plan label (${plan})`, { expectText: ["smoke@example.com"], expectSel: [`dd:text-is("${plan}")`] });
