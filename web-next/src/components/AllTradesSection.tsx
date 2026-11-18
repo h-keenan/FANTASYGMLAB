@@ -68,7 +68,7 @@ export function AllTradesSection({ leagueId, strategy, lens }: { leagueId: strin
     return () => {
       cancelled = true;
     };
-     
+
   }, [request, attempt]);
 
   async function loadMore() {

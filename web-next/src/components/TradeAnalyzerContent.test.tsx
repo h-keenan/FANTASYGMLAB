@@ -854,4 +854,3 @@ describe("Quick Compare (the app's instant players-only readout, on web)", () =>
     expect(screen.queryByTestId("quick-compare")).toBeNull();
   });
 });
-
