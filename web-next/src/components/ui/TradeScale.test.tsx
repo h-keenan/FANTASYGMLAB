@@ -35,6 +35,14 @@ describe("TradeScale (two-column scale)", () => {
     expect(screen.getAllByTestId("compact-player-card")).toHaveLength(2);
   });
 
+  it("keeps the headshot in the stacked rows: a player with an id renders a photo img, not just initials", () => {
+    const { container } = render(<TradeScale give={[chase]} get={[gibbs]} onAdd={() => {}} />);
+    const imgs = Array.from(container.querySelectorAll('[data-testid="scale-give"] img, [data-testid="scale-get"] img'));
+    const srcs = imgs.map((i) => i.getAttribute("src") ?? "");
+    expect(srcs.some((src) => src.includes("7564"))).toBe(true);
+    expect(srcs.some((src) => src.includes("9221"))).toBe(true);
+  });
+
   it("updates the meter live as assets change", () => {
     const { rerender } = render(<TradeScale give={[gibbs]} get={[chase]} onAdd={() => {}} />);
     expect(screen.getByTestId("fairness-label").textContent).toMatch(/win|edge to you/i);

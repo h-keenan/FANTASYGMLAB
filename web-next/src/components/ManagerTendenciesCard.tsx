@@ -52,7 +52,8 @@ export function ManagerTendenciesCard({
       <Link
         href="/premium"
         onClick={() => trackUse("manager_tendencies", "upsell_tapped", { leagueId, tier: "free" })}
-        className="tap-link flex items-center gap-2 text-xs font-bold"
+        // 44px tap target kept, but its padding is pulled back out of the layout (the app uses hitSlop) so the row sits one page-gap from its neighbours, not ~30px.
+        className="tap-link -my-3 flex items-center gap-2 text-xs font-bold"
         style={{ color: "var(--color-text-secondary)" }}
         data-testid="manager-tendencies-locked"
       >
