@@ -62,21 +62,24 @@ def test_no_market_floor_only_for_evidence_free_players():
     assert va.no_market_floor_adjustment(pool).iloc[30] == pytest.approx(-0.10 * 2800)
 
 
-def test_flags_default_off_and_cache_key_untouched(monkeypatch):
+def test_flags_default_on_with_kill_switch_and_cache_key(monkeypatch):
     monkeypatch.delenv(va.STARTING_DEMAND_ENV_KEY, raising=False)
     monkeypatch.delenv(va.NO_MARKET_FLOOR_ENV_KEY, raising=False)
-    assert not va.starting_demand_enabled() and not va.no_market_floor_enabled()
+    assert va.starting_demand_enabled() and va.no_market_floor_enabled()
+    assert va.fingerprint_parts() == ("role_demand=1", "no_market_floor=1")
+    monkeypatch.setenv(va.STARTING_DEMAND_ENV_KEY, "0")
+    assert not va.starting_demand_enabled()
+    assert va.fingerprint_parts() == ("no_market_floor=1",)
+    monkeypatch.setenv(va.NO_MARKET_FLOOR_ENV_KEY, "off")
     assert va.fingerprint_parts() == ()
-    monkeypatch.setenv(va.STARTING_DEMAND_ENV_KEY, "1")
-    assert va.fingerprint_parts() == ("role_demand=1",)
 
 
-def test_lens_applies_both_adjustments_only_when_flagged(monkeypatch):
-    monkeypatch.delenv(va.STARTING_DEMAND_ENV_KEY, raising=False)
-    monkeypatch.delenv(va.NO_MARKET_FLOOR_ENV_KEY, raising=False)
+def test_lens_applies_both_adjustments_unless_switched_off(monkeypatch):
+    monkeypatch.setenv(va.STARTING_DEMAND_ENV_KEY, "0")
+    monkeypatch.setenv(va.NO_MARKET_FLOOR_ENV_KEY, "0")
     off = lvs.apply_valuation_lens(_pool(), lvs.LENS_DYNASTY, dict(ONE_QB))
-    monkeypatch.setenv(va.STARTING_DEMAND_ENV_KEY, "1")
-    monkeypatch.setenv(va.NO_MARKET_FLOOR_ENV_KEY, "1")
+    monkeypatch.delenv(va.STARTING_DEMAND_ENV_KEY)
+    monkeypatch.delenv(va.NO_MARKET_FLOOR_ENV_KEY)
     on = lvs.apply_valuation_lens(_pool(), lvs.LENS_DYNASTY, dict(ONE_QB))
     qb = on.set_index("player_id")
     base = off.set_index("player_id")

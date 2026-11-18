@@ -18,8 +18,7 @@ docs/audits/2026-11-trade-advice-backtest.md section 8:
 
 Both return a NON-POSITIVE per-row point adjustment applied to the league-lens
 pre-league scores in ``league_value_settings.apply_valuation_lens``. They never
-touch the canonical ``base_score``. Each is behind its own flag, default OFF
-(they move rankings everywhere; flip on after the backtest re-run):
+touch the canonical ``base_score``. Each is behind its own flag, default ON (owner-approved 2026-11-18; set to 0 to disable):
 ``DYNASTYGM_ROLE_STARTING_DEMAND_V1`` and ``DYNASTYGM_NO_MARKET_FLOOR_V1``.
 """
 
@@ -30,7 +29,7 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
-from modules.app_config import TRUE_CONFIG_VALUES, config_value
+from modules.app_config import config_value
 
 STARTING_DEMAND_ENV_KEY = "DYNASTYGM_ROLE_STARTING_DEMAND_V1"
 NO_MARKET_FLOOR_ENV_KEY = "DYNASTYGM_NO_MARKET_FLOOR_V1"
@@ -49,16 +48,24 @@ NEUTRAL_TOLERANCE = 1.0
 DEMAND_POSITIONS = ("QB", "RB", "WR", "TE")
 
 
+def flag_default_on(key: str) -> bool:
+    """Default-ON flag: unset or any non-false value is on; only an explicit
+    0/false/no/off turns it off (kill switch)."""
+
+    raw = config_value(key).strip().casefold()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def starting_demand_enabled() -> bool:
-    return config_value(STARTING_DEMAND_ENV_KEY).strip().casefold() in TRUE_CONFIG_VALUES
+    return flag_default_on(STARTING_DEMAND_ENV_KEY)
 
 
 def no_market_floor_enabled() -> bool:
-    return config_value(NO_MARKET_FLOOR_ENV_KEY).strip().casefold() in TRUE_CONFIG_VALUES
+    return flag_default_on(NO_MARKET_FLOOR_ENV_KEY)
 
 
 def fingerprint_parts() -> tuple[str, ...]:
-    """Cache-key parts: empty while both flags are off, so default caches are untouched."""
+    """Cache-key parts: one per enabled flag, so flipping a flag invalidates valued-player caches."""
 
     parts = []
     if starting_demand_enabled():

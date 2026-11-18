@@ -832,7 +832,7 @@ def apply_valuation_lens(
         + base_scores * 0.05
     ) * pd.to_numeric(current_risk_multiplier, errors="coerce").fillna(risk_multiplier)
     value_pre_league = current_scores.clip(lower=0)
-    # Trade-advice audit P1-1/P1-2 (flags default OFF): role/opportunity credit
+    # Trade-advice audit P1-1/P1-2 (flags default ON): role/opportunity credit
     # only for players the league actually starts, and no anchor credit for a
     # no-market, no-evidence player. Never touches the canonical base_score.
     anchor_adjust = pd.Series(0.0, index=df.index, dtype="float64")
