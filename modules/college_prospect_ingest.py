@@ -134,6 +134,11 @@ def draft_year_for(class_year: Any, season: int) -> Optional[int]:
 # ---------------------------------------------------------------------------
 # CFBD parsing
 # ---------------------------------------------------------------------------
+def _name_team_key(name: Any, team: Any) -> Optional[str]:
+    n, t = normalize_name(name), normalize_name(team)
+    return f"nt:{n}|{t}" if n and t else None
+
+
 def parse_production(stat_rows: Iterable[Mapping[str, Any]]) -> set:
     """Set of CFBD playerIds whose season yardage clears the production gate."""
 
@@ -146,8 +151,12 @@ def parse_production(stat_rows: Iterable[Mapping[str, Any]]) -> set:
             value = float(row.get("stat"))
         except (TypeError, ValueError):
             continue
-        if value >= MIN_SEASON_YARDS[category] and row.get("playerId") is not None:
-            keep.add(str(row["playerId"]))
+        if value >= MIN_SEASON_YARDS[category]:
+            if row.get("playerId") is not None:
+                keep.add(str(row["playerId"]))
+            nk = _name_team_key(row.get("player"), row.get("team"))
+            if nk:
+                keep.add(nk)
     return keep
 
 
@@ -186,21 +195,37 @@ def parse_roster(
     producers: set,
     draft_years: Sequence[int],
     recruit_years: Optional[Mapping[str, int]] = None,
+    counts: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
+    c = counts if counts is not None else {}
+
+    def bump(k: str) -> None:
+        c[k] = c.get(k, 0) + 1
+
     for row in roster_rows or []:
+        bump("rows")
         position = str(row.get("position") or "").upper()
         position = POSITION_ALIASES.get(position, position)
         if position not in RELEVANT_POSITIONS:
             continue
+        bump("position_ok")
         pid = row.get("id")
-        if pid is None or str(pid) not in producers:
-            continue
         name = " ".join(str(row.get(k) or "").strip() for k in ("firstName", "lastName")).strip()
         school = str(row.get("team") or "").strip()
+        if not ((pid is not None and str(pid) in producers) or _name_team_key(name, school) in producers):
+            continue
+        bump("producer_ok")
         class_year = roster_class_year(row, season, recruit_years)
         year = draft_year_for(class_year, season)
+        if class_year is None:
+            bump("no_class_year")
+            samples = c.setdefault("samples", [])
+            if len(samples) < 3:
+                samples.append({"year": row.get("year"), "pos": position, "recruitIds": len(row.get("recruitIds") or [])})
         if not name or not school or year not in draft_years:
+            if year is not None:
+                bump("draft_year_out_of_range")
             continue
         city = str(row.get("homeCity") or "").strip()
         state = str(row.get("homeState") or "").strip()
@@ -302,10 +327,15 @@ def fetch_candidates(
             except Exception as exc:
                 log(f"recruiting fetch failed for {y}: {type(exc).__name__}")
     candidates: List[Dict[str, Any]] = []
+    counts: Dict[str, Any] = {}
     for roster in rosters:
         candidates.extend(
-            parse_roster(roster, season=season, producers=producers, draft_years=draft_years, recruit_years=recruit_years)
+            parse_roster(
+                roster, season=season, producers=producers, draft_years=draft_years,
+                recruit_years=recruit_years, counts=counts,
+            )
         )
+    log(f"roster stages: {counts}")
     log(
         f"candidates: producers={len(producers)} teams={len(teams)} rosters={len(rosters)} "
         f"recruit_years={len(recruit_years)} candidates={len(candidates)}"

@@ -154,3 +154,14 @@ def test_roster_class_year_derived_from_recruit_year_when_year_is_season():
     out = parse_roster([row], season=2026, producers={"9"}, draft_years=(2027, 2028), recruit_years={"r1": 2024})
     assert out and out[0]["class_year"] == 3 and out[0]["draft_year"] == 2027
     assert parse_roster([row], season=2026, producers={"9"}, draft_years=(2027, 2028)) == []
+
+
+def test_roster_matches_producers_by_name_and_team_when_ids_differ():
+    from modules.college_prospect_ingest import parse_production, parse_roster
+
+    stats = [{"playerId": "111", "player": "Arch Manning", "team": "Texas", "category": "passing", "statType": "YDS", "stat": "2400"}]
+    producers = parse_production(stats)
+    row = {"id": "999", "firstName": "Arch", "lastName": "Manning", "team": "Texas", "position": "QB", "year": 2, "recruitIds": []}
+    counts = {}
+    out = parse_roster([row], season=2026, producers=producers, draft_years=(2027, 2028), counts=counts)
+    assert out and out[0]["draft_year"] == 2028 and counts["producer_ok"] == 1
