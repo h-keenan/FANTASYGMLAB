@@ -29,7 +29,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from modules import age_profile, experimental_graduation, partner_context
+from modules import age_profile, experimental_graduation, partner_context, playoff_context
 
 OUTLOOK_ENV_KEY = "DYNASTYGM_GM_PLAN_PROFILE_V1"
 FOCUS_OUTLOOK = "team_outlook"
@@ -210,7 +210,19 @@ def needs_item(me_id: str, me: Mapping[str, Any], teams: Mapping[str, Any], look
     return item("needs", "Needs", " · ".join(bits), why, players[:MAX_PLAYERS_PER_ITEM], "accent")
 
 
-def picks_item(me_id: str, me: Mapping[str, Any], teams: Mapping[str, Any], side: str) -> dict[str, Any] | None:
+def _earliest_first(block: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    slots = sorted((a for a in (block or {}).get("assets") or () if a.get("round") == 1 and a.get("slot")), key=lambda a: a.get("slot_number") or 99)
+    return slots[0] if slots else None
+
+
+def picks_item(
+    me_id: str,
+    me: Mapping[str, Any],
+    teams: Mapping[str, Any],
+    side: str,
+    odds_block: Mapping[str, Any] | None = None,
+    my_read: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
     picks = me.get("picks") or {}
     if not picks.get("count"):
         return None
@@ -222,6 +234,14 @@ def picks_item(me_id: str, me: Mapping[str, Any], teams: Mapping[str, Any], side
     why = [f"{picks['count']} picks across your draft years, {firsts} of them firsts"]
     if slots:
         why.append(f"Earliest first projects at {slots[0]['slot']} ({slots[0].get('season')})")
+    # Handshake item 9: the simulated finish joins the slot (roster value + record + playoff odds).
+    odds_first = _earliest_first(odds_block)
+    if odds_first and slots and my_read and my_read.get("expected_finish"):
+        finish = f"{ordinal(int(my_read['expected_finish']))} of {my_read['team_count']}"
+        if odds_first["slot"] != slots[0]["slot"]:
+            why.append(f"With the simulated finish ({finish}) it projects at {odds_first['slot']}, not {slots[0]['slot']} from roster value and record alone")
+        else:
+            why.append(f"The simulated finish ({finish}) agrees with that slot")
     why.append(f"Pick capital ranks {ordinal(rank)} of {len(capitals)} teams ({str(picks.get('tier') or 'middle')} tier)")
     flow = picks.get("flow") or {}
     if flow.get("picks_acquired") or flow.get("picks_sent"):
@@ -232,6 +252,30 @@ def picks_item(me_id: str, me: Mapping[str, Any], teams: Mapping[str, Any], side
         why.append("As a contender, surplus picks are trade currency for upgrades" if firsts >= 2 else "As a contender, you have little pick currency left to spend")
     headline = f"{firsts} first{'s' if firsts != 1 else ''} · {ordinal(rank)} of {len(capitals)} in draft capital"
     return item("picks", "Picks", headline, why, (), "success" if rank <= max(1, len(capitals) // 3) else "muted")
+
+
+def lean_item(me_id: str, me: Mapping[str, Any], reads: Mapping[str, Mapping[str, Any]], declared_stance: str) -> dict[str, Any] | None:
+    """Buyer / seller / hold from the simulated playoff odds (``playoff_context.lean``)."""
+
+    read = reads.get(me_id)
+    if not read or not read.get("lean"):
+        return None
+    side = str(read["lean"])
+    why = [f"{w[:1].upper()}{w[1:]}" for w in read.get("why") or ()]
+    if read.get("expected_finish"):
+        why.append(f"Simulated finish: {ordinal(int(read['expected_finish']))} of {read['team_count']}")
+    declared = STANCE_SIDE.get(str(declared_stance or "").strip().lower())
+    if declared == "contend" and side == "seller":
+        why.append("This disagrees with your declared win-now stance: weigh selling aging value against the odds")
+    elif declared == "rebuild" and side == "buyer":
+        why.append("This disagrees with your declared rebuild: the odds say a push is realistic")
+    elif declared and ((declared == "contend" and side == "buyer") or (declared == "rebuild" and side == "seller")):
+        why.append("This agrees with your declared stance")
+    if len(why) < 2:
+        return None
+    label = {"buyer": "Lean: buyer", "seller": "Lean: seller", "hold": "Lean: hold steady"}[side]
+    tone = "success" if side == "buyer" else "muted"
+    return item("lean", "Season lean", label, why, (), tone)
 
 
 def waivers_item(adds: Sequence[Mapping[str, Any]], me: Mapping[str, Any], side: str) -> dict[str, Any] | None:
@@ -280,6 +324,7 @@ def call_items(
     lookup: Mapping[str, Mapping[str, Any]],
     side: str,
     idea_partners: Iterable[str] = (),
+    odds_reads: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """The best trade partners to call, each with at least two reasons."""
 
@@ -317,6 +362,13 @@ def call_items(
         elif side == "contend" and key in REBUILD_KEYS:
             reasons.append(f"{label}, so they may move veterans")
             score += 1
+        partner_lean = str(((odds_reads or {}).get(rid) or {}).get("lean") or "")
+        if partner_lean == "seller" and side == "contend":
+            reasons.append("their playoff odds make them a seller")
+            score += 1
+        elif partner_lean == "buyer" and side == "rebuild":
+            reasons.append("their playoff odds make them a buyer")
+            score += 1
         firsts = int((team.get("picks") or {}).get("firsts") or 0)
         if side == "rebuild" and firsts >= 2:
             reasons.append(f"holds {firsts} firsts to pay with")
@@ -351,6 +403,8 @@ def build_outlook(
     waiver_adds: Sequence[Mapping[str, Any]] = (),
     bye_tile: Mapping[str, Any] | None = None,
     idea_partners: Iterable[str] = (),
+    odds_reads: Mapping[str, Mapping[str, Any]] | None = None,
+    odds_picks_block: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """The Team Outlook items, or [] when the profile is missing."""
 
@@ -365,13 +419,14 @@ def build_outlook(
         for built in (
             age_item(me, teams, players_by_id, side, source),
             needs_item(me_id, me, teams, players_by_id),
-            picks_item(me_id, me, teams, side),
+            picks_item(me_id, me, teams, side, odds_picks_block, (odds_reads or {}).get(me_id)),
+            lean_item(me_id, me, odds_reads or {}, declared_stance) if odds_reads else None,
         )
         if built
     ]
     if in_season:
         items.extend(b for b in (waivers_item(waiver_adds, me, side), byes_item(bye_tile)) if b)
-    items.extend(call_items(me_id, teams, players_by_id, side, idea_partners))
+    items.extend(call_items(me_id, teams, players_by_id, side, idea_partners, odds_reads))
     return items
 
 

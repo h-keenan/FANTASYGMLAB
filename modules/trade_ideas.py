@@ -51,7 +51,7 @@ from modules.player_state_authority import (
 )
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
-from modules import age_profile, model_status, partner_context, runtime_trace
+from modules import age_profile, model_status, partner_context, playoff_context, runtime_trace
 from modules import drop_candidates, trade_cautions, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 
@@ -388,6 +388,7 @@ def _pick_team_context(
     *,
     roster_record: Mapping[str, Any] | None = None,
     season_progress: float | None = None,
+    odds_percentile: float | None = None,
 ) -> Dict[str, float | str]:
     """Blend roster-value percentile (talent, from `total_score`) with the
     team's REAL win-loss record (from Sleeper's own roster settings, via
@@ -438,6 +439,11 @@ def _pick_team_context(
         season_progress,
         record_strength_is_high=False,
     )
+    # Handshake item 9: the simulated finish (playoff odds, median wins, seed) joins
+    # the roster-value / record blend. None (flag off, off-season, Free surface)
+    # leaves the percentile exactly as before.
+    if odds_percentile is not None:
+        slot_percentile = playoff_context.blend_slot_percentile(slot_percentile, odds_percentile)
 
     if slot_percentile >= 0.67:
         tier_bucket = "early"
@@ -761,6 +767,7 @@ def _build_roster_pick_assets(
     prospect_rankings_by_year: Dict[int, Any] | None = None,
     crowd_class_strength_by_year: Dict[int, Mapping[str, Any]] | None = None,
     adapter=None,
+    odds_slot_percentiles: Mapping[int, float] | None = None,
 ) -> Dict[int, List[Dict[str, Any]]]:
     platform_adapter = adapter or get_sleeper_adapter()
     league = platform_adapter.get_league(league_id)
@@ -835,6 +842,7 @@ def _build_roster_pick_assets(
                 df_summary,
                 roster_record=roster_settings_by_id.get(roster_id),
                 season_progress=season_progress,
+                odds_percentile=(odds_slot_percentiles or {}).get(roster_id),
             )
         )
         for roster_id in dict.fromkeys(roster_ids)
