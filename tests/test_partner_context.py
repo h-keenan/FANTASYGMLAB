@@ -103,6 +103,42 @@ def test_acceptance_context_respects_ceiling_and_max_cap(monkeypatch):
     assert off["context_adjust"]["points"] == 0.0
 
 
+def test_cap_shift_cannot_flip_the_lopsided_cliff():
+    """The +1pp context cap move must not flip the lopsided penalty/hard fail:
+    that would swing realism by 10+ points, past the +/-COMBINED_MAX_POINTS budget."""
+
+    shape = {
+        "strategy": "contender", "needs": ["QB"],
+        "partner_context": _ctx(core_age_delta=5.0, pick_short=True, lean="Seller", sell_count=50),
+        "partner_team_count": 12,
+    }
+    send = [_pick(), _player(22, "WR", 3000)]
+    recv = [_player(32, "RB", 3000)]
+    probe = trade_ideas.partner_acceptance_context(
+        send_assets=send, receive_assets=recv, partner_shape=shape, send_score=8000, receive_score=8000
+    )
+    assert probe["context_adjust"]["cap_shift"] > 0
+    # An edge inside the shifted allowance but outside the base allowance.
+    edge = probe["allowed_edge_base"] + 1
+    assert edge <= probe["allowed_edge"]
+    flipped = trade_ideas.partner_acceptance_context(
+        send_assets=send, receive_assets=recv, partner_shape=shape, send_score=8000 - edge, receive_score=8000
+    )
+    assert flipped["lopsided"] is True
+
+
+def test_realism_shift_stays_within_combined_budget_across_harness():
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "audits"))
+    import handshakes_extension_diff as h
+
+    for surface in ("search", "finder", "dashboard"):
+        result = h.compare(surface)
+        assert result["max_abs_shift"] <= pc.COMBINED_MAX_POINTS, surface
+
+
 def test_reason_line_stays_short_and_neutral():
     ctx = {"need_hits": ["WR"], "strategy": "contender", "context_adjust": {"note": "short on picks"}}
     text = trade_ideas.partner_reason_text(ctx)
