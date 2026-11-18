@@ -10,6 +10,7 @@ import ErrorState from './ErrorState';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
+import Toggle from './Toggle';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './Skeleton';
@@ -26,6 +27,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
   simAssignSlot,
+  simAutoManageNote,
   simBenchOffersReserveMove,
   simBenchSwapTargets,
   simClaimPayload,
@@ -134,6 +136,19 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       setLineup(body);
       ctx.bump();
       await refreshGame();
+    }
+  }
+
+  async function toggleAutoManage(next: boolean) {
+    const previous = lineup;
+    setLineup((l) => (l ? { ...l, auto_manage: next } : l));
+    const body = await call(() => api.setSimAutoManage(gameId, next));
+    if (body) {
+      setLineup(body);
+      ctx.bump();
+      await refreshGame();
+    } else {
+      setLineup(previous);
     }
   }
 
@@ -261,6 +276,13 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           </Pressable>
         }
       >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingBottom: spacing.xs }} testID="sim-auto-manage">
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <AppText style={{ fontSize: 14, fontWeight: '800', color: colors.textPrimary }}>Auto-manage my lineup</AppText>
+            <AppText style={{ fontSize: 12, color: colors.textSecondary }}>{simAutoManageNote(Boolean(lineup.auto_manage), Boolean(lineup.lineup_edited))}</AppText>
+          </View>
+          <Toggle value={Boolean(lineup.auto_manage)} onValueChange={(next) => void toggleAutoManage(next)} disabled={lineup.locked} label="Auto-manage my lineup" />
+        </View>
         {slots.map((slot, index) => (
           <LineupRow key={`${slot.slot}-${index}`} week={game.week} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} handleFor={handleFor} />
         ))}

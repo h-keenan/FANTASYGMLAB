@@ -190,6 +190,10 @@ class SimToBody(BaseModel):
     stops: dict[str, bool] | None = None  # per-run stop toggles (game_simto.Stops); absent = all on
 
 
+class AutoManageBody(BaseModel):
+    on: bool
+
+
 class UndoSimBody(BaseModel):
     from_seq: int
 
@@ -528,7 +532,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 "bench": {"min": BENCH_RANGE[0], "max": BENCH_RANGE[1], "default": DEFAULT_BENCH},
                 "difficulty": {"values": list(DIFFICULTIES), "default": "normal"},
                 "user_slot": {"min": 1, "max": max(TEAM_COUNTS), "default": None},
-                "auto_lineup": {"default": False},
+                "auto_lineup": {"default": True},
                 "team_names": {"values": list(TEAM_NAMES), "max_length": USER_TEAM_NAME_MAX},
                 "tiebreaker": {"values": list(TIEBREAKERS), "default": DEFAULT_TIEBREAKER},
                 # IR and taxi squads (taxi defaults to 4 in dynasty, 0 in redraft; a league import reads its own).
@@ -598,6 +602,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         uid = str(user.get("id") or "")
         raw = dict(body or {})
+        # Auto-manage my lineup is ON for a new game unless the client says otherwise; saved games keep their stored setting.
+        raw.setdefault("auto_lineup", True)
         team_name = " ".join(str(raw.pop("team_name", "") or "").split())
         random_name = raw.pop("random_team_name", False) is True
         if len(team_name) > USER_TEAM_NAME_MAX:
@@ -918,6 +924,13 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     @guarded
     def auto_lineup(game_id: str, user: dict[str, Any] = Depends(require_user)):
         return _mutate(user, game_id, lambda em, *_: act.auto_lineup(em), respond=_lineup_resp)
+
+    @router.put("/games/{game_id}/auto-manage")
+    @guarded
+    def put_auto_manage(game_id: str, body: AutoManageBody, user: dict[str, Any] = Depends(require_user)):
+        """The "Auto-manage my lineup" switch. It only changes the game's own state; a real league lineup is never touched."""
+
+        return _mutate(user, game_id, lambda em, *_: act.set_auto_manage(em, body.on), respond=_lineup_resp)
 
     # ------------------------------------------------------ waivers and cuts
 

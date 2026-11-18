@@ -89,6 +89,10 @@ class GameState:
         self.rules: list[dict[str, Any]] = []
         # posture_v 1+: each AI team's buy / sell posture, {tid: {"stance": "buy" | "sell" | "", "week": n, "odds": p}}. Inert (and out of the digest) while empty; cleared each season.
         self.posture: dict[str, dict[str, Any]] = {}
+        # Auto-manage lineup: the user's runtime switch (None = follow ``settings.auto_lineup``) and the week of their last
+        # hand-set lineup (0 = none). Inert (and out of the digest) at their defaults, so every older save fingerprints as before.
+        self.auto_manage: bool | None = None
+        self.manual_lineup_week = 0
 
     # --------------------------------------------------------------- views
 
@@ -175,6 +179,10 @@ class GameState:
         for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block", "rules", "out_kind", "posture"):
             if not raw[key]:
                 del raw[key]
+        if raw["auto_manage"] is None:
+            del raw["auto_manage"]
+        if not raw["manual_lineup_week"]:
+            del raw["manual_lineup_week"]
         if raw["season_no"] == 1:
             del raw["season_no"]
         if raw["offseason"] is None:
@@ -330,6 +338,18 @@ def _draft_complete(state, snap, week, p):
 
 def _lineup_set(state, snap, week, p):
     state.lineups[p["team"]] = [[s, pid] for s, pid in p["slots"]]
+    if p.get("auto") is False and p["team"] == snap.user_team.tid:
+        state.manual_lineup_week = int(week)  # the user set this week's lineup by hand: auto-manage leaves it alone
+
+
+def _auto_manage_set(state, snap, week, p):
+    state.auto_manage = bool(p["on"])
+
+
+def auto_manage_on(snap, state) -> bool:
+    """Is the user's lineup auto-managed (the runtime switch, else the game's ``auto_lineup`` setting)?"""
+
+    return bool(snap.settings.auto_lineup if state.auto_manage is None else state.auto_manage)
 
 
 def _waiver_claim(state, snap, week, p):
@@ -653,7 +673,7 @@ _HANDLERS = {
     "draft_pick": _draft_pick, "draft_queue": _draft_queue, "draft_complete": _draft_complete,
     "league_rosters": _league_rosters, "league_start": _draft_complete,
     "league_midseason": _league_midseason, "midseason_start": _midseason_start,
-    "lineup_set": _lineup_set, "waiver_claim": _waiver_claim, "waiver_cancel": _waiver_cancel,
+    "lineup_set": _lineup_set, "auto_manage_set": _auto_manage_set, "waiver_claim": _waiver_claim, "waiver_cancel": _waiver_cancel,
     "waiver_result": _waiver_result, "cut": _cut, "drop": _cut, "trade": _trade,
     "trade_reject": _offer_key, "trade_counter": _offer_key, "inbox_offer": _inbox_offer,
     "inbox_response": _inbox_response, "injury": _injury, "week_scored": _week_scored,

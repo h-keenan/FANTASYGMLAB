@@ -74,7 +74,7 @@ export function createMock(opts = {}) {
       seed: 7, engine_version: "game-1.0.0", settings: settings(),
       you: inSeason || state.status === "complete" ? { team_id: you, name: "Zach's Squad", wins: 2, losses: 1, ties: 0, pf: 361.4, pa: 330.2, rank: 4, seed: null } : { team_id: you, name: "Zach's Squad", wins: 0, losses: 0, ties: 0, pf: 0, pa: 0, rank: null, seed: null },
       this_week: inSeason ? { week: state.week, opponent: { team_id: "7", name: "Red Zone Rats", persona_id: "passive" }, bye: false, your_projection: 121.4, opponent_projection: 117.9 } : null,
-      pending: inSeason ? { claims: state.claims.length, inbox: 2, lineup_warnings: 1, roster_size: opts.overLimit ? 18 : 16, roster_limit: 16, cuts_needed: opts.overLimit ? 2 : 0 } : null,
+      auto_manage: state.autoManage !== false, lineup_edited: false, pending: inSeason ? { claims: state.claims.length, inbox: 2, lineup_warnings: 1, roster_size: opts.overLimit ? 18 : 16, roster_limit: 16, cuts_needed: opts.overLimit ? 2 : 0 } : null,
       can_trade: inSeason && state.week <= 10, trade_deadline_week: 10, grade_letter: state.status === "complete" ? "B+" : null, created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-02T00:00:00Z",
     };
   }
@@ -109,7 +109,7 @@ export function createMock(opts = {}) {
     let used = new Set(slots.map((s) => s.player?.id));
     const spare = mine.filter((p) => !used.has(p.id));
     for (const s of slots) if (!s.player) { const p = spare.shift(); if (p) { s.player = p; used.add(p.id); } }
-    return { ...env(), week: state.week, slots, bench: mine.filter((p) => !used.has(p.id)), projected_total: 121.4, warnings: [{ code: "bye", slot: "WR", player_id: slots[3].player?.id }], roster_size: mine.length, roster_limit: 16, opponent: { team_id: "7", name: "Red Zone Rats" }, locked: false };
+    return { ...env(), week: state.week, slots, bench: mine.filter((p) => !used.has(p.id)), projected_total: 121.4, warnings: [{ code: "bye", slot: "WR", player_id: slots[3].player?.id }], roster_size: mine.length, roster_limit: 16, opponent: { team_id: "7", name: "Red Zone Rats" }, locked: false, auto_manage: state.autoManage !== false, lineup_edited: false };
   };
   const recap = (week) => ({
     week, kind: "regular", round: null,
@@ -227,6 +227,7 @@ export function createMock(opts = {}) {
     if ((mm = sub.match(/^\/teams\/(.+)$/))) { const t = teams.find((x) => x.team_id === mm[1]); const rt = rosterTeam(t, teams.indexOf(t)); const held = rt.players; const active = held.filter((p) => p.squad === "roster"); const starters = []; const used = new Set(); for (const slot of SLOTS) { const pick = active.find((p) => !used.has(p.id) && (slot === "FLEX" ? ["RB", "WR", "TE"].includes(p.pos) : p.pos === slot)); if (pick) used.add(pick.id); starters.push({ slot, player: pick ?? null }); } return { status: 200, body: { ...env(), team_id: t.team_id, players: active, ir: held.filter((p) => p.squad === "ir"), taxi: held.filter((p) => p.squad === "taxi"), team: { team_id: t.team_id, name: t.name, owner: "Mgr " + (teams.indexOf(t) + 1), is_you: t.is_you, persona: PERSONAS[teams.indexOf(t) % 7], record: rt.record, power_rank: rt.power_rank, avg_age: rt.avg_age, roster_size: active.length }, lineup: starters, projected_total: Math.round(starters.reduce((a, x) => a + (x.player?.projection ?? 0), 0) * 10) / 10, positions: rt.positions, strengths: rt.strengths, needs: rt.needs, injuries: held.filter((p) => p.status === "out"), recent: [], next_game: { week: state.week, opponent: { team_id: "7", name: "Red Zone Rats" } }, trade: { open: !t.is_you, reason: null } } }; }
     if (sub === "/lineup" && method === "GET") return { status: 200, body: lineup() };
     if (sub === "/lineup" && method === "PUT") return { status: 200, body: lineup() };
+    if (sub === "/auto-manage" && method === "PUT") { state.autoManage = Boolean(body?.on); return { status: 200, body: lineup() }; }
     if (sub === "/sim-to/options") return { status: 200, body: { ...env(), options: [{ id: "weeks", weeks: 1, label: "Next week" }, { id: "weeks", weeks: 4, label: "4 weeks" }, { id: "trade_deadline", label: "Trade deadline (week 10)" }, { id: "playoffs_start", label: "End of regular season" }, { id: "season_end", label: "Through the playoffs" }] } };
     if (sub === "/sim-to" && method === "POST") {
       const n = body?.target === "weeks" ? body.weeks : 3; const first = state.week;

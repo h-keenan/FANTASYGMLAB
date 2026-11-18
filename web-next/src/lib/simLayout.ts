@@ -272,7 +272,7 @@ export function simLineupIssues(
  * `empty` is the empty slot labels (or just a count).
  */
 export function simAdvanceState(
-  game: { phase?: string; week: number; pending?: { cuts_needed?: number; limit_blocks?: boolean } | null },
+  game: { phase?: string; week: number; pending?: { cuts_needed?: number; limit_blocks?: boolean } | null; auto_manage?: boolean; lineup_edited?: boolean },
   empty: number | readonly string[],
   zero: readonly SimZeroStarter[] = [],
 ): SimAdvanceState {
@@ -280,7 +280,9 @@ export function simAdvanceState(
   const cuts = game.pending?.cuts_needed ?? 0;
   if (cuts > 0 && game.pending?.limit_blocks !== false) return { label, blocked: true, reason: `Cut ${cuts} player${cuts === 1 ? "" : "s"} first`, warning: null, confirm: null };
   const names = typeof empty === "number" ? Array.from({ length: empty }, () => "A starting slot") : empty;
-  if (names.length === 0 && zero.length === 0) return { label, blocked: false, reason: null, warning: null, confirm: null };
+  // Auto-manage my lineup fixes holes and hurt starters when the week plays, unless this week's lineup was set by hand.
+  const managed = Boolean(game.auto_manage) && !game.lineup_edited;
+  if (managed || (names.length === 0 && zero.length === 0)) return { label, blocked: false, reason: null, warning: null, confirm: null };
   const n = names.length;
   const who = n === 1 ? `${names[0]} is` : `${names.join(", ")} are`;
   const zeroConfirmWho = zero.map((z) => `${z.name} (${z.label}) ${z.reason === "bye" ? "is on a bye" : "is out"}`).join(", ");

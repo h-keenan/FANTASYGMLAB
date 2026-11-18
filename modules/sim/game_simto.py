@@ -22,7 +22,7 @@ from typing import Any, Mapping, Sequence
 from modules.sim import game_actions as act
 from modules.sim.game_engine import advance, standing_rows
 from modules.sim.game_eval import Evaluator
-from modules.sim.game_state import Emitter, GameState
+from modules.sim.game_state import Emitter, GameState, auto_manage_on
 from modules.sim.game_types import GameError, GameSnapshot
 
 TARGETS = ("weeks", "trade_deadline", "playoffs_start", "season_end")
@@ -254,15 +254,20 @@ def run(em: Emitter, snap: GameSnapshot, state: GameState, seed: int, *, target:
     stopped: dict[str, Any] | None = None
     deadline = time.monotonic() + budget_s
     played = 0
+    used_auto = False
     while not target_reached(snap, state, target, weeks, played) and played < MAX_WEEKS:
         em.snap = snap.view_for(state)
         cur = em.snap
-        if auto_set:
+        # "Auto-manage my lineup" (a game switch) acts like the run's own auto-set, except a lineup the user set by hand this week stays.
+        managed = auto_manage_on(cur, state) and state.manual_lineup_week != state.week
+        eff = auto_set or managed
+        used_auto = used_auto or eff
+        if eff:
             was = [list(r) for r in state.lineups[user]]
             act.auto_lineup(em)
             changes += _lineup_changes(cur, state.week, was, state.lineups[user])
         reason = stop_reason(cur, state, Evaluator(cur, state), pro=pro, paywalled=paywalled_fn(state), stops=stops, seen_offers=seen,
-                             hurt=hurt, played=played, auto_set=auto_set)
+                             hurt=hurt, played=played, auto_set=eff)
         hard = reason is not None and reason["code"] in ("roster_over_limit", "premium_required")
         if reason is not None and (hard or not (force_first and played == 0)):
             stopped = reason
@@ -279,7 +284,7 @@ def run(em: Emitter, snap: GameSnapshot, state: GameState, seed: int, *, target:
     fresh = sum(1 for o in state.offers if o["id"] not in seen)
     return {
         "target": target, "weeks_played": len(recaps), "stopped": stopped, "from_seq": start_seq, "to_seq": state.seq,
-        "summary": (summarize(snap, before, recaps, lineup_changes=changes, state=state, auto_set=auto_set, fresh_offers=fresh)
+        "summary": (summarize(snap, before, recaps, lineup_changes=changes, state=state, auto_set=used_auto, fresh_offers=fresh)
                     if recaps else None),
         "recap": recaps[-1] if recaps else None,  # the last week in full (the recap screen); the rest are in the summary
     }

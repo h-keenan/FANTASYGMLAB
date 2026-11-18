@@ -12,6 +12,7 @@ from modules.sim import game_grades, scouting
 from modules.sim.game_story import depth_chart_view
 from modules.sim.injuries import out_label
 from modules.sim.game_actions import lineup_warnings
+from modules.sim.game_state import auto_manage_on
 from modules.sim.game_ai import trade_window
 from modules.sim.game_draft import DraftContext, advice_reason, best_for_user, hint_reason
 from modules.sim.game_engine import rank_teams, standing_rows
@@ -361,6 +362,8 @@ def lineup_view(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
     ]
     return {
         "week": week, "slots": slots, "bench": bench,
+        # Auto-manage my lineup: the switch, and whether this week's lineup was set by hand (so the engine leaves it).
+        "auto_manage": auto_manage_on(snap, state), "lineup_edited": state.manual_lineup_week == week,
         "projected_total": round(ev.lineup_projection(lineup, week), 1),
         "warnings": lineup_warnings(ev, lineup, week) if state.status in ("in_season", "playoffs") else [],
         "roster_size": len(state.rosters[user]), "roster_limit": snap.settings.roster_limit,
@@ -470,6 +473,7 @@ def game_view(
         "round": (state.week - snap.settings.regular_weeks) if state.status == "playoffs" else None,
         "seed": row.get("seed"), "engine_version": row.get("engine_version"),
         "scoring_model": row.get("scoring_model"), "settings": snap.settings.to_dict(),
+        "auto_manage": auto_manage_on(snap, state), "lineup_edited": state.manual_lineup_week == week,
         "rules": rules_info(snap.unruled.settings, snap.settings, state.rules, state.status, state.view_no),
         "you": {
             "team_id": user, "name": team.name,

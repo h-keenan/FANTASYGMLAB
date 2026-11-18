@@ -9,6 +9,7 @@ import { Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimGlyph } from "@/components/SimGlyph";
+import { Toggle } from "@/components/Toggle";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
 import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SimReserveGroups, useSimRosterMoves, type SimRowMoveOptions } from "@/components/SimGameReserves";
@@ -22,6 +23,7 @@ import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import {
   simAssignSlot,
+  simAutoManageNote,
   simBenchSwapTargets,
   simOptimisticClaim,
   simWithout,
@@ -111,6 +113,19 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       setLineup(body);
       ctx.bump();
       await refreshGame();
+    }
+  }
+
+  async function toggleAutoManage(next: boolean) {
+    const previous = lineup;
+    setLineup((l) => (l ? { ...l, auto_manage: next } : l));
+    const body = await call(() => api.setSimAutoManage(gameId, next));
+    if (body) {
+      setLineup(body);
+      ctx.bump();
+      await refreshGame();
+    } else {
+      setLineup(previous);
     }
   }
 
@@ -226,6 +241,13 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
         }
       >
         <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex items-center justify-between gap-3 pb-1" data-testid="sim-auto-manage">
+          <div className="min-w-0">
+            <p className="text-sm font-bold">Auto-manage my lineup</p>
+            <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{simAutoManageNote(Boolean(lineup.auto_manage), Boolean(lineup.lineup_edited))}</p>
+          </div>
+          <Toggle checked={Boolean(lineup.auto_manage)} onChange={(next) => void toggleAutoManage(next)} disabled={lineup.locked} label="Auto-manage my lineup" />
+        </div>
         {slots.map((slot, index) => (
           <LineupRow key={`${slot.slot}-${index}`} week={game.week} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} handleFor={handleFor} />
         ))}

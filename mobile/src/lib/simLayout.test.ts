@@ -62,6 +62,14 @@ test('trade picker groups, filters and fit', () => {
   assert.deepEqual(simTradeFit(16, 16, 1, 3), { after: 18, room: 0, over: 2, blocked: false });
 });
 
+
+test('auto-manage keeps the Play guard quiet unless this week was set by hand', () => {
+  const zero = [{ name: 'Hurt Harry', label: 'RB', reason: 'out' as const }];
+  assert.equal(simAdvanceState({ phase: 'regular_season', week: 4, auto_manage: true }, ['WR2'], zero).confirm, null);
+  assert.notEqual(simAdvanceState({ phase: 'regular_season', week: 4, auto_manage: true, lineup_edited: true }, ['WR2'], zero).confirm, null);
+  assert.notEqual(simAdvanceState({ phase: 'regular_season', week: 4, auto_manage: false }, ['WR2'], zero).confirm, null);
+});
+
 test('auto-set message and advance state', () => {
   const a = (id: string, name: string) => ({ id, name });
   const before = [{ slot: 'RB', player: a('2', 'Hurt Harry') }];
