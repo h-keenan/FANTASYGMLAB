@@ -243,6 +243,29 @@ describe("LiveDraftContent", () => {
     expect(screen.getByText("Already Drafted")).toBeInTheDocument();
   });
 
+  it("shows the draft context summary and why-notes on the primary pick", () => {
+    const withContext: LiveDraftStateResponse = {
+      ...STATE,
+      draft_context: { parts: ["Rebuilding", "need TE", "RB aging"], lines: ["Rebuilding: from your declared stance, so the board leans younger"] },
+      recommendations: [recommendation({ context_notes: ["Fills a true TE need", "Your RB room is aging (3 of 4 past their prime)"] }), ...STATE.recommendations.slice(1)],
+    };
+    render(
+      <LiveDraftContent
+        leagueId="league-1"
+        leagueName="Dynasty Overlords"
+        discovery={DISCOVERY_ONE_LIVE}
+        selectedDraftId="draft-1"
+        onSelectDraft={vi.fn()}
+        state={withContext}
+        stateError={null}
+        onRefresh={vi.fn()}
+      />,
+    );
+    expandAll();
+    expect(screen.getByText(/Rebuilding: from your declared stance/)).toBeInTheDocument();
+    expect(screen.getByTestId("rec-context-notes")).toHaveTextContent("Fills a true TE need");
+  });
+
   // coridian_: "another redirect to the classic website to view the full
   // live draft" — this breakdown used to only exist on the classic
   // Streamlit page; tapping the score now reveals it in place instead.

@@ -3855,6 +3855,8 @@ export interface LiveDraftPickRow {
 }
 
 export interface LiveDraftRecommendation {
+  /** Why this player fits this team (needs, aging room, ADP gap, class strength); absent with the flag off. */
+  context_notes?: string[];
   player_id: string;
   name: string;
   position: string;
@@ -3934,7 +3936,14 @@ export interface LiveDraftTeamRow {
   total_value: number;
 }
 
+/** modules.live_draft_context.summary: the team's stance, true needs, aging rooms and class read. */
+export interface LiveDraftContext {
+  parts: string[];
+  lines: string[];
+}
+
 export interface LiveDraftStateResponse {
+  draft_context?: LiveDraftContext;
   ok: boolean;
   adp_source?: AdpSource | null;
   adp_est_sf_note?: string | null;

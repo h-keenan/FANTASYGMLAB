@@ -129,6 +129,13 @@ function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; pr
             {rec.adp_read ? <span>{rec.adp_read}</span> : null}
             <span>Confidence: {rec.confidence}</span>
           </div>
+          {rec.context_notes && rec.context_notes.length > 0 ? (
+            <ul className="list-disc pl-4" data-testid="rec-context-notes">
+              {rec.context_notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -537,6 +544,21 @@ export function LiveDraftContent({
                 </div>
                 </div>
               </CompactModule>
+
+              {state.draft_context ? (
+                <CompactModule
+                  id="live-draft.context"
+                  title="Your draft context"
+                  persist={false}
+                  parts={state.draft_context.parts.map((text, i) => ({ key: `c${i}`, text, strong: i === 0 }))}
+                >
+                  <ul className="list-disc pl-4 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                    {state.draft_context.lines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </CompactModule>
+              ) : null}
 
               <CompactModule
                 id="live-draft.recs"
