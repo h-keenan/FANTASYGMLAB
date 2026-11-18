@@ -249,6 +249,40 @@ describe("GmPlanContent", () => {
     expect(screen.getByTestId("player-chip-out")).toBeInTheDocument();
   });
 
+  it("renders Team Outlook facts as compact rows that open on tap to show why", () => {
+    const withOutlook: GmPlanResponse = {
+      ...BASE_RESPONSE,
+      focus_areas: [
+        ...BASE_RESPONSE.focus_areas,
+        {
+          key: "team_outlook",
+          title: "Team Outlook",
+          framing: "Your ages, needs, picks and the league's trade partners, read together.",
+          status: "signal_found",
+          watch_for: "",
+          items: [
+            {
+              outlook_topic: "age",
+              label: "Age",
+              headline: "Aging core: A. Cook near the cliff",
+              why: ["1 on your roster is past the age cliff for their position: A. Cook (RB, 30)", "Your core averages 28.4 years vs the league's 26.5 (1.9 older)"],
+              players: [{ player_id: "1", name: "Aaron Cook", position: "RB", team: "DET" }],
+              tone: "muted",
+            },
+          ],
+        },
+      ],
+    };
+    render(<GmPlanContent initialTab="trades" leagueName="Dynasty Overlords" data={withOutlook} />);
+    expandAll();
+    const row = screen.getByTestId("plan-outlook-row");
+    expect(row).toHaveTextContent("Aging core: A. Cook near the cliff");
+    expect(screen.queryByText(/Your core averages 28.4/)).toBeNull();
+    fireEvent.click(row.querySelector("button")!);
+    expect(row.querySelector("button")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/Your core averages 28.4/)).toBeInTheDocument();
+  });
+
   it("shows an honest no-signal message instead of a fabricated recommendation", () => {
     const noSignal: GmPlanResponse = {
       ...BASE_RESPONSE,

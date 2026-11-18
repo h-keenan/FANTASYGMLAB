@@ -7,6 +7,9 @@ app's existing engines and arranges them into a season-arc "GM Plan":
 
   - Season phase is derived from a real week number the caller already has
     (see `derive_season_phase`) — it does not fetch or infer a week itself.
+  - Team Outlook (handshake item 7, modules.gm_plan_outlook) reads the shared
+    league team profile (age cliffs, needs/surplus, picks, who to call) behind
+    its own kill switch; it never rewrites value_score either.
   - Stance conditioning reads the user's declared Team Situation
     (modules.team_stance — Rebuilding/Competing/Balanced), the SAME
     user-facing declaration modules.trade_ideas.apply_team_stance_framing
@@ -33,6 +36,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from modules import gm_plan_outlook
 from modules import team_stance as team_stance_module
 from modules.compact_fantasy_assets import presentation_asset
 from modules.rankings import injury_display_label
@@ -196,6 +200,9 @@ TRADE_NO_SIGNAL_WATCH_FOR = (
 TRADE_DEADLINE_PASSED_WATCH_FOR = "Trade deadline has passed; trades reopen after the season."
 
 STANDING_NO_SIGNAL_WATCH_FOR = "No power rank data is available for this league yet."
+
+# Framing line of the Team Outlook area (handshake item 7).
+OUTLOOK_FRAMING = "Your ages, needs, picks and the league's trade partners, read together."
 
 ROSTER_NO_SIGNAL_WATCH_FOR = "No roster construction ranking is available for this league yet."
 
@@ -545,6 +552,7 @@ def build_gm_plan(
     playoff_odds: Mapping[str, Any] | None = None,
     injury_context: Mapping[str, Any] | None = None,
     trade_deadline_passed: bool = False,
+    outlook_items: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Assemble a GM Plan from already-computed signals.
 
@@ -567,10 +575,32 @@ def build_gm_plan(
     `trade_deadline_passed` (modules.league_calendar.trade_deadline_passed)
     replaces the Trade Opportunities items with a "deadline has passed"
     state, so the plan stops pushing trades that can't be made in season.
+    `outlook_items` (modules.gm_plan_outlook.build_outlook, handshake item 7)
+    add a "Team Outlook" focus area read from the shared team profile; None or
+    empty (or the kill switch off) leaves the plan exactly as before.
     """
 
     stance = team_stance_module.normalize_stance(team_stance)
     phase = season_phase if season_phase in SEASON_PHASES else PHASE_OFFSEASON_ADJACENT
+
+    focus_areas = [
+        _standing_focus_area(rankings_row, total_teams, record, playoff_odds),
+        _trade_focus_area(
+            stance, trade_ideas or [], max_trade_ideas, trade_deadline_passed=trade_deadline_passed
+        ),
+        _roster_focus_area(rankings_row, total_teams, injury_context),
+    ]
+    if outlook_items and gm_plan_outlook.enabled():
+        focus_areas.append(
+            {
+                "key": gm_plan_outlook.FOCUS_OUTLOOK,
+                "title": gm_plan_outlook.OUTLOOK_TITLE,
+                "framing": OUTLOOK_FRAMING,
+                "status": STATUS_SIGNAL_FOUND,
+                "items": [dict(item) for item in outlook_items],
+                "watch_for": "",
+            }
+        )
 
     return {
         "season_phase": phase,
@@ -578,11 +608,5 @@ def build_gm_plan(
         "team_stance": stance,
         "team_stance_label": team_stance_module.STANCE_LABELS.get(stance, ""),
         "headline": _headline(stance, phase),
-        "focus_areas": [
-            _standing_focus_area(rankings_row, total_teams, record, playoff_odds),
-            _trade_focus_area(
-                stance, trade_ideas or [], max_trade_ideas, trade_deadline_passed=trade_deadline_passed
-            ),
-            _roster_focus_area(rankings_row, total_teams, injury_context),
-        ],
+        "focus_areas": focus_areas,
     }

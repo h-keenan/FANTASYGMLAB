@@ -11,7 +11,7 @@ import PlayerAvatar from './PlayerAvatar';
 import PressableScale from './PressableScale';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
-import type { GmPlanTradeItem, PresentationAsset } from '../lib/api';
+import type { GmPlanOutlookItem, GmPlanTradeItem, PresentationAsset } from '../lib/api';
 import { abbreviatePlayerName } from '../lib/formatPlayerName';
 import type { PlanStep } from '../lib/gmPlanPlan';
 import { tradeIdeaGainPhrase, tradeIdeaNamesText } from '../lib/tradeIdeaSummary';
@@ -32,7 +32,7 @@ export function tradeAvatarPeople(item: GmPlanTradeItem): Person[] {
   ];
 }
 
-function Avatars({ people, size = 28 }: { people: Person[]; size?: number }) {
+export function Avatars({ people, size = 28 }: { people: Person[]; size?: number }) {
   return (
     <View style={styles.avatars}>
       {people.map((p, i) => (
@@ -89,6 +89,45 @@ function TradeRow({ item, onViewDetails }: { item: GmPlanTradeItem; onViewDetail
             <AppText style={s.why}>{item.rationale || item.trade_confidence_label}</AppText>
             <Button variant="accentOutline" size="sm" label="View details" onPress={onViewDetails} />
           </View>
+        </View>
+      </Collapse>
+    </View>
+  );
+}
+
+/** One Team Outlook fact (handshake item 7): avatars, label and headline, the reasons on tap. Web twin: OutlookRow. */
+export function OutlookRow({ item }: { item: GmPlanOutlookItem }) {
+  const { colors } = useThemeMode();
+  const s = useMemo(() => createStyles(colors), [colors]);
+  const [open, setOpen] = useState(false);
+  const tone = { success: colors.success, muted: colors.textTertiary, accent: colors.accent }[item.tone] ?? colors.accent;
+  const people = item.players.map((p) => ({ id: p.player_id || null, name: p.name, position: p.position, team: p.team }));
+  return (
+    <View style={s.row} testID="plan-outlook-row">
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${item.label}: ${item.headline}`}
+        style={s.rowHead}
+        onPress={() => setOpen(!open)}
+      >
+        {people.length > 0 ? <Avatars people={people} /> : null}
+        <View style={s.rowText}>
+          <AppText style={[s.partner, { color: tone }]} numberOfLines={1}>
+            {item.label.toUpperCase()}
+          </AppText>
+          <AppText style={s.swap}>{item.headline}</AppText>
+        </View>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textTertiary} />
+      </PressableScale>
+      <Collapse open={open}>
+        <View style={s.detail}>
+          {item.why.map((line) => (
+            <AppText key={line} style={s.why}>
+              {'\u2022 '}
+              {line}
+            </AppText>
+          ))}
         </View>
       </Collapse>
     </View>

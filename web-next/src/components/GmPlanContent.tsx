@@ -26,6 +26,7 @@ import {
   type GmPlanFocusArea,
   type GmPlanFocusItem,
   type GmPlanInjuryItem,
+  type GmPlanOutlookItem,
   type GmPlanPlayoffOddsItem,
   type GmPlanRankItem,
   type GmPlanRecordItem,
@@ -41,7 +42,7 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { OvrGauge } from "@/components/OvrGauge";
 import { ViewTabs } from "@/components/ui/ViewTabs";
 import { StatStrip } from "@/components/StatStrip";
-import { PlanSteps } from "@/components/GmPlanSteps";
+import { OutlookRow, PlanSteps } from "@/components/GmPlanSteps";
 import { buildPlanSteps, buildPlanWhy, planFacts, planStatTiles, type PlanStance } from "@/lib/gmPlanPlan";
 import { PlayerCard } from "@/components/PlayerCardKit";
 import { playerCardFromStarter } from "@/lib/playerCard";
@@ -83,6 +84,7 @@ import { PresenceList } from "@/components/ui/Presence";
  */
 
 function focusItemKey(item: GmPlanFocusItem, index: number): string {
+  if ("outlook_topic" in item) return `outlook-${item.outlook_topic}-${index}`;
   if ("partner_team_name" in item) return `trade-${item.my_player_id || item.their_player_id || index}`;
   if ("injury_need_positions" in item) return `injury-${index}`;
   if ("rank" in item) return `rank-${item.label}`;
@@ -233,6 +235,7 @@ function TradeOpportunityCard({ item, detailsHref }: { item: GmPlanTradeItem; de
 }
 
 function FocusItem({ item, detailsHref }: { item: GmPlanFocusItem; detailsHref?: (item: GmPlanTradeItem) => string }) {
+  if ("outlook_topic" in item) return <OutlookRow item={item as GmPlanOutlookItem} />;
   if ("partner_team_name" in item) return <TradeOpportunityCard item={item} detailsHref={detailsHref?.(item)} />;
   if ("injury_need_positions" in item) return <InjuryExposureFact item={item} />;
   if ("rank" in item) return <RankFact item={item} />;

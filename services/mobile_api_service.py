@@ -288,6 +288,8 @@ from modules import public_dynasty_values
 from modules import model_status
 from modules import drop_candidates, roster_value_model
 from modules import usage_trends
+from modules import bye_cover, gm_plan_outlook
+from modules import team_profile as team_profile_module
 from modules import direction_checkin, trade_cautions, trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
@@ -14369,6 +14371,81 @@ def get_leagues_glance(lens: str = "Dynasty", user: dict[str, Any] = Depends(req
     return {**base, "leagues": leagues, "failed_leagues": failed_leagues}
 
 
+def _gm_plan_outlook_items(
+    *,
+    league_id: str,
+    lens: str,
+    league: Mapping[str, Any],
+    my_roster: Mapping[str, Any],
+    valued: pd.DataFrame,
+    settings: Mapping[str, Any],
+    score_field: str,
+    roster_df: pd.DataFrame | None,
+    lineup_df: pd.DataFrame | None,
+    declared_stance: str,
+    idea_partners: list[str],
+) -> list[dict[str, Any]]:
+    """GM Plan "Team Outlook" items (handshake item 7), [] when the flag is off
+    or an input is missing. Every input is an existing shared, cached read."""
+
+    if not gm_plan_outlook.enabled() or valued is None or valued.empty:
+        return []
+    try:
+        profile = team_profile_module.league_team_profiles_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+        my_roster_id = str(my_roster.get("roster_id") or "")
+        lookup = gm_plan_outlook.player_lookup(valued, gm_plan_outlook.referenced_ids(profile))
+        in_season = league_calendar.is_in_season(league)
+        adds: list[dict[str, Any]] = []
+        bye_tile: dict[str, Any] | None = None
+        if in_season and roster_df is not None and not roster_df.empty:
+            rostered = {str(pid) for r in (sleeper.get_rosters(league_id) or []) for pid in (r.get("players") or []) if pid is not None}
+            free_agents = valued[~valued["player_id"].astype(str).isin(rostered)]
+            me = ((profile or {}).get("teams") or {}).get(my_roster_id) or {}
+            try:
+                picked = waivers_logic.shared_waiver_adds(
+                    free_agents,
+                    roster_df,
+                    dict(settings),
+                    score_field,
+                    posture=str((me.get("posture") or {}).get("key") or ""),
+                    league=league,
+                    rosters=sleeper.get_rosters(league_id) or [],
+                    roster_id=my_roster.get("roster_id"),
+                    valued=valued,
+                    max_items=3,
+                )
+                adds = [dict(row) for _, row in picked.iterrows()] if picked is not None and not picked.empty else []
+            except Exception:
+                adds = []
+            if lineup_df is not None and not lineup_df.empty:
+                try:
+                    bye_tile = bye_cover.build_bye_cover_tile(
+                        league=league,
+                        roster_df=roster_df,
+                        lineup_df=lineup_df,
+                        free_agents_df=free_agents,
+                        league_settings=settings,
+                        score_field=score_field,
+                    )
+                except Exception:
+                    bye_tile = None
+        return gm_plan_outlook.build_outlook(
+            my_roster_id=my_roster_id,
+            profile=profile,
+            players_by_id=lookup,
+            declared_stance=declared_stance,
+            in_season=in_season,
+            waiver_adds=adds,
+            bye_tile=bye_tile,
+            idea_partners=idea_partners,
+        )
+    except Exception:
+        logger.warning("gm plan outlook unavailable (league=%s)", league_id, exc_info=True)
+        return []
+
+
 @app.get("/v1/leagues/{league_id}/gm-plan")
 def get_gm_plan(
     league_id: str = Depends(resolve_league_path_id),
@@ -14451,16 +14528,19 @@ def get_gm_plan(
     # above (and get_league_waivers below), inlined here rather than shared
     # since neither of those two already factors it into a helper.
     injury_context: dict[str, Any] = {}
+    outlook_roster_df: pd.DataFrame | None = None
+    outlook_lineup_df: pd.DataFrame | None = None
+    score_field = league_value_settings.valuation_score_field(lens)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
     valued = league_value_settings.build_valued_players_frame_cached(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     if not valued.empty:
-        score_field = league_value_settings.valuation_score_field(lens)
         roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
         roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
         if not roster_df.empty:
             lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+            outlook_roster_df, outlook_lineup_df = roster_df, lineup_df
             injury_context = trade_analyzer_fit.roster_injury_context(
                 roster_df,
                 lineup_df,
@@ -14527,6 +14607,22 @@ def get_gm_plan(
         "ties": roster_settings.get("ties"),
     }
 
+    # Handshake item 7: the shared league team profile (age cliffs, needs and
+    # surplus, pick capital, who to call) plus in-season waivers and byes.
+    outlook_items = _gm_plan_outlook_items(
+        league_id=league_id,
+        lens=lens,
+        league=league,
+        my_roster=my_roster,
+        valued=valued,
+        settings=settings,
+        score_field=score_field,
+        roster_df=outlook_roster_df,
+        lineup_df=outlook_lineup_df,
+        declared_stance=declared_team_stance,
+        idea_partners=[str(r.get("partner_team_name") or "") for r in trade_idea_records],
+    )
+
     plan = gm_plan.build_gm_plan(
         team_stance=declared_team_stance,
         season_phase=season_phase,
@@ -14537,6 +14633,7 @@ def get_gm_plan(
         trade_ideas=trade_idea_records,
         injury_context=injury_context,
         trade_deadline_passed=bool(trade_window["trade_deadline_passed"]),
+        outlook_items=outlook_items,
     )
 
     return {
