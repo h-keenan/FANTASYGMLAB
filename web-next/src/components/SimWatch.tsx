@@ -9,6 +9,7 @@ import { SeasonWrapped } from "@/components/SeasonWrapped";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimPlayerChip, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
+import { Collapse } from "@/components/ui/Presence";
 import { api } from "@/lib/api";
 import type { SimGameCreateBody, SimPos } from "@/lib/simGame";
 import {
@@ -193,12 +194,10 @@ function WhatIf({ item }: { item: SimWatchWhatIf }) {
         <span className="text-sm font-bold">{item.title}</span>
         <SimToneBadge label={`+${item.delta.toFixed(1)} pts`} tone="success" />
       </button>
-      {open ? (
-        <div className="flex flex-col gap-2 pt-1">
-          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{item.text}</p>
-          {item.players.map((p) => <SimPlayerChip key={p.id} player={ref(p)} size={28} quick />)}
-        </div>
-      ) : null}
+      <Collapse open={open} className="flex flex-col gap-2 pt-1">
+        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{item.text}</p>
+        {item.players.map((p) => <SimPlayerChip key={p.id} player={ref(p)} size={28} quick />)}
+      </Collapse>
     </AccentCard>
   );
 }

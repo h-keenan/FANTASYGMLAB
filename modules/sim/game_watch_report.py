@@ -22,22 +22,12 @@ from modules.sim.game_engine import _brief, standing_rows
 from modules.sim.game_review import _total
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot
+from modules.sim.game_wrapped import short_name as _short
 
 LOOKAHEAD = 12  # picks after yours a what-if compares against
 SKIP_POS = ("K", "DEF")
 ROUNDS_SHOWN = 5
 LIST_SIZE = 3
-_SUFFIXES = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"}
-
-
-def _short(name: str | None) -> str:
-    parts = str(name or "").split()
-    if len(parts) < 2:
-        return parts[0] if parts else ""
-    last = " ".join(parts[-2:]) if parts[-1].lower() in _SUFFIXES and len(parts) > 2 else parts[-1]
-    return f"{parts[0][0].upper()}. {last}"
-
-
 def _round(v: float) -> float:
     return round(float(v), 1)
 

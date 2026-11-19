@@ -10,6 +10,7 @@ import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SeasonWrapped } from './SeasonWrapped';
 import { SimPlayerChip, SimToneBadge, type SimCtx } from './SimGameParts';
+import { Collapse } from './Presence';
 import { SkeletonCard } from './Skeleton';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -190,12 +191,12 @@ function WhatIf({ item, colors, styles }: { item: SimWatchWhatIf; colors: ThemeC
         <AppText style={styles.row}>{item.title}</AppText>
         <SimToneBadge label={`+${item.delta.toFixed(1)} pts`} tone="success" />
       </Pressable>
-      {open ? (
+      <Collapse open={open}>
         <View style={styles.tight}>
           <AppText style={styles.body}>{item.text}</AppText>
           {item.players.map((p) => <SimPlayerChip key={p.id} player={ref(p)} size={28} quick />)}
         </View>
-      ) : null}
+      </Collapse>
     </AccentCard>
   );
 }
