@@ -93,4 +93,3 @@ def test_lineup_solve_sharing_leaves_every_number_unchanged():
     want = json.loads(GOLDEN.read_text())
     assert sum(len(v) for v in got.values()) >= 200
     assert got == want
-
