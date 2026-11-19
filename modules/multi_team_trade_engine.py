@@ -141,7 +141,6 @@ def analyze_multi_team_trade(
     posture_override: Callable[[Mapping[str, Any]], dict[str, Any] | None] | None = None,
     untouchable_provider: Callable[[str], Callable[[], set[str] | None]] | None = None,
     usage_provider: Callable[[Any], Mapping[str, Mapping[str, Any]]] | None = None,
-    crowd_class_strength_by_year: Mapping[Any, Any] | None = None,
     include_veto: bool = False,
     status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -180,7 +179,7 @@ def analyze_multi_team_trade(
         league_id=league_id, lens=lens, players_db_path=players_db_path,
         perspective_roster_id=perspective_roster_id, load_picks=any(t.asset_type == mt.ASSET_PICK for t in parsed),
         frame_hook=frame_hook, posture_override=posture_override, untouchable_provider=untouchable_provider,
-        usage_provider=usage_provider, crowd_class_strength_by_year=crowd_class_strength_by_year, status=status,
+        usage_provider=usage_provider, status=status,
     )
     if isinstance(ctx, dict):
         return ctx
@@ -253,7 +252,6 @@ def build_context(
     posture_override: Callable[[Mapping[str, Any]], dict[str, Any] | None] | None = None,
     untouchable_provider: Callable[[str], Callable[[], set[str] | None]] | None = None,
     usage_provider: Callable[[Any], Mapping[str, Mapping[str, Any]]] | None = None,
-    crowd_class_strength_by_year: Mapping[Any, Any] | None = None,
     status: dict[str, Any] | None = None,
 ) -> "TradeContext | dict[str, Any]":
     """Load the league-level inputs; a ``_fail`` dict when the league is not ready."""
@@ -285,7 +283,6 @@ def build_context(
             return _fail("unavailable", "Draft pick data is not ready yet.")
         picks = trade_ideas_module.list_draft_pick_assets(
             league_id, df_summary, league_settings=dict(settings),
-            **({"crowd_class_strength_by_year": crowd_class_strength_by_year} if crowd_class_strength_by_year else {}),
         )
         pick_by_id = {f"{p.get('season')}:{p.get('round')}:{p.get('original_roster_id')}": p for p in picks}
     names = _team_names(league_id, sorted(by_rid))

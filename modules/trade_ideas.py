@@ -629,23 +629,9 @@ def _weighted_pick_format_multiplier(
 def _rookie_class_strength_multiplier(
     season: int,
     class_strength_by_year: Dict[int, float] | None = None,
-    crowd_class_strength_by_year: Dict[int, Mapping[str, Any]] | None = None,
 ) -> float:
-    """Editorial class-strength (DEFAULT_CLASS_STRENGTH_BY_YEAR / an override)
-    blended with the crowdsourced college-scouting signal, if any.
-
-    ``crowd_class_strength_by_year`` — built by
-    modules.college_scouting.crowd_class_strength_by_year from the shared
-    scouting pool — is genuinely optional and defaults to None everywhere
-    upstream, so every existing caller is unaffected. When present, a draft
-    year absent from it (zero scouting reports) contributes a neutral 1.0x
-    (see college_scouting's own docstring for why zero reports must never
-    read as a strong or weak opinion); a year with a real, weighted signal
-    multiplies against the editorial value, then the combined result is
-    clamped to the same [0.8, 1.25] band the editorial-only path has always
-    used, so the crowd signal can nudge the number but never blow past the
-    ceiling this formula's other multipliers already respect.
-    """
+    """Editorial class-strength (DEFAULT_CLASS_STRENGTH_BY_YEAR / an override),
+    clamped to the [0.8, 1.25] band."""
 
     lookup = class_strength_by_year or DEFAULT_CLASS_STRENGTH_BY_YEAR
     value = lookup.get(int(season))
@@ -654,17 +640,7 @@ def _rookie_class_strength_multiplier(
     except Exception:
         editorial_multiplier = 1.0
 
-    crowd_multiplier = 1.0
-    if crowd_class_strength_by_year:
-        entry = crowd_class_strength_by_year.get(int(season))
-        if isinstance(entry, Mapping):
-            try:
-                crowd_multiplier = float(entry.get("multiplier", 1.0))
-            except Exception:
-                crowd_multiplier = 1.0
-
-    combined = editorial_multiplier * crowd_multiplier
-    return max(0.8, min(1.25, combined))
+    return max(0.8, min(1.25, editorial_multiplier))
 
 
 def _prospect_rankings_multiplier(
@@ -700,7 +676,6 @@ def pick_value_components(
     league_settings: Dict[str, Any] | None = None,
     class_strength_by_year: Dict[int, float] | None = None,
     prospect_rankings_by_year: Dict[int, Any] | None = None,
-    crowd_class_strength_by_year: Dict[int, Mapping[str, Any]] | None = None,
     team_context: Mapping[str, float | str] | None = None,
     next_draft_year: int | None = None,
 ) -> Dict[str, Any]:
@@ -730,7 +705,7 @@ def pick_value_components(
     team_modifier = TEAM_MODIFIER_BASE + (projected_slot_percentile * TEAM_MODIFIER_RANGE)
     format_multiplier = _weighted_pick_format_multiplier(round_num, bucket_probabilities, league_settings)
     class_strength_multiplier = _rookie_class_strength_multiplier(
-        season, class_strength_by_year, crowd_class_strength_by_year
+        season, class_strength_by_year
     )
     prospect_strength_multiplier = _prospect_rankings_multiplier(
         season,
@@ -796,7 +771,6 @@ def _build_roster_pick_assets(
     draft_status: Dict[str, Any] | None = None,
     class_strength_by_year: Dict[int, float] | None = None,
     prospect_rankings_by_year: Dict[int, Any] | None = None,
-    crowd_class_strength_by_year: Dict[int, Mapping[str, Any]] | None = None,
     adapter=None,
     odds_slot_percentiles: Mapping[int, float] | None = None,
 ) -> Dict[int, List[Dict[str, Any]]]:
@@ -923,7 +897,6 @@ def _build_roster_pick_assets(
             league_settings=league_settings,
             class_strength_by_year=class_strength_by_year,
             prospect_rankings_by_year=prospect_rankings_by_year,
-            crowd_class_strength_by_year=crowd_class_strength_by_year,
             team_context=pick_team_contexts[original_roster_id],
             next_draft_year=next_draft_year,
         )
@@ -977,7 +950,6 @@ def list_draft_pick_assets(
     draft_status: Dict[str, Any] | None = None,
     class_strength_by_year: Dict[int, float] | None = None,
     prospect_rankings_by_year: Dict[int, Any] | None = None,
-    crowd_class_strength_by_year: Dict[int, Mapping[str, Any]] | None = None,
     adapter=None,
 ):
     platform_adapter = adapter or get_sleeper_adapter()
@@ -990,7 +962,6 @@ def list_draft_pick_assets(
         draft_status=draft_status,
         class_strength_by_year=class_strength_by_year,
         prospect_rankings_by_year=prospect_rankings_by_year,
-        crowd_class_strength_by_year=crowd_class_strength_by_year,
         adapter=platform_adapter,
     )
     picks = []
