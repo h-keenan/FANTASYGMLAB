@@ -31,6 +31,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { NextSteps } from "@/components/NextSteps";
 import { TeamArchetypeRead, hasArchetypeRead } from "@/components/TeamArchetypeRead";
 import { PageTitle } from "@/components/PageTitle";
+import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
 
 /**
  * Ports modules/my_team_ui.py's render_my_team_workspace for Revision 2 —
@@ -255,6 +256,7 @@ export function MyTeamContent({
       {leagueId ? <PageTabBar family="team" active="roster" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-col gap-1">
         <PageTitle page="My Team" leagueName={leagueName} info={pageHelp} />
+        {myTeam.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={myTeam.sleeper_data_as_of} className="block text-xs" /> : null}
       </header>
 
       <StatusHeader

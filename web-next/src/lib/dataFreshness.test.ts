@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { freshnessAsOf, freshnessLabel, freshnessText } from "./dataFreshness";
+import { freshnessAsOf, freshnessLabel, freshnessText, leagueStaleLabel } from "./dataFreshness";
 
 const NOW = new Date(2026, 10, 19, 12, 0, 0).getTime();
 const secs = (d: Date) => d.getTime() / 1000;
@@ -52,5 +52,17 @@ describe("freshnessAsOf / freshnessLabel", () => {
     const mtime = { datasets: [{ name: "values_fantasycalc", as_of: secs(new Date(2026, 10, 19, 11, 55)), as_of_source: "file_mtime" }] };
     expect(freshnessAsOf(mtime, "values")).toBeNull();
     expect(freshnessAsOf({ datasets: [{ name: "values_fantasycalc", as_of: 5 }] }, "values")).toBeNull();
+  });
+});
+
+describe("leagueStaleLabel", () => {
+  it("says how old last-known league data is, always flagged as possibly behind", () => {
+    expect(leagueStaleLabel(new Date(2026, 10, 19, 11, 48).toISOString(), NOW)).toBe("League data as of 12m ago (may be behind)");
+    expect(leagueStaleLabel(new Date(2026, 10, 19, 9, 0).toISOString(), NOW)).toBe("League data as of 3h ago (may be behind)");
+  });
+  it("says nothing for live data or an unreadable stamp", () => {
+    expect(leagueStaleLabel(undefined, NOW)).toBeNull();
+    expect(leagueStaleLabel("", NOW)).toBeNull();
+    expect(leagueStaleLabel("not a date", NOW)).toBeNull();
   });
 });

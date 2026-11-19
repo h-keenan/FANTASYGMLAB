@@ -82,6 +82,7 @@ import Input from '../components/Input';
 import HelpLink from '../components/HelpLink';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 import ErrorState from '../components/ErrorState';
+import { ESPN_SAVE_FAILURE_COPY } from '../lib/leaguePlatform';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -114,6 +115,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [addBusy, setAddBusy] = useState(false);
   const [addOptions, setAddOptions] = useState<SleeperLeagueOption[] | null>(null);
   const [addMessage, setAddMessage] = useState<string | null>(null);
+  // The last lookup answered for only one of the two seasons (the list may be missing leagues).
+  const [addPartial, setAddPartial] = useState(false);
   // Structured Sleeper-lookup error (lib/sleeperConnectErrors, the single copy
   // source): username not found / no leagues / network each get guidance.
   const [addConnectError, setAddConnectError] = useState<SleeperConnectError | null>(null);
@@ -329,7 +332,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       setAddMessage(
         result.reason === 'league_not_found'
           ? "That league isn't on Sleeper. Check the league ID and try again."
-          : 'Could not save that league right now. Please try again in a moment.',
+          : (ESPN_SAVE_FAILURE_COPY[result.reason] ?? 'Could not save that league right now. Please try again in a moment.'),
       );
     } catch (error) {
       setAddMessage(
@@ -380,6 +383,9 @@ export default function HomeScreen({ navigation, route }: Props) {
       if (pendingRef && result.ok) void clearPendingReferralCode();
       setAddOptions(result.leagues);
       setAddSelected(defaultLeagueSelection(result.leagues));
+      // One season's lookup failed: the list may be missing leagues. Say so above the picker; searching again retries.
+      setAddPartial(Boolean(result.ok && result.partial && result.leagues.length > 1));
+      if (result.ok && result.partial && result.leagues.length > 1 && result.partial_message) setAddMessage(result.partial_message);
       if (result.ok && result.leagues.length === 1) {
         // One league: no list to pick from, connect it straight away.
         await saveLeague({ leagueId: result.leagues[0].league_id, leagueName: result.leagues[0].name, username: trimmed });
@@ -861,6 +867,9 @@ export default function HomeScreen({ navigation, route }: Props) {
               </View>
             ) : null}
             {addMessage ? <AppText style={styles.addError}>{addMessage}</AppText> : null}
+            {addOptions && addOptions.length > 1 && addPartial ? (
+              <Button label="Check again" variant="secondary" onPress={() => void findLeagues()} style={styles.sampleLeagueButton} />
+            ) : null}
 
             {addOptions && addOptions.length > 0 ? (
               <View style={styles.addOptions}>

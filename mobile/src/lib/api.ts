@@ -240,11 +240,14 @@ export interface SleeperLeagueOption {
 export interface SleeperLeagueLookupResponse {
   ok: boolean;
   // Mirrors modules/sleeper_leagues.py's LeagueLookupStatus.
-  status: 'ok' | 'empty_username' | 'user_not_found' | 'no_leagues' | 'unavailable';
+  status: 'ok' | 'empty_username' | 'user_not_found' | 'no_leagues' | 'unavailable' | 'rate_limited';
   username: string;
   leagues: SleeperLeagueOption[];
   // Customer-safe copy for a non-"ok" status — show it verbatim.
   message: string;
+  // True when one season's lookup failed: the list may be missing leagues (say so, offer retry).
+  partial?: boolean;
+  partial_message?: string;
 }
 
 export type SaveLeagueReason =
@@ -252,6 +255,10 @@ export type SaveLeagueReason =
   | 'at_cap'
   | 'league_not_found'
   | 'not_available'
+  // Sleeper could not answer (modules/provider_errors.py): retryable, never "league not found".
+  | 'provider_unavailable'
+  | 'provider_rate_limited'
+  | 'provider_bad_response'
   // ESPN leagues only (modules/espn_leagues.py).
   | 'espn_team_not_selected'
   | 'mapping_too_low';
@@ -924,6 +931,8 @@ export interface MyTeamNeedsResponse {
 
 export interface MyTeamResponse {
   ok: true;
+  /** ISO time of the oldest last-known provider payload served because a refresh failed (429 / timeout / outage). Absent on live data. */
+  sleeper_data_as_of?: string;
   starters: LineupPlayer[];
   bench: LineupPlayer[];
   /** Rostered defenders (DL/LB/DB) in IDP leagues only; `score` is the IDP model value, null below replacement. Absent/empty otherwise. */
@@ -3181,6 +3190,8 @@ export interface ThisWeek {
 
 export interface DashboardResponse {
   ok: true;
+  /** ISO time of the oldest last-known provider payload served because a refresh failed (429 / timeout / outage). Absent on live data. */
+  sleeper_data_as_of?: string;
   /** Additive; absent on older servers, null when there is nothing real to show. */
   this_week?: ThisWeek | null;
   items: DashboardItem[];

@@ -21,6 +21,13 @@ describe("describeSleeperConnectError", () => {
     expect(describeSleeperConnectError({ status: "unavailable" }).kind).toBe("network");
     expect(describeSleeperConnectError({ status: "network" }).hint).toMatch(/try again/);
   });
+  it("treats rate_limited as a retry card, never as user_not_found", () => {
+    const e = describeSleeperConnectError({ status: "rate_limited", username: "bob" });
+    expect(e.kind).toBe("network");
+    expect(e.message).toMatch(/limiting requests/);
+    expect(e.hint).toMatch(/try again/);
+    expect(e.offerSample).toBe(false);
+  });
   it("falls back to the server message", () => {
     expect(describeSleeperConnectError({ status: "x", serverMessage: "Boom" }).message).toBe("Boom");
   });
@@ -32,5 +39,6 @@ describe("isConnectivityFailure", () => {
     expect(isConnectivityFailure({ status: 503 })).toBe(true);
     expect(isConnectivityFailure(new TypeError("Network request failed"))).toBe(true);
     expect(isConnectivityFailure({ status: 400 })).toBe(false);
+    expect(isConnectivityFailure({ status: 429 })).toBe(true);
   });
 });

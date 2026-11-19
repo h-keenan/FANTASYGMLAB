@@ -12,6 +12,7 @@ import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import AnimatedCard from '../components/AnimatedCard';
 import ErrorState from '../components/ErrorState';
+import FreshnessLabel from '../components/FreshnessLabel';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -274,6 +275,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <PageFamilyTabs family="team" active="roster" leagueId={leagueId} leagueName={leagueName} padded={false} />
+        {myTeamData?.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={myTeamData.sleeper_data_as_of} /> : null}
 
         <TeamHero
           team={myTeam}

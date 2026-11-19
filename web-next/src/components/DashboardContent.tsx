@@ -1,3 +1,4 @@
+import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { TERMS } from "@/lib/terms";
@@ -195,6 +196,9 @@ export function DashboardContent({
           alerts); the league name stays here as the page's <h1> for screen
           readers and is already in the header's league switcher. */}
       {sample ? null : <h1 className="sr-only">{leagueName}</h1>}
+
+      {/* Served from last-known provider data after a failed refresh: say how old it is (shared FreshnessLabel). */}
+      {data.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={data.sleeper_data_as_of} className="block text-xs" /> : null}
 
       {userId ? <StartHereCard userId={userId} accountCreatedAt={accountCreatedAt} leagueId={leagueId} leagueName={leagueName} /> : null}
 

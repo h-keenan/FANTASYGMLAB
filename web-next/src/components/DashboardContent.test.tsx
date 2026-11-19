@@ -99,6 +99,17 @@ describe("DashboardContent", () => {
     expect(screen.getByText(/2 more moves? on Pro/)).toBeInTheDocument();
   });
 
+  it("labels the page with its age when the API served last-known provider data", () => {
+    const stale = new Date(Date.now() - 20 * 60_000).toISOString();
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={{ ...FIXTURE, sleeper_data_as_of: stale }} />);
+    expect(screen.getByTestId("freshness-label")).toHaveTextContent(/League data as of 2\dm ago \(may be behind\)/);
+  });
+
+  it("shows no age label for live data", () => {
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    expect(screen.queryByText(/League data as of/)).toBeNull();
+  });
+
   it("shows the quiet-state copy instead of Game Plan cards when there's nothing urgent", async () => {
     const quietFixture: DashboardResponse = {
       ...FIXTURE,

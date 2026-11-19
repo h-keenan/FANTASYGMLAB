@@ -327,6 +327,9 @@ export interface SleeperLeaguesResponse {
   username: string;
   leagues: SleeperLeagueSummary[];
   message: string;
+  /** True when one season's lookup failed: the list may be missing leagues (say so, offer retry). */
+  partial?: boolean;
+  partial_message?: string;
   /** Present only when a pending ?ref= code was sent with the lookup. */
   referral?: unknown;
 }
@@ -494,6 +497,8 @@ export interface ThisWeek {
 
 export interface DashboardResponse {
   ok: boolean;
+  /** ISO time of the oldest last-known provider payload served because a refresh failed (429 / timeout / outage). Absent on live data. */
+  sleeper_data_as_of?: string;
   /** Additive; absent on older servers, null when there is nothing real to show. */
   this_week?: ThisWeek | null;
   items: BriefingItem[];
@@ -796,6 +801,8 @@ export interface KeepersResponse {
 
 export interface MyTeamResponse {
   ok: boolean;
+  /** ISO time of the oldest last-known provider payload served because a refresh failed (429 / timeout / outage). Absent on live data. */
+  sleeper_data_as_of?: string;
   starters: LineupPlayer[];
   bench: LineupPlayer[];
   /** Rostered defenders (DL/LB/DB) in IDP leagues only; `score` is the IDP model value, null below replacement. Absent/empty otherwise. */

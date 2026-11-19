@@ -18,6 +18,7 @@ import Button from '../components/Button';
 import SkeletonBlock, { SkeletonCard } from '../components/Skeleton';
 import ErrorState from '../components/ErrorState';
 import StaleNote from '../components/StaleNote';
+import FreshnessLabel from '../components/FreshnessLabel';
 import PushPermissionPrompt from '../components/PushPermissionPrompt';
 import CollegeFootballInterestPrompt from '../components/CollegeFootballInterestPrompt';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -501,6 +502,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
       ) : null}
 
       {dashboardData ? <StaleNote updatedAt={dashboardQuery.dataUpdatedAt} refreshFailed={dashboardQuery.isRefetchError} /> : null}
+      {/* Served from last-known provider data after a failed refresh: say how old it is (shared FreshnessLabel). */}
+      {dashboardData?.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={dashboardData.sleeper_data_as_of} /> : null}
 
       {dashboardData?.platform_notice ? (
         <AppText style={{ color: colors.textSecondary, fontSize: 13.5 }}>{dashboardData.platform_notice}</AppText>

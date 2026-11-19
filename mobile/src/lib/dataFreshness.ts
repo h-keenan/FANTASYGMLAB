@@ -8,7 +8,7 @@
  * timestamp is a real provider fetch (`as_of_source: "fetch_timestamp"`), because a file mtime is the git checkout time;
  * over-threshold data says "may be behind" in plain muted text (never an error colour).
  */
-export type FreshnessDataset = "values" | "injuries" | "prospects" | "schedule" | "stats" | "adp";
+export type FreshnessDataset = "values" | "injuries" | "prospects" | "schedule" | "stats" | "adp" | "league";
 
 export interface FreshnessRow {
   name?: string;
@@ -28,6 +28,9 @@ const DATASETS: Record<FreshnessDataset, { row: string; label: string; style: "a
   schedule: { row: "schedule_nflverse", label: "Schedule", style: "ago", staleHours: 192 },
   stats: { row: "weekly_stats", label: "Stats", style: "ago", staleHours: 30 },
   adp: { row: "adp_rookie_dynasty", label: "ADP", style: "ago", staleHours: 72 },
+  // Not in the public report: the API stamps `sleeper_data_as_of` on a league response served from last-known provider data
+  // after a failed refresh (429 / timeout / outage). Shown only then, so it always reads "may be behind".
+  league: { row: "", label: "League data", style: "ago", staleHours: 0 },
 };
 
 /** Epoch seconds the dataset was last refreshed, or null when the report cannot say so honestly. */
@@ -75,4 +78,15 @@ export function freshnessText(dataset: FreshnessDataset, asOfSeconds: number, no
 export function freshnessLabel(report: FreshnessReport | null | undefined, dataset: FreshnessDataset, nowMs: number): string | null {
   const asOf = freshnessAsOf(report, dataset);
   return asOf == null ? null : freshnessText(dataset, asOf, nowMs);
+}
+
+/**
+ * "League data as of 12m ago (may be behind)" for a league response the API served from last-known provider data after a
+ * failed refresh (its `sleeper_data_as_of`, an ISO time). Null for live data (no stamp) or an unreadable stamp, never a guess.
+ */
+export function leagueStaleLabel(asOfIso: string | null | undefined, nowMs: number): string | null {
+  if (!asOfIso) return null;
+  const ms = Date.parse(asOfIso);
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  return freshnessText("league", ms / 1000, nowMs);
 }

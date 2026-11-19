@@ -159,6 +159,12 @@ describe("MyTeamContent need links", () => {
     expect(screen.getByRole("link", { name: /Average age.*open the Roster Age rankings/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#board-age");
   });
 
+  it("labels the page with its age when the API served last-known provider data", () => {
+    const stale = new Date(Date.now() - 20 * 60_000).toISOString();
+    render(<MyTeamContent leagueId="L1" leagueName="My League" myTeam={{ ...MY_TEAM, sleeper_data_as_of: stale }} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
+    expect(screen.getByTestId("freshness-label")).toHaveTextContent(/League data as of 2\dm ago \(may be behind\)/);
+  });
+
   it("shows no links without a league id", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
     expect(screen.queryByRole("link", { name: /Find a waiver add/ })).toBeNull();

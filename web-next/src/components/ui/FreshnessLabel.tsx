@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { freshnessLabel, type FreshnessDataset, type FreshnessReport } from "@/lib/dataFreshness";
+import { freshnessLabel, leagueStaleLabel, type FreshnessDataset, type FreshnessReport } from "@/lib/dataFreshness";
 import { useDataFreshness } from "@/lib/useDataFreshness";
 
 /**
@@ -16,18 +16,23 @@ export function FreshnessLabel({
   datasets,
   report,
   now,
+  leagueAsOf,
   className = "",
 }: {
   datasets: readonly FreshnessDataset[];
   report?: FreshnessReport | null;
   now?: number;
+  /** The league response's `sleeper_data_as_of`: set only when the API served last-known provider data. */
+  leagueAsOf?: string | null;
   className?: string;
 }) {
-  const fetched = useDataFreshness(report === undefined);
+  const fetched = useDataFreshness(report === undefined && datasets.length > 0);
   const source = report === undefined ? fetched : report;
   const [mountedAt] = useState(() => Date.now());
   const at = now ?? mountedAt;
   const labels = datasets.map((dataset) => freshnessLabel(source, dataset, at)).filter((text): text is string => Boolean(text));
+  const stale = leagueStaleLabel(leagueAsOf, at);
+  if (stale) labels.push(stale);
   if (labels.length === 0) return null;
   return (
     <span className={className} data-testid="freshness-label">

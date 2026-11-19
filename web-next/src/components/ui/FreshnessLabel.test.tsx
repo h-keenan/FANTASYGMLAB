@@ -17,6 +17,16 @@ describe("FreshnessLabel", () => {
     expect(screen.getByTestId("freshness-label")).toHaveTextContent("Values as of 2h ago · Injuries updated 9:40am");
   });
 
+  it("labels league data served from last-known provider data, with its age", () => {
+    render(<FreshnessLabel datasets={[]} report={null} leagueAsOf={new Date(2026, 10, 19, 11, 48).toISOString()} now={NOW} />);
+    expect(screen.getByTestId("freshness-label")).toHaveTextContent("League data as of 12m ago (may be behind)");
+  });
+
+  it("renders nothing for live league data (no stamp)", () => {
+    render(<FreshnessLabel datasets={[]} report={null} leagueAsOf={undefined} now={NOW} />);
+    expect(screen.queryByTestId("freshness-label")).toBeNull();
+  });
+
   it("renders nothing when the report cannot vouch for any dataset", () => {
     render(<FreshnessLabel datasets={["adp"]} report={report} now={NOW} />);
     expect(screen.queryByTestId("freshness-label")).toBeNull();

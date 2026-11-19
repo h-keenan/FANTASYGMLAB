@@ -9,6 +9,9 @@ export const LEAGUE_CAP_UPSELL = {
 /** Messages for every non-cap refusal reason POST /v1/leagues/save returns. */
 const SAVE_FAILURE_COPY: Record<string, string> = {
   league_not_found: "That league didn't load just now. Please try again.",
+  provider_unavailable: "Sleeper is temporarily unreachable, so we could not check that league. Wait a moment and try again.",
+  provider_rate_limited: "Sleeper is limiting requests right now. Wait a minute and try again.",
+  provider_bad_response: "Sleeper sent back something we could not read. Try again in a moment.",
   espn_team_not_selected: "Pick which team is yours first.",
   mapping_too_low: "Too few of this league's players matched FantasyDesk's player list to value it accurately.",
 };
