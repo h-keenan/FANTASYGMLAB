@@ -192,53 +192,60 @@ seed carried long-tail names FantasyCalc no longer lists.
 Problem (section 7): GitHub schedules run 6 to 9 hours late. Two jobs matter most: `news-ingest` (every 15 min) and
 `injury-status-sync` (every 30 min).
 
-Where each can run:
-- `news-ingest` runs `python scripts/ingest_news.py --require-durable` and needs only `SUPABASE_URL` and
-  `SUPABASE_SERVICE_ROLE_KEY`, which the box already has in `/opt/fantasygmlab/.env` (the compose `env_file`). It writes to
-  Supabase, not to the repo, so it can run inside the running API container.
-- `injury-status-sync` runs `python scripts/sync_injury_status.py`, which patches `data/players.db` and **commits and pushes to
-  `main`** (needs `GITHUB_PUSH_TOKEN`). The API container has no repo history, and patching the box's own deploy checkout would
-  dirty the tree autopull fast-forwards. So it must not run in the container or in `/opt/fantasygmlab`.
+**Box layout (corrected 2026-11-19).** Releases run from `/var/lib/fantasygmlab/releases/`. `/opt/fantasygmlab` is an
+OLD checkout with a stale compose file. Do not use it. A `deploy` user may not exist. The lines below target the running
+API container directly, so they need no compose file or checkout path, and run from root's crontab (or the box's actual
+cron user if coridian_ uses another one).
 
-Recommendation: box cron for `news-ingest` (Option A), and for `injury-status-sync` a cron `curl` that triggers the existing
-GitHub workflow with `workflow_dispatch` (Option B). That keeps one writer of `players.db` (the workflow), keeps the push token
-on GitHub, and still fixes the cadence, because a dispatched run starts within about a minute where a `schedule` trigger is
+Where each can run:
+- `news-ingest` runs `python scripts/ingest_news.py --require-durable`. It needs only `SUPABASE_URL` and
+  `SUPABASE_SERVICE_ROLE_KEY`, which the running API container already has in its environment, and it writes to Supabase, not
+  the repo. So it can run inside the running API container with `docker exec`.
+- `injury-status-sync` runs `python scripts/sync_injury_status.py`, which patches `data/players.db` and **commits and pushes to
+  `main`** (needs `GITHUB_PUSH_TOKEN`). It must not run in the container or in any deploy/release directory. Trigger the GitHub
+  workflow instead (Option B).
+
+Recommendation: box cron for `news-ingest` (Option A), and a cron `curl` that triggers the existing `injury-status-sync`
+workflow with `workflow_dispatch` (Option B). A dispatched run starts within about a minute, where a `schedule` trigger is
 throttled. Both are free.
 
-Option A, direct on the box (cron file, `deploy` user; `flock -n` stops overlapping runs; the container reads secrets from
-`.env` itself and nothing is echoed; output is appended to a log, never the environment):
+One-time setup on the box (as root):
 
 ```
-# /etc/cron.d/fantasygmlab-jobs
-*/15 * * * * deploy flock -n /var/lock/fgl-news.lock sh -c 'docker compose -f /opt/fantasygmlab/docker-compose.yml exec -T mobile-api python scripts/ingest_news.py --require-durable' >> /var/log/fgl/news-ingest.log 2>&1
+install -d -m 755 /var/log/fgl
+# Check the container filter matches exactly one running API container:
+docker ps --filter name=mobile-api --format '{{.ID}} {{.Names}}'
 ```
 
-Injury sync on the box, only if you accept a second clone (never the deploy checkout): clone once to `/opt/fgl-cron/repo`,
-`python3 -m venv /opt/fgl-cron/venv && /opt/fgl-cron/venv/bin/pip install -r /opt/fgl-cron/repo/requirements.txt`, put
-`GITHUB_PUSH_TOKEN=...` and `GITHUB_REPO_SLUG=h-keenan/FANTASYGMLAB` in `/etc/fgl-cron.env` (mode 600, owner deploy), then:
+If the API container has a different name, use that name in the `--filter` below. Add a logrotate stanza for
+`/var/log/fgl/*.log` (weekly, rotate 4, compress).
+
+Option A, news ingest every 15 min (root crontab via `crontab -e`, or `/etc/cron.d/fantasygmlab-jobs` with a `root` user
+column). `flock -n` stops overlapping runs. The container reads its own secrets, nothing is echoed, and only output is logged:
 
 ```
-*/30 * * * * deploy flock -n /var/lock/fgl-injury.lock sh -c 'set -a; . /etc/fgl-cron.env; set +a; cd /opt/fgl-cron/repo && git pull -q --ff-only origin main && /opt/fgl-cron/venv/bin/python scripts/sync_injury_status.py' >> /var/log/fgl/injury-sync.log 2>&1
+*/15 * * * * flock -n /var/lock/fgl-news.lock sh -c 'C=$(docker ps -qf name=mobile-api | head -n1); [ -n "$C" ] && docker exec "$C" python scripts/ingest_news.py --require-durable || echo "no mobile-api container"' >> /var/log/fgl/news-ingest.log 2>&1
 ```
 
-Create the log directory once (`sudo install -d -o deploy -m 755 /var/log/fgl`) and add a logrotate stanza (weekly, rotate 4,
-compress). `set -a; . file; set +a` loads variables without printing them. Do not add `set -x`.
+(In `/etc/cron.d/` format, insert `root` after the five time fields.)
 
-Option B, cron triggers the GitHub workflow (the token stays in the box's secret store, nothing printed; a fine-grained PAT with
-only `actions: write` on this repo, stored as `GITHUB_DISPATCH_TOKEN` in `/etc/fgl-cron.env`):
+Option B, injury sync every 30 min via workflow dispatch. Create a fine-grained PAT with only `actions: write` on this repo
+(Zach confirms the scope). Store it as `GITHUB_DISPATCH_TOKEN=...` in `/etc/fgl-cron.env` (`chmod 600`, owner root).
+`set -a; . file; set +a` loads it without printing it, so do not add `set -x`:
 
 ```
-*/15 * * * * deploy sh -c 'set -a; . /etc/fgl-cron.env; set +a; curl -fsS -o /dev/null -w "%{http_code} news\n" -X POST -H "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/h-keenan/FANTASYGMLAB/actions/workflows/news-ingest.yml/dispatches -d "{\"ref\":\"main\"}"' >> /var/log/fgl/dispatch.log 2>&1
-*/30 * * * * deploy sh -c 'set -a; . /etc/fgl-cron.env; set +a; curl -fsS -o /dev/null -w "%{http_code} injury\n" -X POST -H "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/h-keenan/FANTASYGMLAB/actions/workflows/injury-status-sync.yml/dispatches -d "{\"ref\":\"main\"}"' >> /var/log/fgl/dispatch.log 2>&1
+*/30 * * * * sh -c 'set -a; . /etc/fgl-cron.env; set +a; curl -fsS -o /dev/null -w "\%{http_code} injury\n" -X POST -H "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/h-keenan/FANTASYGMLAB/actions/workflows/injury-status-sync.yml/dispatches -d "{\"ref\":\"main\"}"' >> /var/log/fgl/dispatch.log 2>&1
 ```
 
-Success is HTTP 204; the log holds only the status code and job name. Both workflows already have `workflow_dispatch:` and a
-`concurrency` group, so an overlapping dispatch queues instead of racing. Keep the GitHub `schedule:` triggers as the fallback if
-the box is down; duplicate runs are harmless (concurrency group, idempotent upserts, no-diff commits are skipped).
+Success is HTTP 204, and the log holds only the status code and the job name. In a crontab a bare `%` means newline, so it must be written `\%` (as above), and the lines deliberately avoid `date +%...`. Before relying on Option A, test once
+by hand: `docker exec $(docker ps -qf name=mobile-api | head -n1) python scripts/ingest_news.py --require-durable`. Both
+workflows already have `workflow_dispatch:` and a `concurrency` group, so an overlapping dispatch queues instead of racing.
+Keep the GitHub `schedule:` triggers as the fallback if the box is down. Duplicate runs are harmless (concurrency group,
+idempotent upserts, no-diff commits are skipped).
 
-Why not the alternatives: a third-party scheduler adds an external account holding a GitHub token; Supabase `pg_cron` could call
-the dispatch endpoint but needs the token stored in the database. Box cron is free, already trusted with the same secrets and the
-easiest to inspect. Owners: coridian_ (box) installs the lines; Zach confirms the token scope.
+Why not the alternatives: a third-party scheduler adds an external account holding a GitHub token, and Supabase `pg_cron` could
+call the dispatch endpoint but needs the token stored in the database. Box cron is free, already trusted with the same secrets
+and the easiest to inspect. Owners: coridian_ (box) installs the lines; Zach confirms the token scope.
 
 ## Needs from the owner
 
