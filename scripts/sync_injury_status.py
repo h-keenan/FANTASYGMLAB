@@ -257,7 +257,6 @@ def patch_injury_columns(db_path: Path, players: Dict[str, Any]) -> Tuple[int, i
         }
 
         updates = []
-        status_changes = []
         for pid, raw in players.items():
             pid = str(pid)
             if pid not in existing:
@@ -275,11 +274,6 @@ def patch_injury_columns(db_path: Path, players: Dict[str, Any]) -> Tuple[int, i
             if new_status == old_status and new_injury_status == old_injury_status:
                 continue
             updates.append((new_status, new_injury_status, pid))
-            status_changes.append({
-                "player_id": pid,
-                "old_status": old_status, "old_injury_status": old_injury_status,
-                "new_status": new_status, "new_injury_status": new_injury_status,
-            })
 
         if updates:
             cur.executemany(
@@ -287,22 +281,10 @@ def patch_injury_columns(db_path: Path, players: Dict[str, Any]) -> Tuple[int, i
                 updates,
             )
             conn.commit()
-            _record_news_value_events(status_changes)
 
         return (len(existing), len(updates))
     finally:
         conn.close()
-
-
-def _record_news_value_events(status_changes) -> None:
-    """Open/clear structured news-value events (flag-gated; never fails the patch)."""
-    try:
-        from modules import news_value_events
-
-        if news_value_events.is_enabled():
-            news_value_events.record_status_changes(status_changes)
-    except Exception as exc:  # noqa: BLE001
-        print(f"news_value_events record skipped: {exc}", file=sys.stderr)
 
 
 def _capture_injury_history(players: Dict[str, Any]) -> None:

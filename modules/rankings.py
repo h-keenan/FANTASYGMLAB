@@ -4345,12 +4345,6 @@ def compose_composite_score(df: pd.DataFrame) -> pd.DataFrame:
     work["score"] = composite.clip(lower=0).round().astype(int)
     work["age_penalty"] = (age_curve - market).round().astype(int)
     work["news_factor"] = 0.0
-    # Structured news-value events (env DYNASTYGM_NEWS_VALUE_EVENTS, default off).
-    # Single central hook: every consumer reads this score, so no per-page logic.
-    from modules import news_value_events
-
-    if news_value_events.is_enabled():
-        work = news_value_events.apply_to_frame(work)
     work["dynasty_score"] = work["score"]
     work["value_score"] = work["score"]
     return work
