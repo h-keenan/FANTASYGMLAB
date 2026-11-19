@@ -278,6 +278,7 @@ from modules import (
 from modules import decision_log
 from modules import derived_cache
 from modules import swr_cache
+from modules import wrapped_real
 from modules import league_prewarm
 from modules import stats_self_heal
 from modules import prefetch
@@ -7684,6 +7685,48 @@ def get_league_recap(
     if me:
         payload["my_roster_id"] = my_roster_id
     return payload
+
+
+@app.get("/v1/leagues/{league_id}/wrapped")
+def get_league_wrapped(
+    league_id: str = Depends(require_league_access),
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Season Wrapped for a real league: the same card deck shape as the Sim's (modules.wrapped_real). The full deck shows once the
+    season has finished; while it is being played the "so far" deck is returned (`partial`). Only cards the matchup data supports
+    are built. No push is sent for it."""
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    my_roster, _reason = _resolve_my_roster(_user, league_id)
+    try:
+        my_roster_id = int((my_roster or {}).get("roster_id") or 0)
+    except (TypeError, ValueError):
+        my_roster_id = 0
+    if my_roster_id <= 0:
+        return {"ok": True, "wrapped": None, "reason": "no_roster"}
+    _, regular_end, max_week = league_recaps.league_history_window(league)
+    rows = league_recaps.build_matchup_history_rows(league_id, max_week, fetch_matchups=sleeper.get_matchups)
+    completed = league_recaps.completed_recap_week(league, rows)
+    if completed <= 0:
+        return {"ok": True, "wrapped": None, "reason": "no_completed_week"}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, completed), thread_name_prefix="dgm-wrapped") as executor:
+        weeks = list(executor.map(lambda w: sleeper.get_matchups(league_id, w) or [], range(1, completed + 1)))
+    profiles = sleeper.get_league_roster_profiles(league_id) or {}
+    valued = league_value_settings.build_valued_players_frame_cached(league_id=league_id, lens="Dynasty", players_db_path=PLAYERS_DB_PATH)
+    lookup: dict[str, dict[str, Any]] = {}
+    if not valued.empty:
+        cols = [c for c in ("player_id", "name", "position", "team") if c in valued.columns]
+        if cols:
+            lookup = league_history.player_lookup_from_rows(valued[cols].to_dict("records"))
+    status = str(league.get("status") or "")
+    partial = not (status == "complete" or completed >= regular_end)
+    deck = wrapped_real.build_real_wrapped(
+        weeks, my_roster_id, season=str(league.get("season") or ""), partial=partial, lookup=lookup, profiles=profiles,
+        team_name=str((profiles.get(str(my_roster_id)) or {}).get("team_name") or "Your team"),
+    )
+    return {"ok": True, "wrapped": deck, "reason": ""}
 
 
 _ROUNDUP_UPSELL = {

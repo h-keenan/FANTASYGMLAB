@@ -17,6 +17,7 @@ import { SimDynastyResult } from './SimGameDynasty';
 import { SimStandingsList } from './SimGameLeague';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { SeasonReviewSections, ReviewDeltaText, ReviewGlyphChip, REVIEW_ICON } from './SeasonReviewSections';
+import { SeasonWrappedLauncher } from './SeasonWrapped';
 import SimReviewShareModal from './SimReviewShareModal';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -208,6 +209,10 @@ export function SimWeekRecapView({
         </View>
       ) : null}
 
+      {!recap.season_complete && ctx.game.settings.mode !== 'dynasty' ? (
+        <SeasonWrappedLauncher label="Season so far" load={() => api.getSimGameWrapped(ctx.gameId).then((b) => b.wrapped)} />
+      ) : null}
+
       {!last ? <Button label="Next round" onPress={onNext} /> : <Button label={recap.season_complete ? (ctx.game.status === 'offseason' ? 'Go to the offseason' : ctx.game.settings.mode === 'dynasty' ? 'See your dynasty review' : 'See your final grade') : 'Back to your team'} onPress={onClose} />}
     </View>
   );
@@ -322,6 +327,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
           <Button label="Play again" onPress={onNewGame} />
           <Button label="All games" variant="secondary" onPress={onHub} />
           <Button label="Share your season" variant="secondary" onPress={() => setSharing(true)} />
+          <SeasonWrappedLauncher label="Season Wrapped" load={() => api.getSimGameWrapped(gameId).then((b) => b.wrapped)} />
         </View>
       </AccentCard>
       )}

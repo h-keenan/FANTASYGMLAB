@@ -21,6 +21,8 @@ import {
   historyFilterToPill,
   } from "@/lib/leagueRecapsPresentation";
 import { PageTitle } from "@/components/PageTitle";
+import { SeasonWrappedLauncher } from "@/components/SeasonWrapped";
+import { api } from "@/lib/api";
 
 import type { RecapsTab } from "@/lib/pageTabs";
 
@@ -149,6 +151,9 @@ export function LeagueRecapsContent({
           <ViewTabs label="League memory view" className="min-w-0 flex-1" value={view} options={MEMORY_VIEWS.map((v) => ({ value: v, label: v }))} onChange={(value) => setView(value as MemoryView)} />
         </PageControl>
         {body}
+        {view === "Recaps" ? (
+          <SeasonWrappedLauncher label="Your season, wrapped" itemId={leagueId} variant="accentOutline" load={() => api.getLeagueWrapped(leagueId).then((b) => b.wrapped)} />
+        ) : null}
       </div>
     </Shell>
   );

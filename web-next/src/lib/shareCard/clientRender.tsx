@@ -17,6 +17,8 @@ import { STORY_SIZE, SHARE_FONT_FAMILY, ShareBackdrop, type ShareBrandAssets } f
 import { TradeShareCard } from "./tradeCard";
 import { MultiTradeShareCard } from "./multiTradeCard";
 import { SeasonReviewShareCard } from "./seasonReviewCard";
+import { WrappedShareCard } from "./wrappedCard";
+import type { WrappedShareModel } from "@/lib/wrapped";
 import type { ReviewShareModel } from "@/lib/simReview";
 import type { ShareModel } from "@/lib/multiTeamTrade";
 
@@ -309,6 +311,21 @@ export async function renderSeasonReviewCardBlob(model: ReviewShareModel, size: 
   const assets = await loadBrowserAssets();
   const svg = await renderSeasonReviewCardSvg(model, assets, { size });
   const { width, height } = SEASON_REVIEW_SIZES[size];
+  return svgToPngBlob(svg, width, height);
+}
+
+/** One Season Wrapped card: player photos (Sleeper CDN only) are embedded, a failed one draws initials. */
+export async function renderWrappedCardBlob(model: WrappedShareModel): Promise<Blob> {
+  const assets = await loadBrowserAssets();
+  const satori = await loadSatori(assets.yoga);
+  const { width, height } = STORY_SIZE;
+  const fetchImage = isPrivacyMode() ? async () => null : fetchImageDataUri;
+  const ids = Array.from(new Set(model.players.map((p) => p.headshot_id).filter((id): id is string => Boolean(id))));
+  const shots = await Promise.all(ids.map((id) => fetchImage(`https://sleepercdn.com/content/nfl/players/thumb/${encodeURIComponent(id)}.jpg`)));
+  const headshots = Object.fromEntries(ids.map((id, index) => [id, shots[index]]));
+  const backdrop = svgDataUri(await satori(<ShareBackdrop width={width} height={height} />, { width, height, fonts: assets.fonts }));
+  const brand: ShareBrandAssets = { lockup: assets.lockup, qr: assets.qr, backdrop };
+  const svg = await satori(<WrappedShareCard model={model} brand={brand} width={width} height={height} images={{ headshots }} />, { width, height, fonts: assets.fonts });
   return svgToPngBlob(svg, width, height);
 }
 

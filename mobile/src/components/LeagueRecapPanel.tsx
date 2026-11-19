@@ -27,6 +27,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { buildRecapPage, isMatchupStory, recapFaab, recapMetric, recapScoreline, recapWeekChips, storyInvolves, type RecapSection } from '../lib/recapPage';
 import Money from './Money';
 import { formatMoney } from '../lib/money';
+import { SeasonWrappedLauncher } from './SeasonWrapped';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -200,6 +201,7 @@ export default function LeagueRecapPanel({
             <RecapBody recap={recap} myRosterId={myRosterId} rosterMap={rosterMap} openTeam={openTeam} onShare={() => setShareOpen(true)} onOpenTrades={() => navigation.navigate('TradeHistory')} />
           </PresenceSwap>
         )}
+        <SeasonWrappedLauncher label="Your season, wrapped" load={() => api.getLeagueWrapped(leagueId).then((b) => b.wrapped)} />
       </ScrollView>
       <RecapSharePreviewModal visible={shareOpen} onClose={() => setShareOpen(false)} leagueName={leagueName} recap={recap} rosterMap={rosterMap} />
       {profile ? (

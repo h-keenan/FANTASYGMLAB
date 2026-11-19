@@ -44,6 +44,7 @@ from modules.sim.game_rules import rules_info
 from modules.sim.game_engine import advance, ensure_rank_movement, finish_draft, start_from_league
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_result import _draft_from_state, build_result
+from modules.sim.game_wrapped import build_wrapped
 from modules.sim.game_review import build_review
 from modules.sim.game_scoring import default_model
 from modules.sim.game_setup import (
@@ -1325,6 +1326,19 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         if state.status == "drafting":
             return {**_env(pro, state, "wrong_phase"), "phase": "draft"}
         return {**_env(pro, state), **_memo_view(state, ("league",), lambda: view.league_view(snap, state))}
+
+    @router.get("/games/{game_id}/wrapped")
+    @guarded
+    def get_wrapped(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        """Season Wrapped: the card deck (complete season) or the "so far" deck (in progress). Pro cards are locked server-side."""
+        pro = ctx.is_pro(user)
+        gid = _gid(game_id)
+        store, uid, row, snap, state = load(user, gid)
+        if state.status == "drafting" or snap.settings.dynasty:
+            return {**_env(pro, state, "wrong_phase")}
+        result = store.get_result(uid, gid) if state.status == "complete" else None
+        events = store.load_events(uid, gid, 0)
+        return {**_env(pro, state), "wrapped": build_wrapped(snap, state, events, result, is_pro=pro)}
 
     @router.get("/games/{game_id}/league/rosters")
     @guarded
