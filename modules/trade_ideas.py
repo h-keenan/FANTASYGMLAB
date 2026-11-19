@@ -51,7 +51,7 @@ from modules.player_state_authority import (
 )
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
-from modules import age_profile, model_status, partner_context, playoff_context, runtime_trace
+from modules import age_profile, model_status, partner_context, playoff_context, runtime_trace, usage_roles_targets
 from modules import drop_candidates, trade_cautions, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 
@@ -2544,7 +2544,24 @@ def evaluate_trade_market_realism(
     )
     if acceptance["penalty"]:
         score -= acceptance["penalty"]
-    score += float(acceptance["context_adjust"]["points"])
+    partner_points = float(acceptance["context_adjust"]["points"])
+    # Handshake 10b: rising / shrinking roles share the partner-context budget, so the
+    # COMBINED shift stays inside +/-COMBINED_MAX_POINTS. Roles never touch the cap,
+    # the lopsided verdict or any price (``usage_roles_targets``).
+    roles_adjust = usage_roles_targets.adjustment(
+        roles=my_shape.get("usage_roles"),
+        my_strategy=str(my_shape.get("strategy") or my_shape.get("mode") or ""),
+        my_needs=my_shape.get("needs") or (),
+        send_assets=send_assets,
+        receive_assets=receive_assets,
+    )
+    if roles_adjust["points"]:
+        budget = partner_context.COMBINED_MAX_POINTS
+        applied = max(-budget, min(budget, partner_points + roles_adjust["points"]))
+        if applied - partner_points >= 0.25:
+            positives[0:0] = roles_adjust["lines"]
+        partner_points = applied
+    score += partner_points
     if acceptance["lopsided"]:
         score -= 10
         negatives.append(
@@ -4708,6 +4725,7 @@ def build_trade_ideas(
     finder_trace: "FinderSearchTrace | None" = None,
     trade_block_player_ids: Sequence[str] | None = None,
     team_profiles: Mapping[str, Any] | None = None,
+    usage_roles: Mapping[str, Mapping[str, str]] | None = None,
 ) -> List[Dict[str, Any]]:
     profile = _TradePipelineProfile(cache_enabled=_pipeline_cache_enabled)
     try:
@@ -4737,6 +4755,7 @@ def build_trade_ideas(
             finder_trace=finder_trace,
             trade_block_player_ids=trade_block_player_ids,
             team_profiles=team_profiles,
+            usage_roles=usage_roles,
         )
     finally:
         profile.emit()
@@ -5088,6 +5107,7 @@ def _build_trade_ideas_impl(
     finder_trace: "FinderSearchTrace | None" = None,
     trade_block_player_ids: Sequence[str] | None = None,
     team_profiles: Mapping[str, Any] | None = None,
+    usage_roles: Mapping[str, Mapping[str, str]] | None = None,
 ) -> List[Dict[str, Any]]:
     profile = _pipeline_profile or _TradePipelineProfile(cache_enabled=False)
     ideas: List[Dict[str, Any]] = []
@@ -5247,6 +5267,8 @@ def _build_trade_ideas_impl(
     my_shape["strategy"] = active_strategy
     my_shape["strategy_label"] = team_strategy_label(active_strategy)
     my_shape["mode"] = my_mode
+    if usage_roles and usage_roles_targets.enabled():
+        my_shape["usage_roles"] = dict(usage_roles)
     if team_archetype:
         my_shape["archetype"] = str(team_archetype)
         my_shape["archetype_label"] = str(team_archetype)

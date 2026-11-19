@@ -35,6 +35,8 @@ from modules import league_rankings
 from modules import league_value_settings
 from modules import model_status
 from modules import partner_context as partner_context_module
+from modules import usage_roles_targets as usage_roles_targets_module
+from modules import league_calendar
 from modules import player_quick_view
 from modules import redis_cache
 from modules import sleeper
@@ -531,6 +533,7 @@ def generate_trade_idea_records(
     keeper_context: Mapping[str, Any] | None = None,
     finder_trace: "trade_ideas_module.FinderSearchTrace | None" = None,
     team_profiles: Mapping[str, Any] | None = None,
+    usage_roles: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
     and modules.trade_hub_presentation already work with (trade_confidence_label,
@@ -689,6 +692,7 @@ def generate_trade_idea_records(
         require_receive_players=bool(require_receive_players),
         finder_trace=finder_trace,
         team_profiles=team_profiles,
+        usage_roles=usage_roles,
     )
     enforced = enforce_generated_trade_ideas(
         raw_ideas,
@@ -756,6 +760,30 @@ def _trade_hub_ideas_cache_bucket() -> int:
     return int(time.time() // TRADE_HUB_IDEAS_TTL_SECONDS)
 
 
+def _usage_roles_for_league(
+    league: Mapping[str, Any], league_id: str, rosters: Any, valued: pd.DataFrame
+) -> dict[str, dict[str, str]] | None:
+    """Corroborated rising / shrinking role flags (usage_trends) for every rostered
+    skill player, in season only. Pro data: the caller asks only for a Pro user.
+    Fails open to None (today's ranking)."""
+
+    try:
+        if not league_calendar.is_in_season(league):
+            return None
+        rostered = {str(p) for r in rosters or [] for p in (r.get("players") or []) if p is not None}
+        if not rostered or "player_id" not in valued.columns or "position" not in valued.columns:
+            return None
+        sub = valued[valued["player_id"].astype(str).isin(rostered)]
+        season_stats = sleeper.get_season_player_stats(season=sleeper.default_player_stats_season(), retain_weekly=True)
+        roles = usage_roles_targets_module.role_map(
+            zip(sub["player_id"].astype(str), sub["position"].astype(str)), season_stats
+        )
+        return roles or None
+    except Exception:
+        logger.warning("usage roles unavailable for trade ideas (league=%s)", league_id, exc_info=True)
+        return None
+
+
 def _generate_trade_idea_records_cached(
     league_id: str,
     roster_id: int,
@@ -766,6 +794,7 @@ def _generate_trade_idea_records_cached(
     gm_target_player_ids: tuple[str, ...],
     keeper_round_penalty: int,
     _bucket: int,
+    usage_roles_pro: bool = False,
 ) -> list[dict[str, Any]]:
     league = sleeper.get_league(league_id)
     if not league:
@@ -815,6 +844,7 @@ def _generate_trade_idea_records_cached(
         league_id=league_id,
         my_roster_id=roster_id,
         team_profiles=team_profiles,
+        usage_roles=_usage_roles_for_league(league, league_id, rosters, valued) if usage_roles_pro else None,
         players_df=valued,
         rosters=rosters,
         untouchable_player_ids=untouchable_player_ids,
@@ -867,6 +897,7 @@ def generate_trade_idea_records_cached(
     team_stance: str = "",
     keeper_round_penalty: int = 0,
     posture: Mapping[str, Any] | None = None,
+    usage_roles_pro: bool = False,
 ) -> list[dict[str, Any]]:
     """Cached front door for `generate_trade_idea_records` — resolves its
     own players_df/settings/rosters from just (league_id, lens) rather than
@@ -901,14 +932,18 @@ def generate_trade_idea_records_cached(
         # Round 4: the league-state fingerprint (settings, rosters, traded picks, players/values files) replaces the clock
         # bucket, so the entry is served stale-while-revalidate and a real change is a different key.
         f"{league_value_settings.league_state_fingerprint(league_id, players_db_path)}"
-        f"|pc={int(partner_context_module.enabled())}{int(partner_context_module.ask_pick_enabled())}",
+        f"|pc={int(partner_context_module.enabled())}{int(partner_context_module.ask_pick_enabled())}"
+        # Handshake 10b: role nudge = flag AND the usage Pro gate (Free never sees role flags).
+        f"|{usage_roles_targets_module.fingerprint_token(usage_roles_pro)}",
     )
     cache_key = redis_cache.build_cache_key("trade_hub_ideas", *key)
     records = swr_cache.redis_swr_cache(
         cache_key=cache_key,
         fresh_ttl_seconds=TRADE_HUB_IDEAS_TTL_SECONDS,
         stale_ttl_seconds=TRADE_HUB_IDEAS_STALE_TTL_SECONDS,
-        compute=lambda: _generate_trade_idea_records_cached(*key),
+        compute=lambda: _generate_trade_idea_records_cached(
+            *key, usage_roles_pro=bool(usage_roles_pro) and usage_roles_targets_module.enabled()
+        ),
         lock_timeout_seconds=_TRADE_HUB_IDEAS_LOCK_TIMEOUT_SECONDS,
     )
     # `posture` (the caller's resolved team posture) is stamped OUTSIDE the

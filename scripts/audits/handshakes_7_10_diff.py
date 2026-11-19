@@ -7,7 +7,7 @@ each team takes a turn as "me" in every seed. Off = the item's flag set to 0
     .venv313/bin/python scripts/audits/handshakes_7_10_diff.py ITEM OUT.md
 
 ITEM is one of 7 (GM Plan team outlook), 8 (live draft), 9 (playoff odds),
-10 (usage roles). Items are added by the PR that ships them.
+10 (usage roles; 10b = role nudge on trade ideas). Items are added by the PR that ships them.
 """
 
 from __future__ import annotations
@@ -238,7 +238,112 @@ def item9(out: str) -> None:
     print("\n".join(lines))
 
 
-ITEMS = {"7": item7, "8": item8, "9": item9}
+def item10b(out: str) -> None:
+    """Rising / shrinking roles nudge trade-idea realism, inside the +/-6 partner budget."""
+
+    import random
+
+    from modules import partner_context, usage_roles_targets
+
+    growing = "His role is growing: snap share is 71% over the last 4 games vs 58% before (+13 pts); targets per game is 7.5 over the last 4 vs 5.1 before. PPR points per game are 15.2 over the last 4 vs 11.0 before."
+    fading = "His role is shrinking: snap share is 49% over the last 4 games vs 63% before (-14 pts); targets per game is 3.1 over the last 4 vs 5.4 before. PPR points per game are 8.0 over the last 4 vs 11.4 before."
+
+    def roles_for(players: pd.DataFrame, seed: int) -> dict:
+        rng = random.Random(seed * 7)
+        out_map = {}
+        for pid in players["player_id"].astype(str):
+            roll = rng.random()
+            if roll < 0.12:
+                out_map[pid] = {"key": "role_expanding", "explanation": growing}
+            elif roll < 0.24:
+                out_map[pid] = {"key": "role_shrinking", "explanation": fading}
+        return out_map
+
+    def run(seed: int, rid: int, roles, partner_on: bool = True):
+        players, summary, adapter, profiles = make_league(seed)
+        os.environ[partner_context.PARTNER_CONTEXT_ENV_KEY] = "1" if partner_on else "0"
+        with patch.object(trade_ideas._UserSideAnalyzerGate, "passes", lambda self, idea: True):
+            return trade_ideas.build_trade_ideas(
+                players, f"synthetic-{seed}", summary, rid, [], [], {}, max_ideas=40, score_field="value_score",
+                league_settings=SETTINGS, adapter=adapter, team_profiles=profiles, _pipeline_cache_enabled=False,
+                usage_roles=roles,
+            )
+
+    def key(i):
+        return trade_ideas._package_key(i["send_assets"], i["receive_assets"]) + f"|{i.get('partner_team_name')}"
+
+    def prices(i):
+        return [(a.get("label"), a.get("score")) for a in [*i["send_assets"], *i["receive_assets"]]]
+
+    ideas = changed = lost = gained = runs = order_changed = top_changed = 0
+    shifts: list[int] = []
+    combined: list[int] = []
+    examples: list[str] = []
+    for seed in SEEDS:
+        roles = roles_for(make_league(seed)[0], seed)
+        for rid in range(1, TEAMS + 1):
+            os.environ.pop(usage_roles_targets.ENV_KEY, None)
+            base = run(seed, rid, None)
+            both_off = run(seed, rid, None, partner_on=False)
+            os.environ[usage_roles_targets.ENV_KEY] = "0"
+            off = run(seed, rid, roles)
+            assert [key(i) for i in base] == [key(i) for i in off] and all(
+                (a["market_realism_score"], a.get("market_realism_summary")) == (b["market_realism_score"], b.get("market_realism_summary"))
+                for a, b in zip(base, off)
+            ), "flag off restores today's exact output"
+            os.environ.pop(usage_roles_targets.ENV_KEY, None)
+            on = run(seed, rid, roles)
+            runs += 1
+            base_by, on_by, zero_by = {key(i): i for i in base}, {key(i): i for i in on}, {key(i): i for i in both_off}
+            lost += len(set(base_by) - set(on_by))
+            gained += len(set(on_by) - set(base_by))
+            if [key(i) for i in base[:5]] != [key(i) for i in on[:5]]:
+                order_changed += 1
+            if base and on and key(base[0]) != key(on[0]):
+                top_changed += 1
+            for k, a in base_by.items():
+                b = on_by.get(k)
+                if b is None:
+                    continue
+                ideas += 1
+                assert prices(a) == prices(b), "no price changes"
+                assert a["user_edge_ratio"] == b["user_edge_ratio"], "partner edge untouched"
+                assert a["market_realism_hard_fail_flags"] == b["market_realism_hard_fail_flags"], "lopsided / hard-fail untouched"
+                delta = b["market_realism_score"] - a["market_realism_score"]
+                shifts.append(delta)
+                z = zero_by.get(k)
+                if z is not None:
+                    both = b["market_realism_score"] - z["market_realism_score"]
+                    combined.append(both)
+                    assert abs(both) <= partner_context.COMBINED_MAX_POINTS, "combined partner + roles shift stays within 6"
+                if delta:
+                    changed += 1
+                    if len(examples) < 3 and "role is" in str(b.get("market_realism_summary")):
+                        send = ", ".join(x.get("label") for x in b["send_assets"])
+                        recv = ", ".join(x.get("label") for x in b["receive_assets"])
+                        examples.append(
+                            f"seed {seed}, team {rid} ({b.get('partner_team_name')}): send [{send}] for [{recv}]: realism {a['market_realism_score']} -> {b['market_realism_score']}; \"{b['market_realism_summary'][:140]}\""
+                        )
+    mags = [abs(d) for d in shifts]
+    cmax = max((abs(c) for c in combined), default=0)
+    lines = [
+        "# Handshake 10b: rising / shrinking roles nudge trade-idea realism",
+        "",
+        f"SYNTHETIC seeded 12-team leagues (seeds {list(SEEDS)}, {runs} team runs, {ideas} matched ideas); about 12% of players flagged growing and 12% shrinking (seeded). Off = DYNASTYGM_USAGE_ROLES_TARGETS_V1=0 with the same role map passed.",
+        "- Flag off: ranking and every score identical to a run with no role map (asserted).",
+        f"- Flag on: {changed}/{ideas} ideas change realism; roles shift max {max(mags) if mags else 0}, average {sum(mags) / len(mags) if mags else 0:.2f} points (module cap {usage_roles_targets.MAX_POINTS}).",
+        f"- Combined partner + roles shift vs both-off: max {cmax} points on {len(combined)} ideas; asserted <= {partner_context.COMBINED_MAX_POINTS:.0f} per idea.",
+        "- Prices, partner edge ratio and lopsided / hard-fail flags identical on every idea (asserted).",
+        f"- Ranking: top-5 order changes in {order_changed}/{runs} runs, #1 idea changes in {top_changed}/{runs}; ideas lost {lost}, gained {gained} (realism-floor crossings).",
+        "",
+        "## Examples",
+        *[f"- {e}" for e in examples],
+    ]
+    Path(out).write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
+ITEMS = {"7": item7, "8": item8, "9": item9, "10b": item10b}
 
 if __name__ == "__main__":
     ITEMS[sys.argv[1]](sys.argv[2] if len(sys.argv) > 2 else f"handshakes_{sys.argv[1]}_diff.md")
