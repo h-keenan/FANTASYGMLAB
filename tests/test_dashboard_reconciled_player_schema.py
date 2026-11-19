@@ -11,12 +11,26 @@ from modules import structured_player_refresh, trade_ideas
 from modules.player_eligibility import filter_current_fantasy_players
 
 
+_FIXTURES = Path(__file__).parent / "fixtures"
+
+
 def _inventory() -> dict:
-    return json.loads(Path("data/sleeper_players.json").read_text(encoding="utf-8"))
+    """Frozen Sleeper inventory entries (hermetic; not the live refresh output)."""
+    return json.loads(
+        (_FIXTURES / "reconciled_player_schema_sleeper_players.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 def _persisted_frame() -> pd.DataFrame:
-    with sqlite3.connect("data/players.db") as connection:
+    """Frozen persisted-schema rows from a known-good players.db snapshot.
+
+    The live data/players.db is rewritten by the scheduled refresh, where a
+    veteran can legitimately lose provider backing (e.g. an unsigned free agent
+    dropping out of the FantasyCalc feed), so these tests must not read it.
+    """
+    with sqlite3.connect(_FIXTURES / "reconciled_player_schema_players.db") as connection:
         return pd.read_sql_query("SELECT * FROM players", connection)
 
 
