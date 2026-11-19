@@ -13,7 +13,7 @@ Options carry a `glyph` name from the central registry
 enforced by `scripts/check_lib_twins.mjs`). The registry maps each name to an
 outline Ionicons glyph, like `navCatalog` does for destinations:
 
-- web: `TabGlyph` draws the same Ionicons SVG (`tabGlyphMarkup.generated.ts`);
+- web: `TabGlyph` draws the same Ionicons SVG (`public/tab-glyphs.svg` (a `<symbol>` sprite referenced with `<use>`));
 - mobile: `TabIcon` renders the Ionicons font glyph.
 
 Add or change an icon by editing the registry only, then pass `glyph: "<name>"`.
