@@ -349,15 +349,34 @@ def _player(pid, score):
     return {"asset_type": "player", "player_id": pid, "score": score}
 
 
-def test_redundancy_flag_defaults_off_and_can_be_switched_on(monkeypatch):
+def test_redundancy_flag_defaults_on_and_can_be_switched_off(monkeypatch):
     monkeypatch.delenv(trade_grade.REDUNDANCY_ENV_KEY, raising=False)
-    assert trade_grade.roster_redundancy_enabled() is False
+    assert trade_grade.roster_redundancy_enabled() is True
     for off in ("0", "false", "no", "off"):
         monkeypatch.setenv(trade_grade.REDUNDANCY_ENV_KEY, off)
         assert trade_grade.roster_redundancy_enabled() is False
-    for on in ("1", "true", "yes", "on"):
-        monkeypatch.setenv(trade_grade.REDUNDANCY_ENV_KEY, on)
-        assert trade_grade.roster_redundancy_enabled() is True
+
+
+def test_scope_is_qb_and_te_outside_tep():
+    assert trade_grade.redundancy_positions({}) == {"QB", "TE"}
+    assert trade_grade.redundancy_positions({"te_premium": True}) == {"QB"}
+
+
+def test_scoped_discount_only_hits_a_received_qb_or_te_who_cannot_start():
+    qb = {**_player("qb2", 5000), "position": "QB"}
+    wr = {**_player("wr2", 4000), "position": "WR"}
+    surplus = {**_player("qb3", 3000), "position": "QB"}
+    points, note = trade_grade.roster_redundancy_adjustment(
+        [surplus], [qb, wr], current_starter_ids=set(), post_starter_ids=set(),
+        value_of=lambda a: a["score"], positions=frozenset({"QB", "TE"}),
+    )
+    # only the received QB is discounted; the received WR and the sent surplus QB are untouched
+    assert points == -2500 and "cannot start" in note
+    starts, _ = trade_grade.roster_redundancy_adjustment(
+        [], [qb], current_starter_ids=set(), post_starter_ids={"qb2"},
+        value_of=lambda a: a["score"], positions=frozenset({"QB"}),
+    )
+    assert starts == 0
 
 
 def test_receiving_a_player_who_cannot_start_is_discounted():

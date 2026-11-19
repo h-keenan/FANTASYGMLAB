@@ -630,6 +630,7 @@ def evaluate_trade_analyzer_fit(
             current_starter_ids=_starter_ids(current_snapshot),
             post_starter_ids=_starter_ids(post_snapshot),
             value_of=score_asset_value,
+            positions=trade_grade.redundancy_positions(lineup_settings),
         )
 
     # Trade engine v2 (docs/trade-engine-v2.md): in season, ONE expected
