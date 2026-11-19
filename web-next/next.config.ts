@@ -7,10 +7,9 @@ const nextConfig: NextConfig = {
   // not confirmed for web-next, and that file's own header comment says
   // production's real Caddy config is generated server-side — not
   // something to edit blind. Setting a baseline here instead applies
-  // regardless of what the reverse proxy does. No Content-Security-Policy
-  // yet — getting one wrong silently breaks functionality (blocked
-  // scripts/styles/images), and that needs a real browser to audit against
-  // every external resource this app actually loads, not a guess.
+  // regardless of what the reverse proxy does. The Content-Security-Policy
+  // is per-request (it carries a nonce), so it is set in src/proxy.ts, in
+  // report-only mode until the violation reports are clean.
   async headers() {
     return [
       {

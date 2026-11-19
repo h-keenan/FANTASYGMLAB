@@ -19,8 +19,8 @@
  *    request cache key is the same as today's). If the signed-in user, league or URL differs, the early response is ignored
  *    and the app fetches normally; a rejected early request also falls back to a normal fetch. Response handling, error
  *    mapping and the coalescing key are all unchanged because the consumer feeds the response into the same code path.
- *  - No CSP exists today (see next.config.ts), and no 'unsafe-inline' is added by this change. The script is inline like
- *    THEME_BOOT_SCRIPT; if a CSP is added later it must allow this script by nonce or hash (no blanket 'unsafe-inline').
+ *  - The script is inline like THEME_BOOT_SCRIPT and is allowed by the per-request CSP nonce (src/proxy.ts, lib/csp.ts,
+ *    components/BootScripts.tsx), never by a blanket 'unsafe-inline'.
  */
 
 /** `window` property holding the in-flight early request. */
