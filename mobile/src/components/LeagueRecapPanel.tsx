@@ -27,6 +27,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { buildRecapPage, isMatchupStory, recapFaab, recapMetric, recapScoreline, recapWeekChips, storyInvolves, type RecapSection } from '../lib/recapPage';
 import Money from './Money';
 import { formatMoney } from '../lib/money';
+import { SeasonWrappedLauncher } from './SeasonWrapped';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -188,6 +189,7 @@ export default function LeagueRecapPanel({
     <View style={styles.root}>
       {weekStrip}
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+        <SeasonWrappedLauncher label="Your season, wrapped" load={() => api.getLeagueWrapped(leagueId).then((b) => b.wrapped)} />
         {loading ? (
           <SkeletonRegion label="Weekly recap" style={styles.stack}>
             <SkeletonStatusHeader rows={0} />

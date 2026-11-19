@@ -5147,6 +5147,9 @@ export const api = {
     authorizedRequest<SimGameTypes.SimBlockResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/block`, { method: "PUT", jsonBody: body }),
   getSimLeagueRosters: (gameId: string) => authorizedRequest<SimGameTypes.SimLeagueRostersResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/league/rosters`),
   getSimGameResult: (gameId: string) => authorizedRequest<SimGameTypes.SimGameResultResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/result`),
+  // Season Wrapped: the card deck (see lib/wrapped.ts normalizeWrappedDeck). Sim: complete or so-far; real league: season end or so-far.
+  getSimGameWrapped: (gameId: string) => authorizedRequest<{ wrapped?: unknown; reason?: string }>(`/v1/sim/games/${encodeURIComponent(gameId)}/wrapped`),
+  getLeagueWrapped: (leagueId: string) => authorizedRequest<{ wrapped?: unknown; reason?: string }>(`/v1/leagues/${encodeURIComponent(leagueId)}/wrapped`),
   // Dynasty mode and IR / taxi squads (game engine 1.2.0).
   getSimPicks: (gameId: string) => authorizedRequest<SimGameTypes.SimPicksResponse>(simDynastyPaths(gameId).picks),
   moveSimPlayer: (gameId: string, body: { player_id: string; to: SimGameTypes.SimReserveMoveTo }) =>

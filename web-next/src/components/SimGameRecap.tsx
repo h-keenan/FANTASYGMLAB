@@ -19,6 +19,7 @@ import { SimStandingsList } from "@/components/SimGameLeague";
 import { SkeletonCard } from "@/components/Skeleton";
 import { SeasonReviewSections, ReviewDeltaText, ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
+import { SeasonWrappedLauncher } from "@/components/SeasonWrapped";
 import { SimReviewShareButton } from "@/components/SimReviewShareButton";
 import { api } from "@/lib/api";
 import { buildReviewShareModel, buildSimReviewSections } from "@/lib/simReview";
@@ -190,6 +191,10 @@ export function SimWeekRecapView({
         </section>
       ) : null}
 
+      {!recap.season_complete && ctx.game.settings.mode !== "dynasty" ? (
+        <SeasonWrappedLauncher label="Season so far" itemId={ctx.gameId} variant="accentOutline" load={() => api.getSimGameWrapped(ctx.gameId).then((b) => b.wrapped)} />
+      ) : null}
+
       </div>
       </div>
 
@@ -326,6 +331,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
           <Button onClick={onNewGame}>Play again</Button>
           <Button variant="secondary" onClick={onHub}>All games</Button>
           <SimReviewShareButton model={shareModel} sections={sections} gameId={gameId} />
+          <SeasonWrappedLauncher label="Season Wrapped" itemId={gameId} variant="accentOutline" load={() => api.getSimGameWrapped(gameId).then((b) => b.wrapped)} />
         </div>
       </AccentCard>
       )}
