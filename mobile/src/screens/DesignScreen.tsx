@@ -201,7 +201,7 @@ export default function DesignScreen() {
             <View style={styles.wrap}>
               <ToneBadge label="Starter" color={colors.success} />
               <ToneBadge label="Bench" color={colors.violet} />
-              <ToneBadge label="Risk" color={colors.danger} />
+              <ToneBadge label="Danger" color={colors.danger} />
               <ToneBadge label="Pro" color={colors.premium} />
               <ToneBadge solid size="xs" label="NEW" color={colors.accent} textColor={colors.onAccent} />
               <ToneBadge size="xs" icon="arrow-up" label="12%" color={colors.success} />

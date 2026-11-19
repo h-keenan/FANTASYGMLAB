@@ -3,6 +3,8 @@
  * communityTradesPresentation.ts / ShareToCommunityToggle payload.
  */
 
+import { toneToken, type ToneToken } from './verdictTone.ts';
+
 export interface SharedTradeAssetInput {
   asset_type: 'player' | 'pick';
   name: string;
@@ -40,13 +42,11 @@ export function buildShareBody(
   };
 }
 
-export type GradeTone = 'success' | 'danger' | 'accent' | 'neutral';
+export type GradeTone = ToneToken;
 
+/** Shared-trade verdict -> tone token (ACCEPT green, COUNTER accent, DECLINE amber; never red). */
 export function gradeTone(grade: string): GradeTone {
-  if (grade === 'ACCEPT') return 'success';
-  if (grade === 'DECLINE') return 'danger';
-  if (grade === 'COUNTER') return 'accent';
-  return 'neutral';
+  return toneToken(grade.toLowerCase());
 }
 
 export function assetLabel(asset: SharedTradeAssetInput): string {

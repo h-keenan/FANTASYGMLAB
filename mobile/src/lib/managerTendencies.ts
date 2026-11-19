@@ -48,14 +48,6 @@ export interface ManagerRecentTrade {
   grade: { letter: string; tone: string; confidence: string; timing_label: string; ratio: number | null } | null;
 }
 
-/** Grade tone slug (server) -> shared semantic color slug. */
-export function gradeToneSlug(tone: string | null | undefined): 'success' | 'accent' | 'muted' | 'danger' {
-  if (tone === 'success') return 'success';
-  if (tone === 'positive') return 'accent';
-  if (tone === 'risk') return 'danger';
-  return 'muted';
-}
-
 /** "2026-10-04" -> "Oct 4, 2026 · Wk 5" (week-only fallback; '' if neither). */
 export function tradeDateLabel(date: string | null | undefined, week?: number | null): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date ?? '');

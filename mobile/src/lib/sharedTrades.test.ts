@@ -28,9 +28,9 @@ test('only analyzer grades are shareable', () => {
 
 test('grade tones and labels', () => {
   assert.equal(gradeTone('ACCEPT'), 'success');
-  assert.equal(gradeTone('DECLINE'), 'danger');
+  assert.equal(gradeTone('DECLINE'), 'warning');
   assert.equal(gradeTone('COUNTER'), 'accent');
-  assert.equal(gradeTone('FAIR'), 'neutral');
+  assert.equal(gradeTone('FAIR'), 'muted');
   assert.equal(assetLabel({ asset_type: 'player', name: 'A', position: 'WR' }), 'A · WR');
   assert.equal(assetLabel({ asset_type: 'pick', name: '2027 1st' }), '2027 1st');
 });

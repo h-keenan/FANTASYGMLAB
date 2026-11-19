@@ -1,5 +1,6 @@
 "use client";
 
+import { toneColorVar } from "@/lib/verdictToneCss";
 import { useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
@@ -19,7 +20,6 @@ import {
   HISTORY_FILTERS,
   emptyFilterNote,
   formatHistoryWhen,
-  gradeToneColorVar,
   matchesHistoryFilter,
   pickLabel,
 } from "@/lib/leagueRecapsPresentation";
@@ -240,7 +240,7 @@ function HistoryGradeBlock({ grade }: { grade: HistoryTransaction["grade"] }) {
             <span className="text-xs uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "var(--letter-spacing-badge)" }}>
               {side.team}
             </span>
-            <span className="font-extrabold" style={{ font: "var(--font-card-title)", color: gradeToneColorVar(side.tone) }}>
+            <span className="font-extrabold" style={{ font: "var(--font-card-title)", color: toneColorVar(side.tone) }}>
               {side.letter}
             </span>
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -274,7 +274,7 @@ function HistoryGradeBlock({ grade }: { grade: HistoryTransaction["grade"] }) {
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {grade.grade_model_label || "Current pickup grade"}
         </span>
-        <span className="font-extrabold" style={{ font: "var(--font-card-title)", color: gradeToneColorVar(grade.tone) }}>
+        <span className="font-extrabold" style={{ font: "var(--font-card-title)", color: toneColorVar(grade.tone) }}>
           {grade.letter}
         </span>
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>

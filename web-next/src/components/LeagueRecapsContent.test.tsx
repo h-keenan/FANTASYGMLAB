@@ -254,8 +254,8 @@ describe("LeagueRecapsContent", () => {
     await waitFor(() => expect(screen.getAllByText("Breakout WR").length).toBeGreaterThan(0));
 
     // The waiver grade letter renders with its tone color (positive ->
-    // --color-information), not flat text.
-    expect(screen.getByText("B+")).toHaveStyle({ color: "var(--color-information)" });
+    // --color-accent), not flat text.
+    expect(screen.getByText("B+")).toHaveStyle({ color: "var(--color-accent)" });
 
     // Deep-linking from a waiver story should land on the "Waivers / Free
     // Agents" pill (modules/league_recaps.py's FILTER_WAIVERS maps there,

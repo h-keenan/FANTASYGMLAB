@@ -61,6 +61,17 @@ const SIDE_SEND_RED = /\b\w*[sS]ide\s*===?\s*["']send["']\s*\?\s*["'`]?(var\(--c
 // A "Give" / "You give" label (or its dot: side === "give" ? "var(--color-danger)") is neutral grey ("Get" may stay green): giving a player is not a loss verdict, so it is never red.
 const GIVE_LABEL = />\s*(You give|Give)\s*<|["'`]You give["'`]|\bside\s*===?\s*["']give["']\s*\?\s*(["']danger["']|["'`]?var\(--color-danger\)|colors\.danger)/;
 
+// A grade / verdict TONE key mapped to a danger / red token (tone === "risk" ? var(--color-danger), risk: colors.danger,
+// { risk: "var(--color-danger)" }): the product rule is no red verdicts, so risk / decline / negative read amber via
+// toneToken (verdictTone.ts). Found in the 2026-11 band-aid audit: managerTendencies mapped risk -> red while
+// leagueRecapsPresentation mapped it amber.
+const TONE_KEY = /["']?\b(risk|decline|didnt_pan_out)\b["']?/i;
+const DANGER_TOKEN = new RegExp(`var\\(--color-danger\\)|\\bcolors\\.danger\\b|${RED_HEX.source}`, "i");
+const TONE_KEY_RED = new RegExp(`${TONE_KEY.source}[^\\n]*?(?:${DANGER_TOKEN.source})`, "i");
+// In the grade-tone files themselves even the "danger" slug is a red verdict (it is rendered red by the caller).
+const GRADE_TONE_FILE = /(managerTendencies|sharedTrades|leagueRecaps\w*|gradeTone\w*)\.(ts|tsx)$/;
+const TONE_KEY_DANGER_SLUG = new RegExp(`${TONE_KEY.source}[^\\n]*?["']danger["']`, "i");
+
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
     if (name === "node_modules" || name.startsWith(".")) continue;
@@ -76,6 +87,10 @@ export function scanText(rel, text) {
   lines.forEach((line, i) => {
     if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
     if (OK.test(line) || (i > 0 && OK.test(lines[i - 1]))) return;
+    if (TONE_KEY_RED.test(line) || (GRADE_TONE_FILE.test(rel) && TONE_KEY_DANGER_SLUG.test(line))) {
+      problems.push(`${rel}:${i + 1}: a risk / decline tone maps to a red token (${line.trim().slice(0, 80)}); use toneToken from verdictTone.ts (risk is amber, never red)`);
+      return;
+    }
     if (LADDER.test(line)) {
       problems.push(`${rel}:${i + 1}: inline probability threshold ladder; use percentBand / probabilityBand from verdictTone.ts`);
       return;

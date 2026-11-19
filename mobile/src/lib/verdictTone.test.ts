@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bandCompactTone, bandSimTone, deltaBand, percentBand, percentWord, probabilityBand, probabilityWord, verdictBand } from './verdictTone.ts';
+import { bandCompactTone, bandSimTone, deltaBand, percentBand, percentWord, probabilityBand, probabilityWord, toneToken, verdictBand } from './verdictTone.ts';
 import { marginNowLabel, matchupCardModel } from './matchupModules.ts';
 import { simHeadline, simOddsTone } from './simPresentation.ts';
 import { statusRingTone } from './statusHeader.ts';
@@ -56,4 +56,13 @@ test('the sim playoff sentence cuts at the same 40% edge as the band', () => {
   const f = (playoffs: number) => simHeadline({ odds: { playoffs, title: 0.04, playoff_spots: 6 } } as never);
   assert.match(f(0.4), /coin flip/);
   assert.doesNotMatch(f(0.39), /coin flip/);
+});
+
+test('toneToken maps positive accent and risk amber, never red', () => {
+  assert.equal(toneToken('success'), 'success');
+  assert.equal(toneToken('positive'), 'accent');
+  assert.equal(toneToken('risk'), 'warning');
+  assert.equal(toneToken('danger'), 'warning');
+  assert.equal(toneToken('pending'), 'muted');
+  assert.equal(toneToken(undefined), 'muted');
 });

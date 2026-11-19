@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { toneColor } from '../lib/verdictToneTheme';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +16,7 @@ import TeamAvatar from './TeamAvatar';
 import { TeamSheetFrame, TeamSheetOverview } from './TeamSheet';
 import ToneBadge from './ToneBadge';
 import { api, type TeamSheetPlayer } from '../lib/api';
-import { gradeToneSlug, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel, type ManagerRecentTradeAsset } from '../lib/managerTendencies';
+import { sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel, type ManagerRecentTradeAsset } from '../lib/managerTendencies';
 import { teamSheetNextGameLine, teamSheetPoints, teamSheetSeasonLine, tradeStyleFromSignals, type TeamSheetChip } from '../lib/teamSheet';
 import { queryKeys } from '../lib/queryKeys';
 import type { OpponentTradeTarget } from '../lib/opponentProfile';
@@ -175,7 +176,7 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
             {trade.grade ? (
               <ToneBadge
                 label={trade.grade.letter}
-                color={{ success: colors.success, accent: colors.accent, danger: colors.danger, muted: colors.textSecondary }[gradeToneSlug(trade.grade.tone)]}
+                color={toneColor(colors, trade.grade.tone)}
               />
             ) : null}
           </View>

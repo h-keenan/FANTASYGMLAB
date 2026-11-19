@@ -9,7 +9,8 @@ import { TeamAvatar } from "@/components/TeamAvatar";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamSheetFrame, TeamSheetOverview } from "@/components/TeamSheet";
 import { ToneBadge } from "@/components/ToneBadge";
-import { gradeToneColor, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel } from "@/lib/managerTendencies";
+import { toneColorVar } from "@/lib/verdictToneCss";
+import { sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel } from "@/lib/managerTendencies";
 import { PopupShell } from "@/components/PopupShell";
 
 import { PickPlate } from "@/components/PickRow";
@@ -51,7 +52,7 @@ function RecentTrades({ trades }: { trades: NonNullable<ManagerTendenciesDetailR
                   {trade.partners.length ? ` · with ${trade.partners.join(", ")}` : ""}
                 </span>
                 {trade.grade ? (
-                  <ToneBadge label={trade.grade.letter} color={gradeToneColor(trade.grade.tone)} />
+                  <ToneBadge label={trade.grade.letter} color={toneColorVar(trade.grade.tone)} />
                 ) : null}
               </div>
               {(

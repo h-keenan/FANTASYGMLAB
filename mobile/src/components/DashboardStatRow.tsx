@@ -48,7 +48,7 @@ export default function DashboardStatRow({ items, style, info, dense = false }: 
           value={item.value}
           amount={item.amount}
           valueColor={
-            item.valueColor ?? (item.tone === 'positive' ? colors.successBright : item.tone === 'risk' ? colors.danger : undefined)
+            item.valueColor ?? (item.tone === 'positive' ? colors.successBright : item.tone === 'risk' ? colors.warning : undefined)
           }
           fill={item.fill}
           note={item.note}

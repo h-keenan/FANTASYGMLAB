@@ -24,7 +24,7 @@ export function thisWeekHref(route: RowRoute | NextRoute, leagueId: string, leag
 
 const TONE_COLOR: Record<ThisWeekRow["tone"], string> = {
   positive: "var(--color-success)",
-  risk: "var(--color-danger)",
+  risk: "var(--color-warning)",
   waiver: "var(--color-accent)",
   trade: "var(--color-accent)",
   neutral: "var(--color-text-muted)",
