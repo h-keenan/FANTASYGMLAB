@@ -477,6 +477,21 @@ describe("TradeFinderContent", () => {
     expect(screen.queryByRole("button", { name: /Find Realistic Trades/ })).not.toBeInTheDocument();
   });
 
+  it("does not show the upsell when a response omits is_premium (same rule as the app)", async () => {
+    const response = { ok: true, ideas: [], reason: "no_players_selected", upsell: null } as unknown as TradeFinderResponse;
+    vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
+
+    render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
+
+    fireEvent.click(screen.getByText("My Running Back"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
+    });
+
+    expect(screen.queryByText("Build and search for a trade")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Find Realistic Trades/ })).toBeInTheDocument();
+  });
+
   describe("Find trades deep link (initialPlayerId)", () => {
     it("pre-selects a roster player and runs the search once, under the declared strategy", async () => {
       vi.mocked(api.getTeamStance).mockResolvedValue({ ok: true, stance: "competing", strategy: "contender" });

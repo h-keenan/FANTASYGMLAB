@@ -240,7 +240,7 @@ export function TradeFinderContent({
         });
         setIdeas(result.ideas);
         setNoResults({ search: result.search, closest: result.closest ?? [] });
-        setPremiumUpsell({ locked: !result.is_premium, upsell: result.upsell });
+        setPremiumUpsell({ locked: result.is_premium === false, upsell: result.upsell });
         if (result.ideas.length === 0 && result.reason === "no_players_selected") {
           setSearchError("Select at least one player or pick to search with.");
         } else if (result.reason === "trade_deadline_passed") {
