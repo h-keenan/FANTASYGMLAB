@@ -4,6 +4,8 @@ import { bandColorVar } from "@/lib/verdictToneCss";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { useLatestGate } from "@/lib/useLatestGate";
+
 import { ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { TradeCompactCard } from "@/components/ui/TradeCompactCard";
@@ -44,7 +46,10 @@ export function TradeOfferContent({
   const [result, setResult] = useState<TradeTargetResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const gate = useLatestGate();
+
   const load = useCallback(() => {
+    const isCurrent = gate.begin();
     setResult(null);
     setError(null);
     if (!playerId) {
@@ -55,9 +60,13 @@ export function TradeOfferContent({
     api
       // "auto": the server resolves your team posture (Team Situation first).
       .getTradeTargetOffers(leagueId, playerId, "auto", lens)
-      .then(setResult)
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not build an offer."));
-  }, [leagueId, playerId, lens]);
+      .then((value) => {
+        if (isCurrent()) setResult(value);
+      })
+      .catch((err) => {
+        if (isCurrent()) setError(err instanceof Error ? err.message : "Could not build an offer.");
+      });
+  }, [gate, leagueId, playerId, lens]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount / when the target changes

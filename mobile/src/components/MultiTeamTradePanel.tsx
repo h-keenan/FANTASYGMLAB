@@ -57,6 +57,7 @@ import {
   type SemanticTone,
 } from '../lib/multiTeamTrade';
 import { prefillToBuilder } from '../lib/multiTeamIdeas';
+import { useLatestGate } from '../lib/useLatestGate';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { pickToSheetItem, playerToSheetItem } from '../lib/tradeSheetItems';
 import { selectedItems, type SheetItem } from '../lib/tradeSheetPicker';
@@ -188,7 +189,11 @@ export default function MultiTeamTradePanel({
   const issue = builderIssue(participants, assets);
   const matrix = useMemo(() => buildMatrix(ordered, assets), [ordered, assets]);
 
+  // Editing the trade retires the outstanding analysis so its late answer cannot land on the changed trade.
+  const analyzeGate = useLatestGate();
   const invalidate = () => {
+    analyzeGate.cancel();
+    setAnalyzing(false);
     setResponse(null);
     setFailure(null);
     setRequestError(null);
@@ -232,6 +237,7 @@ export default function MultiTeamTradePanel({
   };
 
   const analyze = async () => {
+    const isCurrent = analyzeGate.begin();
     setFailure(null);
     setRequestError(null);
     setResponse(null);
@@ -242,6 +248,7 @@ export default function MultiTeamTradePanel({
         perspectiveRosterId: myRosterId,
         lens,
       });
+      if (!isCurrent()) return;
       trackUse('trade_analyzer', 'evaluated', {
         leagueId,
         props: { item_kind: 'multi_team', result: result.status === 'ok' ? 'verdict' : 'no_verdict' },
@@ -249,9 +256,9 @@ export default function MultiTeamTradePanel({
       if (isMultiTradeOk(result)) setResponse(result);
       else setFailure(multiTradeFailureLines(result));
     } catch (err) {
-      setRequestError(multiFailureMessage(err));
+      if (isCurrent()) setRequestError(multiFailureMessage(err));
     } finally {
-      setAnalyzing(false);
+      if (isCurrent()) setAnalyzing(false);
     }
   };
 

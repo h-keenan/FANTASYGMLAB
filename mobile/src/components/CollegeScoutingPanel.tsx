@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
@@ -252,7 +252,11 @@ export default function CollegeScoutingPanel({
     }, [load]),
   );
 
+  // Prospects with a watchlist write in flight: a second tap would send the same add/remove twice and race the rollback.
+  const watchBusy = useRef<Set<string>>(new Set());
   const toggleWatchlist = useCallback(async (prospect: CollegeProspect) => {
+    if (watchBusy.current.has(prospect.id)) return;
+    watchBusy.current.add(prospect.id);
     const next = !prospect.on_watchlist;
     const set = (value: boolean) =>
       setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, on_watchlist: value } : row)));
@@ -264,6 +268,8 @@ export default function CollegeScoutingPanel({
       if (!result.ok) set(!next);
     } catch {
       set(!next);
+    } finally {
+      watchBusy.current.delete(prospect.id);
     }
   }, []);
 

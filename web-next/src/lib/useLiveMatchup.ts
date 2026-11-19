@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type MatchupResponse } from "@/lib/api";
 import { feedKey, liveFeedStore } from "@/lib/liveFeed";
 import { dataAgeSeconds, nextPollDelayMs, shouldPoll } from "@/lib/liveScores";
+import { useLatestGate } from "@/lib/useLatestGate";
 
 /**
  * Loads the Matchup payload and, only while the server says NFL games are live
@@ -24,6 +25,8 @@ export function useLiveMatchup(leagueId: string, lens: string, enabled: boolean)
   const latest = useRef<MatchupResponse | null>(null);
   const inFlight = useRef(false);
   const cancelled = useRef(false);
+  // One ticket per request: a lens or league change retires the old effect's request so its answer cannot be applied.
+  const gate = useLatestGate();
 
   const clearTimer = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -48,11 +51,12 @@ export function useLiveMatchup(leagueId: string, lens: string, enabled: boolean)
     async (manual = false) => {
       if (inFlight.current) return;
       inFlight.current = true;
+      const isCurrent = gate.begin();
       if (manual) setRefreshing(true);
       let retryAfter: number | undefined;
       try {
         const result = await api.getLeagueMatchup(leagueId, lens);
-        if (cancelled.current) return;
+        if (cancelled.current || !isCurrent()) return;
         failures.current = 0;
         latest.current = result;
         liveFeedStore.ingest(feedKey(leagueId, result.week), result, Date.now());
@@ -60,20 +64,20 @@ export function useLiveMatchup(leagueId: string, lens: string, enabled: boolean)
         setReceivedAt(Date.now());
         setError(null);
       } catch (err) {
-        if (cancelled.current) return;
+        if (cancelled.current || !isCurrent()) return;
         failures.current += 1;
         retryAfter = (err as { retryAfterSeconds?: number } | null)?.retryAfterSeconds;
         // Keep showing the last good payload; only a first-load failure is an error screen.
         if (!latest.current) setError(err instanceof Error ? err.message : "Could not load this week's matchup.");
       } finally {
-        inFlight.current = false;
-        if (!cancelled.current) {
+        if (isCurrent()) inFlight.current = false;
+        if (!cancelled.current && isCurrent()) {
           setRefreshing(false);
           schedule(() => void load(), retryAfter);
         }
       }
     },
-    [leagueId, lens, schedule],
+    [gate, leagueId, lens, schedule],
   );
 
   useEffect(() => {
@@ -81,6 +85,7 @@ export function useLiveMatchup(leagueId: string, lens: string, enabled: boolean)
     cancelled.current = false;
     failures.current = 0;
     latest.current = null;
+    inFlight.current = false;
     void load();
     const onVisibility = () => {
       if (document.visibilityState === "hidden") return clearTimer();
@@ -97,13 +102,15 @@ export function useLiveMatchup(leagueId: string, lens: string, enabled: boolean)
     window.addEventListener("offline", onOffline);
     return () => {
       cancelled.current = true;
+      gate.cancel();
+      inFlight.current = false;
       clearTimer();
       clearInterval(tick);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, [enabled, load]);
+  }, [enabled, gate, load]);
 
   const ageSeconds =
     matchup && receivedAt != null && matchup.as_of_age_seconds != null

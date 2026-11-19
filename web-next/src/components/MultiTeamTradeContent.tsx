@@ -3,6 +3,8 @@
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useLatestGate } from "@/lib/useLatestGate";
+
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
@@ -412,7 +414,11 @@ export function MultiTeamTradeContent({
   const issue = builderIssue(participants, assets);
   const transfersCount = assets.length;
 
+  // Editing the trade retires the outstanding analysis so its late answer cannot land on the changed trade.
+  const analyzeGate = useLatestGate();
   function invalidate() {
+    analyzeGate.cancel();
+    setAnalyzing(false);
     setResponse(null);
     setFailure(null);
     setRequestError(null);
@@ -465,6 +471,7 @@ export function MultiTeamTradeContent({
   }
 
   async function analyze() {
+    const isCurrent = analyzeGate.begin();
     setFailure(null);
     setRequestError(null);
     setResponse(null);
@@ -475,6 +482,7 @@ export function MultiTeamTradeContent({
         perspectiveRosterId: myRosterId,
         lens,
       });
+      if (!isCurrent()) return;
       trackUse("trade_analyzer", "evaluated", { leagueId, props: { item_kind: "multi_team", result: result.status === "ok" ? "verdict" : "no_verdict" } });
       if (isMultiTradeOk(result)) {
         setResponse(result);
@@ -483,9 +491,9 @@ export function MultiTeamTradeContent({
         setFailure(multiTradeFailureLines(result));
       }
     } catch (error) {
-      setRequestError(failureMessage(error));
+      if (isCurrent()) setRequestError(failureMessage(error));
     } finally {
-      setAnalyzing(false);
+      if (isCurrent()) setAnalyzing(false);
     }
   }
 

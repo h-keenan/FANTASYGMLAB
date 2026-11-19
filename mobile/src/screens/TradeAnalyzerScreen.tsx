@@ -60,6 +60,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import SelectionActionBar from '../components/SelectionActionBar';
 import { swipeLockProps } from '../components/swipeLock';
 import { trackUse } from '../lib/analytics';
+import { useLatestGate } from '../lib/useLatestGate';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { valueDirectionLabel } from '../lib/tradeValue';
 import { dealSizeFor } from '../lib/tradeValueBands.generated';
@@ -492,8 +493,25 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const canAnalyze = hasAnyAssets;
   const analyzeLabel = 'Analyze';
 
+  // An answer only applies to the exact trade, stance and lens it was asked about: any edit retires the outstanding request.
+  const analyzeGate = useLatestGate();
+  const selectionKey = [
+    sendIds.map((p) => p.player_id).join(','),
+    receiveIds.map((p) => p.player_id).join(','),
+    sendPicks.map((p) => p.pick_id).join(','),
+    receivePicks.map((p) => p.pick_id).join(','),
+    selectedTeamId,
+    strategy,
+    lens,
+  ].join('|');
+  useEffect(() => {
+    analyzeGate.cancel();
+    setAnalyzing(false);
+  }, [analyzeGate, selectionKey]);
+
   const analyze = async () => {
     if (quickMode) return;
+    const isCurrent = analyzeGate.begin();
     setAnalyzeError(null);
     setLimitWall(null);
     setAnalyzing(true);
@@ -507,6 +525,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         lens,
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? '' : selectedTeamId,
       });
+      if (!isCurrent()) return;
       setPlanningNote(result.planning_note ?? '');
       setRoleNotes(result.role_notes ?? []);
       setRoleNotesLocked(result.role_notes_locked === true);
@@ -524,9 +543,9 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         else setAnalyzeError(NOT_READY_MESSAGES[result.reason] ?? 'Could not analyze this trade.');
       }
     } catch (err) {
-      setAnalyzeError(toUserErrorMessage(err, 'Could not analyze this trade.'));
+      if (isCurrent()) setAnalyzeError(toUserErrorMessage(err, 'Could not analyze this trade.'));
     } finally {
-      setAnalyzing(false);
+      if (isCurrent()) setAnalyzing(false);
     }
   };
 

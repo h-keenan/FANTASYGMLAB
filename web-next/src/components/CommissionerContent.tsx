@@ -385,8 +385,12 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
   }, [leagueId]);
   // Changing it saves server-side and refetches the integrity data (the key below changes).
   const setDraftOrder = (value: DraftOrderRule) => {
+    const previous = saved;
     setSaved({ leagueId, rule: value });
-    api.setDraftOrderRule(leagueId, value).catch(() => {});
+    // A failed save must not leave the screen showing a rule the server never stored.
+    api.setDraftOrderRule(leagueId, value).catch(() => {
+      setSaved((current) => (current && current.leagueId === leagueId && current.rule === value ? previous : current));
+    });
   };
   const [state, setState] = useState<{ key: string; data: CommissionerIntegrityResponse | null; error: string | null }>({
     key: "",

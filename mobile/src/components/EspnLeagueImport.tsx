@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+
+import { createSingleFlight } from '../lib/latestRequest';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
@@ -121,7 +123,11 @@ export default function EspnLeagueImport({
     }
   };
 
+  const [saveFlight] = useState(() => createSingleFlight());
   const save = async () => {
+    await saveFlight.run(saveOnce);
+  };
+  const saveOnce = async () => {
     if (!preview?.league || !rosterId) return;
     const { league_key: key, name } = preview.league;
     setBusy(true);

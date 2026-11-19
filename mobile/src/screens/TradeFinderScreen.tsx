@@ -15,6 +15,7 @@ import PickGroupList from '../components/PickGroupList';
 import EmptyState from '../components/EmptyState';
 import PremiumLock from '../components/PremiumLock';
 import { useShowProTags } from '../lib/useShowProTags';
+import { useLatestGate } from '../lib/useLatestGate';
 import GridBackground from '../components/GridBackground';
 import ExchangeSide from '../components/ExchangeSide';
 import PlayerAccordionRow from '../components/PlayerAccordionRow';
@@ -448,7 +449,19 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
     }, [leagueId, lens, rosterReloadToken]),
   );
 
+  // An answer only applies to the exact package it was asked about: editing the package or the return scope, or switching league, retires
+  // the outstanding search, so a slow answer cannot land on the changed one.
+  const finderGate = useLatestGate();
+  const retireSearch = useCallback(() => {
+    finderGate.cancel();
+    setSearching(false);
+  }, [finderGate]);
+  useEffect(() => {
+    retireSearch();
+  }, [retireSearch, leagueId]);
+
   const toggle = useCallback((playerId: string) => {
+    retireSearch();
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(playerId)) next.delete(playerId);
@@ -456,9 +469,10 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
       return next;
     });
     setIdeas(null);
-  }, []);
+  }, [retireSearch]);
 
   const togglePick = (pickId: string) => {
+    retireSearch();
     setSelectedPickIds((prev) => toggleCappedSelection(prev, pickId));
     setIdeas(null);
   };
@@ -469,6 +483,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
   // A confirmed Free account sees the Pro lock up front, before it builds a package and searches (the server still gates the search).
   const confirmedFree = useShowProTags();
   const search = async (playerIds: string[] = Array.from(selectedIds)) => {
+    const isCurrent = finderGate.begin();
     setSearchError(null);
     setSearching(true);
     try {
@@ -477,6 +492,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
         returnPicks: returnScope === 'picks',
         returnPlayers: returnScope === 'players',
       });
+      if (!isCurrent()) return;
       setIdeas(result.ideas);
       setNoResults({ search: result.search, closest: result.closest ?? [] });
       setProLock(result.is_premium === false ? { title: result.upsell?.title, body: result.upsell?.body } : null);
@@ -490,9 +506,9 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
         );
       }
     } catch (err) {
-      setSearchError(toUserErrorMessage(err, 'Could not search for trades.'));
+      if (isCurrent()) setSearchError(toUserErrorMessage(err, 'Could not search for trades.'));
     } finally {
-      setSearching(false);
+      if (isCurrent()) setSearching(false);
     }
   };
 
@@ -593,6 +609,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
               ]}
               active={returnScope}
               onChange={(key) => {
+                retireSearch();
                 setReturnScope(key);
                 setIdeas(null);
               }}

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { createSingleFlight } from "@/lib/latestRequest";
+
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -116,7 +118,13 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
     }
   }
 
+  // One auto-manage save at a time: overlapping taps would each roll back to a different "previous".
+  const [autoManageFlight] = useState(() => createSingleFlight());
   async function toggleAutoManage(next: boolean) {
+    await autoManageFlight.run(() => saveAutoManage(next));
+  }
+
+  async function saveAutoManage(next: boolean) {
     const previous = lineup;
     setLineup((l) => (l ? { ...l, auto_manage: next } : l));
     const body = await call(() => api.setSimAutoManage(gameId, next));

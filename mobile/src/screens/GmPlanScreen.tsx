@@ -66,6 +66,7 @@ import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { PresenceList } from '../components/Presence';
+import { useLatestGate } from '../lib/useLatestGate';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GmPlan'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -130,8 +131,10 @@ export default function GmPlanScreen({ route, navigation }: Props) {
 
   useScreenHeaderTitle(navigation, 'GM Plan', leagueName);
 
+  const gate = useLatestGate();
   const load = useCallback(
     async (isRefresh: boolean) => {
+      const isCurrent = gate.begin();
       setError(null);
       if (isRefresh) setRefreshing(true);
       try {
@@ -141,6 +144,8 @@ export default function GmPlanScreen({ route, navigation }: Props) {
           api.getGmTargets(leagueId),
           api.getLeagueRankings(leagueId),
         ]);
+        // A slower answer for the previous league (or an earlier pull) must not land under this one.
+        if (!isCurrent()) return;
         setPlan(planResult);
         setTradeWindow(planResult.trade_window ?? myTeam.trade_window);
         const seen = new Set<string>();
@@ -156,18 +161,21 @@ export default function GmPlanScreen({ route, navigation }: Props) {
           api.getLeagueTeamRankings(leagueId).catch(() => null),
           api.getLeaguePlayoffOdds(leagueId).catch(() => null),
         ]);
+        if (!isCurrent()) return;
         const teams: TeamRanking[] = teamsResult?.teams ?? [];
         const rosterId = myTeam.roster_id;
         const odds: PlayoffOddsTeam | null = oddsResult?.teams?.find((t) => t.roster_id === rosterId) ?? null;
         setSnapshot(buildPlanSnapshot(teams.find((t) => t.roster_id === rosterId) ?? null, teams.length, odds));
       } catch (err) {
-        setError(toUserErrorMessage(err, 'Failed to load GM Plan.'));
+        if (isCurrent()) setError(toUserErrorMessage(err, 'Failed to load GM Plan.'));
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (isCurrent()) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [leagueId],
+    [gate, leagueId],
   );
 
   useFocusEffect(

@@ -499,8 +499,12 @@ export function GmPlanContent({
     if (next === stance || !leagueId) return;
     // Genuine optimistic update, result intentionally discarded — same
     // contract mobile's GmStanceContext.setStance uses.
+    const previous = stance;
     setStanceState(next);
-    void api.setTeamStance(leagueId, next).catch(() => {});
+    // A failed save reverts, unless the user has already picked something newer.
+    void api.setTeamStance(leagueId, next).catch(() => {
+      setStanceState((current) => (current === next ? previous : current));
+    });
   };
 
   const onToggleProtect = (playerId: string, next: boolean) => {

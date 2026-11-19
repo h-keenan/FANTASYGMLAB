@@ -96,8 +96,21 @@ export function GmStanceProvider({ children }: { children: React.ReactNode }) {
     // api.setTeamStance's request round-trips (its result is intentionally
     // discarded below) — this is the one real remaining use of the client-side
     // teamStrategyForStance mirror; see its definition in lib/api.ts.
-    setStances((prev) => ({ ...prev, [leagueId]: { stance, strategy: teamStrategyForStance(stance), isSet: true } }));
-    void api.setTeamStance(leagueId, stance).catch(() => {});
+    let previous: (typeof stances)[string] | undefined;
+    setStances((prev) => {
+      previous = prev[leagueId];
+      return { ...prev, [leagueId]: { stance, strategy: teamStrategyForStance(stance), isSet: true } };
+    });
+    // A failed save reverts, unless the user has already picked something newer.
+    void api.setTeamStance(leagueId, stance).catch(() => {
+      setStances((prev) => {
+        if (prev[leagueId]?.stance !== stance) return prev;
+        const rest = { ...prev };
+        if (previous) rest[leagueId] = previous;
+        else delete rest[leagueId];
+        return rest;
+      });
+    });
   }, []);
 
   const value = useMemo<GmStanceContextValue>(

@@ -1,5 +1,7 @@
 import { bandColor } from '../lib/verdictToneTheme';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { useLatestGate } from '../lib/useLatestGate';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -58,15 +60,22 @@ export default function TradeOfferScreen({ route, navigation }: Props) {
 
   useScreenHeaderTitle(navigation, 'Build an Offer', leagueName);
 
+  const gate = useLatestGate();
+
   const load = useCallback(() => {
+    const isCurrent = gate.begin();
     setResult(null);
     setError(null);
     trackUse('trade_offer_built', 'used');
     api
       .getTradeTargetOffers(leagueId, playerId, lens)
-      .then(setResult)
-      .catch((err) => setError(toUserErrorMessage(err, 'Could not build an offer.')));
-  }, [leagueId, playerId, lens]);
+      .then((value) => {
+        if (isCurrent()) setResult(value);
+      })
+      .catch((err) => {
+        if (isCurrent()) setError(toUserErrorMessage(err, 'Could not build an offer.'));
+      });
+  }, [gate, leagueId, playerId, lens]);
 
   useEffect(() => {
     load();

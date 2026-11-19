@@ -57,7 +57,9 @@ async function renderContent(playerId = "t1") {
 }
 
 describe("TradeOfferContent", () => {
-  beforeEach(() => vi.mocked(api.getTradeTargetOffers).mockReset());
+  beforeEach(() => {
+    vi.mocked(api.getTradeTargetOffers).mockReset();
+  });
 
   it("shows each offer with its why, acceptance read and an Open in Trade Analyzer link", async () => {
     respond({ headline: "1 way to get Their RB from Rivals.", offers: [OFFER] });
@@ -118,5 +120,18 @@ describe("TradeOfferContent", () => {
     await renderContent("");
     expect(api.getTradeTargetOffers).not.toHaveBeenCalled();
     expect(screen.getByText("Pick a player on another team to build an offer for.")).toBeInTheDocument();
+  });
+  it("ignores the earlier target's answer when the newer target answers first", async () => {
+    const pending: Array<(value: TradeTargetResponse) => void> = [];
+    vi.mocked(api.getTradeTargetOffers).mockImplementation(
+      () => new Promise<TradeTargetResponse>((resolve) => pending.push(resolve)),
+    );
+    const view = render(<TradeOfferContent leagueId="L1" leagueName="Dynasty Overlords" playerId="t1" lens="Dynasty" />);
+    view.rerender(<TradeOfferContent leagueId="L1" leagueName="Dynasty Overlords" playerId="t2" lens="Dynasty" />);
+    expect(pending).toHaveLength(2);
+    const body = { ok: true, status: "found", is_premium: true, upsell: null } as const;
+    await act(async () => pending[1]({ ...body, headline: "NEWER", offers: [OFFER] }));
+    await act(async () => pending[0]({ ...body, headline: "OLDER", offers: [OFFER] }));
+    expect(screen.getByTestId("offer-headline")).toHaveTextContent("NEWER");
   });
 });

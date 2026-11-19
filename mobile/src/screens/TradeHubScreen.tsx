@@ -25,6 +25,7 @@ import DeadlineCard from '../components/DeadlineCard';
 import TradeHubHoldCard from '../components/TradeHubHoldCard';
 import MultiTeamIdeasSection from '../components/MultiTeamIdeasSection';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
+import { useLatestGate } from '../lib/useLatestGate';
 import { TRADE_HUB_UPGRADE_LABEL, tradeHubGateBody, tradeHubGateTitle } from '../lib/tradeHubGate';
 import TradeIdeaCard, { impactTagConfig, type ImpactTagKey } from '../components/TradeIdeaCard';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
@@ -148,12 +149,18 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
   const [allTradesError, setAllTradesError] = useState<string | null>(null);
   const [allTradesStarted, setAllTradesStarted] = useState(false);
 
+  // One ticket per request: a lens, stance or league change retires the earlier request so a slow answer cannot overwrite the new one.
+  const ideasGate = useLatestGate();
+  const allTradesGate = useLatestGate();
+
   const load = useCallback(
     async (nextStrategy: TeamStrategy | 'auto', nextAdUnlocks: number, nextLens: ValuationLens) => {
+      const isCurrent = ideasGate.begin();
       setLoading(true);
       setError(null);
       try {
         const result = await api.getTradeHubIdeas(leagueId, nextStrategy, nextAdUnlocks, nextLens);
+        if (!isCurrent()) return;
         setStaleAsOf(result.sleeper_data_as_of ?? null);
         setHold(result.hold ?? null);
         setPostureSentence(result.posture_sentence ?? '');
@@ -170,12 +177,12 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
           void setSeenTradeIdeaCount(leagueId, result.ideas.length);
         }
       } catch (err) {
-        setError(toUserErrorMessage(err, 'Failed to load Trade Hub ideas.'));
+        if (isCurrent()) setError(toUserErrorMessage(err, 'Failed to load Trade Hub ideas.'));
       } finally {
-        setLoading(false);
+        if (isCurrent()) setLoading(false);
       }
     },
-    [leagueId],
+    [ideasGate, leagueId],
   );
 
   // strategy=auto: the server resolves the declared stance itself (web does
@@ -209,6 +216,9 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
 
   const loadAllTrades = useCallback(
     async (options: { reset: boolean }) => {
+      // A "load more" never starts while the first page is still loading: it would retire that request and append to nothing.
+      if (!options.reset && allTradesLoading) return;
+      const isCurrent = allTradesGate.begin();
       const cursor = options.reset ? 0 : allTradesCursor;
       const shownCount = options.reset ? 0 : allTradesIdeas.length;
       if (options.reset) {
@@ -225,18 +235,21 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
           pageSize: 3,
           shownCount,
         });
+        if (!isCurrent()) return;
         setAllTradesIdeas((prev) => (options.reset ? result.ideas : [...prev, ...result.ideas]));
         setAllTradesCursor(result.next_cursor);
         setAllTradesHasMore(result.has_more);
         setAllTradesEntitlement(result.entitlement);
       } catch (err) {
-        setAllTradesError(toUserErrorMessage(err, 'Failed to load All Trades.'));
+        if (isCurrent()) setAllTradesError(toUserErrorMessage(err, 'Failed to load All Trades.'));
       } finally {
-        setAllTradesLoading(false);
-        setAllTradesLoadingMore(false);
+        if (isCurrent()) {
+          setAllTradesLoading(false);
+          setAllTradesLoadingMore(false);
+        }
       }
     },
-    [leagueId, strategy, lens, allTradesCursor, allTradesIdeas.length],
+    [allTradesGate, allTradesLoading, leagueId, strategy, lens, allTradesCursor, allTradesIdeas.length],
   );
 
   const onSelectAllTrades = useCallback(() => {
