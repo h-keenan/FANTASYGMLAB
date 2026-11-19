@@ -244,16 +244,16 @@ def starter_strength_adjustment(lineup_delta: float, strategy: str) -> int:
 REDUNDANCY_ENV_KEY = "DYNASTYGM_ROSTER_REDUNDANCY_V1"
 # Share of market value a player keeps as a trade chip when he cannot start for
 # the roster that holds him (the audit left "how much liquidity value a bench
-# asset keeps" as an owner decision; 0.6 is the proposal).
-BENCH_CHIP_RETENTION = 0.6
+# asset keeps" as an owner decision; the owner chose 0.50).
+BENCH_CHIP_RETENTION = 0.50
 
 
 def roster_redundancy_enabled() -> bool:
-    """Default OFF: the first reading needs owner approval (audit section 8, item 3)."""
+    """Default ON (owner-approved 2026-11-18); an explicit 0/false/no/off disables it."""
 
     from modules.app_config import config_value
 
-    return config_value(REDUNDANCY_ENV_KEY).strip().casefold() in {"1", "true", "yes", "on"}
+    return config_value(REDUNDANCY_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
 
 
 def roster_redundancy_adjustment(
