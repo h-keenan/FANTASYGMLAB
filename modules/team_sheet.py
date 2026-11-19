@@ -15,6 +15,7 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 from modules import injury_status
+from modules.coerce import float_nan_to_none
 
 POSITION_ORDER = ("QB", "RB", "WR", "TE", "K", "DEF")
 _HEALTHY = {"", "active", "none", "nan", "healthy"}
@@ -27,14 +28,6 @@ def _text(value: Any) -> str:
     if isinstance(value, float) and math.isnan(value):
         return ""
     return str(value).strip()
-
-
-def _num(value: Any) -> float | None:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return None
-    return None if math.isnan(out) else out
 
 
 def streak_label(current_streak: Any) -> str:
@@ -107,8 +100,8 @@ def roster_rows(valued: pd.DataFrame, roster: Mapping[str, Any], score_field: st
         roster_status = _text(row.get("status"))
         if injury.lower() in _HEALTHY and injury_status.is_unavailable(roster_status, injury):
             injury = roster_status  # Sleeper can record "Injured Reserve" on the roster status with a blank injury designation
-        value = _num(row.get(score_field))
-        age = _num(row.get("age"))
+        value = float_nan_to_none(row.get(score_field))
+        age = float_nan_to_none(row.get("age"))
         rows.append(
             {
                 "player_id": pid,

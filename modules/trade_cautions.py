@@ -38,6 +38,7 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from modules import trade_posture, trade_value_bands as bands
+from modules.coerce import float_or_default
 
 CAUTION_PICK_GLUT = "pick_glut"
 PICK_GLUT_TAG = "Trading proven value for picks you may not need"
@@ -58,23 +59,16 @@ AGING_AGE = 28
 _ELIGIBLE_VERDICTS = {bands.VERDICT_SMASH_ACCEPT, bands.VERDICT_ACCEPT, bands.VERDICT_FAIR}
 
 
-def _num(value: Any) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def _score(asset: Mapping[str, Any]) -> float:
-    return _num(asset.get("score", asset.get("value_score")))
+    return float_or_default(asset.get("score", asset.get("value_score")))
 
 
 def _round(asset: Mapping[str, Any]) -> int:
-    return int(_num(asset.get("round")))
+    return int(float_or_default(asset.get("round")))
 
 
 def _season(asset: Mapping[str, Any]) -> int:
-    return int(_num(asset.get("season")))
+    return int(float_or_default(asset.get("season")))
 
 
 def pick_units(picks: Sequence[Mapping[str, Any]], seasons: Sequence[int]) -> float:
@@ -138,7 +132,7 @@ def pick_glut(
 
     incoming_units = pick_units(got_picks, seasons)
     net_units = incoming_units - pick_units(sent_picks, seasons)
-    held = _num(pick_context.get("held_units"))
+    held = float_or_default(pick_context.get("held_units"))
     if incoming_units <= 0 or net_units < MIN_NET_UNITS or held < GLUT_UNITS:
         return None
 
@@ -149,12 +143,12 @@ def pick_glut(
         return None
 
     current_out = sum(_score(a) for a in sent_players) - sum(_score(a) for a in got_players)
-    lineup_points = _num((assessment or {}).get("lineup_points"))
+    lineup_points = float_or_default((assessment or {}).get("lineup_points"))
     if current_out < CURRENT_OUT_MIN and lineup_points > -LINEUP_OUT_MIN:
         return None
     if sent_players:
         top = max(sent_players, key=_score)
-        if _num(top.get("age")) >= AGING_AGE:
+        if float_or_default(top.get("age")) >= AGING_AGE:
             return None
 
     open_spots = pick_context.get("open_roster_spots")
@@ -209,13 +203,13 @@ def severity(caution: Mapping[str, Any] | None) -> int:
 
     facts = (caution or {}).get("facts") or {}
     points = 0
-    if _num(facts.get("held_premium_picks")) >= GLUT_UNITS + 2:
+    if float_or_default(facts.get("held_premium_picks")) >= GLUT_UNITS + 2:
         points += 1
-    if _num(facts.get("pick_share_of_incoming")) >= 0.5:
+    if float_or_default(facts.get("pick_share_of_incoming")) >= 0.5:
         points += 1
-    if _num(facts.get("current_value_out")) >= 2 * CURRENT_OUT_MIN:
+    if float_or_default(facts.get("current_value_out")) >= 2 * CURRENT_OUT_MIN:
         points += 1
-    if _num(facts.get("lineup_points")) <= -2 * LINEUP_OUT_MIN:
+    if float_or_default(facts.get("lineup_points")) <= -2 * LINEUP_OUT_MIN:
         points += 1
     return points
 

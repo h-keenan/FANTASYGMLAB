@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import math
 from typing import Any, Iterable, Mapping, Sequence
+from modules.coerce import float_finite_or_default
 
 FORESEEABLE = "foreseeable"
 COIN_FLIP = "coin_flip"
@@ -64,14 +65,6 @@ _FLEX_ELIGIBLE: dict[str, frozenset[str]] = {
 _FIXED_SLOTS = frozenset({"QB", "RB", "WR", "TE", "K", "DEF", "DL", "LB", "DB"})
 _POSITION_ALIASES = {"DE": "DL", "DT": "DL", "OLB": "LB", "ILB": "LB", "MLB": "LB", "CB": "DB", "S": "DB", "FS": "DB", "SS": "DB", "PK": "K", "DST": "DEF", "D/ST": "DEF"}
 _NON_STARTING_SLOTS = frozenset({"BN", "IR", "TAXI"})
-
-
-def _num(value: Any, default: float = 0.0) -> float:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return default
-    return default if math.isnan(out) or math.isinf(out) else out
 
 
 def _text(value: Any) -> str:
@@ -192,7 +185,7 @@ def league_scoring_profile(league: Mapping[str, Any] | None) -> dict[str, float]
 
     scoring = (league or {}).get("scoring_settings") if isinstance(league, Mapping) else None
     scoring = scoring if isinstance(scoring, Mapping) else {}
-    return {"rec": _num(scoring.get("rec"), 0.0), "te_bonus": _num(scoring.get("bonus_rec_te"), 0.0)}
+    return {"rec": float_finite_or_default(scoring.get("rec"), 0.0), "te_bonus": float_finite_or_default(scoring.get("bonus_rec_te"), 0.0)}
 
 
 def to_league_points(ppr_points: float, *, position: str, receptions: float, scoring: Mapping[str, float]) -> float:
@@ -201,9 +194,9 @@ def to_league_points(ppr_points: float, *, position: str, receptions: float, sco
     pos = normalize_position(position)
     if pos not in {"RB", "WR", "TE"}:
         return ppr_points
-    out = ppr_points - (1.0 - _num(scoring.get("rec"), 1.0)) * receptions
+    out = ppr_points - (1.0 - float_finite_or_default(scoring.get("rec"), 1.0)) * receptions
     if pos == "TE":
-        out += _num(scoring.get("te_bonus"), 0.0) * receptions
+        out += float_finite_or_default(scoring.get("te_bonus"), 0.0) * receptions
     return out
 
 
@@ -233,8 +226,8 @@ def swap_predictability(
             "edge": None,
             "reason": "Not enough earlier-game history to project one of these players.",
         }
-    pa, sa = _num(started_proj.get("points")), max(0.5, _num(started_proj.get("sd"), 4.0))
-    pb, sb = _num(benched_proj.get("points")), max(0.5, _num(benched_proj.get("sd"), 4.0))
+    pa, sa = float_finite_or_default(started_proj.get("points")), max(0.5, float_finite_or_default(started_proj.get("sd"), 4.0))
+    pb, sb = float_finite_or_default(benched_proj.get("points")), max(0.5, float_finite_or_default(benched_proj.get("sd"), 4.0))
     edge = pb - pa
     spread = math.hypot(sa, sb)
     if edge >= max(MIN_FORESEEABLE_EDGE_PTS, MIN_FORESEEABLE_EDGE_SD_SHARE * spread):
@@ -267,7 +260,7 @@ def _player_view(pid: str | None, meta: Mapping[str, Mapping[str, Any]], points:
         "name": _text(info.get("name")) or (pid or ""),
         "position": normalize_position(info.get("position")),
         "team": _text(info.get("team")),
-        "points": round(_num(points.get(pid or "")), 1) if pid else 0.0,
+        "points": round(float_finite_or_default(points.get(pid or "")), 1) if pid else 0.0,
     }
 
 
@@ -290,7 +283,7 @@ def build_week_roundup(
 
     projections = projections or {}
     excluded = {str(x) for x in excluded_ids}
-    points = {str(pid): _num(pts) for pid, pts in players_points.items()}
+    points = {str(pid): float_finite_or_default(pts) for pid, pts in players_points.items()}
     positions = {pid: normalize_position((meta.get(pid) or {}).get("position")) for pid in points}
     positions = {pid: pos for pid, pos in positions.items() if pos}
     slot_list = list(slots)
@@ -374,12 +367,12 @@ def build_week_roundup(
 def _proj_view(proj: Mapping[str, Any] | None) -> dict[str, float] | None:
     if not proj:
         return None
-    return {"points": round(_num(proj.get("points")), 1), "sd": round(_num(proj.get("sd")), 1)}
+    return {"points": round(float_finite_or_default(proj.get("points")), 1), "sd": round(float_finite_or_default(proj.get("sd")), 1)}
 
 
 def week_takeaway(result: Mapping[str, Any]) -> str:
     swaps = list(result.get("swaps") or [])
-    left = _num(result.get("left_on_bench"))
+    left = float_finite_or_default(result.get("left_on_bench"))
     if left < CLEAN_WEEK_BENCH_PTS or not swaps:
         return "Clean week: your lineup was within a few points of the best possible one."
     counts = {tag: sum(1 for s in swaps if s["predictability"] == tag) for tag in PREDICTABILITY_LABELS}
@@ -399,7 +392,7 @@ def push_headline(result: Mapping[str, Any]) -> str:
     """Lock-screen text. No league or team names (see push_triggers privacy rule)."""
 
     week = int(result.get("week") or 0)
-    left = _num(result.get("left_on_bench"))
+    left = float_finite_or_default(result.get("left_on_bench"))
     swaps = list(result.get("swaps") or [])
     if left < CLEAN_WEEK_BENCH_PTS or not swaps:
         return f"Your week {week} roundup is ready: a clean lineup week, nearly optimal."
@@ -420,10 +413,10 @@ def season_tally(weeks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     rows = [
         {
             "week": int(w["week"]),
-            "actual_points": _num(w.get("actual_points")),
-            "optimal_points": _num(w.get("optimal_points")),
-            "left_on_bench": _num(w.get("left_on_bench")),
-            "foreseeable_points": _num(w.get("foreseeable_points")),
+            "actual_points": float_finite_or_default(w.get("actual_points")),
+            "optimal_points": float_finite_or_default(w.get("optimal_points")),
+            "left_on_bench": float_finite_or_default(w.get("left_on_bench")),
+            "foreseeable_points": float_finite_or_default(w.get("foreseeable_points")),
         }
         for w in weeks
     ]
@@ -477,12 +470,12 @@ def point_in_time_projections(
     out: dict[str, dict[str, float]] = {}
     for pid, entry in base.items():
         history = [r for r in (weekly_by_player.get(pid) or []) if r.get("week") is not None and int(r["week"]) < int(week)]
-        recs = [_num(r.get("receptions")) for r in history if r.get("receptions") is not None]
+        recs = [float_finite_or_default(r.get("receptions")) for r in history if r.get("receptions") is not None]
         rec_pg = sum(recs) / len(recs) if recs else 0.0
         pos = normalize_position((meta.get(pid) or {}).get("position"))
         out[pid] = {
-            "points": to_league_points(_num(entry.get("ppg")), position=pos, receptions=rec_pg, scoring=scoring),
-            "sd": _num(entry.get("sd"), 4.0),
+            "points": to_league_points(float_finite_or_default(entry.get("ppg")), position=pos, receptions=rec_pg, scoring=scoring),
+            "sd": float_finite_or_default(entry.get("sd"), 4.0),
         }
     return out
 

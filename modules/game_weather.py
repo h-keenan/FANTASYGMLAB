@@ -37,6 +37,7 @@ from typing import Any
 import requests
 
 from modules import nfl_stadiums
+from modules.coerce import float_if_number
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 FORECAST_TTL_SECONDS = 45 * 60
@@ -250,12 +251,12 @@ def _mean(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
-def _num(series: Any, i: int) -> float | None:
+def _hourly_value(series: Any, i: int) -> float | None:
     try:
         value = series[i]
     except (TypeError, IndexError, KeyError):
         return None
-    return float(value) if isinstance(value, (int, float)) else None
+    return float_if_number(value)
 
 
 def forecast_for_game(
@@ -299,11 +300,11 @@ def forecast_for_game(
         idx = [i for i, t in enumerate(hourly["time"]) if t in wanted]
         if len(idx) < WINDOW_HOURS:
             return None
-        wind = [_num(hourly.get("wind_speed_10m"), i) for i in idx]
-        gust = [_num(hourly.get("wind_gusts_10m"), i) for i in idx]
-        rain = [_num(hourly.get("precipitation"), i) for i in idx]
-        prob = [_num(hourly.get("precipitation_probability"), i) for i in idx]
-        temp = [_num(hourly.get("temperature_2m"), i) for i in idx]
+        wind = [_hourly_value(hourly.get("wind_speed_10m"), i) for i in idx]
+        gust = [_hourly_value(hourly.get("wind_gusts_10m"), i) for i in idx]
+        rain = [_hourly_value(hourly.get("precipitation"), i) for i in idx]
+        prob = [_hourly_value(hourly.get("precipitation_probability"), i) for i in idx]
+        temp = [_hourly_value(hourly.get("temperature_2m"), i) for i in idx]
         if any(v is None for v in wind + rain + temp):
             return None
         return {

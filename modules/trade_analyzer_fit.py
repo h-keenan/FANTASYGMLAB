@@ -36,7 +36,8 @@ from modules import trade_grade
 from modules.team_eval import REPLACEMENT_LEVEL
 from modules import model_status, trade_lineup_impact, trade_lineup_model, trade_posture
 from modules import trade_value_bands, trade_visual_language
-from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
+from modules.coerce import float_or_default_any
+from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
 from modules.league_display import _format_score
 from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
 from modules.roster_needs import TeamNeedsAssessment, assessment_from_model
@@ -326,10 +327,10 @@ def _simulate_post_trade_roster(
                     "status": _safe_text(asset.get("status")),
                     "injury_status": _safe_text(asset.get("injury_status")),
                     "age": asset.get("age"),
-                    "value_score": _safe_float(asset.get("value_score"), 0),
-                    "dynasty_score": _safe_float(asset.get("score"), 0),
-                    "rebuild_score": _safe_float(asset.get("score"), 0),
-                    "score": _safe_float(asset.get("score"), 0),
+                    "value_score": float_or_default_any(asset.get("value_score"), 0),
+                    "dynasty_score": float_or_default_any(asset.get("score"), 0),
+                    "rebuild_score": float_or_default_any(asset.get("score"), 0),
+                    "score": float_or_default_any(asset.get("score"), 0),
                 }
             )
             fallback_rows.append(row)

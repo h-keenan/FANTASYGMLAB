@@ -57,6 +57,7 @@ from modules import age_profile, model_status, partner_context, playoff_context,
 from modules import drop_candidates, trade_cautions, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 from modules import value_scale
+from modules.coerce import float_or_default_any
 
 # Absolute point thresholds below are written on the production value scale. ``_vs`` expresses one on the active
 # league's scale (``modules/value_scale.py``, flag DYNASTYGM_SCALE_AWARE_THRESHOLDS_V1): with the flag OFF it returns
@@ -193,13 +194,6 @@ def _safe_int(value, default=0) -> int:
         return default
 
 
-def _safe_float(value, default=0.0) -> float:
-    try:
-        return float(value)
-    except Exception:
-        return default
-
-
 def _roster_players_map(rosters: List[Dict[str, Any]]) -> Dict[int, List[str]]:
     return {
         _safe_int(roster.get("roster_id")): [
@@ -223,7 +217,7 @@ def _ordinal_round(round_num: int) -> str:
 
 
 def _clamp_float(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
-    return max(lower, min(upper, _safe_float(value, lower)))
+    return max(lower, min(upper, float_or_default_any(value, lower)))
 
 
 def _pick_league_settings(league_settings: Dict[str, Any] | None = None) -> Dict[str, Any]:
@@ -401,7 +395,7 @@ def canonical_pick_identity_value(
 
 def _normalize_bucket_probabilities(weights: Dict[str, float]) -> Dict[str, float]:
     buckets = ("early", "mid", "late")
-    normalized = {bucket: max(0.0, _safe_float(weights.get(bucket), 0.0)) for bucket in buckets}
+    normalized = {bucket: max(0.0, float_or_default_any(weights.get(bucket), 0.0)) for bucket in buckets}
     total = sum(normalized.values())
     if total <= 0:
         return {bucket: 1 / 3 for bucket in buckets}
@@ -719,7 +713,7 @@ def pick_value_components(
     else:
         years_out = max(0, season - (season_clock.calendar_year() + 1))
     projection = _pick_range_projection(
-        _safe_float(context.get("slot_percentile"), 0.5),
+        float_or_default_any(context.get("slot_percentile"), 0.5),
         years_out,
         round_num,
     )
@@ -727,7 +721,7 @@ def pick_value_components(
     bucket_probabilities = projection.get("bucket_probabilities") or {"mid": 1.0}
     base = _weighted_pick_base_value(round_num, bucket_probabilities)
     future_discount = 0.88 ** years_out
-    projected_slot_percentile = _safe_float(projection.get("projected_slot_percentile"), 0.5)
+    projected_slot_percentile = float_or_default_any(projection.get("projected_slot_percentile"), 0.5)
     team_modifier = TEAM_MODIFIER_BASE + (projected_slot_percentile * TEAM_MODIFIER_RANGE)
     format_multiplier = _weighted_pick_format_multiplier(round_num, bucket_probabilities, league_settings)
     class_strength_multiplier = _rookie_class_strength_multiplier(
@@ -761,7 +755,7 @@ def pick_value_components(
         "format_multiplier": float(format_multiplier),
         "class_strength_multiplier": float(class_strength_multiplier),
         "prospect_strength_multiplier": float(prospect_strength_multiplier),
-        "slot_percentile": float(_safe_float(context.get("slot_percentile"), 0.5)),
+        "slot_percentile": float(float_or_default_any(context.get("slot_percentile"), 0.5)),
         "projected_slot_percentile": float(projected_slot_percentile),
         "early_probability": float(bucket_probabilities.get("early", 0.0)),
         "mid_probability": float(bucket_probabilities.get("mid", 0.0)),
@@ -783,7 +777,7 @@ def _projected_pick_slot(round_num: int, projected_slot_percentile: float, team_
     value model uses, so this is the value model's own slot, not a second guess."""
 
     teams = max(1, int(team_count or 0))
-    pct = _clamp_float(_safe_float(projected_slot_percentile, 0.5), 0.0, 1.0)
+    pct = _clamp_float(float_or_default_any(projected_slot_percentile, 0.5), 0.0, 1.0)
     slot = 1 + int(round((1.0 - pct) * (teams - 1)))
     slot = max(1, min(teams, slot))
     return slot, f"{int(round_num)}.{slot:02d}"
@@ -6527,7 +6521,7 @@ def _player_hub_path_label(
             selected_age = float(selected_asset.get("age") or 0)
         except Exception:
             selected_age = 0.0
-        receive_ages = [float(asset.get("age") or 0) for asset in receive_players if _safe_float(asset.get("age"), 0) > 0]
+        receive_ages = [float(asset.get("age") or 0) for asset in receive_players if float_or_default_any(asset.get("age"), 0) > 0]
         if receive_ages and selected_age and min(receive_ages) + 1.5 < selected_age:
             return "Age-down opportunity"
         return "Sell-high opportunity"
@@ -6558,7 +6552,7 @@ def _my_player_candidate_reason(
 ) -> str:
     pos = str(selected_asset.get("position") or "").upper()
     tier = str(selected_asset.get("player_tier") or "").strip()
-    age = _safe_float(selected_asset.get("age"), 0.0)
+    age = float_or_default_any(selected_asset.get("age"), 0.0)
     strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
     injury_positions = set(my_shape.get("injured_starter_positions") or [])
 
@@ -6628,7 +6622,7 @@ def _target_fit_reason(
 ) -> str:
     pos = str(target_asset.get("position") or "").upper()
     strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
-    age = _safe_float(target_asset.get("age"), 0.0)
+    age = float_or_default_any(target_asset.get("age"), 0.0)
     if pos in set(my_shape.get("needs") or []):
         return f"This player fits because {pos} is one of your current pressure positions."
     if strategy in {"rebuild", "tank"} and age_profile.at_most(age, age_profile.REBUILD_TARGET_MAX_AGE):
@@ -7275,7 +7269,7 @@ def _record_closest_structure(
 
 def _add_stage_ms(diagnostics: Dict[str, Any], key: str, started: float) -> None:
     elapsed = round((time.perf_counter() - started) * 1000, 3)
-    diagnostics[key] = round(_safe_float(diagnostics.get(key), 0.0) + elapsed, 3)
+    diagnostics[key] = round(float_or_default_any(diagnostics.get(key), 0.0) + elapsed, 3)
 
 
 def _safe_package_shape(
@@ -7814,7 +7808,7 @@ def _build_my_player_fallback_ideas(
     diagnostics["pick_universe_years"] = len(pick_years)
     my_mode = team_strategy_mode(active_strategy)
     selected_score = int(selected_asset.get("score") or 0)
-    selected_age = _safe_float(selected_asset.get("age"), 0.0)
+    selected_age = float_or_default_any(selected_asset.get("age"), 0.0)
     ideas: List[Dict[str, Any]] = []
     seen: set[str] = set()
     exploratory_pool: List[Dict[str, Any]] = []
@@ -8697,7 +8691,7 @@ def build_player_trade_hub_ideas(
                     continue
                 if str(key).startswith("stage_ms_"):
                     combined_diag[key] = round(
-                        _safe_float(combined_diag.get(key), 0.0) + _safe_float(value, 0.0),
+                        float_or_default_any(combined_diag.get(key), 0.0) + float_or_default_any(value, 0.0),
                         3,
                     )
                     continue

@@ -66,6 +66,7 @@ from modules import multi_team_trade as mt
 from modules import posture_model
 from modules import multi_team_trade_engine as engine
 from modules import roster_value_model, trade_analyzer_fit, trade_grade, trade_veto, trade_value_bands as bands
+from modules.coerce import float_nan_to_default
 
 logger = logging.getLogger("fantasygm.multi_team_trade_finder")
 
@@ -107,14 +108,6 @@ class Candidate:
     pair: tuple[str, str]
     fit: float
     min_delta: float
-
-
-def _num(value: Any) -> float:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return 0.0
-    return 0.0 if out != out else out
 
 
 class _League:
@@ -166,7 +159,7 @@ class _League:
             self.pick_want[rid] = posture_model.pick_want(group, str((self.ctx.posture(rid) or {}).get("key") or ""))
         for pick_id, pick in sorted(self.ctx.pick_by_id.items()):
             rid = str(pick.get("owner_roster_id"))
-            value = _num(pick.get("score"))
+            value = float_nan_to_default(pick.get("score"))
             if rid not in self.need_pos or value < MIN_ASSET_VALUE:
                 continue
             asset = Asset(pick_id, str(pick.get("label") or pick.get("name") or "Draft pick"), PICK_POSITION, value, rid, "pick")
@@ -435,7 +428,7 @@ def _repair(league: _League, graded: Mapping[str, Any], base: Sequence[mt.Transf
     if len(short) != 1 or short[0].get("tone") != "counter" or len(base) >= 4:
         return None
     hurt = short[0]["roster_id"]
-    gap = max(0.0, -_num(short[0]["market_delta"]))
+    gap = max(0.0, -float_nan_to_default(short[0]["market_delta"]))
     giver = next(t.from_roster for t in base if t.to_roster == hurt)
     used = {t.asset_id for t in base}
     keep = league.need_pos.get(giver, {})
@@ -541,7 +534,7 @@ def find_three_team_ideas(
             ))
 
     ideas.sort(key=lambda i: (
-        -min(t["trade_score"] for t in i["teams"]), -_num(i["user"]["trade_score"]), i["id"],
+        -min(t["trade_score"] for t in i["teams"]), -float_nan_to_default(i["user"]["trade_score"]), i["id"],
     ))
     if not ideas:
         search["reason"] = "no_fit"

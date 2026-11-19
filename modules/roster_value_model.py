@@ -51,6 +51,7 @@ from modules.injury_status import is_ruled_out
 from modules.rankings import injury_level
 from modules.rankings import age_multiplier
 from modules.trade_grade import FANTASY_SEASON_WEEKS, SeasonWindow, healthy_equivalent_roster, season_window
+from modules.coerce import float_finite_or_default
 
 logger = logging.getLogger(__name__)
 
@@ -119,14 +120,6 @@ def _text(value: Any) -> str:
     except (TypeError, ValueError):
         pass
     return str(value).strip()
-
-
-def _num(value: Any, default: float = 0.0) -> float:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return default
-    return number if math.isfinite(number) else default
 
 
 def _ordinal(n: int) -> str:
@@ -203,8 +196,8 @@ def roster_limits(league: Mapping[str, Any] | None, roster: Mapping[str, Any] | 
         active_ids=active,
         ir_ids=tuple(p for p in all_ids if p in ir),
         taxi_ids=tuple(p for p in all_ids if p in taxi),
-        reserve_slots=int(_num(settings.get("reserve_slots"), 0)),
-        taxi_slots=int(_num(settings.get("taxi_slots"), 0)),
+        reserve_slots=int(float_finite_or_default(settings.get("reserve_slots"), 0)),
+        taxi_slots=int(float_finite_or_default(settings.get("taxi_slots"), 0)),
     )
 
 
@@ -228,7 +221,7 @@ def ir_eligible(status: Any, injury_status: Any, league: Mapping[str, Any] | Non
         "dnr": "reserve_allow_dnr",
         "na": "reserve_allow_na",
     }
-    return any(key in terms and bool(_num(settings.get(setting), 0)) for key, setting in allow.items())
+    return any(key in terms and bool(float_finite_or_default(settings.get(setting), 0)) for key, setting in allow.items())
 
 
 # --- league-scaled thresholds and the league table --------------------------
@@ -402,12 +395,12 @@ def build_context(
     healthy = healthy_equivalent_roster(roster_df, score_column=score_field, window=window)
     healthy_cols = [c for c in ("player_id", score_field) if c in healthy.columns] if healthy.columns.is_unique else None
     healthy_value = {
-        str(r["player_id"]): _num(r.get(score_field))
+        str(r["player_id"]): float_finite_or_default(r.get(score_field))
         for r in frame_records(healthy[healthy_cols] if healthy_cols is not None else healthy)
     }
     active = {pid for pid in limits.active_ids if pid in profiles}
-    league_size = int(_num((league or {}).get("total_rosters"), 0)) or int(_num(settings.get("league_size"), 12)) or 12
-    starter_count = int(_num(settings.get("starter_count"), sum(model_ctx.slots.values()) or 9))
+    league_size = int(float_finite_or_default((league or {}).get("total_rosters"), 0)) or int(float_finite_or_default(settings.get("league_size"), 12)) or 12
+    starter_count = int(float_finite_or_default(settings.get("starter_count"), sum(model_ctx.slots.values()) or 9))
     return RosterValueContext(
         frame=roster_df,
         score_field=score_field,
@@ -529,7 +522,7 @@ def _evaluate_swap_uncached(
     add_values = healthy_equivalent_roster(add_frame, score_column=rvc.score_field, window=rvc.window) if not add_frame.empty else add_frame
     value_columns = [c for c in ("player_id", rvc.score_field) if c in add_values.columns]
     add_value_by_id = {
-        str(r["player_id"]): _num(r.get(rvc.score_field)) for r in frame_records(add_values[value_columns] if not add_values.empty else add_values)
+        str(r["player_id"]): float_finite_or_default(r.get(rvc.score_field)) for r in frame_records(add_values[value_columns] if not add_values.empty else add_values)
     }
     receive = [_asset(str(r["player_id"]), _text(r.get("name")), add_value_by_id.get(str(r["player_id"]), 0.0)) for r in add_rows]
     raw = sum(a["score"] for a in receive) - sum(a["score"] for a in send)
@@ -582,7 +575,7 @@ def has_path_to_play(pool: pd.DataFrame, all_players: pd.DataFrame | None) -> pd
     if all_players is not None and not all_players.empty and "depth_chart_order" in all_players.columns:
         qbs = all_players[all_players["position"].fillna("").astype(str).str.upper() == "QB"]
         for _, r in qbs.iterrows():
-            rank = _num(r.get("depth_chart_order"), 0.0)
+            rank = float_finite_or_default(r.get("depth_chart_order"), 0.0)
             team = _text(r.get("team")).upper()
             if rank <= 0 or not team:
                 continue
@@ -607,7 +600,7 @@ def _pool_by_position(pool: pd.DataFrame | None, score_field: str) -> dict[str, 
         if pos in out:
             out[pos].append(row)
     for pos in out:
-        out[pos].sort(key=lambda r: -(_num(r.get("proj_ppg"), _num(r.get(score_field)) / 1000.0)))
+        out[pos].sort(key=lambda r: -(float_finite_or_default(r.get("proj_ppg"), float_finite_or_default(r.get(score_field)) / 1000.0)))
     return out
 
 

@@ -10,7 +10,7 @@
 // Use `// weekly-chart-ok: reason` on the line (or the line above) only for a real non-weekly chart.
 //
 // Usage: node scripts/check_weekly_chart.mjs   (exit 1 on any violation)
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,6 +60,8 @@ export function scanText(rel, src) {
 
 export function scan() {
   const problems = [];
+  // SHARED excuses a whole file; a path that no longer exists would silently excuse a future file at that path.
+  for (const rel of SHARED) if (!existsSync(path.join(ROOT, rel))) problems.push(`${rel}: SHARED entry no longer exists (remove it)`);
   for (const tree of TREES) {
     for (const file of walk(path.join(ROOT, tree))) {
       const rel = path.relative(ROOT, file);

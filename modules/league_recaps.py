@@ -16,6 +16,7 @@ from typing import Any, Mapping, MutableMapping, Sequence
 
 from modules import league_history as history
 from modules.league_value_settings import _safe_positive_int
+from modules.coerce import float_or_default
 
 
 SESSION_CACHE_KEY = "_league_recap_cache"
@@ -62,13 +63,6 @@ def _text(value: object, default: str = "") -> str:
 def _int(value: object, default: int = 0) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _float(value: object, default: float = 0.0) -> float:
-    try:
-        return float(value)
     except (TypeError, ValueError):
         return default
 
@@ -145,7 +139,7 @@ def build_matchup_history_rows(
                     "week": week,
                     "roster_id": roster_id,
                     "matchup_id": _safe_positive_int(matchup.get("matchup_id"), 0),
-                    "points": _float(matchup.get("points"), _float(matchup.get("custom_points"), 0.0)),
+                    "points": float_or_default(matchup.get("points"), float_or_default(matchup.get("custom_points"), 0.0)),
                 }
             )
     return rows
@@ -173,9 +167,9 @@ def week_matchups_complete(
     scored = [
         row
         for row in matchups
-        if _int(row.get("week"), 0) == week and _float(row.get("points"), -1.0) >= 0
+        if _int(row.get("week"), 0) == week and float_or_default(row.get("points"), -1.0) >= 0
     ]
-    with_points = [row for row in scored if _float(row.get("points"), 0.0) > 0]
+    with_points = [row for row in scored if float_or_default(row.get("points"), 0.0) > 0]
     roster_ids = {_int(row.get("roster_id"), 0) for row in scored if _int(row.get("roster_id"), 0)}
     return len(with_points) >= min_scored_rosters and len(roster_ids) >= min_scored_rosters
 
@@ -292,11 +286,11 @@ def pair_matchups(rows: Sequence[Mapping[str, Any]], *, week: int) -> list[dict[
             continue
         ordered = sorted(
             members,
-            key=lambda item: (-_float(item.get("points"), 0.0), _int(item.get("roster_id"), 0)),
+            key=lambda item: (-float_or_default(item.get("points"), 0.0), _int(item.get("roster_id"), 0)),
         )[:2]
         a, b = ordered[0], ordered[1]
-        score_a = _float(a.get("points"), 0.0)
-        score_b = _float(b.get("points"), 0.0)
+        score_a = float_or_default(a.get("points"), 0.0)
+        score_b = float_or_default(b.get("points"), 0.0)
         if score_a <= 0 and score_b <= 0:
             continue
         winner, loser = (a, b) if score_a >= score_b else (b, a)
@@ -402,8 +396,8 @@ def _performance_story(
 ) -> dict[str, Any] | None:
     if not paired:
         return None
-    top = max(paired, key=lambda row: (_float(row.get("winner_points"), 0.0), -_int(row.get("matchup_id"), 0)))
-    points = _float(top.get("winner_points"), 0.0)
+    top = max(paired, key=lambda row: (float_or_default(row.get("winner_points"), 0.0), -_int(row.get("matchup_id"), 0)))
+    points = float_or_default(top.get("winner_points"), 0.0)
     if points <= 0:
         return None
     roster_id = _int(top.get("winner_roster_id"), 0)
@@ -453,9 +447,9 @@ def _performance_low_story(
         return None
     bottom = min(
         paired,
-        key=lambda row: (_float(row.get("loser_points"), 0.0), _int(row.get("matchup_id"), 0)),
+        key=lambda row: (float_or_default(row.get("loser_points"), 0.0), _int(row.get("matchup_id"), 0)),
     )
-    points = _float(bottom.get("loser_points"), 0.0)
+    points = float_or_default(bottom.get("loser_points"), 0.0)
     roster_id = _int(bottom.get("loser_roster_id"), 0)
     team = _text(bottom.get("loser_name")) or _team_name(identities.get(roster_id))
     if team == "Unknown team":
@@ -504,7 +498,7 @@ def _matchup_story(
             winner_rank
             and loser_rank
             and winner_rank > loser_rank
-            and _float(row.get("margin"), 0.0) > 0
+            and float_or_default(row.get("margin"), 0.0) > 0
         ):
             gap = winner_rank - loser_rank
             if upset is None or gap > upset[0]:
@@ -520,12 +514,12 @@ def _matchup_story(
             identities.get(_int(row.get("loser_roster_id"), 0))
         )
         summary = (
-            f"{winner} beat {loser} {_float(row.get('winner_points'), 0.0):.1f}–"
-            f"{_float(row.get('loser_points'), 0.0):.1f} despite a worse Roster Power entering the week."
+            f"{winner} beat {loser} {float_or_default(row.get('winner_points'), 0.0):.1f}–"
+            f"{float_or_default(row.get('loser_points'), 0.0):.1f} despite a worse Roster Power entering the week."
         )
     else:
-        row = max(paired, key=lambda item: (_float(item.get("margin"), 0.0), -_int(item.get("matchup_id"), 0)))
-        if _float(row.get("margin"), 0.0) <= 0:
+        row = max(paired, key=lambda item: (float_or_default(item.get("margin"), 0.0), -_int(item.get("matchup_id"), 0)))
+        if float_or_default(row.get("margin"), 0.0) <= 0:
             return None
         kind = "matchup"
         title = _pick_template(fingerprint, ("Biggest matchup", "The week's decisive result"))
@@ -536,9 +530,9 @@ def _matchup_story(
             identities.get(_int(row.get("loser_roster_id"), 0))
         )
         summary = (
-            f"{winner} defeated {loser} {_float(row.get('winner_points'), 0.0):.1f}–"
-            f"{_float(row.get('loser_points'), 0.0):.1f} "
-            f"(margin {_float(row.get('margin'), 0.0):.1f})."
+            f"{winner} defeated {loser} {float_or_default(row.get('winner_points'), 0.0):.1f}–"
+            f"{float_or_default(row.get('loser_points'), 0.0):.1f} "
+            f"(margin {float_or_default(row.get('margin'), 0.0):.1f})."
         )
     if winner == "Unknown team" or loser == "Unknown team":
         return None
@@ -552,13 +546,13 @@ def _matchup_story(
         primary_roster_id=_roster_id_str(row.get("winner_roster_id")),
         secondary_roster_id=_roster_id_str(row.get("loser_roster_id")),
         metric_label="Margin",
-        metric_value=f"{_float(row.get('margin'), 0.0):.1f}",
+        metric_value=f"{float_or_default(row.get('margin'), 0.0):.1f}",
         history_week=week,
         extra={
             "matchup_kind": kind,
             "matchup_id": row.get("matchup_id"),
-            "winner_points": round(_float(row.get("winner_points"), 0.0), 1),
-            "loser_points": round(_float(row.get("loser_points"), 0.0), 1),
+            "winner_points": round(float_or_default(row.get("winner_points"), 0.0), 1),
+            "loser_points": round(float_or_default(row.get("loser_points"), 0.0), 1),
         },
     )
 
@@ -579,7 +573,7 @@ def _matchup_close_story(
         return None
     row = min(
         paired,
-        key=lambda item: (_float(item.get("margin"), 0.0), _int(item.get("matchup_id"), 0)),
+        key=lambda item: (float_or_default(item.get("margin"), 0.0), _int(item.get("matchup_id"), 0)),
     )
     winner = _text(row.get("winner_name")) or _team_name(
         identities.get(_int(row.get("winner_roster_id"), 0))
@@ -591,9 +585,9 @@ def _matchup_close_story(
         return None
     title = _pick_template(fingerprint, ("Closest matchup", "Down to the wire", "Nail-biter of the week"))
     summary = (
-        f"{winner} edged {loser} {_float(row.get('winner_points'), 0.0):.1f}–"
-        f"{_float(row.get('loser_points'), 0.0):.1f} "
-        f"(margin {_float(row.get('margin'), 0.0):.1f})."
+        f"{winner} edged {loser} {float_or_default(row.get('winner_points'), 0.0):.1f}–"
+        f"{float_or_default(row.get('loser_points'), 0.0):.1f} "
+        f"(margin {float_or_default(row.get('margin'), 0.0):.1f})."
     )
     return _story(
         story_type=STORY_MATCHUP_CLOSE,
@@ -605,13 +599,13 @@ def _matchup_close_story(
         primary_roster_id=_roster_id_str(row.get("winner_roster_id")),
         secondary_roster_id=_roster_id_str(row.get("loser_roster_id")),
         metric_label="Margin",
-        metric_value=f"{_float(row.get('margin'), 0.0):.1f}",
+        metric_value=f"{float_or_default(row.get('margin'), 0.0):.1f}",
         history_week=week,
         extra={
             "matchup_kind": "close",
             "matchup_id": row.get("matchup_id"),
-            "winner_points": round(_float(row.get("winner_points"), 0.0), 1),
-            "loser_points": round(_float(row.get("loser_points"), 0.0), 1),
+            "winner_points": round(float_or_default(row.get("winner_points"), 0.0), 1),
+            "loser_points": round(float_or_default(row.get("loser_points"), 0.0), 1),
         },
     )
 

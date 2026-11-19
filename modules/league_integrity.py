@@ -31,6 +31,7 @@ import statistics
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from modules import trade_value_bands
+from modules.coerce import float_nan_to_none_blank
 
 # ---------------------------------------------------------------------------
 # Vocabulary
@@ -137,16 +138,6 @@ LIMITS = [
 # Small helpers
 # ---------------------------------------------------------------------------
 
-def _num(value: Any) -> float | None:
-    if value is None or value == "":
-        return None
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return None
-    return out if out == out else None
-
-
 def _int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
@@ -209,7 +200,7 @@ def _entry_points(entry: Mapping[str, Any]) -> dict[str, float]:
     raw = entry.get("players_points") if isinstance(entry.get("players_points"), Mapping) else {}
     out: dict[str, float] = {}
     for pid, pts in raw.items():
-        value = _num(pts)
+        value = float_nan_to_none_blank(pts)
         if value is not None:
             out[str(pid)] = value
     return out
@@ -232,7 +223,7 @@ def _typical_scores(weekly: Mapping[int, Sequence[Mapping[str, Any]]], week: int
 def _week_played(entries: Sequence[Mapping[str, Any]]) -> bool:
     """A week counts once at least one team has non-zero points."""
 
-    return any((_num(e.get("points")) or 0.0) != 0.0 for e in entries or [])
+    return any((float_nan_to_none_blank(e.get("points")) or 0.0) != 0.0 for e in entries or [])
 
 
 def _analyse_entry(
@@ -254,7 +245,7 @@ def _analyse_entry(
     roster_ids = [str(p) for p in (entry.get("players") or []) if str(p) not in excluded]
     starter_set = {s for s in starters if s and s != "0"}
 
-    actual = _num(entry.get("points"))
+    actual = float_nan_to_none_blank(entry.get("points"))
     if actual is None:
         actual = sum(points.get(s, 0.0) for s in starter_set)
 
@@ -372,7 +363,7 @@ def _week_results(entries: Sequence[Mapping[str, Any]]) -> dict[str, float]:
         if len(pair) != 2:
             continue
         a, b = pair
-        pa, pb = _num(a.get("points")) or 0.0, _num(b.get("points")) or 0.0
+        pa, pb = float_nan_to_none_blank(a.get("points")) or 0.0, float_nan_to_none_blank(b.get("points")) or 0.0
         ra, rb = str(a.get("roster_id")), str(b.get("roster_id"))
         if pa == pb:
             out[ra] = out.get(ra, 0.0) + 0.5
@@ -458,7 +449,7 @@ def _asset_value(
     if asset.get("kind") != "player":
         return None
     row = values.get(str(asset.get("player_id")))
-    return _num((row or {}).get("value_score")) if row else None
+    return float_nan_to_none_blank((row or {}).get("value_score")) if row else None
 
 
 def _asset_key(asset: Mapping[str, Any]) -> str:

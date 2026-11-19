@@ -44,6 +44,9 @@ FILE_REAL_MODULES = {
 # The only files outside modules/sim that may mention modules.sim, and how.
 EXTERNAL_IMPORTERS = {
     "services/mobile_api_service.py": {"modules.sim.api"},
+    # these guards only name the sim path as an exclusion from their scan; they do not import it
+    "tests/test_no_local_float_coercers.py": set(),
+    "tests/test_no_age_literals_outside_age_profile.py": set(),
     # the latency benchmark drives the real router against the in-memory store (no network, no real data)
     "scripts/bench_sim_game.py": {
         "modules.sim.api", "modules.sim.game_state", "modules.sim.game_store", "modules.sim.inputs",

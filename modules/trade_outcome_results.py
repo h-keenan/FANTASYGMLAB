@@ -77,6 +77,7 @@ import pandas as pd
 import requests
 
 from modules import app_config, league_value_settings, player_eligibility, rankings, sleeper
+from modules.coerce import float_nan_to_none
 
 PLAYERS_DB_PATH = "data/players.db"
 TRADE_OUTCOMES_TABLE = "trade_outcomes"
@@ -102,18 +103,6 @@ def _safe_text(value: Any, default: str = "") -> str:
         return default
     text = str(value).strip()
     return text if text else default
-
-
-def _safe_float(value: Any) -> float | None:
-    if value is None:
-        return None
-    try:
-        result = float(value)
-    except (TypeError, ValueError):
-        return None
-    if result != result:  # NaN
-        return None
-    return result
 
 
 @dataclass(frozen=True)
@@ -270,8 +259,8 @@ def _side_value(assets: list[dict[str, Any]], current_value_by_player: Mapping[s
     current_total = 0.0
     matched = 0
     for asset in _tracked_assets(assets):
-        baseline = _safe_float(asset.get("value_score"))
-        current = _safe_float(current_value_by_player.get(_safe_text(asset.get("player_id"))))
+        baseline = float_nan_to_none(asset.get("value_score"))
+        current = float_nan_to_none(current_value_by_player.get(_safe_text(asset.get("player_id"))))
         if baseline is None or current is None:
             continue
         baseline_total += baseline

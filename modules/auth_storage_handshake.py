@@ -12,6 +12,7 @@ from typing import Any, MutableMapping
 
 from modules import performance
 from modules import startup_cold_path
+from modules.coerce import float_or_none_blank
 
 
 HANDSHAKE_STATE_KEY = "_auth_storage_handshake"
@@ -19,15 +20,6 @@ COMPONENT_MOUNT_STARTED_KEY = "_auth_storage_component_mount_started_at"
 REQUEST_ID_KEY = "_auth_storage_request_id"
 MOUNT_ID_KEY = "_auth_storage_mount_id"
 STALE_RESPONSE_COUNT_KEY = "_auth_storage_stale_response_count"
-
-
-def _safe_float(value: Any) -> float | None:
-    try:
-        if value is None or value == "":
-            return None
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def mark_request_emitted(
@@ -107,7 +99,7 @@ def record_pending_return(session_state: MutableMapping[str, Any]) -> None:
     if not isinstance(store, dict):
         return
     store["pending_returns"] = int(store.get("pending_returns") or 0) + 1
-    mount_started = _safe_float(session_state.get(COMPONENT_MOUNT_STARTED_KEY))
+    mount_started = float_or_none_blank(session_state.get(COMPONENT_MOUNT_STARTED_KEY))
     if mount_started is not None and "python_first_pending_ms" not in store:
         store["python_first_pending_ms"] = round(
             (time.perf_counter() - mount_started) * 1000, 1
@@ -129,15 +121,15 @@ def record_payload_received(
 
     received_at = time.perf_counter()
     wall_ms = round(time.time() * 1000)
-    mount_started = _safe_float(session_state.get(COMPONENT_MOUNT_STARTED_KEY))
+    mount_started = float_or_none_blank(session_state.get(COMPONENT_MOUNT_STARTED_KEY))
     data = payload if isinstance(payload, dict) else {}
     diag = data.get("_handshake") if isinstance(data.get("_handshake"), dict) else {}
 
-    js_entry_ms = _safe_float(diag.get("js_entry_ms"))
-    js_entry_wall = _safe_float(diag.get("js_entry_wall_ms"))
-    js_read_ms = _safe_float(diag.get("localStorage_read_ms"))
-    js_emit_ms = _safe_float(diag.get("js_emit_ms"))
-    js_emit_wall = _safe_float(diag.get("emit_wall_ms")) or _safe_float(data.get("ts"))
+    js_entry_ms = float_or_none_blank(diag.get("js_entry_ms"))
+    js_entry_wall = float_or_none_blank(diag.get("js_entry_wall_ms"))
+    js_read_ms = float_or_none_blank(diag.get("localStorage_read_ms"))
+    js_emit_ms = float_or_none_blank(diag.get("js_emit_ms"))
+    js_emit_wall = float_or_none_blank(diag.get("emit_wall_ms")) or float_or_none_blank(data.get("ts"))
     visibility = str(diag.get("visibility") or "")[:32]
     hidden = diag.get("hidden")
     ready_state = str(diag.get("ready_state") or "")[:16]
@@ -175,7 +167,7 @@ def record_payload_received(
     if js_emit_wall is not None:
         frontend_to_python_ms = round(wall_ms - js_emit_wall, 1)
 
-    request_wall = _safe_float(store.get("python_request_wall_ms"))
+    request_wall = float_or_none_blank(store.get("python_request_wall_ms"))
     request_to_receive_wall_ms = None
     if request_wall is not None:
         request_to_receive_wall_ms = round(wall_ms - request_wall, 1)

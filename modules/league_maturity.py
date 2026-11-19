@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any, Mapping
 
 import pandas as pd
+from modules.coerce import float_nan_to_default
 
 
 class LeagueMaturity(str, Enum):
@@ -54,14 +55,6 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return max(0, int(float(value)))
     except (TypeError, ValueError):
         return default
-
-
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return default
-    return number if pd.notna(number) else default
 
 
 def _records(frame: Any) -> list[dict[str, Any]]:
@@ -184,7 +177,7 @@ def classify_league_maturity(evidence: Mapping[str, Any]) -> LeagueMaturity:
         return LeagueMaturity.STARTUP_IN_PROGRESS
 
     roster_count = _safe_int(evidence.get("roster_count"))
-    population_ratio = _safe_float(evidence.get("roster_population_ratio"))
+    population_ratio = float_nan_to_default(evidence.get("roster_population_ratio"))
     if roster_count and population_ratio < 0.5:
         return LeagueMaturity.STARTUP_IN_PROGRESS
 
@@ -346,7 +339,7 @@ def build_startup_roster_insights(
                 "Youngest Contender",
                 youngest,
                 "avg_age",
-                f"Contender-tagged roster with the lowest current average age ({_safe_float(youngest.get('avg_age')):.1f})."
+                f"Contender-tagged roster with the lowest current average age ({float_nan_to_default(youngest.get('avg_age')):.1f})."
                 if youngest is not None
                 else "",
                 tone="opportunity",
@@ -355,7 +348,7 @@ def build_startup_roster_insights(
                 "Oldest Contender",
                 oldest,
                 "avg_age",
-                f"Contender-tagged roster with the highest current average age ({_safe_float(oldest.get('avg_age')):.1f})."
+                f"Contender-tagged roster with the highest current average age ({float_nan_to_default(oldest.get('avg_age')):.1f})."
                 if oldest is not None
                 else "",
                 tone="risk",

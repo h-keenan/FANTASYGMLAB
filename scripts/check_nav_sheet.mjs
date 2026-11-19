@@ -47,9 +47,14 @@ const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(
 export function scan() {
   const problems = [];
   const rel = (f) => path.relative(root, f).split(path.sep).join("/");
+  // An allowlisted file that no longer matches the pattern it is excused for is dead weight (it would silently excuse a
+  // future regression), so every entry must be exercised: the lists only shrink.
+  const used = { hook: new Set(), webGroups: new Set(), appGroups: new Set(), appCatalog: new Set() };
   for (const file of walk(path.join(root, "web-next/src"))) {
     const r = rel(file);
     const code = stripComments(fs.readFileSync(file, "utf8"));
+    if (/\buseNavDestinations\s*\(/.test(code) && WEB_HOOK_OK.has(r)) used.hook.add(r);
+    if (/\bnavSheetGroups\s*[<(]/.test(code) && WEB_GROUPS_OK.has(r)) used.webGroups.add(r);
     if (/\buseNavDestinations\s*\(/.test(code) && !WEB_HOOK_OK.has(r)) problems.push(`${r}: builds a destination list with useNavDestinations; open the shared NavSheet instead`);
     if (/\bnavSheetGroups\s*[<(]/.test(code) && !WEB_GROUPS_OK.has(r)) problems.push(`${r}: groups destinations outside components/NavSheet.tsx`);
     if (/moreLeagueGroups|shell-more-menu/.test(code)) problems.push(`${r}: the retired separate More menu (use components/NavSheet.tsx)`);
@@ -57,10 +62,16 @@ export function scan() {
   for (const file of walk(path.join(root, "mobile/src"))) {
     const r = rel(file);
     const code = stripComments(fs.readFileSync(file, "utf8"));
+    if (/\bnavSheetGroups\s*[<(]/.test(code) && APP_GROUPS_OK.has(r)) used.appGroups.add(r);
+    if (/\b(navPagesIn\s*\(|NAV_PAGES\b)/.test(code) && APP_CATALOG_OK.has(r)) used.appCatalog.add(r);
     if (/\bnavSheetGroups\s*[<(]/.test(code) && !APP_GROUPS_OK.has(r)) problems.push(`${r}: groups destinations outside the GM orb sheet (GmOrb.tsx)`);
     if (/\b(navPagesIn\s*\(|NAV_PAGES\b)/.test(code) && !APP_CATALOG_OK.has(r)) problems.push(`${r}: lists catalog pages outside the GM orb sheet`);
     if (/moreLeagueGroups|leagueMoreGroups/.test(code)) problems.push(`${r}: the retired separate More grouping (use lib/navSheet.ts)`);
   }
+  for (const f of WEB_HOOK_OK.keys()) if (!used.hook.has(f)) problems.push(`${f}: WEB_HOOK_OK entry no longer uses useNavDestinations (remove it)`);
+  for (const f of WEB_GROUPS_OK) if (!used.webGroups.has(f)) problems.push(`${f}: WEB_GROUPS_OK entry no longer calls navSheetGroups (remove it)`);
+  for (const f of APP_GROUPS_OK) if (!used.appGroups.has(f)) problems.push(`${f}: APP_GROUPS_OK entry no longer calls navSheetGroups (remove it)`);
+  for (const f of APP_CATALOG_OK) if (!used.appCatalog.has(f)) problems.push(`${f}: APP_CATALOG_OK entry no longer lists catalog pages (remove it)`);
   return problems;
 }
 

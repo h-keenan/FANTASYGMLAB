@@ -62,6 +62,8 @@ export function scanText(rel, src) {
       problems.push(`${rel}:${line}: ViewSelect with ${count} options; ${MAX_TABS} or fewer are the shared compact tabs (ViewTabs), not a dropdown`);
     } else if (count === null && !ok) {
       problems.push(`${rel}:${line}: ViewSelect with computed options; use ViewTabs for 4 or fewer, or mark a 5+ list (weeks, seasons) with // view-select-ok: reason`);
+    } else if (count !== null && ok) {
+      problems.push(`${rel}:${line}: stale view-select-ok: a literal ViewSelect list needs no marker (only computed options do); remove it`);
     }
   }
   if (!RAW_SELECT_SKIP.test(rel)) problems.push(...scanRawSelects(rel, src, lines));
@@ -88,6 +90,7 @@ function scanRawSelects(rel, src, lines) {
     } else {
       const count = (body.match(/<option[\s>]/g) ?? []).length;
       if (count <= MAX_TABS && !ok) problems.push(`${rel}:${line}: raw <select> with ${count} options; ${MAX_TABS} or fewer are chips/ViewTabs, not a dropdown`);
+      else if (count > MAX_TABS && ok) problems.push(`${rel}:${line}: stale view-select-ok: a literal list of ${count} options needs no marker; remove it`);
     }
   }
   return problems;

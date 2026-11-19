@@ -46,6 +46,7 @@ from modules import (
     trade_offer_analyzer,
     trade_ideas,
 )
+from modules.coerce import float_finite_or_default
 
 logger = logging.getLogger(__name__)
 
@@ -101,14 +102,6 @@ _cache_lock = threading.Lock()
 # ---------------------------------------------------------------------------
 # small helpers
 # ---------------------------------------------------------------------------
-
-
-def _num(value: Any, default: float = 0.0) -> float:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return default
-    return out if math.isfinite(out) else default
 
 
 def _text(value: Any) -> str:
@@ -273,7 +266,7 @@ def _market(x: Any) -> float:
 
     if isinstance(x, tuple):  # ("pick", season, round, tier)
         return float(trade_ideas._round_tier_base_value(x[2], x[3]))
-    return _num(x.get("market_score"))
+    return float_finite_or_default(x.get("market_score"))
 
 
 def _market_ok(send: Sequence[Any], receive: Sequence[Any], *, slack: float) -> bool:
@@ -295,7 +288,7 @@ def _fmt(n: float) -> str:
 
 
 def _who(row: Mapping[str, Any]) -> str:
-    return f"{_text(row.get('name'))} ({_text(row.get('position'))}, {int(_num(row.get('age')))})"
+    return f"{_text(row.get('name'))} ({_text(row.get('position'))}, {int(float_finite_or_default(row.get('age')))})"
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +301,7 @@ def _market_ratio(row: Mapping[str, Any]) -> float | None:
     """market_score / base (1QB PPR) model value: <1 means the market prices
     the player below the model. Both sides are format-matched (base format)."""
 
-    market, base = _num(row.get("market_score")), _num(row.get("v_1qb_ppr"))
+    market, base = float_finite_or_default(row.get("market_score")), float_finite_or_default(row.get("v_1qb_ppr"))
     if market <= 0 or base <= 0:
         return None
     return market / base
@@ -317,16 +310,16 @@ def _market_ratio(row: Mapping[str, Any]) -> float | None:
 def gen_buy_low(ctx: Context) -> list[dict]:
     out = []
     for _, r in ctx.pool.iterrows():
-        if r["position"] not in POSITIONS or r["v"] < MIN_STAR_VALUE or _num(r["age"]) > 28 or not _healthy(r):
+        if r["position"] not in POSITIONS or r["v"] < MIN_STAR_VALUE or float_finite_or_default(r["age"]) > 28 or not _healthy(r):
             continue
         ratio = _market_ratio(r)
-        trend = _num(r.get("recency_trend"))
+        trend = float_finite_or_default(r.get("recency_trend"))
         rising = _text(r.get("workload_trend")) == "Rising" or trend >= 0.10
         if ratio is None or ratio > 0.86 or ratio < 0.55 or r["v"] < 3500 or not rising:
             continue
         price = r["v"] * ratio  # what the market charges, on the format's scale
         exclude = {r["player_id"]}
-        partners = _near(ctx.pool, price, 0.95, 1.06, exclude, min_age=_num(r["age"]) + 1, limit=3)
+        partners = _near(ctx.pool, price, 0.95, 1.06, exclude, min_age=float_finite_or_default(r["age"]) + 1, limit=3)
         for p in partners:
             if _text(p.get("workload_trend")) == "Rising":
                 continue
@@ -340,7 +333,7 @@ def gen_buy_low(ctx: Context) -> list[dict]:
                     why=[
                         f"Market price ({_fmt(price)}) sits {int(round(gap * 100))}% below our model value for {_text(r['name'])} ({_fmt(r['v'])}).",
                         f"Usage trend {trend:+.2f} vs his own baseline ({_text(r.get('workload_trend')) or 'n/a'} workload, {_text(r.get('opportunity_label')) or 'n/a'}).",
-                        f"{_text(p['name'])} ({_fmt(p['v'])}) is the closest match to that {_fmt(price)} market price, at age {int(_num(p['age']))} vs {int(_num(r['age']))}.",
+                        f"{_text(p['name'])} ({_fmt(p['v'])}) is the closest match to that {_fmt(price)} market price, at age {int(float_finite_or_default(p['age']))} vs {int(float_finite_or_default(r['age']))}.",
                     ],
                 )
             )
@@ -350,16 +343,16 @@ def gen_buy_low(ctx: Context) -> list[dict]:
 def gen_sell_high(ctx: Context) -> list[dict]:
     out = []
     for _, s in ctx.pool.iterrows():
-        pos, age = s["position"], _num(s["age"])
+        pos, age = s["position"], float_finite_or_default(s["age"])
         cliff = CLIFF_AGE.get(pos)
         if cliff is None or age < cliff or s["v"] < 3000 or not _healthy(s):
             continue
-        cooling = _text(s.get("workload_trend")) == "Cooling" or _num(s.get("recency_trend")) <= -0.10
+        cooling = _text(s.get("workload_trend")) == "Cooling" or float_finite_or_default(s.get("recency_trend")) <= -0.10
         ratio = _market_ratio(s)
         priced_above = ratio is not None and ratio >= 1.0
         if not (cooling or priced_above):
             continue
-        price = _num(s.get("market_score")) * (s["v"] / s["v_1qb_ppr"] if s["v_1qb_ppr"] > 0 else 1.0)
+        price = float_finite_or_default(s.get("market_score")) * (s["v"] / s["v_1qb_ppr"] if s["v_1qb_ppr"] > 0 else 1.0)
         price = max(price, s["v"])
         for p in _near(ctx.pool, price, 0.88, 1.04, {s["player_id"]}, max_age=min(26, age - 4), limit=6):
             if not _market_ok([s], [p], slack=1.05):
@@ -370,12 +363,12 @@ def gen_sell_high(ctx: Context) -> list[dict]:
                     type=TYPE_SELL_HIGH, send=[s], receive=[p],
                     signal=min(1.0, (yrs + 1) / 4.0),
                     facts=dict(cliff=cliff, cooling=cooling),
-                    figures=dict(market_price=price, cliff_age=cliff, years_younger=int(age - _num(p["age"])), usage_trend=_num(s.get("recency_trend"))),
-                    hook=f"Sell {_text(s['name'])} ({int(age)}) while the market still pays {_fmt(price)}; {_text(p['name'])} is {int(age - _num(p['age']))} years younger.",
+                    figures=dict(market_price=price, cliff_age=cliff, years_younger=int(age - float_finite_or_default(p["age"])), usage_trend=float_finite_or_default(s.get("recency_trend"))),
+                    hook=f"Sell {_text(s['name'])} ({int(age)}) while the market still pays {_fmt(price)}; {_text(p['name'])} is {int(age - float_finite_or_default(p['age']))} years younger.",
                     why=[
                         f"{_text(s['name'])} is {int(age)}; {pos}s typically fall off around {cliff}. Our model value is {_fmt(s['v'])} vs a market price near {_fmt(price)}.",
-                        f"Usage trend {_num(s.get('recency_trend')):+.2f} ({_text(s.get('workload_trend')) or 'n/a'}).",
-                        f"{_text(p['name'])} returns {_fmt(p['v'])} at age {int(_num(p['age']))}.",
+                        f"Usage trend {float_finite_or_default(s.get('recency_trend')):+.2f} ({_text(s.get('workload_trend')) or 'n/a'}).",
+                        f"{_text(p['name'])} returns {_fmt(p['v'])} at age {int(float_finite_or_default(p['age']))}.",
                     ],
                 )
             )
@@ -390,7 +383,7 @@ def gen_arbitrage(ctx: Context) -> list[dict]:
             if not _healthy(q):
                 continue
             jump = q["v"] / q["v_1qb_ppr"] - 1 if q["v_1qb_ppr"] > 0 else 0
-            for w in _near(pool, q["v"], 0.94, 1.06, {q["player_id"]}, positions=("RB", "WR", "TE"), min_age=_num(q["age"]) - 2, limit=2):
+            for w in _near(pool, q["v"], 0.94, 1.06, {q["player_id"]}, positions=("RB", "WR", "TE"), min_age=float_finite_or_default(q["age"]) - 2, limit=2):
                 out.append(
                     dict(
                         type=TYPE_ARBITRAGE, send=[w], receive=[q], signal=min(1.0, jump / 0.40),
@@ -408,16 +401,16 @@ def gen_arbitrage(ctx: Context) -> list[dict]:
         for _, q in pool[(pool["position"] == "QB") & (pool["v"] >= 4500) & (pool["age"] >= 28)].iterrows():
             if not _healthy(q):
                 continue
-            for w in _near(pool, q["v"], 0.97, 1.10, {q["player_id"]}, positions=("RB", "WR"), max_age=_num(q["age"]) - 3, limit=2):
+            for w in _near(pool, q["v"], 0.97, 1.10, {q["player_id"]}, positions=("RB", "WR"), max_age=float_finite_or_default(q["age"]) - 3, limit=2):
                 out.append(
                     dict(
                         type=TYPE_ARBITRAGE, send=[q], receive=[w], signal=0.5,
                         facts=dict(kind="1qb_qb"),
-                        figures=dict(years_younger=int(_num(q["age"]) - _num(w["age"]))),
+                        figures=dict(years_younger=int(float_finite_or_default(q["age"]) - float_finite_or_default(w["age"]))),
                         hook=f"In 1QB there is one QB slot: {_text(q['name'])} and {_text(w['name'])} are priced the same, but the {w['position']} is the harder starter to replace.",
                         why=[
                             f"Only one starting QB slot: {_text(q['name'])} is worth {_fmt(q['v'])}, {_text(w['name'])} {_fmt(w['v'])}.",
-                            f"{_text(w['name'])} is {int(_num(q['age']) - _num(w['age']))} years younger.",
+                            f"{_text(w['name'])} is {int(float_finite_or_default(q['age']) - float_finite_or_default(w['age']))} years younger.",
                         ],
                     )
                 )
@@ -428,7 +421,7 @@ def gen_arbitrage(ctx: Context) -> list[dict]:
             jump = te["v"] / te["v_fmt_ppr"] - 1 if te["v_fmt_ppr"] > 0 else 0
             if jump < 0.04:
                 continue
-            for w in _near(pool, te["v"], 0.94, 1.06, {te["player_id"]}, positions=("RB", "WR"), min_age=_num(te["age"]) - 1, limit=2):
+            for w in _near(pool, te["v"], 0.94, 1.06, {te["player_id"]}, positions=("RB", "WR"), min_age=float_finite_or_default(te["age"]) - 1, limit=2):
                 out.append(
                     dict(
                         type=TYPE_ARBITRAGE, send=[w], receive=[te], signal=min(1.0, jump / 0.20),
@@ -459,36 +452,36 @@ def gen_pick_for_player(ctx: Context) -> list[dict]:
         pv = trade_ideas._round_tier_base_value(rnd, tier)
         # A: pay the pick for a young proven producer the app values above it
         for _, p in pool[(pool["v"] >= pv * 1.04) & (pool["v"] <= pv * 1.25) & (pool["age"] <= 25)].iterrows():
-            if not _healthy(p) or _num(p.get("production_score")) < 8500 or not _market_ok([("pick", year, rnd, tier)], [p], slack=1.05):
+            if not _healthy(p) or float_finite_or_default(p.get("production_score")) < 8500 or not _market_ok([("pick", year, rnd, tier)], [p], slack=1.05):
                 continue
             out.append(
                 dict(
                     type=TYPE_PICK, send=[("pick", year, rnd, tier)], receive=[p],
                     signal=min(1.0, (p["v"] / pv - 1) / 0.20),
                     facts=dict(pick_value=pv, direction="buy"),
-                    figures=dict(production_score=_num(p.get("production_score")), opportunity_score=_num(p.get("opportunity_score"))),
+                    figures=dict(production_score=float_finite_or_default(p.get("production_score")), opportunity_score=float_finite_or_default(p.get("opportunity_score"))),
                     hook=f"A {year} round {rnd} pick buys {_text(p['name'])}, who is already producing.",
                     why=[
-                        f"The app prices a {year} round {rnd} ({tier}) at {_fmt(pv)}; {_text(p['name'])} is {_fmt(p['v'])} at age {int(_num(p['age']))}.",
-                        f"Production score {_fmt(_num(p.get('production_score')))} (opportunity {_fmt(_num(p.get('opportunity_score')))}): proven, not projected.",
+                        f"The app prices a {year} round {rnd} ({tier}) at {_fmt(pv)}; {_text(p['name'])} is {_fmt(p['v'])} at age {int(float_finite_or_default(p['age']))}.",
+                        f"Production score {_fmt(float_finite_or_default(p.get('production_score')))} (opportunity {_fmt(float_finite_or_default(p.get('opportunity_score')))}): proven, not projected.",
                     ],
                 )
             )
         # B: cash an aging starter for the pick before the age curve takes it
         for _, s in pool[(pool["v"] >= pv * 0.97) & (pool["v"] <= pv * 1.10) & (pool["position"].isin(["RB", "WR", "TE"]))].iterrows():
             cliff = CLIFF_AGE.get(s["position"], 99)
-            if not _healthy(s) or _num(s["age"]) < cliff - 1 or not _market_ok([s], [("pick", year, rnd, tier)], slack=1.05):
+            if not _healthy(s) or float_finite_or_default(s["age"]) < cliff - 1 or not _market_ok([s], [("pick", year, rnd, tier)], slack=1.05):
                 continue
             out.append(
                 dict(
                     type=TYPE_PICK, send=[s], receive=[("pick", year, rnd, tier)],
-                    signal=min(1.0, (_num(s["age"]) - cliff + 2) / 4.0),
+                    signal=min(1.0, (float_finite_or_default(s["age"]) - cliff + 2) / 4.0),
                     facts=dict(pick_value=pv, direction="sell"),
                     figures=dict(cliff_age=cliff),
-                    hook=f"Turn {_text(s['name'])} ({int(_num(s['age']))}) into a {year} round {rnd} pick while he still carries first-round value.",
+                    hook=f"Turn {_text(s['name'])} ({int(float_finite_or_default(s['age']))}) into a {year} round {rnd} pick while he still carries first-round value.",
                     why=[
                         f"{_text(s['name'])} is {_fmt(s['v'])}; the app prices a {year} round {rnd} ({tier}) at {_fmt(pv)}.",
-                        f"At {int(_num(s['age']))}, {s['position']}s are at or near the {cliff} cliff; the pick does not age.",
+                        f"At {int(float_finite_or_default(s['age']))}, {s['position']}s are at or near the {cliff} cliff; the pick does not age.",
                     ],
                 )
             )
@@ -544,7 +537,7 @@ def gen_injury_stash(ctx: Context) -> list[dict]:
             continue
         # pay with a healthy player of equal listed value; the Analyzer's own
         # injury pricing (trade_grade) decides whether the wait is worth it
-        for p in _near(pool, r["v"], 0.90, 1.15, {r["player_id"]}, min_age=_num(r["age"]) + 1, limit=4):
+        for p in _near(pool, r["v"], 0.90, 1.15, {r["player_id"]}, min_age=float_finite_or_default(r["age"]) + 1, limit=4):
             out.append(
                 dict(
                     type=TYPE_STASH, send=[p], receive=[r],
@@ -554,7 +547,7 @@ def gen_injury_stash(ctx: Context) -> list[dict]:
                     hook=f"{_text(r['name'])} is {status} ({_text(r.get('injury_body_part')) or 'injury'}); the discount is the buying window.",
                     why=[
                         f"{status} designation, estimated {int(absence.weeks)} weeks out ({absence.basis}; no return date is on record).",
-                        f"Model value {_fmt(r['v'])} at age {int(_num(r['age']))}; {_text(p['name'])} ({_fmt(p['v'])}) is an equal-value healthy player.",
+                        f"Model value {_fmt(r['v'])} at age {int(float_finite_or_default(r['age']))}; {_text(p['name'])} ({_fmt(p['v'])}) is an equal-value healthy player.",
                     ],
                 )
             )
@@ -577,7 +570,7 @@ GENERATORS = {
 
 
 def _player_view(row: Mapping[str, Any]) -> dict[str, Any]:
-    age = _num(row.get("age"))
+    age = float_finite_or_default(row.get("age"))
     return {
         "kind": "player",
         "player_id": _text(row.get("player_id")),
@@ -585,7 +578,7 @@ def _player_view(row: Mapping[str, Any]) -> dict[str, Any]:
         "team": _text(row.get("team")) or None,
         "position": _text(row.get("position")),
         "age": round(age, 1) if age > 0 else None,
-        "value": int(round(_num(row.get("v", row.get("score"))))),
+        "value": int(round(float_finite_or_default(row.get("v", row.get("score"))))),
         "injury_status": _text(row.get("injury_status")) or None,
     }
 
@@ -621,8 +614,8 @@ def _spice(ctx: Context, cand: dict, assets: list[dict], rows: list[Mapping[str,
     edge = min(30.0, max(0.0, value_delta) / 20.0)
     story = min(30.0, 30.0 * float(cand.get("signal") or 0.0))
     now_ms = ctx.now.timestamp() * 1000
-    fresh = any(_num(r.get("news_updated")) > 0 and now_ms - _num(r.get("news_updated")) <= 7 * 86400 * 1000 for r in rows)
-    trendy = any(abs(_num(r.get("recency_trend"))) >= 0.10 for r in rows)
+    fresh = any(float_finite_or_default(r.get("news_updated")) > 0 and now_ms - float_finite_or_default(r.get("news_updated")) <= 7 * 86400 * 1000 for r in rows)
+    trendy = any(abs(float_finite_or_default(r.get("recency_trend"))) >= 0.10 for r in rows)
     newsy = 15.0 if fresh else (5.0 if trendy else 0.0)
     total = max(0, min(100, int(round(star + edge + story + newsy))))
     return {
@@ -664,7 +657,7 @@ def share_card_descriptor(iid: str, fmt: str, lens: str) -> dict[str, Any]:
 def _figure(value: Any) -> float:
     """A derived number cited in the free text, rounded the way the text prints it."""
 
-    v = _num(value)
+    v = float_finite_or_default(value)
     return float(int(round(v))) if abs(v) >= 10 else round(v, 2)
 
 
@@ -681,7 +674,7 @@ def structured_numbers(item: Mapping[str, Any]) -> set[float]:
     def add(x: Any) -> None:
         if x is None or isinstance(x, bool):
             return
-        v = _num(x, float("nan"))
+        v = float_finite_or_default(x, float("nan"))
         if math.isnan(v):
             return
         allowed.add(round(abs(v), 2))

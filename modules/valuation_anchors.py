@@ -29,6 +29,7 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
+from modules.coerce import float_or_default
 from modules.experimental_graduation import graduated_kill_switch_enabled
 
 STARTING_DEMAND_ENV_KEY = "DYNASTYGM_ROLE_STARTING_DEMAND_V1"
@@ -80,19 +81,16 @@ def starting_demand_by_position(settings: Mapping[str, Any] | None) -> dict[str,
 
     s = dict(settings or {})
 
-    def num(key: str, default: float = 0.0) -> float:
-        try:
-            return float(s.get(key) if s.get(key) is not None else default)
-        except (TypeError, ValueError):
-            return default
+    def setting(key: str, default: float = 0.0) -> float:
+        return float_or_default(s.get(key) if s.get(key) is not None else default, default)
 
-    size = max(2.0, num("league_size", 12.0))
-    flex, wrrb, rec = num("regular_flex_count"), num("wrrb_flex_count"), num("rec_flex_count")
+    size = max(2.0, setting("league_size", 12.0))
+    flex, wrrb, rec = setting("regular_flex_count"), setting("wrrb_flex_count"), setting("rec_flex_count")
     per_team = {
-        "QB": num("qb_count", 1.0) + num("superflex_count"),
-        "RB": num("rb_count", 2.0) + 0.5 * flex + 0.5 * wrrb,
-        "WR": num("wr_count", 3.0) + 0.5 * flex + 0.5 * wrrb + 0.5 * rec,
-        "TE": num("te_count", 1.0) + 0.34 * flex + 0.5 * rec,
+        "QB": setting("qb_count", 1.0) + setting("superflex_count"),
+        "RB": setting("rb_count", 2.0) + 0.5 * flex + 0.5 * wrrb,
+        "WR": setting("wr_count", 3.0) + 0.5 * flex + 0.5 * wrrb + 0.5 * rec,
+        "TE": setting("te_count", 1.0) + 0.34 * flex + 0.5 * rec,
     }
     return {pos: max(1.0, count) * size for pos, count in per_team.items()}
 
