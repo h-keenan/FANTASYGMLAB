@@ -13,6 +13,7 @@ import { AccentCard } from "@/components/AccentCard";
 import { usePageHelp } from "@/components/PageHelpLines";
 import { Button } from "@/components/Button";
 import { ValueRing } from "@/components/ValueRing";
+import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
 import { api, type LeagueTeamRankingsResponse, type PlayoffOddsResponse, type PlayoffOddsTeam, type TeamRanking } from "@/lib/api";
 import {
   boardSecondaryParts,
@@ -393,6 +394,9 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
           fallbackTitle="Your real shot at the playoffs"
           fallbackBody="Playoff Odds is a Pro feature: a rest-of-season simulation of your league's real schedule, every team's playoff chance and projected seed. Start your free trial to unlock it."
         />
+      ) : null}
+      {state === "ready" && result && result.is_premium !== false && result.sleeper_data_as_of ? (
+        <FreshnessLabel datasets={[]} report={null} leagueAsOf={result.sleeper_data_as_of} className="block text-xs" />
       ) : null}
       {state === "ready" && result && result.is_premium !== false ? (
         result.reason || result.teams.length === 0 ? (

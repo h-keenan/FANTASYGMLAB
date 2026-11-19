@@ -197,6 +197,23 @@ describe("LeagueRankingsContent", () => {
     expect(api.getLeaguePlayoffOdds).toHaveBeenCalledWith("L1");
   });
 
+  it("labels Playoff Odds with its age when the API served last-known provider data, and not otherwise", async () => {
+    const stale = new Date(Date.now() - 20 * 60_000).toISOString();
+    vi.mocked(api.getLeaguePlayoffOdds).mockResolvedValue({ ok: true, reason: "offseason", teams: [], sleeper_data_as_of: stale });
+    const { unmount } = render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
+    fireEvent.click(screen.getByRole("button", { name: "Calculate playoff odds" }));
+    await waitFor(() => expect(screen.getByTestId("freshness-label")).toHaveTextContent(/League data as of 2\dm ago \(may be behind\)/));
+    unmount();
+
+    vi.mocked(api.getLeaguePlayoffOdds).mockResolvedValue({ ok: true, reason: "offseason", teams: [] });
+    render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
+    fireEvent.click(screen.getByRole("button", { name: "Calculate playoff odds" }));
+    await waitFor(() =>
+      expect(screen.getByText("Playoff odds will be available once the regular season begins.")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("freshness-label")).toBeNull();
+  });
+
   it("shows a reason message instead of rows when playoff odds aren't ready", async () => {
     vi.mocked(api.getLeaguePlayoffOdds).mockResolvedValue({ ok: true, reason: "offseason", teams: [] });
 
