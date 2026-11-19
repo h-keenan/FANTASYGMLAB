@@ -1270,6 +1270,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         with _lock_for(gid):
             store, uid, row, snap, state = load(user, gid, write=True)
             _require_offseason(state)
+            if view.paywalled(pro, state):
+                return _premium(state)  # the offseason is Pro: same gate as every other write
             em = Emitter(state, snap)
             with ctx.compute() as ok:
                 if not ok:
@@ -1306,6 +1308,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         with _lock_for(gid):
             store, uid, row, snap, state = load(user, gid, write=True)
             _require_offseason(state)
+            if view.paywalled(pro, state):
+                return _premium(state)
             em = Emitter(state, snap)
             with ctx.compute() as ok:
                 if not ok:
