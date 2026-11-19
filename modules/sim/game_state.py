@@ -93,6 +93,8 @@ class GameState:
         # hand-set lineup (0 = none). Inert (and out of the digest) at their defaults, so every older save fingerprints as before.
         self.auto_manage: bool | None = None
         self.manual_lineup_week = 0
+        # wrapped_v 1+: the projection shown going into each week, {pid: {"week": proj}}. Inert (and out of the digest) while empty.
+        self.proj_hist: dict[str, dict[str, float]] = {}
 
     # --------------------------------------------------------------- views
 
@@ -176,7 +178,7 @@ class GameState:
         for key in ("ir", "taxi"):
             if not any(raw[key].values()):
                 del raw[key]
-        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block", "rules", "out_kind", "posture"):
+        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "proj_hist", "block", "rules", "out_kind", "posture"):
             if not raw[key]:
                 del raw[key]
         if raw["auto_manage"] is None:
@@ -484,6 +486,8 @@ def _week_scored(state, snap, week, p):
     state.week = week + 1  # next week to play (out-week counters tick below)
     for pid, ra in (p.get("roles") or {}).items():
         state.role_hist.setdefault(pid, {})[str(week)] = [float(ra[0]), float(ra[1])]
+    for pid, pj in (p.get("proj") or {}).items():
+        state.proj_hist.setdefault(pid, {})[str(week)] = float(pj)
     for pid in snap.pids:
         hist = state.points.setdefault(pid, [])
         while len(hist) < week - 1:
@@ -607,6 +611,7 @@ def _season_started(state, snap, week, p):
     state.history = []
     state.points = {}
     state.role_hist = {}
+    state.proj_hist = {}
     state.claims = []
     state.posture = {}
     state.offers = []

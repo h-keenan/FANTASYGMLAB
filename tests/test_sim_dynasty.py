@@ -52,7 +52,7 @@ class Run:
         self.root = new_snapshot(seed, **kw)
         from dataclasses import replace as _replace
 
-        object.__setattr__(self.root, "settings", _replace(self.root.settings, cap_v=cap, posture_v=posture, cover_v=cover, **({"econ_v": econ} if econ is not None else {})))
+        object.__setattr__(self.root, "settings", _replace(self.root.settings, cap_v=cap, posture_v=posture, cover_v=cover, wrapped_v=0, **({"econ_v": econ} if econ is not None else {})))
         self.state = GameState(self.root)
         self.em = Emitter(self.state, self.root)
         ctx = draft.DraftContext(self.root, self.state)

@@ -14,7 +14,7 @@ PIN_OLD = ["bc7e1fb5de41ec70", "5ab40a2ba2b41aad", "f50dbd192cdfdd5d"]
 
 
 def _play(seed: int, wire_v: int):
-    snap, state = rep._new_game(seed, {"wire_v": wire_v, "cap_v": 0, "posture_v": 0, "cover_v": 0})  # the digest pins predate cap_v and posture_v
+    snap, state = rep._new_game(seed, {"wire_v": wire_v, "cap_v": 0, "posture_v": 0, "cover_v": 0, "wrapped_v": 0})  # the digest pins predate cap_v and posture_v
     user = snap.user_team.tid
     results = []  # (user priority index, ok, reason) for the user's claims
     while state.status == "in_season":

@@ -40,7 +40,7 @@ def make_snapshot(seed=11, hint_v=0, world_v=0, econ_v=0, cap_v=0, posture_v=0, 
     snap = build_snapshot(ROWS, BYES, GameSettings.parse(opts), seed, scoring_model=game_scoring.default_model().model_id)
     # world_v defaults to 0 for the same reason: the pinned digests of these seeded games predate the usage-conserving world
     # (covered by tests/test_sim_world_v.py).
-    return dataclasses.replace(snap, settings=dataclasses.replace(snap.settings, hint_v=hint_v, world_v=world_v, econ_v=econ_v, cap_v=cap_v, posture_v=posture_v))  # cap_v 0 too: the seeded drafts here predate the shared position limit (tests/test_sim_cap_v.py)
+    return dataclasses.replace(snap, settings=dataclasses.replace(snap.settings, hint_v=hint_v, world_v=world_v, econ_v=econ_v, cap_v=cap_v, posture_v=posture_v, wrapped_v=0))  # cap_v 0 too: the seeded drafts here predate the shared position limit (tests/test_sim_cap_v.py)
 
 
 def drafted(seed=11, limit_v=None, **settings):
