@@ -209,4 +209,3 @@ def pick_sale_terms(strategy: str, picks: int) -> tuple[int, int]:
 
 def lineup_weights(posture: str, default: str = "retool") -> tuple[float, float]:
     return POSTURE_WEIGHTS.get(posture, POSTURE_WEIGHTS[default])
-
