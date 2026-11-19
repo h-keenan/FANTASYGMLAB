@@ -193,20 +193,21 @@ def graduated_kill_switch_enabled(
 
 # Flag registry (2026-11 flag hygiene audit, docs/audits/2026-11-flag-hygiene.md).
 # Every product flag that is not an operational switch gets an owner, a flip or
-# removal criterion and a review date. "unassigned" means a human owner is
-# still needed. Review dates are proposals (one release after graduation).
+# removal criterion and a review date. Owners (2026-11-19): product/advice
+# flags belong to coridian_; ops/infra/billing/security flags belong to Zach.
+# Review dates are proposals (one release after graduation).
 FLAG_REGISTRY: dict[str, dict[str, str]] = {
-    "DYNASTYGM_CANONICAL_AGE_CURVE": {"default": "on", "owner": "unassigned", "criterion": "delete kill switch and legacy cutoffs once stable in prod", "review": "2026-12-19"},
-    "DYNASTYGM_CANONICAL_POSTURE": {"default": "on", "owner": "unassigned", "criterion": "delete kill switch and per-surface refine path once stable in prod", "review": "2026-12-19"},
-    "DYNASTYGM_ROLE_STARTING_DEMAND_V1": {"default": "on", "owner": "unassigned", "criterion": "delete kill switch after one release (owner-approved 2026-11-18)", "review": "2026-12-19"},
-    "DYNASTYGM_NO_MARKET_FLOOR_V1": {"default": "on", "owner": "unassigned", "criterion": "delete kill switch after one release (owner-approved 2026-11-18)", "review": "2026-12-19"},
-    "DYNASTYGM_LIVE_DRAFT_CONTEXT_V1": {"default": "on", "owner": "unassigned", "criterion": "delete kill switch after one release", "review": "2026-12-19"},
-    "DYNASTYGM_PLAYOFF_ODDS_CONTEXT_V1": {"default": "on", "owner": "unassigned", "criterion": "delete kill switch after one release", "review": "2026-12-19"},
-    "DYNASTYGM_USAGE_ROLES_TARGETS_V1": {"default": "on", "owner": "unassigned", "criterion": "delete kill switch after one release", "review": "2026-12-19"},
-    "DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY": {"default": "on", "owner": "unassigned", "criterion": "kill switch asked for in #232; keep", "review": "2027-02-19"},
-    "DYNASTYGM_EXPERIMENTAL_GM_TARGETS": {"default": "on", "owner": "unassigned", "criterion": "kill switch asked for in #232; keep", "review": "2027-02-19"},
-    "DYNASTYGM_EXPERIMENTAL_SHARE_CARDS": {"default": "on", "owner": "unassigned", "criterion": "kill switch asked for in #232; keep", "review": "2027-02-19"},
-    "DYNASTYGM_EXPERIMENTAL_TEAM_STANCE": {"default": "on", "owner": "unassigned", "criterion": "kill switch kept by design", "review": "2027-02-19"},
-    "DYNASTYGM_NEWS_VALUE_EVENTS": {"default": "off", "owner": "unassigned", "criterion": "flip ON only after a separate walk-forward backtest passes; queued", "review": "2026-12-19"},
-    "DYNASTYGM_COLLEGE_SCOUTING_CLASS_STRENGTH_SIGNAL": {"default": "off", "owner": "unassigned", "criterion": "flip ON only with a real scouting pool and a backtest; queued", "review": "2026-12-19"},
+    "DYNASTYGM_CANONICAL_AGE_CURVE": {"default": "on", "owner": "coridian_", "criterion": "delete kill switch and legacy cutoffs once stable in prod", "review": "2026-12-19"},
+    "DYNASTYGM_CANONICAL_POSTURE": {"default": "on", "owner": "coridian_", "criterion": "delete kill switch and per-surface refine path once stable in prod", "review": "2026-12-19"},
+    "DYNASTYGM_ROLE_STARTING_DEMAND_V1": {"default": "on", "owner": "coridian_", "criterion": "delete kill switch after one release (owner-approved 2026-11-18)", "review": "2026-12-19"},
+    "DYNASTYGM_NO_MARKET_FLOOR_V1": {"default": "on", "owner": "coridian_", "criterion": "delete kill switch after one release (owner-approved 2026-11-18)", "review": "2026-12-19"},
+    "DYNASTYGM_LIVE_DRAFT_CONTEXT_V1": {"default": "on", "owner": "coridian_", "criterion": "delete kill switch after one release", "review": "2026-12-19"},
+    "DYNASTYGM_PLAYOFF_ODDS_CONTEXT_V1": {"default": "on", "owner": "coridian_", "criterion": "delete kill switch after one release", "review": "2026-12-19"},
+    "DYNASTYGM_USAGE_ROLES_TARGETS_V1": {"default": "on", "owner": "coridian_", "criterion": "delete kill switch after one release", "review": "2026-12-19"},
+    "DYNASTYGM_EXPERIMENTAL_DECISION_MEMORY": {"default": "on", "owner": "coridian_", "criterion": "kill switch asked for in #232; keep", "review": "2027-02-19"},
+    "DYNASTYGM_EXPERIMENTAL_GM_TARGETS": {"default": "on", "owner": "coridian_", "criterion": "kill switch asked for in #232; keep", "review": "2027-02-19"},
+    "DYNASTYGM_EXPERIMENTAL_SHARE_CARDS": {"default": "on", "owner": "coridian_", "criterion": "kill switch asked for in #232; keep", "review": "2027-02-19"},
+    "DYNASTYGM_EXPERIMENTAL_TEAM_STANCE": {"default": "on", "owner": "coridian_", "criterion": "kill switch kept by design", "review": "2027-02-19"},
+    "DYNASTYGM_NEWS_VALUE_EVENTS": {"default": "off", "owner": "coridian_", "criterion": "flip ON only after a separate walk-forward backtest passes; queued", "review": "2026-12-19"},
+    "DYNASTYGM_COLLEGE_SCOUTING_CLASS_STRENGTH_SIGNAL": {"default": "off", "owner": "coridian_", "criterion": "flip ON only with a real scouting pool and a backtest; queued", "review": "2026-12-19"},
 }
