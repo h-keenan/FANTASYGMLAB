@@ -3,7 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 
+import { SLOW_REQUEST_MESSAGE } from './badDayCopy';
 import { env } from './env';
+import { withReadTimeout } from './requestTimeouts';
 
 // Same Supabase project as the web app (auth.users, profiles.entitlement) —
 // accounts and premium status carry over between web and mobile.
@@ -14,6 +16,8 @@ export const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: false,
   },
+  // The one place PostgREST reads get a client timeout (lib/requestTimeouts.ts); auth calls and writes pass through.
+  global: { fetch: withReadTimeout((input, init) => fetch(input, init), { message: SLOW_REQUEST_MESSAGE }) },
 });
 
 // autoRefreshToken's setTimeout is suspended by the OS while the app is

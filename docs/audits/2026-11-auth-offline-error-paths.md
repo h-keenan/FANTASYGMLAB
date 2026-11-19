@@ -74,7 +74,7 @@ Not done, by the boundary. For the cookie-session decision.
 ## Not fixed
 
 - **Unsaved input on a forced sign-out** (trade builder, notes, settings) is still lost; the user is now told why and the web returns them to the page. Preserving drafts needs a per-screen draft store (web and app); too broad for this pass and wants a product call on retention.
-- **No client timeout on PostgREST reads (`supabase.from`) or `billingRequest`.** They use browser or RN defaults. Wrapping them is a transport change across many call sites.
+- **Client timeouts on PostgREST reads and billing: done** (follow-up PR). `lib/requestTimeouts.ts` (twin): `withReadTimeout` wraps the one Supabase fetch on each platform (`lib/supabase.ts`); GET/HEAD to `/rest/v1/` give up after 15 s and resolve a 408 `{message, code: client_timeout}`, so postgrest-js returns `error.message` = "This is taking too long..." and the existing ErrorState + retry shows it. Writes and auth calls are never timed out. Billing (`billingClient.ts`, web only; the app has no billing request client): plan list 15 s; checkout, portal and account deletion keep 30 s and on timeout say "we cannot say whether that went through. Refresh the page to check your plan". Kill switch: constant `REQUEST_TIMEOUTS_ENABLED` (no client flag mechanism exists); false restores the old behaviour. Not timed out: all PostgREST writes (`update`/`insert`/`delete`), the three billing writes above (30 s limit unchanged, copy only).
 - **Stale-response overwrite** was sampled, not exhaustively audited across all screens (the app has many `useEffect` fetches).
 - **App connectivity is still request-inferred** (no NetInfo module; adding it needs a native build).
 - **No retry on 401** (see recommendation 1).

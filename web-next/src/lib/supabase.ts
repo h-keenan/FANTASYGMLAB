@@ -1,7 +1,9 @@
 import type { AuthChangeEvent, AuthClient as AuthClientClass, Session, Subscription } from "@supabase/auth-js";
 import { PostgrestClient } from "@supabase/postgrest-js";
 
+import { SLOW_REQUEST_MESSAGE } from "./badDayCopy";
 import { env } from "./env";
+import { withReadTimeout } from "./requestTimeouts";
 import { baseUrl, storageKey } from "./supabaseKeys";
 
 /**
@@ -157,7 +159,8 @@ const fetchWithSession: typeof fetch = async (input, init) => {
 
 const rest = new PostgrestClient(new URL("rest/v1", baseUrl).href, {
   schema: "public",
-  fetch: fetchWithSession,
+  // The one place PostgREST reads get a client timeout (lib/requestTimeouts.ts); writes are never timed out.
+  fetch: withReadTimeout(fetchWithSession, { message: SLOW_REQUEST_MESSAGE }),
 });
 
 export const supabase = {
