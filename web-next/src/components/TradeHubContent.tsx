@@ -1,4 +1,5 @@
 import { FreeLimitNote } from "@/components/FreeLimitNote";
+import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
 import { useHeaderContext } from "@/lib/headerContext";
 import Link from "next/link";
 import { ButtonLink } from "@/components/Button";
@@ -132,6 +133,7 @@ export function TradeHubContent({
         leagueName={leagueName}
         info={<TradeHubInfo sentence={data.posture_sentence} />}
       />
+      {data.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={data.sleeper_data_as_of} className="block text-xs" /> : null}
       {viewMode === "all_trades" ? (
         <AllTradesSection key={`${data.team_strategy}-${lens}`} leagueId={leagueId} leagueName={leagueName} strategy={data.team_strategy} lens={lens} />
       ) : (

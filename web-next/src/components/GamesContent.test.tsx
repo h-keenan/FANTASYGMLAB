@@ -91,6 +91,13 @@ function expandAll() {
 }
 
 describe("GamesContent season sim", () => {
+  it("labels the page with its age when the API served last-known provider data", async () => {
+    const stale = new Date(Date.now() - 20 * 60_000).toISOString();
+    vi.mocked(api.getGamesSeasonSim).mockResolvedValue(sim({ sleeper_data_as_of: stale }));
+    render(<GamesContent leagueId="9" leagueName="Test League" />);
+    expect((await screen.findByTestId("freshness-label"))).toHaveTextContent(/League data as of 2\dm ago \(may be behind\)/);
+  });
+
   it("shows my odds and the league table", async () => {
     vi.mocked(api.getGamesSeasonSim).mockResolvedValue(sim());
     render(<GamesContent leagueId="9" leagueName="Test League" />);

@@ -3,6 +3,7 @@ import { AppState, Pressable, RefreshControl, ScrollView, StyleSheet, View } fro
 import ManagerProfileModal from '../components/ManagerProfileModal';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
+import FreshnessLabel from '../components/FreshnessLabel';
 import TickNumber from '../components/TickNumber';
 import PageStatusLine from '../components/PageStatusLine';
 import ErrorState from '../components/ErrorState';
@@ -320,6 +321,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
         }
       >
         <PageFamilyTabs family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} padded={false} />
+        {matchup.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={matchup.sleeper_data_as_of} /> : null}
         <PageStatusLine
           context={
             <>

@@ -1,4 +1,5 @@
 import { verdictColorVar } from "@/lib/verdictToneCss";
+import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
 import { TERMS } from "@/lib/terms";
 import { PageTabBar } from "@/components/PageTabBar";
 import type { TabIconName } from "@/lib/tabIcons";
@@ -635,6 +636,7 @@ export function WaiversContent({
       <header className="flex flex-col gap-2">
         <div className="flex flex-col gap-1">
           <PageTitle page="Waivers" leagueName={leagueName} info={helpInfo} />
+          {data.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={data.sleeper_data_as_of} className="block text-xs" /> : null}
         </div>
         {/* ONE compact header module: summary "394 available · $81 FAAB · Need QB"; the stat strip, needs sentence,
             position badges, ranking notes, Sleeper link and injury cover are all inside, one tap away. Nothing was
