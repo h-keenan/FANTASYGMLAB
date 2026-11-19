@@ -44,6 +44,6 @@ Checked and fine: web `useSavedLeagues`, `useDefaultLeague`, `useTeamStatusData`
 
 - B on app stack screens (`WaiversScreen`, `DraftCenterScreen`, `PlayoffOddsPanel`, `TeamRosterScreen`, `TradeFinderScreen` roster, `TradeAnalyzerScreen` selections): no reset on in-place league change. Not reachable today because league switch uses `replace`; revisit if any switch path becomes `setParams`.
 - `DashboardAlerts` (web) `load()` unguarded; page remounts per league, so impact is nil.
-- `ShareToCommunityToggle` (app): switching off while a share is in flight can leave the trade public; needs a server-side compensating delete, left for follow-up.
+- `ShareToCommunityToggle` (app): switching off while a share is in flight can leave the trade public; fixed in the account-isolation follow-up: `lib/shareToggleFlow.ts` (web and app twin) serializes share and off, so an off during an in-flight share waits for the id and then removes the trade. Kill switch `SHARE_OFF_WINS_ENABLED`.
 - C (low): `fd:trade-outcome-prompt-dismissed` (web sessionStorage), `fgl:dashboard-seen-recs:<league>` and `fgl:trade-hub-seen:<league>` (app AsyncStorage) are not user-keyed; a second account on the same device inherits seen/dismissed state. No data exposure.
 - Checkout, billing portal, delete-account: not changed. Any guard there is a UI disable only.
