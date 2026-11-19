@@ -9374,7 +9374,7 @@ def answer_trade_outcome(
     else:
         patch = {"outcome": answer, "outcome_recorded_at": datetime.now(timezone.utc).isoformat()}
 
-    query = f"id=eq.{outcome_id}&user_id=eq.{user_id}"
+    query = f"id=eq.{account_store.pg_eq(outcome_id)}&user_id=eq.{user_id}"
     url = auth_supabase.rest_api_url(config, TRADE_OUTCOMES_TABLE, query)
     headers = auth_supabase.auth_headers(config, str(user.get("_access_token") or ""))
     headers["Prefer"] = "return=minimal"
@@ -9628,7 +9628,7 @@ def react_to_community_trade(
                 timeout=15,
             )
         else:
-            query = f"outcome_id=eq.{outcome_id}&user_id=eq.{user_id}&emoji=eq.{emoji}"
+            query = f"outcome_id=eq.{account_store.pg_eq(outcome_id)}&user_id=eq.{user_id}&emoji=eq.{account_store.pg_eq(emoji)}"
             headers["Prefer"] = "return=minimal"
             response = requests.delete(
                 auth_supabase.rest_api_url(config, community_trades.COMMUNITY_REACTIONS_TABLE, query),
@@ -11670,7 +11670,7 @@ def _fetch_gm_target_rows(
         access_token,
         gm_targets.TARGETS_TABLE,
         user_id=user_id,
-        extra_query=f"league_id=eq.{league_id}&select={select}&order=created_at.desc",
+        extra_query=f"league_id=eq.{account_store.pg_eq(league_id)}&select={select}&order=created_at.desc",
     )
 
 
@@ -11841,7 +11841,7 @@ def remove_gm_target(
         config,
         access_token,
         gm_targets.TARGETS_TABLE,
-        query=f"user_id=eq.{user_id}&league_id=eq.{league_id}&player_id=eq.{pid}",
+        query=f"user_id=eq.{user_id}&league_id=eq.{account_store.pg_eq(league_id)}&player_id=eq.{account_store.pg_eq(pid)}",
     )
     if not ok:
         return {"ok": False, "reason": "not_available"}
@@ -12079,7 +12079,7 @@ def delete_scouting_report(
         config,
         access_token,
         college_scouting.SCOUTING_REPORTS_TABLE,
-        query=f"user_id=eq.{user_id}&prospect_id=eq.{prospect_id}",
+        query=f"user_id=eq.{user_id}&prospect_id=eq.{account_store.pg_eq(prospect_id)}",
     )
     if not ok:
         return {"ok": False, "reason": "not_available"}
@@ -12130,7 +12130,7 @@ def remove_prospect_from_watchlist(
         config,
         access_token,
         college_scouting.WATCHLIST_TABLE,
-        query=f"user_id=eq.{user_id}&prospect_id=eq.{prospect_id}",
+        query=f"user_id=eq.{user_id}&prospect_id=eq.{account_store.pg_eq(prospect_id)}",
     )
     if not ok:
         return {"ok": False, "reason": "not_available"}
@@ -12759,7 +12759,7 @@ def _fetch_team_stance_uncached(config: dict, user_id: str, access_token: str, l
         access_token,
         team_stance.STANCE_TABLE,
         user_id=user_id,
-        extra_query=f"league_id=eq.{league_id}&select=stance&limit=1",
+        extra_query=f"league_id=eq.{account_store.pg_eq(league_id)}&select=stance&limit=1",
     )
     if error or not rows:
         return ""
@@ -12848,7 +12848,7 @@ def _fetch_draft_order_rule(config: dict, user_id: str, access_token: str, leagu
         access_token,
         team_stance.STANCE_TABLE,
         user_id=user_id,
-        extra_query=f"league_id=eq.{league_id}&select=draft_order_rule&limit=1",
+        extra_query=f"league_id=eq.{account_store.pg_eq(league_id)}&select=draft_order_rule&limit=1",
     )
     if error or not rows:
         return league_integrity.DRAFT_RULE_UNKNOWN

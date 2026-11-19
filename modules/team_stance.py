@@ -284,7 +284,7 @@ def fetch_stance_for_league(
         access_token,
         STANCE_TABLE,
         user_id=user_id,
-        extra_query=f"league_id=eq.{league_key}&select=stance&limit=1",
+        extra_query=f"league_id=eq.{account_store.pg_eq(league_key)}&select=stance&limit=1",
         timing_label="team_stance_fetch",
         timeout=8,
     )
