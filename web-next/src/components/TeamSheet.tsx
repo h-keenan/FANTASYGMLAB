@@ -25,6 +25,7 @@ import {
 const TONE_COLOR: Record<string, string> = {
   success: "var(--color-success)",
   danger: "var(--color-danger)",
+  warning: "var(--color-warning)",
   muted: "var(--color-text-secondary)",
   accent: "var(--color-accent)",
   premium: "var(--color-premium)",

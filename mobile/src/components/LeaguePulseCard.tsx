@@ -8,6 +8,7 @@ import TeamAvatar from './TeamAvatar';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { leaguePulseHighlights, type PulseTeam, type PulseTone } from '../lib/leaguePulse';
 import { spacing, type ThemeColors } from '../theme';
+import { toneColor as sharedToneColor } from '../lib/verdictToneTheme';
 
 /**
  * Shared "League Activity" tile (mirrors web-next's LeaguePulseCard, same
@@ -27,7 +28,7 @@ export default function LeaguePulseCard({
   const highlights = leaguePulseHighlights(teams);
   if (highlights.length === 0) return null;
   const toneColor = (tone: PulseTone) =>
-    tone === 'positive' ? colors.success : tone === 'negative' ? colors.danger : colors.textSecondary;
+    tone === 'positive' ? colors.success : tone === 'negative' ? sharedToneColor(colors, 'negative') : colors.textSecondary;
 
   return (
     <AnimatedCard style={styles.card} onPress={onPress} accessibilityLabel="League activity, open league recap">

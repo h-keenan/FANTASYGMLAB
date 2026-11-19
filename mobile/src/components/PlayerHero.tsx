@@ -280,8 +280,8 @@ function UsageTile({ trend, loading, locked }: { trend: UsageTrend | null; loadi
     );
   }
   const tone = usageTrendTone(trend);
-  const tint = tone === 'positive' ? colors.success : tone === 'danger' ? colors.danger : colors.textSecondary;
-  const background = tone === 'positive' ? colors.successMuted : tone === 'danger' ? colors.dangerMuted : undefined;
+  const tint = tone === 'positive' ? colors.success : tone === 'warning' ? colors.warning : colors.textSecondary;
+  const background = tone === 'positive' ? colors.successMuted : tone === 'warning' ? colors.warningMuted : undefined;
   const magnitude = Math.abs(trend.trend_pct);
   const confidence = sentenceCase(trend.confidence_label);
   const lit = usageConfidenceBars(trend.confidence_label);

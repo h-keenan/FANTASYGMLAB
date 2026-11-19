@@ -277,7 +277,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
 
 type ReasonIconKind = "up" | "down" | "spark";
 
-function ReasonPill({ label, kind, tone }: { label: string; kind: ReasonIconKind; tone: "accent" | "success" | "danger" }) {
+function ReasonPill({ label, kind, tone }: { label: string; kind: ReasonIconKind; tone: "accent" | "success" | "warning" | "danger" }) {
   const color = tone === "accent" ? "var(--color-accent)" : verdictColorVar(tone);
   const path = kind === "up" ? "M7 17 17 7M9 7h8v8" : kind === "down" ? "M7 7l10 10M17 9v8H9" : "M13 3 5 13h6l-1 8 8-10h-6z";
   return (
@@ -371,7 +371,7 @@ function RecommendedRow({
           {chips.map((chip) => (
             <ReasonPill key={chip} label={chip} kind="spark" tone="accent" />
           ))}
-          {flag ? <ReasonPill label={flag.label} kind={flag.tone === "positive" ? "up" : "down"} tone={flag.tone === "positive" ? "success" : "danger"} /> : null}
+          {flag ? <ReasonPill label={flag.label} kind={flag.tone === "positive" ? "up" : "down"} tone={flag.tone === "positive" ? "success" : "warning"} /> : null}
           {differentDrop ? <ReasonPill label={`Drop ${differentDrop.name}`} kind="down" tone="danger" /> : null}
         </span>
         </div>

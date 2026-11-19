@@ -19,7 +19,7 @@ test('next game, streak tone and season lines', () => {
   assert.equal(teamSheetNextGameLine({ week: 13, opponent: 'Rival' }), 'Week 13 vs Rival');
   assert.equal(teamSheetNextGameLine(null), '');
   assert.equal(teamSheetStreakTone('W12'), 'success');
-  assert.equal(teamSheetStreakTone('L2'), 'danger');
+  assert.equal(teamSheetStreakTone('L2'), 'warning');
   assert.equal(teamSheetSeasonLine({ wins: 9, losses: 3, ties: 0, place: 2, of: 12 }), '9-3 · #2 of 12');
 });
 

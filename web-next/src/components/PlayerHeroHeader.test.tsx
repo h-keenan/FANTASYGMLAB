@@ -38,9 +38,9 @@ describe("usageTrendTone", () => {
   it("is positive for rising usage", () => {
     expect(usageTrendTone(RISING)).toBe("positive");
   });
-  it("is danger for a confirmed decline (high confidence or a 20%+ drop)", () => {
-    expect(usageTrendTone(FALLING)).toBe("danger");
-    expect(usageTrendTone({ ...FALLING, confidence_label: "moderate confidence", trend_pct: -24 })).toBe("danger");
+  it("is warning (amber, never red) for a confirmed decline (high confidence or a 20%+ drop)", () => {
+    expect(usageTrendTone(FALLING)).toBe("warning");
+    expect(usageTrendTone({ ...FALLING, confidence_label: "moderate confidence", trend_pct: -24 })).toBe("warning");
   });
   it("is neutral, never green, for a mild moderate-confidence decline", () => {
     expect(usageTrendTone({ ...FALLING, confidence_label: "moderate confidence", trend_pct: -8 })).toBe("neutral");
@@ -69,11 +69,11 @@ describe("PlayerHeroHeader", () => {
     expect(screen.getByText("Contributor").closest(".pqv-archetype-pill")).not.toBeNull();
   });
 
-  it("colors a declining usage trend red, with a down arrow and the magnitude", () => {
+  it("colors a declining usage trend amber (never red), with a down arrow and the magnitude", () => {
     renderHero({ usageTrend: FALLING });
     const usage = screen.getByTestId("pqv-usage-tile");
-    expect(usage).toHaveAttribute("data-tone", "danger");
-    expect(usage.className).toContain("pqv-stat-tile--danger");
+    expect(usage).toHaveAttribute("data-tone", "warning");
+    expect(usage.className).toContain("pqv-stat-tile--warning");
     expect(usage).toHaveTextContent("▼ 37%");
   });
 

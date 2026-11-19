@@ -19,8 +19,8 @@ const TREND_GLYPH: Record<string, string> = { rising: "↑", stable: "→", cool
 const TREND_COLOR: Record<string, string> = {
   rising: "var(--color-success)",
   cooling: "var(--color-warning)",
-  fragile: "var(--color-danger)",
-  blocked: "var(--color-danger)",
+  fragile: "var(--color-warning)",
+  blocked: "var(--color-warning)",
 };
 
 export function ValueTable({

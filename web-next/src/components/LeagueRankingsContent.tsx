@@ -1,6 +1,6 @@
 "use client";
 
-import { percentColorVar } from "@/lib/verdictToneCss";
+import { percentColorVar, toneColorVar } from "@/lib/verdictToneCss";
 import { TERMS } from "@/lib/terms";
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
@@ -69,7 +69,7 @@ const ManagerProfileSheet = dynamic(() => import("@/components/ManagerProfileShe
  */
 
 function rankBadgeColor(tone: "positive" | "negative" | "neutral" = "neutral"): string {
-  return tone === "positive" ? "var(--color-success)" : tone === "negative" ? "var(--color-danger)" : "var(--color-text-muted)";
+  return tone === "positive" ? "var(--color-success)" : tone === "negative" ? toneColorVar("negative") : "var(--color-text-muted)";
 }
 
 /** Rank boards stay scannable: a row shows its first few badges, the rest as "+N". */

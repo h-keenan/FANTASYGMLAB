@@ -261,7 +261,7 @@ export function SimStandingsCard({ standings, onTab }: { standings: SimHomeRespo
             >
               <span className="text-xs font-extrabold tabular-nums" style={{ color: r.rank <= standings.playoff_spots ? "var(--color-success)" : "var(--color-text-muted)" }}>{r.rank}</span>
               <SimTeamLink teamId={r.team_id} name={r.name} isYou={r.is_you} size="chip" bold={r.is_you} />
-              <span className="text-xs tabular-nums" style={{ color: r.streak?.startsWith("W") ? "var(--color-success)" : r.streak?.startsWith("L") ? "var(--color-danger)" : "var(--color-text-muted)" }}>{r.streak ?? ""}</span>
+              <span className="text-xs tabular-nums" style={{ color: r.streak?.startsWith("W") ? "var(--color-success)" : r.streak?.startsWith("L") ? "var(--color-warning)" : "var(--color-text-muted)" }}>{r.streak ?? ""}</span>
               <span className="text-sm font-bold tabular-nums" title={label || undefined}>{simFmtRecord(r)}</span>
             </li>
           );

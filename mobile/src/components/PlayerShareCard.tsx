@@ -14,6 +14,7 @@ import { resolvePlayerTier } from '../lib/playerTier';
 import { overallRatingColor } from '../lib/percentile';
 import CircularProgressRing from './CircularProgressRing';
 import PlayerName from './PlayerName';
+import { toneColor } from '../lib/verdictToneTheme';
 
 // Same safety net as TradeShareCard's AVATAR_READY_TIMEOUT_MS — not the
 // fix, just a floor so a single hung headshot request can't leave the
@@ -126,7 +127,7 @@ const PlayerShareCard = forwardRef<View, {
             <View style={styles.statCell}>
               <AppText style={styles.statLabel}>USAGE TREND</AppText>
               <AppText
-                style={[styles.statValue, { color: usageTrend.direction === 'up' ? colors.successBright : colors.danger }]}
+                style={[styles.statValue, { color: usageTrend.direction === 'up' ? colors.successBright : toneColor(colors, 'negative') }]}
               >
                 {`${usageTrend.direction === 'up' ? '+' : '-'}${Math.abs(Math.round(usageTrend.trend_pct))}%`}
               </AppText>

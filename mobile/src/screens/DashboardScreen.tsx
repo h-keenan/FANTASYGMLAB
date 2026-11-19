@@ -80,6 +80,7 @@ import { formatRank, rankFill, winShare } from '../lib/percentile';
 import { getLastOpenedRecapId } from '../lib/recapSeen';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { toneColor } from '../lib/verdictToneTheme';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
@@ -1078,7 +1079,7 @@ function DashboardInsightRow({
   const { colors } = useThemeMode();
   const baseMeta = categoryMeta(colors)[item.category] ?? categoryMeta(colors).watch;
   const tagKind = watchTagKind(item);
-  const tagColor = tagKind === 'trending' ? (watchTrendDirection(item) === 'up' ? colors.success : colors.danger) : tagKind === 'injury' ? colors.premium : tagKind === 'waiver' ? colors.success : tagKind === 'bye' ? colors.premium : baseMeta.color;
+  const tagColor = tagKind === 'trending' ? (watchTrendDirection(item) === 'up' ? colors.success : toneColor(colors, 'negative')) : tagKind === 'injury' ? colors.premium : tagKind === 'waiver' ? colors.success : tagKind === 'bye' ? colors.premium : baseMeta.color;
   const meta = { ...baseMeta, label: WATCH_TAG_LABEL[tagKind] ?? baseMeta.label, color: tagColor };
   const routeName = DESTINATION_ROUTE[item.destination];
   const onActionPress = routeName

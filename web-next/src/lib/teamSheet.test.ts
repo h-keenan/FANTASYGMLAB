@@ -20,7 +20,7 @@ describe("teamSheet", () => {
     expect(teamSheetNextGameLine({ week: 13, opponent: "Rival" })).toBe("Week 13 vs Rival");
     expect(teamSheetNextGameLine(null)).toBe("");
     expect(teamSheetStreakTone("W12")).toBe("success");
-    expect(teamSheetStreakTone("L2")).toBe("danger");
+    expect(teamSheetStreakTone("L2")).toBe("warning");
     expect(teamSheetSeasonLine({ wins: 9, losses: 3, ties: 0, place: 2, of: 12 })).toBe("9-3 · #2 of 12");
   });
 

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { api, type LeagueTeamRankingsResponse, type TeamRanking } from "@/lib/api";
 import { TeamAvatar } from "@/components/TeamAvatar";
+import { toneColorVar } from "@/lib/verdictToneCss";
 
 /**
  * "League Pulse" Dashboard tile — named and deferred by DashboardContent.tsx's
@@ -88,7 +89,7 @@ export function leaguePulseHighlights(teams: TeamRanking[]): Highlight[] {
 
 function toneColor(tone: Highlight["tone"]): string {
   if (tone === "positive") return "var(--color-success)";
-  if (tone === "negative") return "var(--color-danger)";
+  if (tone === "negative") return toneColorVar("negative");
   return "var(--color-text-muted)";
 }
 

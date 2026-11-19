@@ -8,6 +8,7 @@ import { COLLAPSE_AFTER, type StatRowModel } from '../lib/statRows';
 import { radii, spacing, type ThemeColors } from '../theme';
 import GlassCard from './GlassCard';
 import { ProgressFill } from './Motion';
+import { toneColor } from '../lib/verdictToneTheme';
 
 export type ExploreHandler = (target: { key: string; label: string }) => void;
 
@@ -22,7 +23,7 @@ export function StatRow({ row, onExplore, first }: { row: StatRowModel; onExplor
   const styles = useMemo(() => createStyles(colors), [colors]);
   const tint = row.percentile != null ? percentileColor(Math.max(0, Math.min(100, row.percentile)), colors) : colors.textTertiary;
   const trendColor =
-    row.trendDirection === 'up' ? colors.success : row.trendDirection === 'down' ? colors.danger : colors.textTertiary;
+    row.trendDirection === 'up' ? colors.success : row.trendDirection === 'down' ? toneColor(colors, 'negative') : colors.textTertiary;
   const tappable = Boolean(row.explorerKey && onExplore);
   const body = (
     <View style={[styles.row, !first && styles.rowBorder]}>

@@ -62,4 +62,29 @@ describe("verdict colour guard", () => {
     expect(run('background: side === "give" ? "var(--color-danger)" : "var(--color-success)"')).toHaveLength(1);
     expect(run('background: side === "give" ? "var(--color-text-muted)" : "var(--color-success)"')).toHaveLength(0);
   });
+
+  it("flags a usage / role-flag / cold-streak / workload negative drawn red (audit C10)", () => {
+    const scanAs = (file: string, text: string) =>
+      JSON.parse(
+        execFileSync(
+          "node",
+          ["-e", `import(${JSON.stringify(script)}).then((m) => console.log(JSON.stringify(m.scanText(${JSON.stringify(file)}, ${JSON.stringify(text)}))))`],
+          { encoding: "utf8" },
+        ),
+      ) as string[];
+    // The old shapes: each was red and must fail.
+    expect(scanAs("x.tsx", "color={rising ? colors.success : colors.danger}")).toHaveLength(1);
+    expect(scanAs("x.tsx", "const tint = flag.tone === 'positive' ? colors.success : colors.danger;")).toHaveLength(1);
+    expect(scanAs("x.tsx", '<span className={`pqv-chip pqv-chip--${flag.tone === "positive" ? "positive" : "danger"}`}>')).toHaveLength(1);
+    expect(scanAs("x.tsx", "if (tone === 'negative') return colors.danger;")).toHaveLength(1);
+    expect(scanAs("x.tsx", 'if (tone === "negative") return "var(--color-danger)";')).toHaveLength(1);
+    expect(scanAs("x.tsx", "    cooling: colors.danger,")).toHaveLength(1);
+    expect(scanAs("x.tsx", 'return (streak ?? "").startsWith("W") ? "success" : "danger";')).toHaveLength(1);
+    expect(scanAs("lib/usageTrendPresentation.ts", "  if (highConfidence) return 'danger';")).toHaveLength(1);
+    // The fixed shapes pass.
+    expect(scanAs("x.tsx", "color={rising ? colors.success : toneColor(colors, 'negative')}")).toHaveLength(0);
+    expect(scanAs("x.tsx", 'if (tone === "negative") return toneColorVar("negative");')).toHaveLength(0);
+    expect(scanAs("x.tsx", "    cooling: colors.warning,")).toHaveLength(0);
+    expect(scanAs("lib/usageTrendPresentation.ts", "  if (highConfidence) return 'warning';")).toHaveLength(0);
+  });
 });

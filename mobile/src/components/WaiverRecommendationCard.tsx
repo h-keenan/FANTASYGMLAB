@@ -25,6 +25,7 @@ import { injuryTone } from '../lib/injuryDisplay';
 import { radii, spacing, type ThemeColors } from '../theme';
 import Money from './Money';
 import { Collapse } from './Presence';
+import { toneColor } from '../lib/verdictToneTheme';
 
 
 /** Same risk-vs-watch split WaiversScreen has always used, just relocated
@@ -161,7 +162,7 @@ function UsageFlagChip({ player }: { player: WaiverPriorityAdd }) {
   const { colors } = useThemeMode();
   const flag = player.usage_flag;
   if (!flag) return null;
-  const tint = flag.tone === 'positive' ? colors.success : colors.danger;
+  const tint = flag.tone === 'positive' ? colors.success : toneColor(colors, 'negative');
   return (
     <View style={chipStyles.row}>
       <View style={[chipStyles.chip, { borderColor: `${tint}70`, backgroundColor: `${tint}1A` }]}>
@@ -286,7 +287,7 @@ export default function WaiverRecommendationCard({
             score, rank or bid. Same copy as web's Top Waiver Target card. */}
         {player.usage_flag ? (
           <AppText style={styles.faabWhy}>
-            <AppText style={{ fontWeight: '700', color: player.usage_flag.tone === 'positive' ? colors.success : colors.danger }}>
+            <AppText style={{ fontWeight: '700', color: player.usage_flag.tone === 'positive' ? colors.success : toneColor(colors, 'negative') }}>
               {player.usage_flag.label}:{' '}
             </AppText>
             {player.usage_flag.explanation}
@@ -351,7 +352,7 @@ export default function WaiverRecommendationCard({
         </View>
         <View style={chipStyles.row}>
           {chips.map((chip) => pill(chip, chip, colors.accent, 'flash'))}
-          {flag ? pill('flag', flag.label, flag.tone === 'positive' ? colors.success : colors.danger, flag.tone === 'positive' ? 'trending-up' : 'trending-down') : null}
+          {flag ? pill('flag', flag.label, flag.tone === 'positive' ? colors.success : toneColor(colors, 'negative'), flag.tone === 'positive' ? 'trending-up' : 'trending-down') : null}
           {differentDrop ? pill('drop', `Drop ${differentDrop.name}`, colors.danger, 'trending-down') : null}
         </View>
       </PressableScale>
@@ -371,7 +372,7 @@ export default function WaiverRecommendationCard({
           {player.faab?.why ? <Money style={styles.faabWhy}>{player.faab.why}</Money> : null}
           {flag ? (
             <AppText style={styles.faabWhy}>
-              <AppText style={{ fontWeight: '700', color: flag.tone === 'positive' ? colors.success : colors.danger }}>{flag.label}: </AppText>
+              <AppText style={{ fontWeight: '700', color: flag.tone === 'positive' ? colors.success : toneColor(colors, 'negative') }}>{flag.label}: </AppText>
               {flag.explanation}
             </AppText>
           ) : null}

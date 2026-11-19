@@ -72,6 +72,20 @@ const TONE_KEY_RED = new RegExp(`${TONE_KEY.source}[^\\n]*?(?:${DANGER_TOKEN.sou
 const GRADE_TONE_FILE = /(managerTendencies|sharedTrades|leagueRecaps\w*|gradeTone\w*)\.(ts|tsx)$/;
 const TONE_KEY_DANGER_SLUG = new RegExp(`${TONE_KEY.source}[^\\n]*?["']danger["']`, "i");
 
+// Usage / role-flag / league-pulse / workload negatives (2026-11 free-pro audit C10): a falling usage trend, a shrinking-role flag, a
+// cold streak or a "cooling" workload is a caution, not a red verdict, so it reads amber / muted via toneToken (verdictTone.ts).
+//   11a. a ternary whose false branch is red on a usage / flag / pulse / trend / workload line (rising ? success : danger);
+//   11b. tone === "negative" mapped to the red token;
+//   11c. a workload word keyed to the red token (cooling: colors.danger);
+//   11d. a usage tone function returning "danger".
+const RED_TOKEN = /(["'`])danger\1|var\(--color-danger\)|\bcolors\.danger\b|pqv-chip--danger|pqv-stat-tile--danger/;
+const USAGE_WORDS = /\b(flag\.tone|usage_flag|usage\w*|pulse|workload\w*|trend\w*|trending\w*|rising|streak\w*)\b/i;
+const USAGE_FALSE_BRANCH_RED = new RegExp(`\\?[^:?]*:\\s*[^;]*?(?:${RED_TOKEN.source})`);
+const NEGATIVE_TONE_RED = new RegExp(`["']negative["']\\s*(?:\\?|\\)\\s*return)\\s*[^:]*?(?:${RED_TOKEN.source})`);
+const WORKLOAD_KEY_RED = new RegExp(`\\b(cooling|fragile|blocked|falling|declining|decreasing|shrinking)\\b["']?\\s*:\\s*[^,]*?(?:${RED_TOKEN.source})`);
+const USAGE_FILE = /(usage|Usage|playerQuickViewPresentation)/;
+const USAGE_TONE_RETURN_RED = /return\s+["']danger["']/;
+
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
     if (name === "node_modules" || name.startsWith(".")) continue;
@@ -89,6 +103,15 @@ export function scanText(rel, text) {
     if (OK.test(line) || (i > 0 && OK.test(lines[i - 1]))) return;
     if (TONE_KEY_RED.test(line) || (GRADE_TONE_FILE.test(rel) && TONE_KEY_DANGER_SLUG.test(line))) {
       problems.push(`${rel}:${i + 1}: a risk / decline tone maps to a red token (${line.trim().slice(0, 80)}); use toneToken from verdictTone.ts (risk is amber, never red)`);
+      return;
+    }
+    if (
+      (USAGE_WORDS.test(line) && USAGE_FALSE_BRANCH_RED.test(line)) ||
+      NEGATIVE_TONE_RED.test(line) ||
+      WORKLOAD_KEY_RED.test(line) ||
+      (USAGE_FILE.test(rel) && USAGE_TONE_RETURN_RED.test(line))
+    ) {
+      problems.push(`${rel}:${i + 1}: a usage / flag / pulse / workload negative is red (${line.trim().slice(0, 80)}); a decline is a caution: use toneToken / toneColorVar (amber), never red`);
       return;
     }
     if (LADDER.test(line)) {

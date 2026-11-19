@@ -1486,7 +1486,7 @@ a {
 }
 /* Usage tile tones follow the trend's real direction and severity
    (lib/playerQuickViewPresentation.ts usageTrendTone): semantic success /
-   danger tokens, neutral for a mild decline. */
+   warning tokens, neutral for a mild decline (never red). */
 .pqv-stat-tile--positive {
   border-color: color-mix(in srgb, var(--color-success) 55%, transparent);
   background: var(--color-success-soft);
@@ -1495,13 +1495,13 @@ a {
 .pqv-stat-tile--positive .pqv-stat-tile-confidence {
   color: var(--color-success);
 }
-.pqv-stat-tile--danger {
-  border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
-  background: var(--color-danger-soft);
+.pqv-stat-tile--warning {
+  border-color: color-mix(in srgb, var(--color-warning) 55%, transparent);
+  background: var(--color-warning-soft);
 }
-.pqv-stat-tile--danger .pqv-stat-tile-trend,
-.pqv-stat-tile--danger .pqv-stat-tile-confidence {
-  color: var(--color-danger);
+.pqv-stat-tile--warning .pqv-stat-tile-trend,
+.pqv-stat-tile--warning .pqv-stat-tile-confidence {
+  color: var(--color-warning);
 }
 .pqv-stat-tile--neutral .pqv-stat-tile-trend,
 .pqv-stat-tile--neutral .pqv-stat-tile-confidence {
@@ -1510,8 +1510,8 @@ a {
 .pqv-stat-tile--positive .pqv-stat-tile-divider {
   background: color-mix(in srgb, var(--color-success) 35%, transparent);
 }
-.pqv-stat-tile--danger .pqv-stat-tile-divider {
-  background: color-mix(in srgb, var(--color-danger) 35%, transparent);
+.pqv-stat-tile--warning .pqv-stat-tile-divider {
+  background: color-mix(in srgb, var(--color-warning) 35%, transparent);
 }
 .pqv-hero-footnote {
   grid-column: 1 / -1;
@@ -3869,7 +3869,7 @@ button.sr {
   border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border));
 }
 .sr-flag--negative {
-  border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
+  border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-border));
 }
 .sr-flag p,
 .sr-note {

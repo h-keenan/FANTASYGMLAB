@@ -265,7 +265,7 @@ function UsageTile({ trend, loading, locked }: { trend: UsageTrend | null; loadi
     );
   }
   // Same tone everywhere the trend reads: green rising, red for a
-  // confirmed decline, neutral for a mild one (usageTrendTone).
+  // confirmed decline (amber, never red), neutral for a mild one (usageTrendTone).
   const tone = usageTrendTone(trend);
   const magnitude = Math.abs(trend.trend_pct);
   const confidence = sentenceCase(trend.confidence_label);
