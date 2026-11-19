@@ -381,6 +381,38 @@ def apply_trade_hub_featured_diversity(
     return selected + filled_tail
 
 
+HUB_EDGE_ORDER_ENV_KEY = "DYNASTYGM_HUB_EDGE_ORDER_V1"
+# Partner loss (share of what they give up) at or under this is acceptance-likely: it is the engine's own
+# PARTNER_EDGE_SOFT_RATIO, below which partner_acceptance_context applies no realism penalty.
+EDGE_ORDER_ACCEPT_RATIO = 0.04
+
+
+def hub_edge_order_enabled() -> bool:
+    """Order the Trade Hub list by market-value edge inside the acceptable ideas. Default ON; 0/false/off restores
+    the previous ``priority``-based order exactly."""
+
+    from modules import experimental_graduation
+
+    return experimental_graduation.graduated_kill_switch_enabled(HUB_EDGE_ORDER_ENV_KEY, default=True)
+
+
+def _edge_order_keys(idea: Mapping) -> tuple[int, int]:
+    """(acceptance-likely, market edge). An idea with no partner-loss or market-edge field sorts as acceptable
+    with a zero edge, so records that do not carry them keep their established order."""
+
+    try:
+        ratio = float(idea.get("user_edge_ratio"))
+    except (TypeError, ValueError):
+        ratio = 0.0
+    if ratio != ratio:
+        ratio = 0.0
+    try:
+        edge = int(idea.get("market_edge") or 0)
+    except (TypeError, ValueError):
+        edge = 0
+    return (1 if ratio <= EDGE_ORDER_ACCEPT_RATIO else 0, edge)
+
+
 def order_trade_hub_visible_ideas(ideas: list[dict]) -> list[dict]:
     """Defensive presentation sort: highest executive usefulness first.
 
@@ -399,13 +431,27 @@ def order_trade_hub_visible_ideas(ideas: list[dict]) -> list[dict]:
 
     from modules import trade_posture
 
+    edge_order = hub_edge_order_enabled()
+
     def _presentation_key(idea: dict) -> tuple:
         # Team posture first (modules.trade_posture.sort_rank): ideas that fit
         # the team's status lead, ideas that cost it trail. Ungraded ideas are
         # neutral, so the established surface key decides as before.
+        surface = _trade_surface_sort_key(idea)
+        if edge_order:
+            # DYNASTYGM_HUB_EDGE_ORDER_V1: after readiness / tier / confidence, ideas the partner can accept come
+            # first and, among them, the largest market-value edge for the user. The engine's own
+            # priority / trade_gain carry no outcome signal (replay audit); they stay as late tie-breaks.
+            return (
+                *trade_posture.sort_rank(idea),
+                *surface[:3],
+                *_edge_order_keys(idea),
+                *surface[3:],
+                int(idea.get("trade_gain") or 0),
+            )
         return (
             *trade_posture.sort_rank(idea),
-            *_trade_surface_sort_key(idea),
+            *surface,
             int(idea.get("trade_gain") or 0),
         )
 
