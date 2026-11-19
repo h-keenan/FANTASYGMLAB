@@ -3,7 +3,7 @@ from typing import Dict, Any, Iterable, List, Mapping, Optional
 import numpy as np
 import pandas as pd
 
-from modules import runtime_trace
+from modules import age_profile, runtime_trace
 from modules.rank_tie_metadata import add_rank_tie_metadata
 from modules.record_signal import blend_percentile_with_record, season_progress_fraction
 from modules.sleeper import get_league_roster_profiles
@@ -244,11 +244,11 @@ def _classify_team_strategy(
     if pct >= 0.82:
         return "contender"
     if pct >= 0.62:
-        return "retool" if age_delta >= 1.25 else "fringe_contender"
+        return "retool" if age_delta >= age_profile.TEAM_OLDER_RETOOL_DELTA_YEARS else "fringe_contender"
     if pct >= 0.38:
         return "retool"
     if pct >= 0.18:
-        return "tank" if age_delta >= 1.0 else "rebuild"
+        return "tank" if age_delta >= age_profile.TEAM_OLDER_TANK_DELTA_YEARS else "rebuild"
     return "tank"
 
 

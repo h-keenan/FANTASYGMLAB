@@ -51,7 +51,7 @@ SWAP_MIN_GAIN_SHARE = 0.01
 YOUTH_PROTECTION = posture_model.YOUTH_PROTECTION
 # Reference window-opening age the legacy YOUTH_PROTECTION ages were tuned against
 # (the skill-position prime window opens around 23).
-YOUTH_RUNWAY_BASE_AGE = 23.0
+YOUTH_RUNWAY_BASE_AGE = age_profile.YOUTH_RUNWAY_BASE_AGE
 CANDIDATES_PER_ADD = 6
 FREE_STANDALONE_LIMIT = 2
 MAX_STANDALONE = 8

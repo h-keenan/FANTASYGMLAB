@@ -5,6 +5,7 @@ from typing import Any, Iterable, Mapping
 
 import pandas as pd
 
+from modules import age_profile
 from modules import season_clock
 from modules import injury_status as injury_table
 from modules import league_format_context, sleeper
@@ -987,7 +988,7 @@ def apply_draft_pool_filter(df_players: pd.DataFrame, draft_context: dict | None
         rookie_like = pool[years_exp <= 1].copy()
         if len(rookie_like) >= 20:
             return rookie_like
-    rookie_like = pool[(years_exp <= 1) | ((years_exp <= 2) & (ages <= 24))].copy()
+    rookie_like = pool[(years_exp <= 1) | ((years_exp <= 2) & (ages <= age_profile.YOUNG_UPSIDE_MAX_AGE))].copy()
     return rookie_like if len(rookie_like) >= 20 else pool
 
 

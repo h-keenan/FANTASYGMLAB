@@ -30,7 +30,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
-from modules import runtime_trace
+from modules import age_profile, runtime_trace
 from modules.frame_records import frame_records
 from modules import trade_grade
 from modules.team_eval import REPLACEMENT_LEVEL
@@ -856,23 +856,23 @@ def evaluate_trade_analyzer_fit(
     age_component = 0
     if age_delta is not None:
         if strategy_key in {"rebuild", "tank"}:
-            if age_delta <= -0.4:
+            if age_delta <= age_profile.FIT_REBUILD_YOUNGER_STRONG_DELTA:
                 age_component = 2
             elif age_delta < 0:
                 age_component = 1
-            elif age_delta >= 0.5:
+            elif age_delta >= age_profile.FIT_REBUILD_OLDER_STRONG_DELTA:
                 age_component = -2
             elif age_delta > 0:
                 age_component = -1
         elif strategy_key in {"contender", "fringe_contender"}:
-            if lineup_delta >= 120 and age_delta <= 0.6:
+            if lineup_delta >= 120 and age_delta <= age_profile.FIT_CONTENDER_OK_OLDER_DELTA:
                 age_component = 1
-            elif age_delta >= 0.8 and lineup_delta <= 0:
+            elif age_delta >= age_profile.FIT_CONTENDER_BAD_OLDER_DELTA and lineup_delta <= 0:
                 age_component = -1
         else:
-            if age_delta <= -0.35:
+            if age_delta <= age_profile.FIT_RETOOL_YOUNGER_DELTA:
                 age_component = 1
-            elif age_delta >= 0.75 and lineup_delta <= 0:
+            elif age_delta >= age_profile.FIT_RETOOL_OLDER_DELTA and lineup_delta <= 0:
                 age_component = -1
 
     draft_component = 0
@@ -1004,7 +1004,7 @@ def evaluate_trade_analyzer_fit(
             strategy_parts.append("adds future draft capital")
         if age_delta is not None and age_delta < 0:
             strategy_parts.append("gets the roster younger")
-        elif age_delta is not None and age_delta > 0.4:
+        elif age_delta is not None and age_delta > age_profile.FIT_NOTE_OLDER_DELTA:
             strategy_parts.append("pushes the roster older")
         if incoming_major_injuries and receive_pick_value > send_pick_value:
             strategy_parts.append("can absorb a longer injury timeline")
@@ -1066,7 +1066,7 @@ def evaluate_trade_analyzer_fit(
         negatives.append(f"thins {' / '.join(depth_losses[:2])} depth")
     if send_pick_value > receive_pick_value:
         negatives.append("spends future draft capital")
-    if age_delta is not None and age_delta > 0.6:
+    if age_delta is not None and age_delta > age_profile.FIT_NEGATIVE_OLDER_DELTA:
         negatives.append("ages the roster up")
     if incoming_major_injuries or incoming_moderate_injuries:
         negatives.append("brings back injured production")

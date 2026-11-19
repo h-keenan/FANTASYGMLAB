@@ -275,6 +275,7 @@ from modules import (
     weekly_box_scores,
     weekly_roundup,
 )
+from modules import age_profile
 from modules import decision_log
 from modules import derived_cache
 from modules import swr_cache
@@ -10108,13 +10109,13 @@ def _quick_view_identity(player_id: str, row: pd.Series | None) -> dict[str, Any
     if raw_age is not None:
         try:
             parsed = float(raw_age)
-            if 0 < parsed < 99:
+            if 0 < parsed < age_profile.UNKNOWN_AGE_SENTINEL:
                 age = int(parsed)
         except (TypeError, ValueError):
             age = None
     if age is None:
         raw_dir_age = directory.get("age")
-        if isinstance(raw_dir_age, (int, float)) and 0 < raw_dir_age < 99:
+        if isinstance(raw_dir_age, (int, float)) and 0 < raw_dir_age < age_profile.UNKNOWN_AGE_SENTINEL:
             age = int(raw_dir_age)
         else:
             birth = str(directory.get("birth_date") or "").strip()[:10]
@@ -17629,7 +17630,7 @@ def _secondary_waiver_sections(
     age_numeric = pd.to_numeric(free_agents.get("age"), errors="coerce").fillna(99)
     upside_labels = {"Backup With Upside", "Starter At Risk", "Committee Back"}
     opportunity = free_agents.get("opportunity_label", pd.Series("", index=free_agents.index)).fillna("")
-    stash_mask = ((age_numeric <= 24) | opportunity.isin(upside_labels)) & ~is_non_skill
+    stash_mask = ((age_numeric <= age_profile.YOUNG_UPSIDE_MAX_AGE) | opportunity.isin(upside_labels)) & ~is_non_skill
     stash_df = free_agents[stash_mask & ~pid.isin(priority_ids)].drop_duplicates(subset=["player_id"]).head(6)
     seen_after_stash = priority_ids | set(stash_df["player_id"].astype(str))
     # Stable partition: skill players first, K/DEF only as a fallback.

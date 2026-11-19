@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping, Sequence
 
-from modules import experimental_graduation
+from modules import age_profile, experimental_graduation
 
 ENV_KEY = "DYNASTYGM_USAGE_ROLES_TARGETS_V1"
 TARGET_POINTS = 1.5
@@ -119,7 +119,7 @@ def adjustment(
             continue
         fills = str(asset.get("position") or "").upper() in needs
         wants = strategy in {"contender", "fringe_contender"} or (
-            strategy in {"rebuild", "tank"} and 0 < _age(asset) <= 25
+            strategy in {"rebuild", "tank"} and age_profile.at_most(_age(asset), age_profile.REBUILD_TARGET_MAX_AGE)
         )
         if fills or wants:  # the flag plus one more real factor
             points += TARGET_POINTS * (1.0 if fills and wants else 0.75)

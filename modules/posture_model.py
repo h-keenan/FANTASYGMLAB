@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
+from modules import age_profile
+
 POSTURES: tuple[str, ...] = ("contender", "fringe_contender", "retool", "rebuild", "tank")
 
 # --- starter strength (trade_grade): how much a real lineup point is worth beyond market, by posture -------------------
@@ -199,12 +201,17 @@ def youth_points(curve: AgeCurve) -> tuple[tuple[float, float], ...]:
 
 # --- drop_candidates: young-upside protection ---------------------------------------------------------------------------
 # (max age for skill players, QB age bump, minimum healthy value as a share of the high-value threshold).
+# The max age is the age_profile window-opening reference (``YOUTH_RUNWAY_BASE_AGE``) plus a posture-tuned runway in
+# years: a rebuild protects a longer youth runway than a contender. ``drop_candidates`` measures the same runway from
+# each position's real window start (``age_profile.runway_ok``); the absolute age is only the no-curve fallback.
+YOUTH_RUNWAY_YEARS: dict[str, float] = {"tank": 3.0, "rebuild": 2.0, "retool": 1.0, "fringe_contender": 0.0, "contender": 0.0}
+_BASE = age_profile.YOUTH_RUNWAY_BASE_AGE
 YOUTH_PROTECTION: dict[str, tuple[float, float, float]] = {
-    "tank": (26.0, 1.0, 0.10),
-    "rebuild": (25.0, 2.0, 0.12),
-    "retool": (24.0, 2.0, 0.20),
-    "fringe_contender": (23.0, 2.0, 0.28),
-    "contender": (23.0, 2.0, 0.35),
+    "tank": (_BASE + YOUTH_RUNWAY_YEARS["tank"], 1.0, 0.10),
+    "rebuild": (_BASE + YOUTH_RUNWAY_YEARS["rebuild"], 2.0, 0.12),
+    "retool": (_BASE + YOUTH_RUNWAY_YEARS["retool"], 2.0, 0.20),
+    "fringe_contender": (_BASE + YOUTH_RUNWAY_YEARS["fringe_contender"], 2.0, 0.28),
+    "contender": (_BASE + YOUTH_RUNWAY_YEARS["contender"], 2.0, 0.35),
 }
 
 # --- trade_ideas: what posture thinks of the user's own pick sales --------------------------------------------------------
