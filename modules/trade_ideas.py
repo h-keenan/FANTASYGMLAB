@@ -507,11 +507,35 @@ def _pick_range_projection(
     }
 
 
+# Trade-advice pick audit (2026-11-18): the early-1st base (4,200, the realized
+# slot-1..4 rookie value) sat ~13% below the market's early 1st (FantasyCalc 2027
+# Early 1st 4,588; DynastyProcess-ECR-implied ~5,100) and early-1st trades were
+# the worst-calibrated pick shape (AUC 0.516 lineup / 0.517 over replacement).
+# Raising it to 4,900 lifted that AUC to 0.538 / 0.541 in 2023-2025 and
+# 0.604 -> 0.622 (lineup) in the 2021-2022 holdout. Applied here, the single
+# place every surface's pick value is built from, so Grade, Finder, Analyzer and
+# Hub move together. Default ON; 0/false/no/off restores 4,200.
+EARLY_FIRST_TOP_END_ENV_KEY = "DYNASTYGM_EARLY_FIRST_TOP_END_V1"
+EARLY_FIRST_TOP_END_BASE = 4900
+
+
+def early_first_top_end_enabled() -> bool:
+    from modules.app_config import config_value
+
+    return config_value(EARLY_FIRST_TOP_END_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
+
+
+def _pick_tier_base(round_num: int, bucket: str) -> float:
+    if round_num == 1 and bucket == "early" and early_first_top_end_enabled():
+        return float(EARLY_FIRST_TOP_END_BASE)
+    return float(_round_tier_base_value(round_num, bucket))
+
+
 def _weighted_pick_base_value(round_num: int, bucket_probabilities: Dict[str, float]) -> float:
     probabilities = _normalize_bucket_probabilities(bucket_probabilities)
     return float(
         sum(
-            _round_tier_base_value(round_num, bucket) * probability
+            _pick_tier_base(round_num, bucket) * probability
             for bucket, probability in probabilities.items()
         )
     )
