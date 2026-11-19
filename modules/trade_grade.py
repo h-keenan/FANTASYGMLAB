@@ -603,7 +603,14 @@ def healthy_restore_factor(row: Mapping[str, Any] | None, score_field: str) -> f
     rank = 1 if _number(rank, 0) <= 0 else rank
     healthy_risk = risk_multiplier("active", team, rank, "")
     healthy_current = current_availability_multiplier("active", team, rank, "")
-    dyn_ratio = risk_multiplier(status, team, rank, injury_status) / healthy_risk if healthy_risk else 1.0
+    # Undo exactly what the valuation applied: the row's own risk_multiplier (age-aware, and whichever injury model was active when it
+    # was built, legacy curve or horizon model). Recomputing it here without the player's age drifted from it once the horizon model
+    # (DYNASTYGM_INJURY_HORIZON_V1) removed the flat severity factor. Rows without a usable value fall back to the recomputation.
+    applied_risk = _number(row.get("risk_multiplier"), 0.0)
+    if applied_risk > 0 and healthy_risk and injury_level(status, injury_status) != "healthy":
+        dyn_ratio = applied_risk / healthy_risk
+    else:
+        dyn_ratio = risk_multiplier(status, team, rank, injury_status) / healthy_risk if healthy_risk else 1.0
     cur_ratio = (
         current_availability_multiplier(status, team, rank, injury_status) / healthy_current
         if healthy_current

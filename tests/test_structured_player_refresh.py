@@ -194,11 +194,20 @@ def test_persisted_healthy_to_sleeper_q_local_patch():
     patched = _refresh(frame, _sleeper_room(starter_injury="Questionable"))
     starter = patched.set_index("player_id").loc["rb1"]
     assert injury_level(starter["status"], starter["injury_status"]) == "minor"
+    # Legacy: the flat minor factor. Horizon model: games-lost cost (still below healthy).
     assert float(starter["injury_multiplier"]) == pytest.approx(
-        injury_multiplier("Active", "Questionable")
+        rankings.injury_multiplier_for_age("Active", "Questionable", starter.get("age"))
     )
+    assert float(starter["injury_multiplier"]) < 1.0
     assert float(starter["risk_multiplier"]) < 1.0
     assert int(starter["score"]) != int(frame.set_index("player_id").loc["rb1", "score"])
+
+
+def test_persisted_healthy_to_sleeper_q_local_patch_legacy_flat_factor(monkeypatch):
+    monkeypatch.setenv("DYNASTYGM_INJURY_HORIZON_V1", "0")
+    patched = _refresh(_rb_room(), _sleeper_room(starter_injury="Questionable"))
+    starter = patched.set_index("player_id").loc["rb1"]
+    assert float(starter["injury_multiplier"]) == pytest.approx(injury_multiplier("Active", "Questionable"))
 
 
 def test_q_to_out_updates_immediately():

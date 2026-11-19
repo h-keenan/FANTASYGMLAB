@@ -121,7 +121,8 @@ def test_injury_cost_is_capped_well_below_a_permanent_loss():
     assert cost == round(6000 * trade_grade.INJURY_COST_CAP_SHARE)
 
 
-def test_healthy_restore_only_undoes_a_discount_the_valuation_applied():
+def test_healthy_restore_only_undoes_a_discount_the_valuation_applied(monkeypatch):
+    monkeypatch.setenv("DYNASTYGM_INJURY_RETURN_CURVES_V1", "0")  # exact static-table numbers; the fitted path is the companion below
     assert trade_grade.healthy_restore_factor({"status": "Active", "injury_status": "Out", "team": "LAC"}, "dynasty_score") == 1.0
     row = {"status": "Active", "injury_status": "Out", "team": "LAC", "search_rank": 35, "risk_multiplier": 0.8}
     # 90% of the composite carries the 0.80 Out multiplier, opportunity does not.
@@ -130,6 +131,21 @@ def test_healthy_restore_only_undoes_a_discount_the_valuation_applied():
     assert trade_grade.healthy_restore_factor(lensed, "value_score") == pytest.approx(0.72)
     healthy = dict(row, injury_status="")
     assert trade_grade.healthy_restore_factor(healthy, "dynasty_score") == 1.0
+
+
+def test_healthy_restore_undoes_exactly_what_the_active_injury_model_applied(monkeypatch):
+    from modules import rankings
+
+    row = {"status": "Active", "injury_status": "Out", "team": "LAC", "search_rank": 35, "risk_multiplier": 0.8, "league_settings_multiplier": 1.0}
+    for flag in ("0", "1"):
+        monkeypatch.setenv("DYNASTYGM_INJURY_RETURN_CURVES_V1", flag)
+        monkeypatch.setenv("DYNASTYGM_INJURY_HORIZON_V1", flag)
+        # Redraft lens: the restore divides by the same current-availability multiplier the valuation multiplied by.
+        applied = rankings.current_availability_multiplier("Active", "LAC", 35, "Out")
+        assert trade_grade.healthy_restore_factor(row, "value_score") == pytest.approx(applied)
+        # Dynasty: the row's own (age-aware, active-model) risk multiplier is what gets undone, whatever the model.
+        assert trade_grade.healthy_restore_factor(row, "dynasty_score") == pytest.approx(0.9 * 0.8 + 0.1)
+    assert trade_grade.healthy_restore_factor(row, "value_score") == pytest.approx(0.3509, abs=1e-4)
 
 
 # --- consolidation -----------------------------------------------------------------
