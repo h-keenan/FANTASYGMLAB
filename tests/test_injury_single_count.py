@@ -8,6 +8,13 @@ from modules import league_value_settings as lvs
 from modules import rankings
 
 FLAG = rankings.INJURY_SINGLE_COUNT_ENV_KEY
+
+
+@pytest.fixture(autouse=True)
+def _legacy_injury_curves(monkeypatch):
+    # These pins are the single-count change in isolation; the horizon model and fitted return curves have their own tests.
+    monkeypatch.setenv(rankings.INJURY_HORIZON_ENV_KEY, "0")
+    monkeypatch.setenv(rankings.injury_return_curves.ENV_KEY, "0")
 LEGACY = {"0", "false", "off", "no"}
 
 

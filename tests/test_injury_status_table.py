@@ -82,7 +82,8 @@ def test_dnr_and_cov_are_out_everywhere():
         assert rankings.injury_level("Active", tag) == "moderate"
 
 
-def test_rankings_wrappers_delegate_to_the_table():
+def test_rankings_wrappers_delegate_to_the_table(monkeypatch):
+    monkeypatch.setenv("DYNASTYGM_INJURY_RETURN_CURVES_V1", "0")  # the static-table path; the fitted curves are tested in test_injury_return_curves.py
     for status, tag in [("Active", "Out"), ("Active", "IR"), ("Active", "Doubtful"), ("Active", "Questionable"),
                         ("Inactive", ""), ("Active", "Sus"), ("Active", "NA"), ("Injured Reserve", "")]:
         assert rankings.injury_level(status, tag) == table.category(status, tag)
