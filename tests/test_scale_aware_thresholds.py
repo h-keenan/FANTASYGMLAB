@@ -159,3 +159,41 @@ def test_flag_off_hub_is_not_scale_invariant_which_is_the_defect_this_fixes():
         half = support.selection(support.hub_ideas(spec, "contender", 0.5, flag=False))
         differs += base != half
     assert differs >= 1
+
+
+def _at_suggestion_bar(idea, slack):
+    """The idea's Analyzer trade score sits within ``slack`` points of the "essentially even" rung it must clear."""
+
+    from modules import trade_value_bands
+
+    edge = trade_value_bands.cuts_for(max(idea["my_score"] or 0, idea["their_score"] or 0)).edge
+    return abs((idea["analyzer"] or 0) + edge) <= slack
+
+
+@pytest.mark.parametrize("k", [0.5, 2.0])
+def test_flag_on_deep_idea_set_is_invariant_except_at_the_suggestion_bar_rounding(k):
+    """The 40-deep set is identical except where integer rounding decides.
+
+    Cause (proved, see docs/audits/2026-11-scale-aware-thresholds.md): the Analyzer's trade score is an int, so an idea
+    sitting within a point of the suggestion bar can land on either side of it once every value is halved or doubled
+    (e.g. -268 vs a -267 bar in the base league, -133 vs a -133.4 bar in the x0.5 league). One such flip then displaces
+    the idea at the 40th place. So: every difference is a bar-rounding idea or the idea it displaced, and ideas that
+    are not at the bar must match exactly.
+    """
+
+    slack = max(1.5, 1.5 * k)
+    for spec in (support.SPECS[0], support.SPECS[1], support.SPECS[5]):
+        for posture in support.POSTURES:
+            base = support.hub_ideas(spec, posture, flag=True, max_ideas=40)
+            rescaled = support.hub_ideas(spec, posture, k, flag=True, max_ideas=40)
+            assert base and len(base) == len(rescaled), f"{spec[0]}|{posture} x{k}"
+            by_base = {support.selection([i])[0]: i for i in base}
+            by_rescaled = {support.selection([i])[0]: i for i in rescaled}
+            only_base = [by_base[key] for key in by_base.keys() - by_rescaled.keys()]
+            only_rescaled = [by_rescaled[key] for key in by_rescaled.keys() - by_base.keys()]
+            assert len(only_base) == len(only_rescaled), f"{spec[0]}|{posture} x{k}"
+            at_bar = sum(_at_suggestion_bar(i, slack) for i in only_base) + sum(
+                _at_suggestion_bar(i, slack * (k if k < 1 else 1)) for i in only_rescaled
+            )
+            # each swap is one bar-rounding idea plus the idea it displaced at the cut
+            assert len(only_base) + len(only_rescaled) <= 2 * at_bar, f"{spec[0]}|{posture} x{k}: {only_base} {only_rescaled}"

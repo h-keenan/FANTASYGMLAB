@@ -74,11 +74,15 @@ def _scaled_players(players: pd.DataFrame, k: float) -> pd.DataFrame:
     players = players.copy()
     for col in players.columns:
         if pd.api.types.is_numeric_dtype(players[col]) and (col.endswith("_score") or col in SCORE_COLS):
-            # Engine scores are ints: start from even whole numbers so x0.5 stays whole and the rescaled league is an
-            # exact copy of the base one (otherwise int() truncation at a cutoff would be a rounding artefact).
-            even = (players[col] // 4) * 4
-            players[col] = even * k if k != 1.0 else even
+            players[col] = _quantize(players[col]) * k
     return players
+
+
+def _quantize(values):
+    """Engine scores are ints. Multiples of 4 stay whole numbers under x0.5 and x2, so the rescaled league is an exact
+    copy of the base one and int() rounding at a cutoff cannot masquerade as an unscaled threshold."""
+
+    return (values // 4) * 4
 
 
 def hub_ideas(spec, posture: str, k: float = 1.0, *, flag: bool, max_ideas: int = 8) -> list[dict]:
@@ -91,19 +95,29 @@ def hub_ideas(spec, posture: str, k: float = 1.0, *, flag: bool, max_ideas: int 
     with mock.patch.dict(os.environ, {FLAG: "1" if flag else "0"}):
         fx = build_fixture(FixtureSpec(label, teams, size, qbf, te_premium=tep, strategy="contender"))
         fx["settings"] = dict(fx["settings"], current_week=8)
-        pool = trade_hub_engine.apply_strategy_age_curve(_scaled_players(fx["players"], k), posture, "value_score")
+        curved = trade_hub_engine.apply_strategy_age_curve(fx["players"], posture, "value_score")
+        pool = _scaled_players(curved, k)  # age curve first, then the uniform rescale (the curve rounds to ints)
         fx["summary"] = _scaled_players(fx["summary"], k)
-        multiplier = trade_hub_engine.strategy_adjusted_pick_score_multiplier(1.0, posture) * k
+        posture_multiplier = trade_hub_engine.strategy_adjusted_pick_score_multiplier(1.0, posture)
+        real_pick_asset = trade_ideas._pick_asset
+
+        def pick_asset(pick, score_multiplier=1.0):
+            asset = real_pick_asset(pick, score_multiplier=posture_multiplier)
+            asset["score"] = int(_quantize(asset["score"]) * k)  # same rounding discipline as the players
+            return asset
+
         trade_ideas.clear_team_shape_memos()
-        hub = trade_ideas._build_trade_ideas_impl(
-            pool, "fixture-league", fx["summary"], 1, [], [], {}, max_ideas=max_ideas, score_field="value_score",
-            pick_score_multiplier=multiplier, team_strategy=posture, league_settings=fx["settings"],
-            draft_status={"draft_year": 2026, "current_year_picks_active": True}, adapter=fx["adapter"],
-        )
+        with mock.patch.object(trade_ideas, "_pick_asset", pick_asset):
+            hub = trade_ideas._build_trade_ideas_impl(
+                pool, "fixture-league", fx["summary"], 1, [], [], {}, max_ideas=max_ideas, score_field="value_score",
+                pick_score_multiplier=posture_multiplier, team_strategy=posture, league_settings=fx["settings"],
+                draft_status={"draft_year": 2026, "current_year_picks_active": True}, adapter=fx["adapter"],
+            )
     return [
         {"send": [str(a.get("player_id") or a.get("label") or "") for a in idea.get("send_assets") or ()],
          "receive": [str(a.get("player_id") or a.get("label") or "") for a in idea.get("receive_assets") or ()],
-         "my_score": idea.get("my_score"), "their_score": idea.get("their_score"), "gain": idea.get("trade_gain")}
+         "my_score": idea.get("my_score"), "their_score": idea.get("their_score"), "gain": idea.get("trade_gain"),
+         "analyzer": idea.get("analyzer_trade_score")}
         for idea in hub
     ]
 

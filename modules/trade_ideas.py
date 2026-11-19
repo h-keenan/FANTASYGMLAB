@@ -2108,8 +2108,11 @@ def partner_acceptance_context(
     # The absolute floor keeps tiny trades from failing on a handful of points,
     # but it may never let the partner lose more than the hard ceiling.
     def _allowed(edge_cap: float) -> int:
-        out = max(_vs(PARTNER_EDGE_MIN_ABS), int(round(edge_cap * max(0, receive_score))))
-        return min(out, int(round(PARTNER_EDGE_HARD_CEILING * max(0, receive_score))))
+        # Flag ON keeps the allowed edge unrounded: rounding a derived points figure to a whole number moves a trade
+        # across the cap on a half-point, which breaks invariance to a uniform rescale of the league's values.
+        whole = (lambda x: x) if value_scale.active() else (lambda x: int(round(x)))
+        out = max(_vs(PARTNER_EDGE_MIN_ABS), whole(edge_cap * max(0, receive_score)))
+        return min(out, whole(PARTNER_EDGE_HARD_CEILING * max(0, receive_score)))
 
     allowed_edge = _allowed(cap)
     # The lopsided verdict (a -10 realism penalty plus a hard fail) is a cliff, so

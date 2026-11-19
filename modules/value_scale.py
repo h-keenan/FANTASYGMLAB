@@ -61,6 +61,12 @@ def scale() -> float:
     return 1.0 if value is None else value
 
 
+def active() -> bool:
+    """True while a league scale is in scope (flag ON and measurable)."""
+
+    return _ACTIVE.get() is not None
+
+
 def scaled(points: Any) -> Any:
     """An absolute point threshold expressed on the active league's scale. Untouched when no scale is active."""
 
