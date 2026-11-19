@@ -143,3 +143,29 @@ healthy players whose dynasty rank changed: 121 of 141 (rank shifts from the inj
 | Jayden Reed | WR | 26 | IR | 174 | 226 | 197 | 283 | 282 |
 | Jaylin Noel | WR | 24 | IR | 182 | 270 | 245 | 335 | 333 |
 | Jake Ferguson | TE | 27 | Out | 188 | 188 | 185 | 218 | 217 |
+
+## Single count (owner decision 2026-11-19), shipped ON: `DYNASTYGM_INJURY_SINGLE_COUNT_V1`
+
+The double count is a bug regardless of sample size: Sleeper reports an IR'd player's roster status as "Inactive", and that status
+is the injury, yet it also cost the 0.72 roster-presence penalty on top of the injury table. One source now: the injury table
+(severity bucket, age curve, current-season factor). The status penalty stays for non-injury statuses (e.g. retired), and the
+no-team (0.35) and unranked (0.80) floors are untouched. It applies in three places that stacked or could stack:
+dynasty `risk_multiplier`, the opportunity factor's `non_injury_risk_multiplier`, and redraft `current_availability_multiplier`.
+In redraft the stack was a `min()` and the major-injury factor (0.42) was already below 0.72, so redraft ranks do not move; the
+change there is that the status can no longer compete with the injury. The 51-game horizon (`DYNASTYGM_INJURY_HORIZON_V1`) stays OFF.
+
+Ranks with only this fix (fresh values, same frame as above; market rank in brackets):
+
+| Player | market | dynasty off to on | redraft off to on |
+|---|---|---|---|
+| Puka Nacua | 7 | 72 to 65 | 166 to 165 |
+| Jeremiyah Love | 15 | 114 to 95 | 192 to 192 |
+| De'Von Achane | 30 | 130 to 120 | 214 to 213 |
+
+Median dynasty gap to market: IR/Out/Doubtful (n=32) +79 to +68; IR only (n=23) +99 to +73; healthy (n=141) -1 to -1. Redraft
+medians unchanged (+146, +157 IR only). So the double count explains part of the dynasty gap, not all of it: the rest is the injury
+curve itself (about 0.77 for a 25-year-old) and the production/role/opportunity components.
+
+`trade_grade` (read only, not changed): `healthy_restore_factor` rebuilds the valuation's injury discount with the same
+`rankings` functions and divides it back out before pricing an explicit availability cost, so the Analyzer's healthy value is
+invariant to this change and `injury_availability_cost` does not stack the status penalty (it prices weeks missed only).

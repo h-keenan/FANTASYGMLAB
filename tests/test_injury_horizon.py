@@ -5,6 +5,7 @@ import pytest
 from modules import rankings
 
 FLAG = rankings.INJURY_HORIZON_ENV_KEY
+SINGLE = rankings.INJURY_SINGLE_COUNT_ENV_KEY  # default ON since 2026-11-19; these legacy pins run with it off
 CASES = [
     ("Inactive", "IR", 22.0), ("Inactive", "IR", 25.0), ("Inactive", "IR", 31.0), ("Inactive", "IR", 35.0),
     ("Active", "Out", 24.0), ("Active", "Out", 29.0), ("Active", "Doubtful", 27.0), ("Active", "Questionable", 27.0),
@@ -14,6 +15,7 @@ CASES = [
 
 @pytest.mark.parametrize("status,injury,age", CASES)
 def test_flag_off_is_bit_identical_to_the_legacy_curve(monkeypatch, status, injury, age):
+    monkeypatch.setenv(SINGLE, "0")
     monkeypatch.delenv(FLAG, raising=False)
     legacy = rankings.injury_multiplier_for_age(status, injury, age)
     monkeypatch.setenv(FLAG, "0")
@@ -57,6 +59,7 @@ def test_older_is_never_valued_above_younger_for_the_same_injury(monkeypatch):
 
 
 def test_an_injury_is_counted_once_not_twice(monkeypatch):
+    monkeypatch.setenv(SINGLE, "0")
     monkeypatch.setenv(FLAG, "0")
     assert rankings.risk_multiplier("Inactive", "LAR", 150, "IR", age=25.0) == pytest.approx(0.72)  # status penalty stacked on the injury
     monkeypatch.setenv(FLAG, "1")
