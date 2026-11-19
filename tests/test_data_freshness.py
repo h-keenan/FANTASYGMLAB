@@ -49,8 +49,11 @@ def _stopped_values_sync_checks(data_dir, monkeypatch):
 
 
 def test_a_stopped_sync_fails_in_season_and_only_warns_off_season(data_dir, monkeypatch):
-    # Default (fresh provider cache ON): the age is the real fetch timestamp beside the CSV, not the checkout mtime.
+    # Fresh provider cache ON (the production default; conftest pins it off for hermetic tests): the age is the real fetch
+    # timestamp beside the CSV, not the checkout mtime.
     import json
+
+    monkeypatch.setenv("DYNASTYGM_FRESH_PROVIDER_CACHE_V1", "1")
 
     (data_dir / "fantasycalc_values.meta.json").write_text(json.dumps({"fetched_at": time.time() - 24 * 4 * 3600}))
     _stopped_values_sync_checks(data_dir, monkeypatch)
