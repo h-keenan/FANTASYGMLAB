@@ -388,7 +388,7 @@ def fetch_targets_for_league(
             TARGETS_TABLE,
             user_id=user_id,
             extra_query=(
-                f"league_id=eq.{league_key}"
+                f"league_id=eq.{account_store.pg_eq(league_key)}"
                 "&select=user_id,league_id,player_id,source_surface,created_at,untouchable"
                 "&order=created_at.desc"
             ),
@@ -650,7 +650,7 @@ def remove_target(
         return result
 
     resolved = _resolve_config(config)
-    query = f"user_id=eq.{user_id}&league_id=eq.{league_key}&player_id=eq.{pid}"
+    query = f"user_id=eq.{user_id}&league_id=eq.{account_store.pg_eq(league_key)}&player_id=eq.{account_store.pg_eq(pid)}"
     with performance.time_block("gm_targets_remove", category="supabase"):
         ok, error = account_store.delete_rows(
             resolved,

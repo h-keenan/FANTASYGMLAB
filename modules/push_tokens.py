@@ -117,7 +117,7 @@ def unregister_token(
         dict(config),
         access_token,
         TOKENS_TABLE,
-        query=f"user_id=eq.{uid}&expo_push_token=eq.{token}",
+        query=f"user_id=eq.{uid}&expo_push_token=eq.{account_store.pg_eq(token, safe="[]")}",
     )
 
 

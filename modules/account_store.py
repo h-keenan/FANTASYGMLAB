@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 import requests
 
@@ -32,6 +33,13 @@ def _safe_text(value: Any, default: str = "") -> str:
         return default
     text = str(value).strip()
     return text if text else default
+
+
+def pg_eq(value: Any, *, safe: str = "") -> str:
+    """URL-quote a value interpolated into a PostgREST filter (`col=eq.<value>`), so a caller-controlled string
+    can never smuggle extra `&filter=...` parameters or operators into the query."""
+
+    return quote(_safe_text(value), safe=safe)
 
 
 def _rest_url(config: dict, table: str, query: str = "") -> str:

@@ -18,7 +18,7 @@ from typing import Any, Mapping
 
 import requests
 
-from modules import auth_supabase
+from modules import account_store, auth_supabase
 
 TRADES_TABLE = "community_shared_trades"
 REPORTS_TABLE = "community_shared_trade_reports"
@@ -238,7 +238,7 @@ def insert_share(config: dict, token: str, row: dict[str, Any], viewer_user_id: 
 
 
 def delete_share(config: dict, token: str, trade_id: str, user_id: str) -> None:
-    query = f"id=eq.{trade_id}&user_id=eq.{user_id}"
+    query = f"id=eq.{account_store.pg_eq(trade_id)}&user_id=eq.{user_id}"
     try:
         response = requests.delete(
             auth_supabase.rest_api_url(config, TRADES_TABLE, query),
