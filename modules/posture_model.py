@@ -61,14 +61,14 @@ if starter_floor_enabled():
 # Three divergences that were preserved on purpose by the shared-model refactor (#2199) are coupled to the shared
 # tables when this flag is ON: the injury weights follow the starter weights, the multi-team finder's pick want
 # follows the tank/rebuild pick-sale distinction, and the pick-sale priority follows the posture ordering. Default
-# OFF until the out-of-sample backtest clears it. Read at import because the tables below derive from it.
+# ON (2026-11-19: the point-in-time replay in docs/audits/2026-11-posture-coherence-replay.md was flat for tank/rebuild). Read at import because the tables below derive from it.
 COHERENCE_ENV_KEY = "DYNASTYGM_POSTURE_COHERENCE_V1"
 
 
 def coherence_enabled() -> bool:
     from modules.app_config import config_value
 
-    return config_value(COHERENCE_ENV_KEY).strip().casefold() in {"1", "true", "yes", "on"}
+    return config_value(COHERENCE_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
 
 
 COHERENCE_ON = coherence_enabled()

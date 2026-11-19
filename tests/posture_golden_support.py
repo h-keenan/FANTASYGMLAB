@@ -267,5 +267,9 @@ def coherence_snapshot():
 
 if __name__ == "__main__" and os.environ.get("POSTURE_GOLDEN_MODE") == "coherence":  # subprocess entry, flag ON
     print("GOLDEN_JSON=" + json.dumps(coherence_snapshot(), sort_keys=True))
+elif __name__ == "__main__" and os.environ.get("POSTURE_GOLDEN_MODE") == "legacy":  # subprocess entry, flag OFF (pre-coherence goldens)
+    print("GOLDEN_JSON=" + json.dumps({
+        "tables": tables_snapshot(), "grade": grade_snapshot(), "engine": engine_snapshot(), "multi": multi_team_snapshot(),
+    }, sort_keys=True))
 elif __name__ == "__main__":  # subprocess entry: cheap snapshots under the caller's env flags
     print("GOLDEN_JSON=" + json.dumps({"tables": tables_snapshot(), "grade": grade_snapshot()}, sort_keys=True))
