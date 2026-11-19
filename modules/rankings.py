@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Sequence
 import numpy as np
 import pandas as pd
 
+from modules import injury_return_curves
 from modules import injury_status as injury_status_table
 from modules import performance
 from modules import player_hydrate_stages
@@ -2688,7 +2689,7 @@ _INJURY_AGE_CURVE = {
 # severity multiplier (an IR'd 25-year-old lost ~23% of his whole composite), and an injury also stacked the status-derived
 # 0.72 roster-presence penalty (Sleeper reports IR'd players as "Inactive"). Backtest 2021-2025: injured players' market value
 # did not fall further relative to healthy peers by more than ~0-9% after the market had priced the injury. Flag
-# DYNASTYGM_INJURY_HORIZON_V1 (default OFF) scales the dynasty discount by what an injury actually costs a multi-year
+# DYNASTYGM_INJURY_HORIZON_V1 (default ON since the out-of-sample backtest; was OFF) scales the dynasty discount by what an injury actually costs a multi-year
 # horizon: expected games lost over the horizon, times the age durability already in the curve (relative to its youngest
 # anchor), and counts the injury once (the status that IS the injury no longer adds the 0.72 penalty).
 INJURY_HORIZON_ENV_KEY = "DYNASTYGM_INJURY_HORIZON_V1"
@@ -2696,9 +2697,10 @@ DYNASTY_HORIZON_GAMES = 3 * 17
 
 
 def injury_horizon_enabled() -> bool:
-    from modules.app_config import config_bool
+    # Default ON since 2026-11-19 (out-of-sample backtest, docs/audits/2026-11-injury-discount.md); "0" is the kill switch.
+    from modules.experimental_graduation import graduated_kill_switch_enabled
 
-    return bool(config_bool(INJURY_HORIZON_ENV_KEY))
+    return graduated_kill_switch_enabled(INJURY_HORIZON_ENV_KEY, default=True)
 
 
 def injury_multiplier_for_age(status: str, injury_status: str = "", age=None) -> float:
@@ -2713,6 +2715,11 @@ def injury_multiplier_for_age(status: str, injury_status: str = "", age=None) ->
         age_value = float("nan")
     if injury_horizon_enabled() and level != "healthy":
         weeks = injury_status_table.classify(status, injury_status).weeks_out
+        if injury_return_curves.dynasty_feed_enabled():
+            # Evidence-based expected games lost (DYNASTYGM_INJURY_RETURN_CURVES_DYNASTY_V1, default OFF) replaces the table's weeks_out.
+            fitted_games = injury_return_curves.expected_games_lost(status, injury_status)
+            if fitted_games is not None:
+                weeks = fitted_games
         if weeks is not None:
             games_cost = min(1.0, float(weeks) / DYNASTY_HORIZON_GAMES)
             durability = 1.0
@@ -2810,6 +2817,11 @@ def current_availability_multiplier(status: str, team: str, search_rank, injury_
         base_risk = min(base_risk, 0.80)
 
     injury_risk = injury_status_table.CURRENT_SEASON_MULTIPLIER.get(injury_level(status, injury_status), 1.0)
+    if injury_return_curves.enabled():
+        # Fitted next-4-games production fraction (DYNASTYGM_INJURY_RETURN_CURVES_V1); statuses with no fitted evidence keep the static factor.
+        fitted_fraction = injury_return_curves.expected_production_fraction(status, injury_status)
+        if fitted_fraction is not None:
+            injury_risk = fitted_fraction
     return min(base_risk, injury_risk)
 
 

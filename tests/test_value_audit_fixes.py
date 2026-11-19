@@ -37,11 +37,21 @@ def test_lifecycle_valuation_replaces_the_teamless_cap():
     assert not hasattr(rankings, "TEAMLESS_VETERAN_VALUE_CAP")
 
 
-def test_injury_discount_is_age_aware():
+def test_injury_discount_is_age_aware(monkeypatch):
+    monkeypatch.setenv("DYNASTYGM_INJURY_HORIZON_V1", "0")  # legacy: no age falls back to the flat severity factor
     young = rankings.injury_multiplier_for_age("Inactive", "IR", 23)
     old = rankings.injury_multiplier_for_age("Inactive", "IR", 34)
     assert young > old
     assert rankings.injury_multiplier_for_age("Inactive", "IR", None) == rankings.injury_multiplier("Inactive", "IR")
+    assert rankings.injury_multiplier_for_age("Active", "", 30) == 1.0
+
+
+def test_injury_discount_is_age_aware_with_the_horizon_model(monkeypatch):
+    monkeypatch.setenv("DYNASTYGM_INJURY_HORIZON_V1", "1")
+    young = rankings.injury_multiplier_for_age("Inactive", "IR", 23)
+    old = rankings.injury_multiplier_for_age("Inactive", "IR", 34)
+    assert young > old
+    assert rankings.injury_multiplier_for_age("Inactive", "IR", None) >= old
     assert rankings.injury_multiplier_for_age("Active", "", 30) == 1.0
 
 

@@ -1,4 +1,6 @@
+import os
 import unittest
+from unittest import mock
 
 import pandas as pd
 
@@ -88,10 +90,19 @@ class TestPlayerValuationContext(unittest.TestCase):
 
 
     def test_minor_injury_has_small_current_availability_hit(self):
-        healthy = current_availability_multiplier("Active", "DAL", 100, "")
-        minor = current_availability_multiplier("Questionable", "DAL", 100, "limited")
+        # The static-table path (DYNASTYGM_INJURY_RETURN_CURVES_V1 off). With the fitted curves on, a Questionable player is expected to
+        # produce 0.73 of baseline over the next four games (nflverse 2021-23: he plays 67% of the time), which is the evidence-based hit.
+        with mock.patch.dict(os.environ, {"DYNASTYGM_INJURY_RETURN_CURVES_V1": "0"}):
+            healthy = current_availability_multiplier("Active", "DAL", 100, "")
+            minor = current_availability_multiplier("Questionable", "DAL", 100, "limited")
 
         self.assertGreaterEqual(minor, healthy * 0.90)
+
+    def test_questionable_current_availability_follows_the_fitted_curve_when_on(self):
+        with mock.patch.dict(os.environ, {"DYNASTYGM_INJURY_RETURN_CURVES_V1": "1"}):
+            minor = current_availability_multiplier("Questionable", "DAL", 100, "limited")
+
+        self.assertAlmostEqual(minor, 0.7297, places=3)
 
     def test_major_injury_discount_is_meaningful_but_not_zero_for_dynasty(self):
         major = injury_multiplier("Injured Reserve", "season-ending")

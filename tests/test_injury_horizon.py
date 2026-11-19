@@ -6,6 +6,12 @@ from modules import rankings
 
 FLAG = rankings.INJURY_HORIZON_ENV_KEY
 SINGLE = rankings.INJURY_SINGLE_COUNT_ENV_KEY  # default ON since 2026-11-19; these legacy pins run with it off
+CURVES = rankings.injury_return_curves.ENV_KEY  # default ON since 2026-11-19; this file pins the table-fed horizon model with it off
+
+
+@pytest.fixture(autouse=True)
+def _table_fed_horizon(monkeypatch):
+    monkeypatch.setenv(CURVES, "0")
 CASES = [
     ("Inactive", "IR", 22.0), ("Inactive", "IR", 25.0), ("Inactive", "IR", 31.0), ("Inactive", "IR", 35.0),
     ("Active", "Out", 24.0), ("Active", "Out", 29.0), ("Active", "Doubtful", 27.0), ("Active", "Questionable", 27.0),
@@ -16,10 +22,11 @@ CASES = [
 @pytest.mark.parametrize("status,injury,age", CASES)
 def test_flag_off_is_bit_identical_to_the_legacy_curve(monkeypatch, status, injury, age):
     monkeypatch.setenv(SINGLE, "0")
-    monkeypatch.delenv(FLAG, raising=False)
-    legacy = rankings.injury_multiplier_for_age(status, injury, age)
     monkeypatch.setenv(FLAG, "0")
-    assert rankings.injury_multiplier_for_age(status, injury, age) == legacy
+    legacy = rankings.injury_multiplier_for_age(status, injury, age)
+    for off in ("false", "off", "no"):
+        monkeypatch.setenv(FLAG, off)
+        assert rankings.injury_multiplier_for_age(status, injury, age) == legacy
     # Pinned legacy anchors so a refactor cannot move them silently.
     assert rankings.injury_multiplier_for_age("Inactive", "IR", 24.0) == pytest.approx(0.80)
     assert rankings.injury_multiplier_for_age("Inactive", "IR", 30.0) == pytest.approx(0.52)
@@ -74,3 +81,17 @@ def test_redraft_current_season_availability_is_unchanged_by_the_flag(monkeypatc
     before = rankings.current_availability_multiplier("Inactive", "LAR", 150, "IR")
     monkeypatch.setenv(FLAG, "1")
     assert rankings.current_availability_multiplier("Inactive", "LAR", 150, "IR") == before == pytest.approx(0.42)
+
+
+def test_default_is_on_since_the_out_of_sample_backtest_and_registered(monkeypatch):
+    from modules import experimental_graduation as eg
+
+    row = eg.FLAG_REGISTRY[FLAG]
+    assert row["default"] == "on" and row["owner"] == "coridian_" and row["review"]
+    monkeypatch.delenv(FLAG, raising=False)
+    assert rankings.injury_horizon_enabled() is True
+    on = rankings.injury_multiplier_for_age("Inactive", "IR", 27.0)
+    monkeypatch.setenv(FLAG, "1")
+    assert rankings.injury_multiplier_for_age("Inactive", "IR", 27.0) == on
+    monkeypatch.setenv(FLAG, "0")
+    assert rankings.injury_horizon_enabled() is False

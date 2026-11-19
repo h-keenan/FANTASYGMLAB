@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from modules import rankings
 from modules import team_eval
@@ -215,7 +216,9 @@ def test_holding_market_constant_age_alone_changes_value():
         assert all(scores[i] >= scores[i + 1] for i in range(peak_idx, len(scores) - 1))
 
 
-def test_injury_monotonicity_risk_and_availability():
+def test_injury_monotonicity_risk_and_availability(monkeypatch):
+    monkeypatch.setenv("DYNASTYGM_INJURY_HORIZON_V1", "0")  # exact legacy numbers; the flags-on companion follows
+    monkeypatch.setenv("DYNASTYGM_INJURY_RETURN_CURVES_V1", "0")
     statuses = [
         ("Active", ""),
         ("Active", "Questionable"),
@@ -236,6 +239,19 @@ def test_injury_monotonicity_risk_and_availability():
     assert current[-1] < dynasty[-1]
     assert dynasty[-1] == 0.68
     assert current[-1] == 0.42
+
+
+def test_injury_monotonicity_holds_with_the_horizon_model_and_fitted_curves(monkeypatch):
+    monkeypatch.setenv("DYNASTYGM_INJURY_HORIZON_V1", "1")
+    monkeypatch.setenv("DYNASTYGM_INJURY_RETURN_CURVES_V1", "1")
+    statuses = [("Active", ""), ("Active", "Questionable"), ("Active", "Doubtful"), ("Injured Reserve", "Torn ACL")]
+    dynasty = [rankings.risk_multiplier(s, "KC", 40, i) for s, i in statuses]
+    current = [rankings.current_availability_multiplier(s, "KC", 40, i) for s, i in statuses]
+    assert all(dynasty[i] >= dynasty[i + 1] for i in range(len(dynasty) - 1))
+    assert all(current[i] > current[i + 1] for i in range(len(current) - 1))
+    assert current[-1] < dynasty[-1]  # a season-ending absence still crushes current harder than long-term dynasty value
+    assert dynasty[-1] == pytest.approx(1 - 4 / 51)
+    assert current[-1] == pytest.approx(0.2358, abs=1e-4)
 
 
 def test_worse_injury_does_not_raise_composite():

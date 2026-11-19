@@ -169,3 +169,133 @@ curve itself (about 0.77 for a 25-year-old) and the production/role/opportunity 
 `trade_grade` (read only, not changed): `healthy_restore_factor` rebuilds the valuation's injury discount with the same
 `rankings` functions and divides it back out before pricing an explicit availability cost, so the Analyzer's healthy value is
 invariant to this change and `injury_availability_cost` does not stack the status penalty (it prices weeks missed only).
+
+## Evidence-based return curves (owner-approved 2026-11-19)
+
+Code: `modules/injury_return_curves.py` (runtime), `modules/injury_return_curves_table.py` (generated), harnesses
+`scripts/audits/injury_return_panel.py` (panel), `injury_return_fit.py` (fit and test), `injury_return_backtest.py` (market backtest).
+Flags: `DYNASTYGM_INJURY_RETURN_CURVES_V1` (redraft current availability, **ON**), `DYNASTYGM_INJURY_RETURN_CURVES_DYNASTY_V1` (fitted
+games lost into the horizon model, **OFF**), and `DYNASTYGM_INJURY_HORIZON_V1` is now **ON** (all registered, owner coridian_).
+
+Data and method. nflverse injury reports and weekly PPR stats, QB/RB/WR/TE, regular season. One row per player team-game in a listed
+state: Out, Doubtful, Questionable, or IR (proxy: no stat line, not on the report, previous week Out/IR; nflverse has no IR flag).
+Baseline = mean PPR of the previous (up to) 6 games with a stat line (>= 3 games and >= 4.0 points). Targets: share of baseline
+produced over the next 4 team games (zeros for missed games), share of games played, and games missed in the next 17 (spans into
+next season). "Excess" games lost subtract what a healthy same-position player misses (3.0 to 4.6 of 17; no stat line counts as a
+miss, so this includes benchings). Fit on 2021-23 (n = 2,074 listed player-weeks with a baseline, 9,814 healthy comparison rows),
+tested on 2024-25 (n = 1,273, 1,098 with a full 4-game window, 269 players). Shrinkage: empirical Bayes, 20 pseudo-observations per
+level, state -> state x weeks -> position x state x weeks, and state -> position x state -> position x state x body group.
+Limits: "played" means a stat line (a WR who dressed with no targets counts as absent), players with no listing and no stat line for a
+whole season are invisible, the IR proxy includes non-injury absences, and 4 games is the horizon the redraft multiplier now means.
+
+### Fitted curves (2021-23, shrunk)
+
+By weeks since first listing, all positions (n = rows with a full 4-game window):
+
+| state | weeks | n | plays next game | next-4 production | excess games lost /17 |
+|---|---|---|---|---|---|
+| Out | 1 | 278 | 0.00 | 0.32 | 2.8 |
+| Out | 2 | 147 | 0.00 | 0.36 | 2.5 |
+| Out | 3 | 78 | 0.00 | 0.40 | 2.6 |
+| Out | 4 | 33 | 0.00 | 0.34 | 3.4 |
+| Out | 5-6 | 26 | 0.01 | 0.39 | 4.3 |
+| Out | 7+ | 19 | 0.01 | 0.28 | 6.0 |
+| Doubtful | 1 | 54 | 0.03 | 0.47 | 1.5 |
+| Doubtful | 2 | 31 | 0.02 | 0.35 | 2.5 |
+| Doubtful | 3 to 6 | 24 | 0.03 to 0.05 | 0.39 to 0.42 | 1.9 to 2.6 |
+| Questionable | 1 | 581 | 0.67 | 0.73 | 0.9 |
+| Questionable | 2 | 202 | 0.70 | 0.76 | 0.6 |
+| Questionable | 3 | 99 | 0.65 | 0.70 | 0.9 |
+| Questionable | 4 | 61 | 0.71 | 0.79 | 0.6 |
+| Questionable | 5-6 | 32 | 0.72 | 0.69 | 1.1 |
+| Questionable | 7+ | 19 | 0.70 | 0.67 | 2.4 |
+| IR (proxy) | 2 | 54 | 0.01 | 0.17 | 4.1 |
+| IR (proxy) | 3 | 62 | 0.00 | 0.24 | 3.8 |
+| IR (proxy) | 4 | 60 | 0.00 | 0.26 | 3.7 |
+| IR (proxy) | 5-6 | 78 | 0.00 | 0.25 | 4.0 |
+| IR (proxy) | 7+ | 67 | 0.00 | 0.18 | 4.5 |
+
+By position (age pooled):
+
+| pos | state | n | next-4 production | excess games lost /17 |
+|---|---|---|---|---|
+| QB | Out / IR / Q | 97 / 59 / 101 | 0.26 / 0.23 / 0.64 | 3.8 / 5.0 / 1.1 |
+| RB | Out / IR / Q | 129 / 74 / 275 | 0.37 / 0.25 / 0.77 | 2.7 / 3.3 / 0.6 |
+| WR | Out / IR / Q | 263 / 131 / 470 | 0.37 / 0.20 / 0.73 | 2.8 / 2.9 / 1.1 |
+| TE | Out / IR / Q | 92 / 57 / 148 | 0.35 / 0.23 / 0.73 | 2.9 / 4.9 / 1.0 |
+
+Doubtful (n 17 to 40 per position) is 0.37 to 0.47 with 0.5 to 3.3 excess games. Body-group cells (knee, ankle, hamstring,
+concussion, ...) are in the generated table; the ones with n >= 30 are WR Out hamstring 0.42 (n 65), WR Out concussion 0.56 (n 32),
+WR Out knee 0.32 (n 36), RB Out ankle 0.28 (n 37), WR Questionable knee 0.67 (n 70).
+
+The pooled state curves the flag actually uses: Out 0.351, Doubtful 0.425, Questionable 0.730, IR 0.236 of baseline over the next four
+games (the static table says 0.72, 0.72, 0.93, 0.42), and excess games lost of 3.0 (Out), 2.1 (Doubtful), 0.9 (Questionable), 3.9 (IR).
+The evidence therefore confirms the old 4-week IR default for games lost (3.9) but not the short-term production factors.
+
+### Out of sample, 2024-25
+
+Next four games, points error (mean absolute error in PPR points over the 4 games; paired improvement vs the static current-season
+multiplier, 95% CI from resampling players):
+
+| predictor | mean predicted share | bias (pts) | MAE | RMSE | MAE improvement [95% CI] |
+|---|---|---|---|---|---|
+| static current-season multiplier (0.42 / 0.72 / 0.93) | 0.75 | +13.0 | 18.5 | 23.2 | reference |
+| static weeks_out table | 0.60 | +6.8 | 14.9 | 20.2 | +3.6 [2.9, 4.4] |
+| fitted, state only | 0.49 | +1.6 | 13.6 | 17.6 | +4.9 [4.0, 5.9] |
+| fitted, position x state (the cell the API serves) | 0.49 | +1.4 | 13.4 | 17.5 | +5.1 [4.1, 6.1] |
+| fitted, position x state x weeks since listing | 0.49 | +1.5 | 13.5 | 17.6 | +5.0 [4.0, 5.9] |
+
+The actual share was 0.46 (Out 0.33, Doubtful 0.59, Questionable 0.69, IR 0.15). The static multiplier over-predicts by 29 points of
+share; this is the short-term under-penalty from the #2205 side finding. Calibration of the fitted prediction in quintiles
+(predicted / actual): 0.23 / 0.18, 0.36 / 0.34, 0.51 / 0.57, 0.74 / 0.68, 0.77 / 0.78. Next game only: MAE 2.4 vs 6.9 points
+(+4.4 [4.1, 4.8]). Position, weeks-since-listing and body group did not beat the pooled state curve with a CI excluding zero (position
+vs state only: +0.12 pts [-0.05, 0.31]; body group +0.14 [-0.05, 0.33]), so the flag path uses the pooled state curve and the finer
+cells stay available through the API for callers that know them.
+
+Games lost (excess, next 17, n = 588): actual mean 2.04, fitted 2.08 (bias +0.04), static table 1.56 (bias -0.48). The table is not
+worse on dispersion though: MAE 2.97 vs 3.10 and RMSE 3.77 vs 3.83 (the fitted curve is worse by 0.14 [0.03, 0.24] MAE). Mean-unbiased
+but not more precise, so it is not flipped on for dynasty.
+
+### Dynasty backtest re-run (market value vs healthy peers)
+
+Same DynastyProcess snapshots and control method as above, but "injured" is now observable at the snapshot: the player's state in the
+last completed week (Out, Doubtful or IR proxy), value >= 1,500. n = 84 player-dates (25 players): 57 on 2024-25 dates (out of sample),
+27 on 2021-23 dates. Relative value (injured over matched healthy peers) pooled median 1.00 overall and 1.02 out of sample: the market
+does not take a further cut after it has priced the injury (+4w 1.01, +8w 1.02, +26w 1.06 out of sample). Each dynasty multiplier is
+scored by its absolute distance to that realized relative value; improvement = legacy error minus model error:
+
+| out of sample 2024-25 | n | legacy MAE | horizon (table weeks) MAE | horizon vs legacy [95% CI] | horizon with fitted games vs horizon with table |
+|---|---|---|---|---|---|
+| +4w | 13 | 0.179 | 0.109 | +0.070 [0.034, 0.092] | -0.010 [-0.018, -0.001] |
+| +8w | 19 | 0.209 | 0.133 | +0.076 [0.048, 0.093] | -0.011 [-0.017, -0.004] |
+| +26w | 25 | 0.368 | 0.316 | +0.052 [0.022, 0.083] | -0.007 [-0.015, 0.001] |
+| pooled | 57 | 0.272 | 0.208 | +0.064 [0.042, 0.084] | -0.009 [-0.014, -0.003] |
+
+In 2021-23 dates alone (n = 27) the horizon model is not distinguishable from legacy (about 0.00 [-0.04, 0.04] pooled); the in-season
+subset is n = 7 out of sample. Mean multipliers: legacy 0.83, horizon 0.92. Caveat: because realized relative value is about 1.0, any
+smaller discount scores better; the test says the legacy cut is larger than what the market later did, not that no discount is right.
+
+### Decisions
+
+- `DYNASTYGM_INJURY_RETURN_CURVES_V1` ON: the CI excludes zero on both next-game and next-4-game error.
+- `DYNASTYGM_INJURY_HORIZON_V1` ON: out-of-sample positive with the table's weeks_out (CI excludes zero pooled and at every horizon).
+- `DYNASTYGM_INJURY_RETURN_CURVES_DYNASTY_V1` OFF: feeding fitted games lost is mean-calibrated but slightly worse than the table on
+  MAE, RMSE and the market backtest (CIs exclude zero in the wrong direction, by less than 0.01 of multiplier).
+- Flags off is bit-identical legacy (`tests/test_injury_return_curves.py`, `tests/test_injury_horizon.py`). The existing tests that pin
+  the legacy numbers now set the new flags to "0" explicitly; no assertion was changed or removed.
+
+### Ranks (committed `data/players.db` frame, read only; dynasty / redraft rank; market rank in the header)
+
+Market rank: Nacua 5, Love 7, Achane 13.
+
+| flags | P. Nacua | J. Love | D. Achane |
+|---|---|---|---|
+| legacy (all off) | 48 / 156 | 75 / 166 | 98 / 187 |
+| return curves only (redraft) | 48 / 224 | 75 / 235 | 98 / 246 |
+| horizon only | 20 / 156 | 49 / 165 | 77 / 187 |
+| horizon + curves (shipped defaults) | 20 / 224 | 49 / 235 | 77 / 244 |
+| horizon + curves + dynasty feed | 19 / 224 | 48 / 235 | 76 / 244 |
+
+(The earlier tables above used a fresh-values frame and the single-count flag in isolation; this frame differs, so ranks are not
+comparable across the two.) Redraft falls hard for IR players because the evidence says an IR player yields about a quarter of his
+baseline over the next four games, not 0.42. Median redraft gap to market for injured players: +147 to +250.

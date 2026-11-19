@@ -37,8 +37,12 @@ def read_frame(args: argparse.Namespace) -> pd.DataFrame:
         con.close()
 
 
-def lens_ranks(frame: pd.DataFrame, flag_on: bool) -> dict[str, pd.Series]:
+def lens_ranks(frame: pd.DataFrame, flag_on: bool, curves_on: bool | None = None, feed: bool = True) -> dict[str, pd.Series]:
+    """curves_on None follows flag_on (the original off/on diff); a bool pins DYNASTYGM_INJURY_RETURN_CURVES_V1 independently."""
     os.environ[rankings.INJURY_HORIZON_ENV_KEY] = "1" if flag_on else "0"
+    curves = flag_on if curves_on is None else curves_on
+    os.environ[rankings.injury_return_curves.ENV_KEY] = "1" if curves else "0"
+    os.environ[rankings.injury_return_curves.DYNASTY_FEED_ENV_KEY] = "1" if (curves and feed) else "0"
     work = rankings.compose_composite_score(rankings.apply_injury_risk_fields(frame.copy()))
     out = {}
     for name, lens, fmt in (("dynasty", "Dynasty", "Dynasty"), ("redraft", "Non-Dynasty", "Redraft")):
@@ -77,7 +81,20 @@ def main() -> None:
         f"median redraft rank gap to market, injured: off {(off['redraft'][injured] - mrank[injured]).median():+.0f}, on {(on['redraft'][injured] - mrank[injured]).median():+.0f}",
         f"healthy players whose dynasty rank changed: {int((off['dynasty'][healthy] != on['dynasty'][healthy]).sum())} of {int(healthy.sum())} (rank shifts from the injured players moving, never from a changed multiplier)",
     ]
-    text = "\n".join(summary + [""] + lines)
+    combos = {
+        "legacy (both off)": lens_ranks(frame, False, False),
+        "return curves only": lens_ranks(frame, False, True),
+        "horizon only": lens_ranks(frame, True, False),
+        "horizon + curves (shipped defaults)": lens_ranks(frame, True, True, feed=False),
+        "horizon + curves + dynasty feed": lens_ranks(frame, True, True, feed=True),
+    }
+    key = ["Puka Nacua", "Jeremiyah Love", "De'Von Achane"]
+    keyed = ["", "market rank " + ", ".join(f"{n} {int(mrank[frame['name'] == n].iloc[0])}" for n in key), "",
+             "| flags | " + " | ".join(f"{n} dyn / red" for n in key) + " |", "|---|" + "---|" * len(key)]
+    for label, ranks in combos.items():
+        cells = [f"{int(ranks['dynasty'][frame['name'] == n].iloc[0])} / {int(ranks['redraft'][frame['name'] == n].iloc[0])}" for n in key]
+        keyed.append(f"| {label} | " + " | ".join(cells) + " |")
+    text = "\n".join(summary + keyed + [""] + lines)
     print(text)
     if args.out:
         Path(args.out).write_text(text + "\n", encoding="utf-8")
