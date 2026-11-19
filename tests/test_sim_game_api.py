@@ -248,6 +248,14 @@ def test_free_season_ends_at_the_offseason_and_upgrade_resumes_the_same_save():
     assert client.get(f"/v1/sim/games/{gid}", headers=hdr("free")).json()["game"]["status"] == "offseason"
     assert client.get(f"/v1/sim/games/{gid}/league", headers=hdr("free")).json()["reason"] == ""
     n_events = len(backend.tables["sim_events"])
+    # The offseason commands are writes too: a lapsed account cannot start the rookie draft or the next season.
+    for path in ("offseason/rookie-draft/start", "offseason/rookie-draft/auto", "offseason/start-season"):
+        out = client.post(f"/v1/sim/games/{gid}/{path}", headers=hdr("free"))
+        assert out.status_code == 200 and out.json()["reason"] == "premium_required", path
+        assert out.json()["upsell"] and out.json()["preview"]["paywalled"] is True
+    pick = client.post(f"/v1/sim/games/{gid}/offseason/rookie-draft/pick", json={"player_id": "x"}, headers=hdr("free"))
+    assert pick.json()["reason"] == "premium_required"
+    assert len(backend.tables["sim_events"]) == n_events
     pro_set.add("free")  # upgrading resumes the same save
     res = client.post(f"/v1/sim/games/{gid}/offseason/rookie-draft/start", headers=hdr("free")).json()
     assert res["reason"] == "" and res["preview"] is None
