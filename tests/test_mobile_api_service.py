@@ -11739,6 +11739,31 @@ def test_team_rankings_requires_auth(monkeypatch):
     assert response.status_code == 401
 
 
+def _realistic_rank_frame(fillers: int = 8):
+    """A realistic-scale league frame for the team-rankings test: roster 1 is a full, strong roster, roster 2 is one
+    player, and `fillers` mid rosters (3..) sit between them. The earlier 2-team fixture used 2,000-point players, so
+    a roster's whole value (~11k) was the same size as one team's pick capital and the franchise rank flipped on a
+    3% knife-edge whenever the pick curve moved."""
+
+    positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "RB", "WR"]
+    scores = [8200, 7400, 6800, 6200, 5600, 5000, 4400, 3800, 3200]
+
+    def row(pid, name, pos, score, age=26, exp=4):
+        return {
+            "player_id": pid, "name": name, "position": pos, "team": "KC", "age": age, "years_exp": exp,
+            "status": "Active", "injury_status": None,
+            "score": score, "dynasty_score": score, "value_score": score, "rebuild_score": score,
+        }
+
+    rows = [row(f"my{i}", f"My Player {i}", pos, sc) for i, (pos, sc) in enumerate(zip(positions, scores), start=1)]
+    rows.append(row("my_bench_rb", "Bench Runner", "RB", 500, age=30, exp=8))
+    rows.append(row("target_rb", "Target Runner", "RB", 4500, age=25, exp=3))
+    for r in range(3, 3 + fillers):
+        for j, (pos, sc) in enumerate(zip(["QB", "RB", "WR", "WR"], [4200, 3600, 3300, 3000]), start=1):
+            rows.append(row(f"f{r}_{j}", f"Filler {r}-{j}", pos, sc - r * 20))
+    return pd.DataFrame(rows)
+
+
 def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
     client = _client(monkeypatch)
 
@@ -11759,10 +11784,20 @@ def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
             "players": ["target_rb"],
             "settings": {"wins": 3, "losses": 10, "ties": 0},
         },
+        *[
+            {
+                "roster_id": r,
+                "owner_id": f"sleeper-user-{r}",
+                "players": [f"f{r}_{j}" for j in range(1, 5)],
+                "settings": {"wins": 4 + (r % 3), "losses": 9 - (r % 3), "ties": 0},
+            }
+            for r in range(3, 11)
+        ],
     ]
     fake_users = [
         {"user_id": "sleeper-user-1", "display_name": "GM One"},
         {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+        *[{"user_id": f"sleeper-user-{r}", "display_name": f"GM {r}"} for r in range(3, 11)],
     ]
 
     # require_user is the only auth check here (no _resolve_my_roster / no
@@ -11773,7 +11808,7 @@ def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
             with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
                 with patch("modules.sleeper.get_users", return_value=fake_users):
                     with patch("modules.sleeper.get_traded_picks", return_value=[]):
-                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                        with patch("modules.rankings.load_players", return_value=_realistic_rank_frame()):
                             with patch(
                                 "modules.player_eligibility.filter_current_fantasy_players",
                                 side_effect=lambda df, **kwargs: df,
@@ -11788,13 +11823,15 @@ def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
     assert body["ok"] is True
     assert body["reason"] == ""
     teams = body["teams"]
-    assert len(teams) == 2
+    assert len(teams) == 10
     by_roster = {t["roster_id"]: t for t in teams}
     # Roster 1's 10 starter-weighted players comfortably outscore roster 2's
-    # single player, so roster 1 gets the top power/franchise rank.
+    # single player, so roster 1 gets the top power/franchise rank (and roster 2, one
+    # player, is the weakest roster of the 10).
     assert by_roster["1"]["power_rank"] == 1
-    assert by_roster["2"]["power_rank"] == 2
+    assert by_roster["2"]["power_rank"] == 10
     assert by_roster["1"]["franchise_rank"] == 1
+    assert by_roster["1"]["franchise_rank"] < by_roster["2"]["franchise_rank"]
     # Standings come straight off each roster's own settings, independent of
     # the rank computation.
     assert by_roster["1"]["wins"] == 7
@@ -11829,7 +11866,7 @@ def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
     # wins/win_pct/points_for tie-break order.
     assert body["standings_available"] is True
     assert by_roster["1"]["standing_rank"] == 1
-    assert by_roster["2"]["standing_rank"] == 2
+    assert by_roster["2"]["standing_rank"] == 10
     assert isinstance(by_roster["1"]["win_pct_label"], str) and by_roster["1"]["win_pct_label"]
     # Archetype/strategy classification (modules.team_eval.refine_team_directions)
     # runs on real strength inputs here (starter/bench/age/draft-capital ranks
