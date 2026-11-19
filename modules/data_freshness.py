@@ -53,6 +53,17 @@ def _newest_mtime(path: str) -> float | None:
         return None
 
 
+def _meta_fetched_at(path: str) -> float | None:
+    import json
+
+    try:
+        with open(path, encoding="utf-8") as fh:
+            value = float(json.load(fh)["fetched_at"])
+        return value if value > 0 else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def _age_status(age_hours: float, limit: float, in_season: bool) -> str:
     if in_season:
         return "ok" if age_hours <= limit else "fail"
@@ -78,11 +89,27 @@ def dataset_rows(now: float, data_dir: str, in_season: bool) -> list[dict[str, A
             candidates = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.startswith("nflverse_advanced_stats_")] if os.path.isdir(data_dir) else []
             mtime = max((m for m in map(_newest_mtime, candidates) if m is not None), default=None)
         row: dict[str, Any] = {"name": spec.name, "cadence": spec.cadence, "max_age_hours": spec.max_age_hours, "producer": spec.producer}
+        if spec.name == "values_fantasycalc":
+            # A file mtime is the checkout time in a git deploy (data-truth audit finding 2), so with the flag on the
+            # FantasyCalc row reads the real fetch timestamp stored beside the CSV; no timestamp means unknown, not fresh.
+            from modules import fantasycalc
+
+            if fantasycalc.fresh_cache_enabled():
+                mtime = _meta_fetched_at(os.path.join(data_dir, "fantasycalc_values.meta.json"))
+                if mtime is None:
+                    row.update(status="warn", as_of=None, age_hours=None, detail="no fetch timestamp (committed seed file); values may predate the last refresh")
+                    rows.append(row)
+                    continue
         if mtime is None:
             row.update(status="fail" if in_season else "warn", as_of=None, age_hours=None, detail="no data file found")
         else:
             age = max(0.0, (now - mtime) / 3600.0)
             row.update(status=_age_status(age, spec.max_age_hours, in_season), as_of=mtime, age_hours=round(age, 1), detail=f"{age:.1f}h old (limit {spec.max_age_hours:g}h in season)")
+            if spec.name == "values_fantasycalc":
+                # Clients label values "as of" only for a real provider fetch time, never a checkout mtime.
+                from modules import fantasycalc
+
+                row["as_of_source"] = "fetch_timestamp" if fantasycalc.fresh_cache_enabled() else "file_mtime"
         rows.append(row)
     return rows
 
