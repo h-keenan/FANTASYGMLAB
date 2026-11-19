@@ -108,6 +108,33 @@ def bump_ios_build_number
 end
 
 platform :ios do
+  # App Privacy ("nutrition label") answers. This action drives the App Store
+  # Connect WEB session (Apple ID + 2FA), NOT the ASC API key, so a human must
+  # run it interactively. FASTLANE_USER / APPLE_TEAM_ID / FGL_BUNDLE_ID come
+  # from the environment (see docs/app-store-privacy-labels.md); nothing is
+  # hard-coded. Saves a DRAFT only; publish in App Store Connect after review.
+  desc "Upload App Privacy answers (draft only; human runs this, 2FA)"
+  lane :privacy_labels do
+    upload_app_privacy_details_to_app_store(
+      username: ENV["FASTLANE_USER"],
+      team_id: ENV["APPLE_TEAM_ID"],
+      app_identifier: ENV["FGL_BUNDLE_ID"] || "com.fantasygmlab.app",
+      json_path: "fastlane/app_privacy_details.json",
+      skip_publish: true,
+    )
+  end
+
+  desc "Upload App Privacy answers AND publish them (human runs this, 2FA)"
+  lane :privacy_labels_publish do
+    upload_app_privacy_details_to_app_store(
+      username: ENV["FASTLANE_USER"],
+      team_id: ENV["APPLE_TEAM_ID"],
+      app_identifier: ENV["FGL_BUNDLE_ID"] || "com.fantasygmlab.app",
+      json_path: "fastlane/app_privacy_details.json",
+      skip_publish: false,
+    )
+  end
+
   desc "Check whether the App Store Connect app record exists"
   lane :app_status do
     require "spaceship"
