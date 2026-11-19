@@ -470,6 +470,51 @@ def _tag_landed_gm_targets(
     return ideas
 
 
+def market_value_edge(idea: Mapping[str, Any], market_by_player: Mapping[str, float]) -> int | None:
+    """What the user gains in player MARKET value (FantasyCalc) if the idea is accepted: received minus sent.
+
+    Only players count. The market table carries no pick prices, and pricing picks at the engine's own price
+    made the edge anti-predictive on replayed history (corr -0.08 with rest-of-season points, against +0.36 for
+    players only), so a pick is neither credit nor cost here. None when no player on either side has a market
+    value (nothing to compare)."""
+
+    seen = False
+
+    def total(assets: Any) -> float:
+        nonlocal seen
+        out = 0.0
+        for asset in assets or ():
+            if not isinstance(asset, Mapping) or str(asset.get("asset_type") or "") == "pick":
+                continue
+            value = market_by_player.get(str(asset.get("player_id") or ""))
+            if value is not None:
+                seen = True
+                out += float(value)
+        return out
+
+    edge = total(idea.get("receive_assets")) - total(idea.get("send_assets"))
+    return int(round(edge)) if seen else None
+
+
+def stamp_market_edge(ideas: list[dict[str, Any]], players_df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Add ``market_edge`` to every idea record. Additive and presentation-only: it never changes which ideas
+    exist, their scores, or their order. Skips quietly when the pool has no market column."""
+
+    if not ideas or "fantasycalc_value" not in players_df.columns or "player_id" not in players_df.columns:
+        return ideas
+    values = pd.to_numeric(players_df["fantasycalc_value"], errors="coerce")
+    market = {
+        str(pid): float(v)
+        for pid, v in zip(players_df["player_id"].astype(str), values)
+        if v == v and v > 0
+    }
+    for idea in ideas:
+        edge = market_value_edge(idea, market)
+        if edge is not None:
+            idea["market_edge"] = edge
+    return ideas
+
+
 def _apply_keeper_context(
     frame: pd.DataFrame, score_field: str, keeper_context: Mapping[str, Any] | None
 ) -> pd.DataFrame:
@@ -748,7 +793,7 @@ def generate_trade_idea_records(
         list(enforced),
         gm_target_player_ids=frozenset(str(pid) for pid in gm_target_player_ids if str(pid)),
     )
-    return trade_ideas_module.apply_team_stance_framing(tagged, team_stance)
+    return stamp_market_edge(trade_ideas_module.apply_team_stance_framing(tagged, team_stance), players_df)
 
 
 # Idea generation re-applies the valuation lens across the whole players
