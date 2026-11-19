@@ -7216,7 +7216,8 @@ def _compute_trade_analyzer(
         "trade_window": trade_window,
         # Pro only (advanced usage; owner decision 2026-11-03): display-only
         # role-change lines for the players in this package. Omitted for Free.
-        **({"role_notes": _role_change_notes([*send_assets, *receive_assets])} if _is_pro_caller(user) else {}),
+        # Free gets only a boolean "there is a role note here" teaser (the text is Pro): the client shows one small locked row.
+        **_role_notes_fields([*send_assets, *receive_assets], pro=_is_pro_caller(user)),
         # Read-only description of what this verdict assumed (format, lens,
         # posture, projections vs values, injury timing); see
         # modules.verdict_assumptions. Never feeds back into the verdict.
@@ -8074,6 +8075,16 @@ _COLLEGE_SCOUTING_UPSELL = {
         "Start your free trial to unlock it."
     ),
 }
+
+
+def _role_notes_fields(assets: list[dict[str, Any]], *, pro: bool) -> dict[str, Any]:
+    """Trade Analyzer role-change notes: the lines for Pro, only ``role_notes_locked`` (no text, no count) for Free
+    when the package has a covered player, nothing at all when there is nothing to say."""
+
+    notes = _role_change_notes(assets)
+    if pro:
+        return {"role_notes": notes}
+    return {"role_notes_locked": True} if notes else {}
 
 
 def _is_pro_caller(user: dict[str, Any]) -> bool:

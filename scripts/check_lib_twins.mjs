@@ -44,6 +44,7 @@ export const IDENTICAL = [
   "recapPage.ts",
   "simTeamIdentity.ts",
   "teamSheet.ts",
+  "tradeHubGate.ts",
   "playerBadges.ts",
   "playerMetaFit.ts",
   "moduleTemplates.ts",

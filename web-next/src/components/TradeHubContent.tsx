@@ -15,6 +15,7 @@ import { DeadlineCard } from "@/components/DeadlineCard";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { MultiTeamIdeasSection } from "@/components/MultiTeamIdeasSection";
 import { isEspnLeagueId } from "@/lib/leaguePlatform";
+import { TRADE_HUB_UPGRADE_LABEL, tradeHubGateBody, tradeHubGateTitle } from "@/lib/tradeHubGate";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { Hero } from "@/components/ui/ModuleTemplates";
 import { formatTradeGain } from "@/lib/tradeHubPresentation";
@@ -210,11 +211,12 @@ export function TradeHubContent({
           className="p-4 flex flex-col gap-2 premium-glow-card"
           style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-premium)" }}
         >
-          <p className="text-sm font-bold">
-            {entitlement.hidden_count} more trade idea{entitlement.hidden_count === 1 ? "" : "s"} available on Pro.
+          <p className="text-sm font-bold">{tradeHubGateTitle(entitlement.hidden_count)}</p>
+          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            {tradeHubGateBody(entitlement.free_limit, null)}
           </p>
           <ButtonLink href="/premium" variant="premium" size="sm">
-            Upgrade →
+            {TRADE_HUB_UPGRADE_LABEL}
           </ButtonLink>
         </div>
       ) : null}

@@ -26,6 +26,7 @@ import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { selectionPrimary } from "@/lib/bottomNav";
 import { usePillState } from "@/lib/useBottomPillContext";
+import { useIsPro } from "@/lib/useIsPro";
 import { PickGroupList } from "@/components/PickGroupList";
 import { pickToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { TRADE_DEADLINE_PASSED_MESSAGE, tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
@@ -222,6 +223,8 @@ export function TradeFinderContent({
   // null = not yet known (no search attempted); set from the first search
   // response's `is_premium`/`upsell` — see the premium-gating note above.
   const [premiumUpsell, setPremiumUpsell] = useState<{ locked: boolean; upsell: PremiumUpsell | null } | null>(null);
+  // A confirmed Free account sees the Pro upsell up front, before it builds a package and searches (the server still gates the search).
+  const confirmedFree = useIsPro() === false;
   // The caller's declared Team Situation, mapped to the real engine
   // strategy key — see this file's docstring. Defaults to "retool" (the
   // same default as before this fetch existed) until GET .../team-stance
@@ -344,12 +347,12 @@ export function TradeFinderContent({
     );
   }
 
-  if (premiumUpsell?.locked) {
+  if (confirmedFree || premiumUpsell?.locked) {
     return (
       <PremiumUpsellCard
         kicker="Trade Finder"
         leagueName={leagueName}
-        upsell={premiumUpsell.upsell}
+        upsell={premiumUpsell?.upsell ?? null}
         fallbackTitle="Build and search for a trade"
         fallbackBody="Trade Finder is a Pro feature. Build a custom package and search every roster in your league for a real match. Upgrade to Pro to unlock it."
       />

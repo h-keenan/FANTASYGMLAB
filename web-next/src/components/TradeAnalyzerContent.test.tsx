@@ -263,6 +263,24 @@ describe("TradeAnalyzerContent", () => {
     expect(screen.getByRole("button", { name: "Report a bad verdict" })).toBeInTheDocument();
   });
 
+  it("shows a small locked Pro row for Free (role_notes_locked) and the lines themselves for Pro", async () => {
+    vi.mocked(api.postTradeAnalyzer).mockResolvedValue({ ok: true, verdict: VERDICT, reason: "", role_notes_locked: true });
+    renderPage();
+    addVia("You send", "My RB");
+    addVia("You receive", "Their WR");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
+    });
+    expect(await screen.findByTestId("trade-role-notes-lock")).toHaveTextContent("Role changes for players in this trade");
+    expect(screen.queryByTestId("trade-role-notes")).not.toBeInTheDocument();
+    vi.mocked(api.postTradeAnalyzer).mockResolvedValue({ ok: true, verdict: VERDICT, reason: "", role_notes: ["Rico: role expanding"] });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Analyze$/ }));
+    });
+    expect(await screen.findByTestId("trade-role-notes")).toHaveTextContent("Rico: role expanding");
+    expect(screen.queryByTestId("trade-role-notes-lock")).not.toBeInTheDocument();
+  });
+
   it("analyzes a built package and renders the verdict with the width-fill grid, a single value bar, and confidence/risk rows", async () => {
     vi.mocked(api.postTradeAnalyzer).mockResolvedValue({ ok: true, verdict: VERDICT, reason: "" });
     renderPage();

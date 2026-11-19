@@ -167,7 +167,7 @@ describe("TradeHubContent", () => {
     };
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={gated} />);
 
-    expect(screen.getByText("3 more trade ideas available on Pro.")).toBeInTheDocument();
+    expect(screen.getByText("3 more trade ideas on this board")).toBeInTheDocument();
   });
 
   // New-user guidance audit, 2026-10: plain-English posture line replaces the
