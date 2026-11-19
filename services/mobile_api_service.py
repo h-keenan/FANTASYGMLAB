@@ -344,6 +344,8 @@ if SENTRY_DSN:
         from sentry_sdk.integrations.fastapi import FastApiIntegration
         from sentry_sdk.integrations.starlette import StarletteIntegration
 
+        from modules import sentry_scrub
+
         if not sentry_sdk.is_initialized():
             sentry_sdk.init(
                 dsn=SENTRY_DSN,
@@ -353,6 +355,9 @@ if SENTRY_DSN:
                 # cost this app doesn't need to opt into implicitly. Raise via
                 # SENTRY_TRACES_SAMPLE_RATE if that changes later.
                 traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
+                # No request bodies, no default PII, and a scrubber for credential-shaped keys/values (ESPN cookies,
+                # bearer tokens, emails) -- see modules/sentry_scrub.py.
+                **sentry_scrub.sentry_init_options(),
             )
             logger.info("Sentry error reporting initialized.")
     except Exception:
