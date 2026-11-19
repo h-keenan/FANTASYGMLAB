@@ -40,6 +40,7 @@ import { simByeParts, simInboxParts, simInjuryParts, simStandingsParts, simWaive
 import type { SimTab } from '../lib/simGameFlow';
 import { simPreview } from '../lib/simLayout';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { toneColor } from '../lib/verdictToneTheme';
 
 type OnTab = (tab: SimTab) => void;
 
@@ -264,7 +265,7 @@ export function SimStandingsCard({ standings, onTab }: { standings: SimHomeRespo
               <View style={common.grow}>
                 <SimTeamLink teamId={r.team_id} name={r.name} isYou={r.is_you} size='chip' bold={r.is_you} />
               </View>
-              <AppText style={[common.small, { color: r.streak?.startsWith('W') ? colors.success : r.streak?.startsWith('L') ? colors.danger : colors.textTertiary }]}>{r.streak ?? ''}</AppText>
+              <AppText style={[common.small, { color: r.streak?.startsWith('W') ? colors.success : r.streak?.startsWith('L') ? toneColor(colors, 'negative') : colors.textTertiary }]}>{r.streak ?? ''}</AppText>
               <AppText style={common.bodyStrong}>{simFmtRecord(r)}</AppText>
             </View>
           );

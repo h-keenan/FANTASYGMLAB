@@ -3,6 +3,7 @@ import React from 'react';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { UsageTrend } from '../lib/api';
+import { toneColor } from '../lib/verdictToneTheme';
 
 /**
  * Usage-trend -> ToneBadge adapter: arrow plus the signed move, no words.
@@ -16,7 +17,7 @@ export default function UsageTrendPill({ trend }: { trend: UsageTrend }) {
     <ToneBadge
       size="xs"
       icon={rising ? 'arrow-up' : 'arrow-down'}
-      color={rising ? colors.success : colors.danger}
+      color={rising ? colors.success : toneColor(colors, 'negative')}
       label={`${trend.magnitude_pct}%`}
     />
   );

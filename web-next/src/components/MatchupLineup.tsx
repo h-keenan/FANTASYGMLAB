@@ -303,6 +303,7 @@ function CompactSide({
           {card.projectedFinal != null ? (
             <span
               className="text-[0.6875rem] font-bold tabular-nums"
+              /* verdict-color-ok: live-scoring projected-final move, not a usage state */
               style={{ color: trend ? (trend.dir === "up" ? "var(--color-success)" : trend.dir === "down" ? "var(--color-danger)" : "var(--color-text-muted)") : "var(--color-text-secondary)" }}
               title="Projected final"
             >

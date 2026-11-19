@@ -54,6 +54,7 @@ export default function PlayerHero({
   usageTrend,
   simTiles = null,
   usageLoading = false,
+  usageLocked = false,
   valueNote,
   valueLabel,
   byeWeek = null,
@@ -102,6 +103,8 @@ export default function PlayerHero({
   ringColor: string;
   usageTrend: UsageTrend | null;
   usageLoading?: boolean;
+  /** Free: the server withheld the usage read (Pro); the empty tile says so instead of "No clear trend". */
+  usageLocked?: boolean;
   /** Server-provided reason the Value tile is empty (e.g. "No market value yet"). */
   valueNote?: string | null;
   /** Overrides the VALUE caption (and explainer) when the number is not the real market value: Fantasy Sim passes "Trade value". */
@@ -255,7 +258,7 @@ export default function PlayerHero({
             </TapForWhy>
           )
         )}
-        <UsageTile trend={usageTrend} loading={usageLoading} />
+        <UsageTile trend={usageTrend} loading={usageLoading} locked={usageLocked} />
           </>
         )}
       </View>}
@@ -264,7 +267,7 @@ export default function PlayerHero({
   );
 }
 
-function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: boolean }) {
+function UsageTile({ trend, loading, locked }: { trend: UsageTrend | null; loading: boolean; locked: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (!trend) {
@@ -272,13 +275,13 @@ function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: bool
       <View style={styles.tile}>
         <AppText style={[styles.tileValue, styles.tileValueEmpty]}>{loading ? '…' : '—'}</AppText>
         <AppText style={styles.tileCaption}>USAGE</AppText>
-        {loading ? null : <AppText style={styles.tileNote}>No clear trend</AppText>}
+        {loading ? null : <AppText style={styles.tileNote}>{locked ? 'Pro' : 'No clear trend'}</AppText>}
       </View>
     );
   }
   const tone = usageTrendTone(trend);
-  const tint = tone === 'positive' ? colors.success : tone === 'danger' ? colors.danger : colors.textSecondary;
-  const background = tone === 'positive' ? colors.successMuted : tone === 'danger' ? colors.dangerMuted : undefined;
+  const tint = tone === 'positive' ? colors.success : tone === 'warning' ? colors.warning : colors.textSecondary;
+  const background = tone === 'positive' ? colors.successMuted : tone === 'warning' ? colors.warningMuted : undefined;
   const magnitude = Math.abs(trend.trend_pct);
   const confidence = sentenceCase(trend.confidence_label);
   const lit = usageConfidenceBars(trend.confidence_label);

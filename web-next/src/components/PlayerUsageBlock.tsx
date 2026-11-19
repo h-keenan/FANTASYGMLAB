@@ -32,7 +32,7 @@ export function PlayerUsageBlock({
         ) : null}
         {profile.flags.map((flag) => (
           <div key={flag.key} className={`sr-flag sr-flag--${flag.tone}`}>
-            <span className={`pqv-chip pqv-chip--${flag.tone === "positive" ? "positive" : "danger"}`}>{flag.label}</span>
+            <span className={`pqv-chip pqv-chip--${flag.tone === "positive" ? "positive" : "warning"}`}>{flag.label}</span>
             <p>{flag.explanation}</p>
           </div>
         ))}

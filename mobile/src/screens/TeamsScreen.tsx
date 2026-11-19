@@ -38,6 +38,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { toneColor as sharedToneColor } from '../lib/verdictToneTheme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import ErrorState from '../components/ErrorState';
 
@@ -194,7 +195,7 @@ const TEAM_BADGE_VISUALS: Record<string, { icon: keyof typeof Ionicons.glyphMap;
 
 function toneColor(tone: 'neutral' | 'positive' | 'negative', colors: ThemeColors): string {
   if (tone === 'positive') return colors.success;
-  if (tone === 'negative') return colors.danger;
+  if (tone === 'negative') return sharedToneColor(colors, 'negative');
   return colors.textSecondary;
 }
 

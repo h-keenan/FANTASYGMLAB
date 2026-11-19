@@ -73,6 +73,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
 import GlassCard from '../components/GlassCard';
 import { Collapse } from '../components/Presence';
+import { toneColor } from '../lib/verdictToneTheme';
 
 export type DetailTab = 'stats' | 'trends' | 'schedule' | 'career' | 'model' | 'news';
 const TABS: Array<{ key: DetailTab; label: string; glyph: TabIconName }> = [
@@ -728,12 +729,12 @@ function workloadTrendColor(colors: ThemeColors): Record<string, string> {
     // one whose role was merely "Stable." "falling"/"declining"/"decreasing"
     // are kept too in case the vocabulary ever changes, but the backend
     // never actually emits them today.
-    cooling: colors.danger,
-    fragile: colors.danger,
-    blocked: colors.danger,
-    falling: colors.danger,
-    declining: colors.danger,
-    decreasing: colors.danger,
+    cooling: toneColor(colors, 'negative'),
+    fragile: toneColor(colors, 'negative'),
+    blocked: toneColor(colors, 'negative'),
+    falling: toneColor(colors, 'negative'),
+    declining: toneColor(colors, 'negative'),
+    decreasing: toneColor(colors, 'negative'),
   };
 }
 
@@ -770,7 +771,7 @@ function UsageTrendChip({ trend }: { trend: UsageTrend }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const rising = trend.direction === 'up';
-  const tint = rising ? colors.success : colors.danger;
+  const tint = rising ? colors.success : toneColor(colors, 'negative');
   const tintMuted = rising ? colors.successMuted : colors.dangerMuted;
   return (
     <View style={[styles.usageTrendChip, { backgroundColor: tintMuted, borderColor: tint }]}>
@@ -822,7 +823,7 @@ function InsightChipsRow({ model }: { model: QuickViewModel }) {
     rows.push({
       key: 'usage',
       icon: rising ? 'flame' : 'alert-circle-outline',
-      color: rising ? colors.success : colors.danger,
+      color: rising ? colors.success : toneColor(colors, 'negative'),
       label: 'Usage',
       headline: model.usage_trend.label,
       detail: model.usage_trend.detail,
@@ -1416,6 +1417,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       ringColor={overallRating !== null ? overallRatingColor(overallRating, colors) : colors.accent}
       usageTrend={model?.usage_trend ?? null}
       usageLoading={loading}
+      usageLocked={model?.usage_profile?.gated === true}
       expanded={snapshotExpanded}
       onToggleExpand={overallRating !== null ? () => setSnapshotExpanded((value) => !value) : undefined}
     >

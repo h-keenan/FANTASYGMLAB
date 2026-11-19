@@ -9,6 +9,7 @@ import type { UsageProfile } from '../lib/api';
 import { poolCaption, usageRows } from '../lib/statRows';
 import { hasUsageContent, usageDataNote } from '../lib/usageProfile';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { toneColor } from '../lib/verdictToneTheme';
 
 /**
  * Usage card for the quick view sheet and player detail: the role flag in plain
@@ -40,7 +41,7 @@ export default function UsageBlock({
           <AppText style={styles.note}>Usage trends could not be calculated right now.</AppText>
         ) : null}
         {profile.flags.map((flag) => {
-          const tint = flag.tone === 'positive' ? colors.success : colors.danger;
+          const tint = flag.tone === 'positive' ? colors.success : toneColor(colors, 'negative');
           return (
             <View key={flag.key} style={[styles.flag, { borderColor: tint }]}>
               <AppText style={[styles.flagLabel, { color: tint }]}>{flag.label.toUpperCase()}</AppText>

@@ -12,8 +12,8 @@ test('rising usage is positive', () => {
 });
 
 test('a confirmed decline (high confidence or a 20%+ drop) is danger', () => {
-  assert.equal(usageTrendTone(FALLING), 'danger');
-  assert.equal(usageTrendTone({ ...FALLING, confidence_label: 'moderate confidence', trend_pct: -24 }), 'danger');
+  assert.equal(usageTrendTone(FALLING), 'warning');
+  assert.equal(usageTrendTone({ ...FALLING, confidence_label: 'moderate confidence', trend_pct: -24 }), 'warning');
 });
 
 test('a mild moderate-confidence decline is neutral, never green', () => {

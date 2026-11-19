@@ -1,6 +1,6 @@
 "use client";
 
-import { percentColorVar } from "@/lib/verdictToneCss";
+import { percentColorVar, toneColorVar } from "@/lib/verdictToneCss";
 import { PageTabBar } from "@/components/PageTabBar";
 import { PageTitle } from "@/components/PageTitle";
 import { useRouter } from "next/navigation";
@@ -395,7 +395,7 @@ function RosterPickRow({
 function WhatIfResult({ result }: { result: GamesWhatIfResponse }) {
   const change = result.change!;
   const tone = whatIfTone(change);
-  const color = tone === "positive" ? "var(--color-success)" : tone === "negative" ? "var(--color-danger)" : "var(--color-text-muted)";
+  const color = tone === "positive" ? "var(--color-success)" : tone === "negative" ? toneColorVar("negative") : "var(--color-text-muted)";
   return (
     <div className="glass-surface flex flex-col gap-3 p-4" data-testid="what-if-result">
       <div className="flex items-center justify-between gap-3">

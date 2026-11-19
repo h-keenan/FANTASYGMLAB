@@ -1,4 +1,4 @@
-import { percentColor } from '../lib/verdictToneTheme';
+import { percentColor, toneColor as sharedToneColor } from '../lib/verdictToneTheme';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
@@ -253,7 +253,7 @@ function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeason
 
   const change = result?.change;
   const tone = change ? whatIfTone(change) : 'neutral';
-  const toneColor = tone === 'positive' ? colors.success : tone === 'negative' ? colors.danger : colors.textTertiary;
+  const toneColor = tone === 'positive' ? colors.success : tone === 'negative' ? sharedToneColor(colors, 'negative') : colors.textTertiary;
   return (
     <View style={styles.section}>
       <SectionHeading title="What if" caption={`Pro. Up to ${MAX_PLAYERS} players on each side.`} />

@@ -51,9 +51,9 @@ export function teamSheetNextGameLine(game: { week: number; opponent: string } |
   return game ? `Week ${game.week} vs ${game.opponent}` : "";
 }
 
-/** W-streaks read green, anything else red. */
-export function teamSheetStreakTone(streak: string | null | undefined): "success" | "danger" {
-  return (streak ?? "").startsWith("W") ? "success" : "danger";
+/** W-streaks read green, a cold streak amber (never red: toneToken in verdictTone.ts). */
+export function teamSheetStreakTone(streak: string | null | undefined): "success" | "warning" {
+  return (streak ?? "").startsWith("W") ? "success" : "warning";
 }
 
 export function teamSheetPoints(value: number | null | undefined): string {

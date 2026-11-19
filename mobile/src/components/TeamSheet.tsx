@@ -31,6 +31,8 @@ function toneColor(tone: string, colors: ThemeColors): string {
       return colors.success;
     case 'danger':
       return colors.danger;
+    case 'warning':
+      return colors.warning;
     case 'accent':
       return colors.accent;
     case 'premium':

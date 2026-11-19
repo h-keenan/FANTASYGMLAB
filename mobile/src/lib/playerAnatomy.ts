@@ -91,7 +91,7 @@ function num(value: number | null | undefined, digits = 1): string | null {
 
 export function signedTrend(trend: number | null | undefined): PlayerFact | null {
   if (trend == null || !Number.isFinite(trend) || trend === 0) return null;
-  return { key: "trend", label: "TREND", value: `${trend > 0 ? "▲" : "▼"} ${Math.abs(Math.round(trend))}`, tone: trend > 0 ? "success" : "danger" };
+  return { key: "trend", label: "TREND", value: `${trend > 0 ? "▲" : "▼"} ${Math.abs(Math.round(trend))}`, tone: trend > 0 ? "success" : "warning" };
 }
 
 /** Everything a player row/card shows, per mode. The sim branch has no path to a numeric OVR or a trade value. */

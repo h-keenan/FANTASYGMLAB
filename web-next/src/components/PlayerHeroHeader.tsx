@@ -45,6 +45,7 @@ export function PlayerHeroHeader({
   usageTrend,
   simTiles = null,
   usageLoading = false,
+  usageLocked = false,
   depthChartNote,
   valueNote,
   valueLabel,
@@ -104,6 +105,8 @@ export function PlayerHeroHeader({
   /** True while the quick-view detail (which carries the usage read) is
    * still loading, so the tile shows a placeholder, not "no trend". */
   usageLoading?: boolean;
+  /** Free: the server withheld the usage read (Pro); the empty tile says so instead of "No clear trend". */
+  usageLocked?: boolean;
   depthChartNote?: string | null;
 }) {
   const Heading = headingLevel === 1 ? "h1" : "h2";
@@ -229,7 +232,7 @@ export function PlayerHeroHeader({
               </TapForWhy>
             )
           )}
-          <UsageTile trend={usageTrend} loading={usageLoading} />
+          <UsageTile trend={usageTrend} loading={usageLoading} locked={usageLocked} />
             </>
           )}
         </div></div>
@@ -247,7 +250,7 @@ export function PlayerHeroHeader({
   );
 }
 
-function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: boolean }) {
+function UsageTile({ trend, loading, locked }: { trend: UsageTrend | null; loading: boolean; locked: boolean }) {
   if (!trend) {
     return (
       <div className="pqv-stat-tile" aria-busy={loading || undefined}>
@@ -257,12 +260,12 @@ function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: bool
           <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
         )}
         <span className="pqv-stat-tile-caption">Usage trend</span>
-        {loading ? null : <span className="pqv-stat-tile-note">No clear trend</span>}
+        {loading ? null : <span className="pqv-stat-tile-note">{locked ? "Pro" : "No clear trend"}</span>}
       </div>
     );
   }
   // Same tone everywhere the trend reads: green rising, red for a
-  // confirmed decline, neutral for a mild one (usageTrendTone).
+  // confirmed decline (amber, never red), neutral for a mild one (usageTrendTone).
   const tone = usageTrendTone(trend);
   const magnitude = Math.abs(trend.trend_pct);
   const confidence = sentenceCase(trend.confidence_label);

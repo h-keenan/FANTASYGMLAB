@@ -120,18 +120,17 @@ export function opportunityUsageCaption(
 
 /** Color family for the PQV usage-trend tile, by the trend's real
  * direction and severity. Rising usage is positive (green). A decline is
- * danger (red) when it is a confirmed read: high confidence, or a drop of
- * 20% or more. That is the same "declining role reads red" rule PR #1308
- * applied to mobile's Player Quick View. A smaller, moderate-confidence
- * decline is neutral, never green. */
+ * a warning (amber, never red: toneToken in verdictTone.ts) when it is a
+ * confirmed read: high confidence, or a drop of 20% or more. A smaller,
+ * moderate-confidence decline is neutral, never green. */
 export function usageTrendTone(trend: {
   direction: "up" | "down";
   trend_pct: number;
   confidence_label: string;
-}): "positive" | "danger" | "neutral" {
+}): "positive" | "warning" | "neutral" {
   if (trend.direction === "up") return "positive";
   const highConfidence = trend.confidence_label.trim().toLowerCase().startsWith("high");
-  if (highConfidence || Math.abs(trend.trend_pct) >= 20) return "danger";
+  if (highConfidence || Math.abs(trend.trend_pct) >= 20) return "warning";
   return "neutral";
 }
 

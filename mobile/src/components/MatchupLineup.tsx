@@ -170,6 +170,7 @@ function CompactSide({
   const primary = chips[0];
   const flag = chips.find((chip) => chip.kind === 'questionable' || chip.kind === 'doubtful');
   const align = mirror ? 'flex-end' : 'flex-start';
+  // verdict-color-ok: live-scoring projected-final move, not a usage state
   const trendColor = trend ? (trend.dir === 'up' ? colors.successBright : trend.dir === 'down' ? colors.danger : colors.textTertiary) : colors.textSecondary;
   return (
     <PressableScale
