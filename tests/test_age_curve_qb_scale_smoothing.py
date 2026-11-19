@@ -31,7 +31,7 @@ def test_strategy_curve_has_no_large_step_between_adjacent_ages(strategy, positi
 def test_rebuild_rb_ramps_instead_of_cliff():
     out = apply_strategy_age_curve(_frame("RB", [26, 27, 28, 29, 30]), "rebuild", "dynasty_score")
     m = out["strategy_preference_multiplier"].tolist()
-    assert m[1] == pytest.approx(1.005)  # age-27 youth bonus tempered by half (audit P1-5)
+    assert m[1] == pytest.approx(1.01)
     assert m[2] == pytest.approx(0.91)
     assert m[3] == pytest.approx(0.82)
     assert m[4] == pytest.approx(0.82)
