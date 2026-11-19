@@ -1,6 +1,7 @@
 import concurrent.futures
 import contextvars
 import json
+import logging
 import os
 import threading
 import time
@@ -13,6 +14,26 @@ import requests
 
 from modules import live_policy, performance, season_clock, sleeper_budget, sleeper_cache
 from modules.file_lock import ExclusiveFileLock
+
+_log = logging.getLogger("fantasygm.sleeper")
+_FAILURE_LOG_INTERVAL_SECONDS = 60.0
+_failure_log_last: Dict[str, float] = {}
+
+
+def _log_failure(label: str, reason: str, *, league_id: str | None = None) -> None:
+    """Warn (throttled per label+reason) that a Sleeper read failed and the caller is about to degrade to empty.
+
+    Context is the call label, a coarse reason and the league id (not PII); never the URL, query, or payload.
+    The Sentry scrubber (modules/sentry_scrub.py) still applies to anything that reaches Sentry.
+    """
+
+    key = f"{label}:{reason}"
+    now = time.monotonic()
+    if now - _failure_log_last.get(key, -1e9) < _FAILURE_LOG_INTERVAL_SECONDS:
+        return
+    _failure_log_last[key] = now
+    _log.warning("sleeper_read_failed label=%s reason=%s league_id=%s", label, reason, league_id or "-")
+
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
 PLAYERS_CACHE_PATH = "data/sleeper_players.json"
@@ -1252,7 +1273,10 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                     time.sleep(SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1)))
                     continue
                 cache_status = "timeout"
-                return _last_known_or_none()
+                result = _last_known_or_none()
+                if result is None:
+                    _log_failure(label, "timeout")
+                return result
             except requests.RequestException:
                 # Network-level failure (connection error, etc.) — same
                 # transient treatment as a timeout.
@@ -1261,7 +1285,10 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                     time.sleep(SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1)))
                     continue
                 cache_status = "error"
-                return _last_known_or_none()
+                result = _last_known_or_none()
+                if result is None:
+                    _log_failure(label, "network_error")
+                return result
 
             if response.status_code == 200:
                 try:
@@ -1270,10 +1297,16 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                     # A 200 with a non-JSON body (maintenance page, proxy error): garbage,
                     # not data. Same treatment as a failed call; never raise into a request.
                     cache_status = "garbage"
-                    return _last_known_or_none()
+                    result = _last_known_or_none()
+                    if result is None:
+                        _log_failure(label, "non_json_body")
+                    return result
                 if payload is None:
                     cache_status = "garbage"
-                    return _last_known_or_none()
+                    result = _last_known_or_none()
+                    if result is None:
+                        _log_failure(label, "null_body")
+                    return result
                 sleeper_budget.remember(url, payload)
                 return payload
             if response.status_code in _RETRYABLE_STATUS_CODES and attempt < retries:
@@ -1284,7 +1317,11 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
             # fetch time) when we have one. A genuine 4xx fails fast.
             if response.status_code in _RETRYABLE_STATUS_CODES:
                 cache_status = "rate_limited" if response.status_code == 429 else "error"
-                return _last_known_or_none()
+                result = _last_known_or_none()
+                if result is None:
+                    _log_failure(label, f"http_{response.status_code}")
+                return result
+            _log_failure(label, f"http_{response.status_code}")
             return None
     finally:
         _note_provider_timing(
@@ -1775,7 +1812,8 @@ def _get_users_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
     try:
         users = _live_league_json("sleeper_league_users", url)
         return users if isinstance(users, list) else []
-    except Exception:
+    except Exception as exc:
+        _log_failure("sleeper_league_users", type(exc).__name__, league_id=league_id)
         return []
 
 
@@ -1817,7 +1855,8 @@ def _get_rosters_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
     try:
         rosters = _live_league_json("sleeper_league_rosters", url)
         return rosters if isinstance(rosters, list) else []
-    except Exception:
+    except Exception as exc:
+        _log_failure("sleeper_league_rosters", type(exc).__name__, league_id=league_id)
         return []
 
 
@@ -1838,7 +1877,8 @@ def _get_league_cached(league_id: str, _bucket: int) -> Dict[str, Any]:
     try:
         league = _live_league_json("sleeper_league", url)
         return league if isinstance(league, dict) else {}
-    except Exception:
+    except Exception as exc:
+        _log_failure("sleeper_league", type(exc).__name__, league_id=league_id)
         return {}
 
 
@@ -1862,7 +1902,8 @@ def get_league_drafts(league_id: str) -> List[Dict[str, Any]]:
     try:
         drafts = _request_json("sleeper_league_drafts", url, timeout=5)
         return drafts if isinstance(drafts, list) else []
-    except Exception:
+    except Exception as exc:
+        _log_failure("sleeper_league_drafts", type(exc).__name__, league_id=league_id)
         return []
 
 
@@ -1877,7 +1918,8 @@ def get_draft(draft_id: str) -> Dict[str, Any]:
     try:
         draft = _request_json("sleeper_draft", url, timeout=5)
         return draft if isinstance(draft, dict) else {}
-    except Exception:
+    except Exception as exc:
+        _log_failure("sleeper_draft", type(exc).__name__)
         return {}
 
 
@@ -2006,7 +2048,8 @@ def get_matchups(league_id: str, round_num: int) -> List[Dict[str, Any]]:
                 defer_max_age=live_policy.SEVERE_DEFER_MAX_AGE_SECONDS if live else None),
         )
         return matchups if isinstance(matchups, list) else []
-    except Exception:
+    except Exception as exc:
+        _log_failure("sleeper_matchups", type(exc).__name__, league_id=league_id)
         return []
 
 

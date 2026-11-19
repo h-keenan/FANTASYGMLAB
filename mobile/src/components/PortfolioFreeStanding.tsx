@@ -7,6 +7,7 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import DashboardStatRow from './DashboardStatRow';
 import EmptyState from './EmptyState';
+import ErrorState from './ErrorState';
 import SectionHeading from './SectionHeading';
 import ToneBadge from './ToneBadge';
 import { api, type TeamSnapshot } from '../lib/api';
@@ -29,6 +30,8 @@ export default function PortfolioFreeStanding() {
   const [league, setLeague] = useState<LastLeague | null>(null);
   const [snapshot, setSnapshot] = useState<TeamSnapshot | null>(null);
   const [noLeague, setNoLeague] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   useEffect(() => {
     let cancelled = false;
@@ -44,11 +47,13 @@ export default function PortfolioFreeStanding() {
         setLeague(last);
         setSnapshot(dashboard.team_snapshot ?? null);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
   if (noLeague) {
     return (
       <EmptyState
@@ -62,6 +67,11 @@ export default function PortfolioFreeStanding() {
       />
     );
   }
+  const retry = () => {
+    setFailed(false);
+    setAttempt((n) => n + 1);
+  };
+  if (failed && !snapshot) return <ErrorState compact title="Could not load your standing" onRetry={retry} />;
   if (!league || !snapshot) return null;
   return (
     <AccentCard accent={colors.accent} style={styles.card}>

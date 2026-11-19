@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { ErrorState } from "@/components/ErrorState";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api, type CareerSeason, type WeeklyStatPoint } from "@/lib/api";
 import { simCareerAsOf, simGameLog } from "@/lib/simAsOf";
@@ -18,7 +19,9 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
   const [career, setCareer] = useState<CareerSeason[] | null>(null);
   const [log, setLog] = useState<WeeklyStatPoint[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [logFailed, setLogFailed] = useState(false);
   const [open, setOpen] = useState(0);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,20 +36,30 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
     api
       .getPlayerWeeklyStats(playerId, asOf)
       .then((body) => {
-        if (!cancelled) setLog(body.weeks);
+        if (cancelled) return;
+        // stats_available === false: the server could not load that season's stats (not "no games").
+        if (body.stats_available === false) setLogFailed(true);
+        else setLog(body.weeks);
       })
       .catch(() => {
-        if (!cancelled) setLog([]);
+        if (!cancelled) setLogFailed(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [playerId, asOf]);
+  }, [playerId, asOf, attempt]);
 
-  if (failed) return <p className="pqv-status-text">{SIM_LOAD_ERROR.pastSeasons}</p>;
+  const retry = () => {
+    setFailed(false);
+    setLogFailed(false);
+    setCareer(null);
+    setLog(null);
+    setAttempt((n) => n + 1);
+  };
+  if (failed) return <ErrorState bare message={SIM_LOAD_ERROR.pastSeasons} onRetry={retry} />;
   if (career == null) return <SkeletonText label="past seasons" lines={3} />;
   const summary = simGameLog(log ?? []);
-  if (career.length === 0 && summary.games === 0) return <p className="pqv-status-text">No NFL seasons on file before this one.</p>;
+  if (career.length === 0 && summary.games === 0 && !logFailed) return <p className="pqv-status-text">No NFL seasons on file before this one.</p>;
   return (
     <div className="flex flex-col gap-3" data-testid="sim-real-history">
       {career.length > 0 ? (
@@ -103,6 +116,7 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
           </ul>
         </section>
       ) : null}
+      {logFailed ? <ErrorState compact bare onRetry={retry} message={SIM_LOAD_ERROR.pastSeasons} /> : null}
     </div>
   );
 }

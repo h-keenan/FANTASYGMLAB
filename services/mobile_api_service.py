@@ -10220,6 +10220,11 @@ def get_player_weekly_stats(
         )
 
     season_stats = sleeper.get_season_player_stats(target_season, retain_weekly=True)
+    stats_available = bool(season_stats)
+    if not stats_available:
+        # An empty season aggregate means the load failed, not that the player did not play. Log it and say so in the
+        # body (`stats_available: false`) so the client shows a retry instead of "no games".
+        logger.warning("weekly_stats_unavailable season=%s", target_season)
     player_stats = season_stats.get(str(player_id))
     weeks = player_stats.get("weekly") if isinstance(player_stats, dict) else None
     inactive_weeks = (
@@ -10258,6 +10263,7 @@ def get_player_weekly_stats(
     played = {r["week"] for r in rows}
     return {
         "ok": True,
+        "stats_available": stats_available,
         "season": target_season,
         "weeks": rows,
         "inactive_weeks": [w for w in inactive_weeks if w not in played],
