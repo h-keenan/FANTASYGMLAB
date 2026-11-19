@@ -39,7 +39,7 @@ export function ShareToCommunityToggle({
   const [sharedId, setSharedId] = useState<string | null>(null);
   const [error, setError] = useState("");
   // Serializes share and off so that switching off during an in-flight share always wins.
-  
+
   useEffect(() => {
     let cancelled = false;
     api
@@ -117,7 +117,7 @@ export function ShareToCommunityToggle({
       </div>
       {on && !sharedId ? (
         <div className="flex flex-col gap-2">
-          <Input
+          <Inpu
             type="text"
             value={name}
             maxLength={24}
