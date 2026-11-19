@@ -36,7 +36,7 @@ from typing import Any, Mapping, Sequence
 
 from modules import age_profile, projection_calibration
 from modules.team_eval import normalize_team_strategy, team_strategy_label
-from modules.trade_lineup_model import STATIC_VALUE_PER_POINT
+from modules.trade_lineup_model import POSTURE_WEIGHTS, STATIC_VALUE_PER_POINT
 
 # --- parameters (all approximate; see docs/trade-engine-v2.md) ----------------
 
@@ -73,18 +73,21 @@ WINDOW_WIN_WEIGHT: dict[str, float] = {
     "rebuild": 0.0,
     "tank": 0.0,
 }
-# Extra weight on REAL lineup points (value units per point = the model's k)
-# beyond what ``trade_lineup_model.POSTURE_WEIGHTS`` already applies
-# (contender 1.50 ... tank 1.00). A rebuilding team's short-term lineup, up or
-# down, is worth less than the market's present-value share says; this takes
-# the net point weight to rebuild ~0.65 and tank ~0.40. Contender-side
+# The net weight on REAL lineup points a rebuilding team puts on a point of ROS lineup change (value units
+# per point = the model's k), relative to the market's 1.0: rebuild ~0.65, tank ~0.40. A rebuilding team's
+# short-term lineup, up or down, is worth less than the market's present-value share says. Contender-side
 # emphasis is the wins term below, not this table.
+NET_POINT_WEIGHT_TARGET: dict[str, float] = {"rebuild": 0.65, "tank": 0.40}
+# Extra weight beyond what ``trade_lineup_model.POSTURE_WEIGHTS`` already applies. DERIVED, not hand-set:
+# the lineup model's own posture weight (1.0 + the starter-strength weight, so it moves with the P1-5 floor)
+# plus this adjustment lands on the net target above. With the old weights (rebuild 1.05, tank 1.00) that is
+# the long-standing -0.40 / -0.60; with the 0.20 floor (both 1.20) it is -0.55 / -0.80, so raising the
+# starter-strength weight does not silently change how a rebuilder or tank prices a lineup point here.
 PRESENT_ADJUST: dict[str, float] = {
     "contender": 0.0,
     "fringe_contender": 0.0,
     "retool": 0.0,
-    "rebuild": -0.40,
-    "tank": -0.60,
+    **{posture: round(target - POSTURE_WEIGHTS[posture][0], 4) for posture, target in NET_POINT_WEIGHT_TARGET.items()},
 }
 # Where a posture wants its assets: +1 = present (lineup now), -1 = future
 # (youth, picks). Retool is deliberately neutral.
