@@ -244,7 +244,7 @@ def test_breaking_up_a_stud_for_depth_is_a_decline():
     # starter-strength weight) decides. The market says "wins on raw value"
     # but the depth pieces would not start, so the expected lineup points
     # drop. The contender, who weights real lineup points 1.5x, declines; the
-    # rebuilder (1.05x) is hurt much less.
+    # rebuilder (1.20x with the P1-5 floor) is hurt much less.
     depth = [_row("D1", "WR", 3400), _row("D2", "RB", 3300), _row("D3", "TE", 3300)]
     pool = _pool(*depth)
     stud = _roster().set_index("player_id").loc["STUD"].to_dict() | {"player_id": "STUD"}
@@ -265,7 +265,7 @@ def test_breaking_up_a_stud_for_depth_is_a_decline():
     # Posture is a parameter of the one model: contenders weight real
     # lineup points more than rebuilders do.
     assert contender_fit["lineup_model"]["weights"]["now"] == 1.5
-    assert rebuild_fit["lineup_model"]["weights"]["now"] == 1.05
+    assert rebuild_fit["lineup_model"]["weights"]["now"] == 1.20  # rebuild floored at 0.20 (audit P1-5)
     assert contender.trade_score == contender_fit["trade_score"]
 
 
@@ -376,3 +376,48 @@ def test_selling_surplus_is_credited_and_starters_and_picks_are_untouched():
         value_of=lambda a: a["score"],
     )
     assert points == 2500
+
+
+# --- starter-weight floor + youth tempering (audit P1-5) ---------------------------
+
+
+def _in_subprocess(code, flag):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    env = {k: v for k, v in os.environ.items() if k != "DYNASTYGM_STARTER_WEIGHT_FLOOR_V1"}
+    if flag:
+        env["DYNASTYGM_STARTER_WEIGHT_FLOOR_V1"] = flag
+    out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True,
+                         cwd=Path(__file__).resolve().parents[1])
+    return out.stdout.strip().splitlines()[-1]
+
+
+_WEIGHTS = "import json; from modules import trade_grade as t; print(json.dumps(t.STARTER_STRENGTH_WEIGHTS))"
+_YOUTH = (
+    "import pandas as pd; from modules.trade_hub_engine import apply_strategy_age_curve as f; "
+    "d=pd.DataFrame({'age':[23.0],'position':['WR'],'dynasty_score':[5000]}); "
+    "print(f(d,'rebuild','dynasty_score')['strategy_preference_multiplier'].iloc[0])"
+)
+
+
+def test_starter_floor_defaults_on_for_rebuild_and_tank_only():
+    import json
+
+    w = json.loads(_in_subprocess(_WEIGHTS, ""))
+    assert w["rebuild"] == 0.20 and w["tank"] == 0.20
+    assert w["retool"] == 0.15 and w["contender"] == 0.50 and w["fringe_contender"] == 0.35
+
+
+def test_starter_floor_can_be_switched_off():
+    import json
+
+    w = json.loads(_in_subprocess(_WEIGHTS, "0"))
+    assert w["rebuild"] == 0.05 and w["tank"] == 0.0 and w["retool"] == 0.15
+
+
+def test_youth_bonus_is_tempered_by_default_and_restored_when_off():
+    assert float(_in_subprocess(_YOUTH, "")) == 1.05
+    assert float(_in_subprocess(_YOUTH, "0")) == 1.10

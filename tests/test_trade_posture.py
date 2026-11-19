@@ -130,7 +130,9 @@ def test_rebuilder_paying_picks_for_old_vets_is_not_a_smash_accept():
     out = {s: _grade(roster, [], vets, strategy=s, send_picks=picks) for s in ("contender", "rebuild", "tank")}
     assert out["contender"][1].ui_verdict == ACCEPT_UI  # win-now fits a contender
     assert out["rebuild"][1].ui_verdict != ACCEPT_UI
-    assert out["tank"][1].ui_verdict in {"DECLINE", "COUNTER"}
+    # With the P1-5 starter-weight floor (tank 0 -> 0.20) a tank no longer reads this as a decline; it
+    # must still never be an accept.
+    assert out["tank"][1].ui_verdict in {"DECLINE", "COUNTER", "FAIR"}
     note = out["rebuild"][1].posture_note
     assert "rebuilding" in note and "away from your rebuild" in note
 

@@ -73,6 +73,20 @@ def _safe_text(value: object, default: str = "") -> str:
 DEFAULT_ANALYZER_STRATEGY = "retool"
 
 
+# Trade-advice audit P1-5: under the starter-floor flag (trade_grade.STARTER_FLOOR_ENV_KEY,
+# default ON) the rebuild / tank youth bonus is halved, since trades handing the user the
+# younger side trailed the market (0.591 vs 0.618).
+YOUTH_BONUS_TEMPER = 0.5
+
+
+def _tempered_youth_points(points: tuple[tuple[float, float], ...]) -> tuple[tuple[float, float], ...]:
+    from modules import trade_grade
+
+    if not trade_grade._starter_floor_enabled():
+        return points
+    return tuple((age, 1.0 + (mult - 1.0) * YOUTH_BONUS_TEMPER) for age, mult in points)
+
+
 def apply_strategy_age_curve(df: pd.DataFrame, strategy: str, score_field: str) -> pd.DataFrame:
     """Faithful port of app.py's apply_strategy_age_curve — see module docstring.
 
@@ -113,7 +127,7 @@ def apply_strategy_age_curve(df: pd.DataFrame, strategy: str, score_field: str) 
         multiplier = sy(ages, ((22.0, 1.04), (25.0, 1.04), (26.0, 1.01), (29.0, 1.01), (31.0, 1.0)))
         multiplier = multiplier * decline(["RB"], 28, 0.91) * decline(["WR", "TE"], 31, 0.94)
     elif strategy_key == "rebuild":
-        multiplier = sy(ages, ((23.0, 1.10), (25.0, 1.06), (26.0, 1.02), (28.0, 1.0)))
+        multiplier = sy(ages, _tempered_youth_points(((23.0, 1.10), (25.0, 1.06), (26.0, 1.02), (28.0, 1.0))))
         multiplier = (
             multiplier
             * decline(["RB"], 28, 0.82)
@@ -122,7 +136,7 @@ def apply_strategy_age_curve(df: pd.DataFrame, strategy: str, score_field: str) 
             * decline(["QB"], 34, 0.92)
         )
     elif strategy_key == "tank":
-        multiplier = sy(ages, ((23.0, 1.15), (25.0, 1.09), (26.0, 1.0)))
+        multiplier = sy(ages, _tempered_youth_points(((23.0, 1.15), (25.0, 1.09), (26.0, 1.0))))
         multiplier = (
             multiplier
             * decline(["RB"], 27, 0.75)
