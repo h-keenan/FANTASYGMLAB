@@ -197,7 +197,11 @@ def multi_team_snapshot(specs=MULTI_SPECS):
             pid = players["player_id"].astype(str)
             for col in ("dynasty_score", "value_score"):
                 # one RB / QB / WR per team priced equally (a fair cycle can exist); every third team's QBs are weak
-                players.loc[pid.str.endswith(("-17", "-14", "-10")), col] = 4000.0
+                # distinct per-player offsets: exact ties would let float noise (platform, BLAS) reorder the search
+                balanced = pid.str.endswith(("-17", "-14", "-10"))
+                owner = pid.str.slice(1, 3).astype(int)
+                slot = pid.str.slice(4, 6).astype(int)
+                players.loc[balanced, col] = 4000.0 + ((owner * 13 + slot * 7) % 29 * 3)[balanced]
                 weak = pid.str.slice(1, 3).astype(int).mod(3).eq(0) & pid.str.endswith(("-00", "-01", "-15"))
                 players.loc[weak, col] = 3200.0
             fx["players"] = players
