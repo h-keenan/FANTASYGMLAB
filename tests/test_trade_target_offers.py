@@ -17,16 +17,6 @@ from modules import nfl_schedule, trade_grade, trade_ideas, trade_target_offers 
 from modules.trade_hub_engine import apply_strategy_age_curve, strategy_adjusted_pick_score_multiplier
 from scripts.profile_trade_hub import FixtureSpec, build_fixture
 
-
-@pytest.fixture(autouse=True)
-def _redundancy_discount_off(monkeypatch):
-    """These tests pin the search mechanics on synthetic full rosters, where the
-    returned depth player would be priced at the 50% bench-chip rate once the
-    roster-redundancy discount (default ON, trade_grade) applies. That interaction
-    is covered in tests/test_trade_grade.py."""
-
-    monkeypatch.setenv("DYNASTYGM_ROSTER_REDUNDANCY_V1", "0")
-
 SCORE = "value_score"
 
 # The fixture league is a 2026 dynasty league in week 8 (see _league). Whether

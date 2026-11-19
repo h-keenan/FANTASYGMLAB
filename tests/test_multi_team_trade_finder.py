@@ -237,9 +237,7 @@ def test_candidates_carry_picks_within_the_caps(pick_ctx):
             assert view.group[t.from_roster] == "contender" and view.pick_want[t.to_roster] > 0
 
 
-def test_ideas_with_picks_pass_every_teams_own_verdict_and_explain_the_pick(pick_ctx, monkeypatch):
-    # Pins pick-search mechanics; the roster-redundancy discount (default ON) is tested in test_trade_grade.
-    monkeypatch.setenv("DYNASTYGM_ROSTER_REDUNDANCY_V1", "0")
+def test_ideas_with_picks_pass_every_teams_own_verdict_and_explain_the_pick(pick_ctx):
     out = finder.find_three_team_ideas(pick_ctx, "1")
     assert out["search"]["picks_in_play"] > 0
     pick_ideas = [i for i in out["ideas"] if _pick_transfers(i)]

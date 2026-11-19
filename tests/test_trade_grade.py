@@ -349,14 +349,15 @@ def _player(pid, score):
     return {"asset_type": "player", "player_id": pid, "score": score}
 
 
-def test_redundancy_flag_defaults_on_and_can_be_switched_off(monkeypatch):
+def test_redundancy_flag_defaults_off_and_can_be_switched_on(monkeypatch):
     monkeypatch.delenv(trade_grade.REDUNDANCY_ENV_KEY, raising=False)
-    assert trade_grade.roster_redundancy_enabled() is True
+    assert trade_grade.roster_redundancy_enabled() is False
     for off in ("0", "false", "no", "off"):
         monkeypatch.setenv(trade_grade.REDUNDANCY_ENV_KEY, off)
         assert trade_grade.roster_redundancy_enabled() is False
-    monkeypatch.setenv(trade_grade.REDUNDANCY_ENV_KEY, "1")
-    assert trade_grade.roster_redundancy_enabled() is True
+    for on in ("1", "true", "yes", "on"):
+        monkeypatch.setenv(trade_grade.REDUNDANCY_ENV_KEY, on)
+        assert trade_grade.roster_redundancy_enabled() is True
 
 
 def test_receiving_a_player_who_cannot_start_is_discounted():

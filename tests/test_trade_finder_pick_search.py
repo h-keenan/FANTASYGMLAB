@@ -27,16 +27,6 @@ from scripts.profile_trade_hub import FixtureSpec, build_fixture
 DRAFT_STATUS = {"draft_year": 2026, "current_year_picks_active": True}
 
 
-@pytest.fixture(autouse=True)
-def _redundancy_discount_off(monkeypatch):
-    """These tests pin the search mechanics on synthetic full rosters, where the
-    returned depth player would be priced at the 50% bench-chip rate once the
-    roster-redundancy discount (default ON, trade_grade) applies. That interaction
-    is covered in tests/test_trade_grade.py."""
-
-    monkeypatch.setenv("DYNASTYGM_ROSTER_REDUNDANCY_V1", "0")
-
-
 def _fixture(strategy="contender", *, roster_size=26, max_roster=None):
     fixture = build_fixture(FixtureSpec("finder-picks", 12, roster_size, "1 QB", strategy=strategy))
     if max_roster is not None:

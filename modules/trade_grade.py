@@ -249,11 +249,12 @@ BENCH_CHIP_RETENTION = 0.50
 
 
 def roster_redundancy_enabled() -> bool:
-    """Default ON (owner-approved 2026-11-18); an explicit 0/false/no/off disables it."""
+    """Default OFF (stopgap): the all-bench discount moved 45.8% of backtest verdicts, cut lineup
+    AUC 0.622 -> 0.611 and starved the Trade Finder of pick-for-player ideas. 1/true/yes/on enables it."""
 
     from modules.app_config import config_value
 
-    return config_value(REDUNDANCY_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
+    return config_value(REDUNDANCY_ENV_KEY).strip().casefold() in {"1", "true", "yes", "on"}
 
 
 def roster_redundancy_adjustment(
