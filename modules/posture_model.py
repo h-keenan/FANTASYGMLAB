@@ -55,15 +55,38 @@ if starter_floor_enabled():
         k: (max(v, STARTER_WEIGHT_FLOOR) if k in STARTER_FLOOR_POSTURES else v) for k, v in STARTER_STRENGTH_BASE.items()
     }
 
+# --- coherence retune (owner-approved 2026-11-19, flagged) ----------------------------------------------------------
+# Three divergences that were preserved on purpose by the shared-model refactor (#2199) are coupled to the shared
+# tables when this flag is ON: the injury weights follow the starter weights, the multi-team finder's pick want
+# follows the tank/rebuild pick-sale distinction, and the pick-sale priority follows the posture ordering. Default
+# OFF until the out-of-sample backtest clears it. Read at import because the tables below derive from it.
+COHERENCE_ENV_KEY = "DYNASTYGM_POSTURE_COHERENCE_V1"
+
+
+def coherence_enabled() -> bool:
+    from modules.app_config import config_value
+
+    return config_value(COHERENCE_ENV_KEY).strip().casefold() in {"1", "true", "yes", "on"}
+
+
+COHERENCE_ON = coherence_enabled()
+
 # --- injury availability (trade_grade): how much a posture cares about the weeks a player misses ---------------------
 
-INJURY_POSTURE_WEIGHTS: dict[str, float] = {
+_INJURY_POSTURE_BASE: dict[str, float] = {
     "contender": 0.95,
     "fringe_contender": 0.75,
     "retool": 0.45,
     "rebuild": 0.15,
     "tank": 0.05,
 }
+# Coherence ON: a missed week costs a posture at least what a starter point earns it, so a floored rebuilder (starter
+# weight 0.20) no longer prices a missed week (0.15) below a point. Derived from the same now-weight source.
+INJURY_POSTURE_WEIGHTS: dict[str, float] = (
+    {k: max(v, STARTER_STRENGTH_WEIGHTS[k]) for k, v in _INJURY_POSTURE_BASE.items()}
+    if COHERENCE_ON
+    else dict(_INJURY_POSTURE_BASE)
+)
 
 # --- lineup model weights (trade_lineup_model): (now, future); derived from the starter weight -------------------------
 # A posture's extra weight on REAL lineup points is the starter-strength weight; future capital stays at 1.0 for every
@@ -193,11 +216,30 @@ PICK_SALE_PRIORITY_PER_PICK: dict[str, int] = {
 }
 PICK_SALE_PRIORITY_DEFAULT = -7  # rebuild and tank
 PICK_SALE_FIT_TERM: dict[str, int] = {"tank": -16, "rebuild": -12, "retool": -2}
+if COHERENCE_ON:
+    # Fringe sits between contender (+6) and retool (+1), interpolated by the shared orientation (0.6 of the way).
+    PICK_SALE_PRIORITY_PER_PICK["fringe_contender"] = round(
+        PICK_SALE_PRIORITY_PER_PICK["retool"]
+        + (PICK_SALE_PRIORITY_PER_PICK["contender"] - PICK_SALE_PRIORITY_PER_PICK["retool"])
+        * (ORIENTATION["fringe_contender"] - ORIENTATION["retool"])
+        / (ORIENTATION["contender"] - ORIENTATION["retool"])
+    )
 
 # --- multi_team_trade_finder: how much a posture group wants draft capital back, who sends it -------------------------
 # Keyed by posture GROUP (team_eval.normalize_team_strategy collapses tank into rebuild for the finder).
 PICK_WANT_BY_GROUP: dict[str, float] = {"rebuild": 2.0, "retool": 1.0, "contender": 0.0}
 PICK_SENDER_GROUPS: frozenset[str] = frozenset({"contender"})
+
+
+def pick_want(group: str, posture: str | None = None) -> float:
+    """How much a team wants draft capital back. ``group`` is the finder's collapsed posture group; with coherence ON
+    the finder also passes the full ``posture`` and tank scales the rebuild want by the pick-sale fit-term ratio
+    (the same tank/rebuild distinction ``pick_sale_terms`` and the hub pick multiplier already draw)."""
+
+    want = PICK_WANT_BY_GROUP.get(group, 0.0)
+    if COHERENCE_ON and group == "rebuild" and posture in PICK_SALE_FIT_TERM:
+        want *= PICK_SALE_FIT_TERM[posture] / PICK_SALE_FIT_TERM["rebuild"]
+    return want
 
 
 def pick_sale_terms(strategy: str, picks: int) -> tuple[int, int]:

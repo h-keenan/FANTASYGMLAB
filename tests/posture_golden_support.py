@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from unittest.mock import patch
 
 import pandas as pd
@@ -243,5 +244,28 @@ def multi_team_snapshot(specs=MULTI_SPECS):
     return _json(out)
 
 
-if __name__ == "__main__":  # subprocess entry: cheap snapshots under the caller's env flags
+def coherence_snapshot():
+    """Everything the posture-coherence flag (DYNASTYGM_POSTURE_COHERENCE_V1) can move, captured with it ON."""
+
+    from modules import posture_model, trade_grade, trade_ideas
+
+    send = {"asset_type": "pick"}
+    return _json({
+        "injury_weight": {p: trade_grade.INJURY_POSTURE_WEIGHTS.get(p) for p in POSTURES},
+        "pick_sale_priority": {
+            f"{p}|{n}": list(trade_ideas._pick_send_posture_terms([send] * n, {"strategy": p})) for p in POSTURES for n in (1, 2)
+        },
+        "pick_want": {f"{g}|{p}": posture_model.pick_want(g, p) for g, p in (
+            ("contender", "contender"), ("contender", "fringe_contender"), ("retool", "retool"),
+            ("rebuild", "rebuild"), ("rebuild", "tank"))},
+        "tables": tables_snapshot(),
+        "grade": grade_snapshot(),
+        "engine": engine_snapshot(),
+        "multi": multi_team_snapshot(),
+    })
+
+
+if __name__ == "__main__" and os.environ.get("POSTURE_GOLDEN_MODE") == "coherence":  # subprocess entry, flag ON
+    print("GOLDEN_JSON=" + json.dumps(coherence_snapshot(), sort_keys=True))
+elif __name__ == "__main__":  # subprocess entry: cheap snapshots under the caller's env flags
     print("GOLDEN_JSON=" + json.dumps({"tables": tables_snapshot(), "grade": grade_snapshot()}, sort_keys=True))

@@ -65,6 +65,35 @@ def test_three_team_finder_is_unchanged():
     _compare(S.multi_team_snapshot(), _want()["multi"], "multi-team finder")
 
 
+COHERENCE_GOLDEN = Path(__file__).parent / "fixtures" / "posture_golden_coherence.json"
+
+
+def _coherence_snapshot():
+    env = {**os.environ, "DYNASTYGM_POSTURE_COHERENCE_V1": "1", "POSTURE_GOLDEN_MODE": "coherence"}
+    out = subprocess.run(
+        [sys.executable, "-m", "tests.posture_golden_support"], cwd=ROOT, env={**env, "PYTHONPATH": str(ROOT)},
+        capture_output=True, text=True, check=True,
+    ).stdout
+    line = next(x for x in out.splitlines() if x.startswith("GOLDEN_JSON="))
+    return json.loads(line[len("GOLDEN_JSON="):])
+
+
+def test_coherence_flag_on_matches_its_own_golden():
+    """DYNASTYGM_POSTURE_COHERENCE_V1=1 (default OFF): every table, grade, Hub/Finder/GM Plan and 3-team result."""
+
+    got, want = _coherence_snapshot(), json.loads(COHERENCE_GOLDEN.read_text())
+    _compare(got, want, "coherence on")
+
+
+def test_coherence_flag_off_is_the_default(monkeypatch):
+    from modules import posture_model
+
+    assert posture_model.COHERENCE_ON is False or os.environ.get(posture_model.COHERENCE_ENV_KEY)
+
+
+if __name__ == "__main__" and os.environ.get("POSTURE_GOLDEN_CAPTURE_COHERENCE"):  # pragma: no cover - capture helper
+    COHERENCE_GOLDEN.write_text(json.dumps(_coherence_snapshot(), sort_keys=True, indent=0))
+
 if __name__ == "__main__" and os.environ.get("POSTURE_GOLDEN_CAPTURE"):  # pragma: no cover - capture helper
     snap = {
         "tables_on": S.tables_snapshot(), "grade_on": S.grade_snapshot(),

@@ -163,7 +163,7 @@ class _League:
         for rid in self.need_pos:
             group = str((self.ctx.posture(rid) or {}).get("group") or "retool")
             self.group[rid] = group
-            self.pick_want[rid] = PICK_WANT_BY_GROUP.get(group, 0.0)
+            self.pick_want[rid] = posture_model.pick_want(group, str((self.ctx.posture(rid) or {}).get("key") or ""))
         for pick_id, pick in sorted(self.ctx.pick_by_id.items()):
             rid = str(pick.get("owner_roster_id"))
             value = _num(pick.get("score"))
