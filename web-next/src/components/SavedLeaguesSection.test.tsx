@@ -5,12 +5,13 @@ import { SavedLeaguesSection } from "./SavedLeaguesSection";
 
 const mocks = vi.hoisted(() => ({
   rows: [] as Array<{ league_id: string; league_name: string | null }>,
+  readError: null as { message: string } | null,
   remove: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({
   supabase: {
-    from: () => ({ select: () => ({ order: () => Promise.resolve({ data: mocks.rows, error: null }) }) }),
+    from: () => ({ select: () => ({ order: () => Promise.resolve({ data: mocks.readError ? null : mocks.rows, error: mocks.readError }) }) }),
   },
 }));
 vi.mock("@/lib/api", () => ({ api: { removeSavedLeague: (id: string) => mocks.remove(id) } }));
@@ -21,7 +22,17 @@ describe("SavedLeaguesSection", () => {
       { league_id: "1", league_name: "Alpha" },
       { league_id: "2", league_name: "Beta" },
     ];
+    mocks.readError = null;
     mocks.remove.mockReset().mockResolvedValue({ ok: true, reason: "" });
+  });
+
+  it("shows a retry instead of vanishing when the read fails, then lists the leagues", async () => {
+    mocks.readError = { message: "down" };
+    render(<SavedLeaguesSection />);
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    mocks.readError = null;
+    fireEvent.click(retry);
+    expect(await screen.findByText("Alpha")).toBeInTheDocument();
   });
 
   it("renders nothing when there are no saved leagues", async () => {

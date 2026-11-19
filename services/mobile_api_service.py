@@ -1100,7 +1100,9 @@ def optional_user(
         if not auth_supabase.is_configured(config):
             return None
         user, _error = auth_supabase.fetch_auth_user_cached(config, token)
-    except Exception:
+    except Exception as exc:
+        # The caller is treated as signed out; without this a provider outage looks like thousands of expired sessions.
+        logger.warning("auth_user_lookup_failed error=%s", type(exc).__name__)
         return None
     if not user:
         return None
@@ -1195,7 +1197,9 @@ def _referral_comp_active(config: dict, user_id: str, access_token: str) -> bool
         if error or not isinstance(settings_row, dict):
             return False
         return bool(referrals.comp_is_active(settings_row))
-    except Exception:
+    except Exception as exc:
+        # Fails closed (the user loses the comp window), so say so instead of silently downgrading them.
+        logger.warning("referral_comp_check_failed error=%s", type(exc).__name__)
         return False
 
 
@@ -2451,7 +2455,8 @@ def _candidate_sleeper_username_for_rollover(
         return username
     try:
         saved_rows, saved_error = _fetch_saved_leagues_cached(config, access_token, user_id)
-    except Exception:
+    except Exception as exc:
+        logger.warning("saved_leagues_username_lookup_failed error=%s", type(exc).__name__)
         return ""
     if saved_error or not saved_rows:
         return ""
@@ -9494,9 +9499,11 @@ def record_decision(body: RecordDecisionRequest, user: dict[str, Any] = Depends(
     url = auth_supabase.rest_api_url(config, decision_log.DECISION_LOG_TABLE, "on_conflict=user_id,rec_key")
     try:
         response = requests.post(url, headers=headers, json={**row, "user_id": user_id}, timeout=15)
-    except Exception:
+    except Exception as exc:
+        logger.warning("decision_log_write_failed error=%s", type(exc).__name__)
         return {"ok": False, "reason": "not_available"}
     if response.status_code >= 400:
+        logger.warning("decision_log_write_failed status=%s", response.status_code)
         return {"ok": False, "reason": "not_available"}
     return {"ok": True, "reason": ""}
 

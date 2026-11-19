@@ -55,6 +55,15 @@ describe("ValueSignalsCard", () => {
     await waitFor(() => expect(screen.getAllByText(/3 days stored so far, 7 needed/).length).toBeGreaterThan(0));
   });
 
+  it("shows a retry instead of a skeleton forever when the load fails", async () => {
+    const spy = vi.spyOn(api, "getPlayerValueSignals").mockRejectedValueOnce(new Error("down"));
+    render(<ValueSignalsCard leagueId="L1" />);
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    spy.mockResolvedValue({ ok: true, status: "unavailable", span_days: 0, method: "", buy_low: [], sell_high: [] } as never);
+    fireEvent.click(retry);
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+  });
+
   it("renders nothing when value history is unavailable", async () => {
     vi.spyOn(api, "getPlayerValueSignals").mockResolvedValue({ ok: true, status: "unavailable", buy_low: [], sell_high: [] });
     const { container } = render(<ValueSignalsCard leagueId="L" />);

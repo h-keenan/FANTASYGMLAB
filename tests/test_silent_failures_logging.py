@@ -70,3 +70,38 @@ def test_weekly_stats_says_unavailable_instead_of_no_games(monkeypatch, caplog):
         log.removeHandler(caplog.handler)
     assert body["ok"] is True and body["weeks"] == [] and body["stats_available"] is False
     assert "weekly_stats_unavailable" in caplog.text
+
+def _capture(caplog, name="fantasygm.mobile_api"):
+    log = logging.getLogger(name)
+    log.addHandler(caplog.handler)  # that logger does not propagate to root
+    caplog.set_level(logging.WARNING, logger=name)
+    return log
+
+
+def test_referral_comp_check_failure_is_logged_and_still_fails_closed(caplog):
+    from services import mobile_api_service as svc
+
+    log = _capture(caplog)
+    try:
+        with patch("modules.account_store.fetch_user_settings", side_effect=RuntimeError("down")):
+            assert svc._referral_comp_active({}, "secret-user", "secret-token") is False
+    finally:
+        log.removeHandler(caplog.handler)
+    assert "referral_comp_check_failed" in caplog.text and "RuntimeError" in caplog.text
+    assert "secret" not in caplog.text
+
+
+def test_decision_log_write_failure_is_logged_and_surfaced(monkeypatch, caplog):
+    from tests.test_mobile_api_service import _client
+
+    client = _client(monkeypatch)
+    auth = Mock(status_code=200)
+    auth.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    log = _capture(caplog)
+    try:
+        with patch("requests.get", return_value=auth), patch("requests.post", return_value=Mock(status_code=500)):
+            body = client.post("/v1/decisions", headers={"Authorization": "Bearer good-token"}, json={"kind": "waiver_add", "rec_key": "w:1"}).json()
+    finally:
+        log.removeHandler(caplog.handler)
+    assert body == {"ok": False, "reason": "not_available"}
+    assert "decision_log_write_failed" in caplog.text and "status=500" in caplog.text

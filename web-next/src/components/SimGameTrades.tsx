@@ -5,6 +5,7 @@ import { useContext, useEffect, useMemo, useReducer, useRef, useState } from "re
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimTeamIdentity } from "@/components/SimTeamIdentity";
@@ -290,6 +291,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const [teamsAttempt, setTeamsAttempt] = useState(0);
   const [partnerLoaded, setPartnerLoaded] = useState<{ partner: string; players: SimGamePlayer[] } | null>(null);
   const [mine, setMine] = useState<SimGamePlayer[]>([]);
+  // A failed roster load must not leave the builder silently empty ("nothing to trade").
+  const [rosterFailed, setRosterFailed] = useState(false);
+  const [rosterAttempt, setRosterAttempt] = useState(0);
   // The verdict is stored with the offer it answers, so a changed offer
   // never shows the old verdict (no reset effect needed).
   const [verdictFor, setVerdictFor] = useState<{ key: string; verdict: SimTradeVerdict | null } | null>(null);
@@ -309,21 +313,39 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   useEffect(() => {
     if (!teamId) return;
     let cancelled = false;
-    api.getSimGameTeam(gameId, teamId).then((b) => !cancelled && setMine([...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])])).catch(() => {});
+    api
+      .getSimGameTeam(gameId, teamId)
+      .then((b) => {
+        if (cancelled) return;
+        setMine([...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])]);
+        setRosterFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setRosterFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [gameId, teamId, ctx.tick]);
+  }, [gameId, teamId, ctx.tick, rosterAttempt]);
 
   useEffect(() => {
     const partnerId = draft.partner;
     if (!partnerId) return;
     let cancelled = false;
-    api.getSimGameTeam(gameId, partnerId).then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: [...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])] })).catch(() => {});
+    api
+      .getSimGameTeam(gameId, partnerId)
+      .then((b) => {
+        if (cancelled) return;
+        setPartnerLoaded({ partner: partnerId, players: [...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])] });
+        setRosterFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setRosterFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [gameId, draft.partner, ctx.tick]);
+  }, [gameId, draft.partner, ctx.tick, rosterAttempt]);
   const partnerRoster = partnerLoaded && partnerLoaded.partner === draft.partner ? partnerLoaded.players : [];
 
   // "Trade for him" from the Players tab: preselect the partner and the player.
@@ -383,6 +405,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   // The partner list never renders empty without saying why.
   if (teamsError && !teams) {
     return <EmptyState title={SIM_LOAD_ERROR.teams} subtitle={teamsError} actionLabel="Try again" onAction={() => setTeamsAttempt((n) => n + 1)} />;
+  }
+  if (rosterFailed) {
+    return <ErrorState bare message={SIM_LOAD_ERROR.roster} onRetry={() => setRosterAttempt((n) => n + 1)} />;
   }
   if (!teams) return <SkeletonRows count={4} />;
   if (teams.length === 0) return <EmptyState title="No teams to trade with" subtitle="This league has no other teams to trade with right now." />;

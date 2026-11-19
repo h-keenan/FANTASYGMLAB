@@ -1,5 +1,6 @@
 "use client";
 
+import { bestEffort } from "@/lib/bestEffort";
 import { ButtonLink } from "@/components/Button";
 import { useEffect, useState } from "react";
 
@@ -160,7 +161,7 @@ export function ManagerProfileSheet({
       .then((result) => {
         if (!cancelled) setProfile(result);
       })
-      .catch(() => {});
+      .catch(bestEffort("manager_team_profile"));
     return () => {
       cancelled = true;
     };

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/Button";
+import { ErrorState } from "@/components/ErrorState";
 import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
@@ -14,25 +15,36 @@ type SavedLeague = { league_id: string; league_name: string | null };
  * Portfolio, but is reachable on every plan (Portfolio is Pro-only, so a
  * Free user who saved the wrong league had no way to swap it). Mirrors
  * mobile's More > Saved leagues. Renders nothing until leagues load, and
- * when there are none.
+ * when there are none; a failed read shows a retry row instead.
  */
 export function SavedLeaguesSection() {
   const [leagues, setLeagues] = useState<SavedLeague[]>([]);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A failed read must not look like "no saved leagues" (the section would vanish and the user could not remove a wrong one).
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     Promise.resolve(supabase.from("saved_leagues").select("league_id, league_name").order("is_default", { ascending: false }))
-      .then(({ data }) => {
-        if (!cancelled && data) setLeagues(data as SavedLeague[]);
+      .then(({ data, error: readError }) => {
+        if (cancelled) return;
+        if (readError || !data) {
+          setLoadFailed(true);
+          return;
+        }
+        setLoadFailed(false);
+        setLeagues(data as SavedLeague[]);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   const remove = (leagueId: string) => {
     setBusyId(leagueId);
@@ -51,6 +63,7 @@ export function SavedLeaguesSection() {
       .finally(() => setBusyId(null));
   };
 
+  if (loadFailed && leagues.length === 0) return <ErrorState compact onRetry={() => setAttempt((n) => n + 1)} message="Could not load your saved leagues" />;
   if (leagues.length === 0) return null;
 
   return (

@@ -4,6 +4,7 @@ import PressableScale from './PressableScale';
 import { useQuery } from '@tanstack/react-query';
 
 import AppText from './AppText';
+import ErrorState from './ErrorState';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import CompactModule from './CompactModule';
 import { listSummaryParts } from '../lib/moduleTemplates';
@@ -51,6 +52,10 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
     retry: false,
   });
   const data = query.data;
+  // A failed load must not make the card silently vanish: say so and offer a retry.
+  if (!data && query.isError) {
+    return <ErrorState compact title="Could not load buy low and sell high" onRetry={() => void query.refetch()} />;
+  }
   if (!data || data.status === 'unavailable') return null;
   const status = signalsStatusMessage(data);
   const items = tab === 'buy_low' ? data.buy_low : data.sell_high;

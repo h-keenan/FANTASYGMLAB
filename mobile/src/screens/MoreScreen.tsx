@@ -20,6 +20,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
+import ErrorState from '../components/ErrorState';
 import IconCircle from '../components/IconCircle';
 import { api, ApiError, type MeResponse, type PushCategory } from '../lib/api';
 import { planOf } from '../lib/plan';
@@ -190,19 +191,33 @@ export default function MoreScreen({ navigation }: Props) {
   // league can be removed on any plan (Portfolio itself is Pro-only).
   const [savedLeagues, setSavedLeagues] = useState<Array<{ id: string; league_id: string; league_name: string | null }>>([]);
   const [removingLeagueId, setRemovingLeagueId] = useState<string | null>(null);
+  // A failed read must not look like "no saved leagues" (the section would vanish and a wrong league could not be removed).
+  const [savedLeaguesFailed, setSavedLeaguesFailed] = useState(false);
+  const [savedLeaguesAttempt, setSavedLeaguesAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    supabase
-      .from('saved_leagues')
-      .select('id, league_id, league_name')
-      .order('is_default', { ascending: false })
-      .then(({ data }) => {
-        if (!cancelled && data) setSavedLeagues(maskShowcaseFields(data as typeof savedLeagues));
+    Promise.resolve(
+      supabase
+        .from('saved_leagues')
+        .select('id, league_id, league_name')
+        .order('is_default', { ascending: false }),
+    )
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data) {
+          setSavedLeaguesFailed(true);
+          return;
+        }
+        setSavedLeaguesFailed(false);
+        setSavedLeagues(maskShowcaseFields(data as typeof savedLeagues));
+      })
+      .catch(() => {
+        if (!cancelled) setSavedLeaguesFailed(true);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [savedLeaguesAttempt]);
   const onRemoveLeague = (league: { league_id: string; league_name: string | null }) => {
     const name = league.league_name || league.league_id;
     Alert.alert(
@@ -559,6 +574,9 @@ export default function MoreScreen({ navigation }: Props) {
         ) : null}
         </AnimatedCard>
 
+        {savedLeaguesFailed && savedLeagues.length === 0 ? (
+          <ErrorState compact title="Could not load your saved leagues" onRetry={() => setSavedLeaguesAttempt((n) => n + 1)} />
+        ) : null}
         {savedLeagues.length > 0 ? (
           <>
             <SectionHeading title="Saved leagues" topGap={16} />

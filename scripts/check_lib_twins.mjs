@@ -182,6 +182,7 @@ export const MIRRORED = [
   "useDelayedFlag.ts",
   "useSimLeagueRosters.ts",
   "valueHistoryPresentation.ts",
+  "bestEffort.ts",
 ];
 
 // Known, already-divergent twins (see header). Keep sorted.
