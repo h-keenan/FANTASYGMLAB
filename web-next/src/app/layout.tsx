@@ -20,6 +20,7 @@ import { DeferredTradeOutcomePrompt } from "@/components/DeferredTradeOutcomePro
 import { BRAND_NAME } from "@/lib/brand";
 import { THEME_BOOT_SCRIPT } from "@/lib/displayPreferences";
 import { OG_IMAGE } from "@/lib/seo/site";
+import { preconnectOrigins } from "@/lib/preconnect";
 
 // Share previews (Discord, X, iMessage): a static 1200x630 branded card
 // (public/og-image.png) with the large-image Twitter card; see OG_IMAGE.
@@ -57,6 +58,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     // <html> (a forced Day/Night choice) before React hydrates.
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
+        {/* Open the API and auth connections while the bundle downloads (see lib/preconnect.ts). */}
+        {preconnectOrigins([process.env.NEXT_PUBLIC_API_BASE_URL, process.env.NEXT_PUBLIC_SUPABASE_URL]).map((origin) => (
+          <link key={origin} rel="preconnect" href={origin} crossOrigin="anonymous" />
+        ))}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className="min-h-dvh flex flex-col">
