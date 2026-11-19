@@ -244,7 +244,7 @@ def test_breaking_up_a_stud_for_depth_is_a_decline():
     # starter-strength weight) decides. The market says "wins on raw value"
     # but the depth pieces would not start, so the expected lineup points
     # drop. The contender, who weights real lineup points 1.5x, declines; the
-    # rebuilder (1.20x with the P1-5 floor) is hurt much less.
+    # rebuilder (1.05x) is hurt much less.
     depth = [_row("D1", "WR", 3400), _row("D2", "RB", 3300), _row("D3", "TE", 3300)]
     pool = _pool(*depth)
     stud = _roster().set_index("player_id").loc["STUD"].to_dict() | {"player_id": "STUD"}
@@ -265,7 +265,7 @@ def test_breaking_up_a_stud_for_depth_is_a_decline():
     # Posture is a parameter of the one model: contenders weight real
     # lineup points more than rebuilders do.
     assert contender_fit["lineup_model"]["weights"]["now"] == 1.5
-    assert rebuild_fit["lineup_model"]["weights"]["now"] == 1.20  # rebuild floored at 0.20 (audit P1-5)
+    assert rebuild_fit["lineup_model"]["weights"]["now"] == 1.05
     assert contender.trade_score == contender_fit["trade_score"]
 
 
@@ -403,21 +403,21 @@ _YOUTH = (
 )
 
 
-def test_starter_floor_defaults_on_for_rebuild_and_tank_only():
+def test_starter_floor_defaults_off():
     import json
 
     w = json.loads(_in_subprocess(_WEIGHTS, ""))
+    assert w["rebuild"] == 0.05 and w["tank"] == 0.0 and w["retool"] == 0.15
+
+
+def test_starter_floor_when_on_floors_rebuild_and_tank_only():
+    import json
+
+    w = json.loads(_in_subprocess(_WEIGHTS, "1"))
     assert w["rebuild"] == 0.20 and w["tank"] == 0.20
     assert w["retool"] == 0.15 and w["contender"] == 0.50 and w["fringe_contender"] == 0.35
 
 
-def test_starter_floor_can_be_switched_off():
-    import json
-
-    w = json.loads(_in_subprocess(_WEIGHTS, "0"))
-    assert w["rebuild"] == 0.05 and w["tank"] == 0.0 and w["retool"] == 0.15
-
-
-def test_youth_bonus_is_tempered_by_default_and_restored_when_off():
-    assert float(_in_subprocess(_YOUTH, "")) == 1.05
-    assert float(_in_subprocess(_YOUTH, "0")) == 1.10
+def test_youth_bonus_is_untouched_by_default_and_tempered_when_the_flag_is_on():
+    assert float(_in_subprocess(_YOUTH, "")) == 1.10
+    assert float(_in_subprocess(_YOUTH, "1")) == 1.05
