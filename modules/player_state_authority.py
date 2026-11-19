@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 
 import pandas as pd
 
-from modules import injury_status as _injury_table
+from modules import derived_cache, injury_status as _injury_table
 from modules.frame_records import frame_records
 from modules.player_eligibility import (
     FREE_AGENT_TEAM_MARKERS,
@@ -153,11 +153,30 @@ def waiver_actionability(player: Mapping[str, object] | pd.Series) -> dict[str, 
     return {"actionable": True, "reason": "current_nfl_roster"}
 
 
+# ``waiver_actionability`` is a pure function of one row, so the filtered frame is a pure function of the input frame's content.
+# A frame tagged by a shared cache (``derived_cache.tag_frame``) names that content; an untagged frame is filtered directly.
+_ACTIONABLE_MEMO = derived_cache.Memo(
+    "waiver_actionable", max_entries=16,
+    copier=lambda frame: derived_cache.tag_frame(frame.copy(), derived_cache.frame_key(frame)),
+)
+
+
 def filter_waiver_actionable_players(players: pd.DataFrame) -> pd.DataFrame:
     """Keep only players eligible for current actionable add recommendations."""
 
     if players is None or players.empty:
         return players.copy() if players is not None else pd.DataFrame()
+    tag = derived_cache.frame_key(players)
+    if not tag:
+        return _filter_waiver_actionable(players)
+    result = _ACTIONABLE_MEMO.get_or_compute(
+        derived_cache.fingerprint("waiver_actionable", tag),
+        lambda: derived_cache.derive_frame_key(players, _filter_waiver_actionable(players), "waiver_actionable"),
+    )
+    return result
+
+
+def _filter_waiver_actionable(players: pd.DataFrame) -> pd.DataFrame:
     # Plain row dicts instead of ``DataFrame.apply(axis=1)``: the latter builds a
     # full pandas Series per row (about half of this function's cost on the
     # 7-8k-row pool).  ``waiver_actionability`` only ever calls ``.get`` on the row.
