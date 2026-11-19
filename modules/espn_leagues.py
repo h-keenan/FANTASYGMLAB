@@ -178,6 +178,7 @@ ERROR_MESSAGES = {
         "ESPN with fresh values and check you're using the account that's in the league."
     ),
     "league_not_found": "We couldn't find that ESPN league for that season. Check the league ID and season.",
+    "espn_rate_limited": "ESPN is limiting requests right now. Please try again in a minute.",
     "no_teams": "That ESPN league loaded, but it has no teams or rosters yet.",
     "espn_unavailable": "ESPN didn't respond. Please try again in a moment.",
     "mapping_too_low": (
@@ -572,6 +573,8 @@ def _classify_load_error(exc: Exception, *, used_credentials: bool = False) -> E
         return ESPNLeagueError("private_league", ERROR_MESSAGES["private_league"])
     if name == "ESPNInvalidLeague" or status == 404:
         return ESPNLeagueError("league_not_found", ERROR_MESSAGES["league_not_found"])
+    if status == 429:
+        return ESPNLeagueError("espn_rate_limited", ERROR_MESSAGES["espn_rate_limited"])
     return ESPNLeagueError("espn_unavailable", ERROR_MESSAGES["espn_unavailable"])
 
 
@@ -677,6 +680,17 @@ def _private_cache_key(league_key: str, user_id: str) -> str:
     return f"{league_key}\x00{user_id}"
 
 
+def _stale_espn_or_none(key: str, entry: Any, exc: Exception) -> dict[str, Any] | None:
+    """A failed ESPN refresh serves the last good snapshot (labelled with its age) when the failure is transient."""
+
+    from modules.external_league_common import note_stale_snapshot, serve_stale_on_failure
+
+    if entry and serve_stale_on_failure(exc):
+        note_stale_snapshot(key, entry[0])
+        return entry[1]
+    return None
+
+
 def get_league_snapshot(league_key: str, *, refresh: bool = False) -> dict[str, Any] | None:
     """Cached snapshot, or None when the league can't be loaded.
 
@@ -708,8 +722,8 @@ def get_league_snapshot(league_key: str, *, refresh: bool = False) -> dict[str, 
                 return entry[1]
             try:
                 snapshot = load_league_snapshot(league_key, credentials)
-            except ESPNLeagueError:
-                return None
+            except ESPNLeagueError as exc:
+                return _stale_espn_or_none(key, entry, exc)
             _SNAPSHOT_CACHE[key] = (time.time(), snapshot)
             return snapshot
 
@@ -731,7 +745,7 @@ def get_league_snapshot(league_key: str, *, refresh: bool = False) -> dict[str, 
             return snapshot
         except ESPNLeagueError as exc:
             if exc.reason != "private_league":
-                return None
+                return _stale_espn_or_none(league_key, entry, exc)
             _KNOWN_PRIVATE[league_key] = time.time()
     return private_load()
 
