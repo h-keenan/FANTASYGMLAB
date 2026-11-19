@@ -349,9 +349,12 @@ def _player(pid, score):
     return {"asset_type": "player", "player_id": pid, "score": score}
 
 
-def test_redundancy_flag_defaults_off(monkeypatch):
+def test_redundancy_flag_defaults_on_and_can_be_switched_off(monkeypatch):
     monkeypatch.delenv(trade_grade.REDUNDANCY_ENV_KEY, raising=False)
-    assert trade_grade.roster_redundancy_enabled() is False
+    assert trade_grade.roster_redundancy_enabled() is True
+    for off in ("0", "false", "no", "off"):
+        monkeypatch.setenv(trade_grade.REDUNDANCY_ENV_KEY, off)
+        assert trade_grade.roster_redundancy_enabled() is False
     monkeypatch.setenv(trade_grade.REDUNDANCY_ENV_KEY, "1")
     assert trade_grade.roster_redundancy_enabled() is True
 
@@ -361,7 +364,7 @@ def test_receiving_a_player_who_cannot_start_is_discounted():
         [], [_player("qb2", 5000)], current_starter_ids=set(), post_starter_ids=set(),
         value_of=lambda a: a["score"],
     )
-    assert points == -2000 and "cannot start" in note
+    assert points == -2500 and "cannot start" in note
 
 
 def test_selling_surplus_is_credited_and_starters_and_picks_are_untouched():
@@ -371,4 +374,4 @@ def test_selling_surplus_is_credited_and_starters_and_picks_are_untouched():
         current_starter_ids={"qb1"}, post_starter_ids={"wr"},
         value_of=lambda a: a["score"],
     )
-    assert points == 2000
+    assert points == 2500

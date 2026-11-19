@@ -631,7 +631,6 @@ def evaluate_trade_analyzer_fit(
             post_starter_ids=_starter_ids(post_snapshot),
             value_of=score_asset_value,
         )
-    raw_value_delta += redundancy_adjustment
 
     # Trade engine v2 (docs/trade-engine-v2.md): in season, ONE expected
     # lineup-points model replaces the three older single-signal pieces (the
@@ -675,7 +674,7 @@ def evaluate_trade_analyzer_fit(
                 model_ctx,
                 send_assets=send_assets,
                 receive_assets=receive_assets,
-                raw_value_delta=raw_value_delta,
+                raw_value_delta=raw_value_delta + redundancy_adjustment,
                 healthy_restore=healthy_restore,
                 consolidation_adjustment=consolidation_adjustment,
                 asset_value=model_asset_value,
@@ -713,12 +712,14 @@ def evaluate_trade_analyzer_fit(
             conf_pct, conf_label = trade_posture.adjusted_confidence(lineup_model, trade_score)
             lineup_model["confidence_pct"] = conf_pct
             lineup_model["confidence_label"] = conf_label
-        value_delta = int(raw_value_delta + consolidation_adjustment)
+        value_delta = int(raw_value_delta + redundancy_adjustment + consolidation_adjustment)
         injury_value_adjustment = int(lineup_model["components"]["injury_value_restore"])
     else:
         injury_value_adjustment = legacy_injury_value_adjustment
         starter_adjustment = legacy_starter_adjustment
-        value_delta = int(raw_value_delta + injury_value_adjustment + consolidation_adjustment + starter_adjustment)
+        value_delta = int(
+            raw_value_delta + redundancy_adjustment + injury_value_adjustment + consolidation_adjustment + starter_adjustment
+        )
         trade_score = value_delta
     current_needs = current_context["needs"]
     need_set = {str(pos).upper() for pos in current_needs}
@@ -1193,6 +1194,7 @@ def evaluate_trade_analyzer_fit(
         "value_adjustments": {
             "injury": injury_value_adjustment,
             "consolidation": consolidation_adjustment,
+            "redundancy": redundancy_adjustment,
             "starter_strength": starter_adjustment,
             "lineup_model": (
                 {k: v for k, v in lineup_model["components"].items() if k not in {"raw_value_delta", "consolidation"}}
