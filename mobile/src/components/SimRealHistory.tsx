@@ -22,10 +22,14 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
   const [career, setCareer] = useState<CareerSeason[] | null>(null);
   const [log, setLog] = useState<WeeklyStatPoint[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [logFailed, setLogFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [open, setOpen] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setFailed(false);
+    setLogFailed(false);
     api.getPlayerCareer(playerId).then(
       (body) => {
         if (!cancelled) setCareer(simCareerAsOf(body.seasons, asOf));
@@ -36,21 +40,29 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
     );
     api.getPlayerWeeklyStats(playerId, asOf).then(
       (body) => {
-        if (!cancelled) setLog(body.weeks);
+        if (cancelled) return;
+        // stats_available === false: the server could not load that season's stats (not "no games").
+        if (body.stats_available === false) setLogFailed(true);
+        else setLog(body.weeks);
       },
       () => {
-        if (!cancelled) setLog([]);
+        if (!cancelled) setLogFailed(true);
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [playerId, asOf]);
+  }, [playerId, asOf, attempt]);
 
-  if (failed) return <ErrorState title={SIM_LOAD_ERROR.pastSeasons} message="Check your connection and try again." />;
+  const retry = () => {
+    setCareer(null);
+    setLog(null);
+    setAttempt((n) => n + 1);
+  };
+  if (failed) return <ErrorState title={SIM_LOAD_ERROR.pastSeasons} message="Check your connection and try again." onRetry={retry} />;
   if (career == null) return <SkeletonText label="past seasons" lines={3} />;
   const summary = simGameLog(log ?? []);
-  if (career.length === 0 && summary.games === 0) return <AppText style={common.small}>No NFL seasons on file before this one.</AppText>;
+  if (career.length === 0 && summary.games === 0 && !logFailed) return <AppText style={common.small}>No NFL seasons on file before this one.</AppText>;
   return (
     <View style={common.stack} testID="sim-real-history">
       {career.length > 0 ? (
@@ -93,6 +105,7 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
           ))}
         </PqvSection>
       ) : null}
+      {logFailed ? <ErrorState compact title={SIM_LOAD_ERROR.pastSeasons} onRetry={retry} /> : null}
     </View>
   );
 }

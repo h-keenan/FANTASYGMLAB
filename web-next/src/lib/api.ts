@@ -2731,6 +2731,8 @@ export interface WeeklyStatPoint {
 
 export interface WeeklyStatsResponse {
   ok: true;
+  /** False when the server could not load that season's stats (a load failure, not "no games"). Absent on older servers. */
+  stats_available?: boolean;
   season: number;
   weeks: WeeklyStatPoint[];
   /** Weeks the provider lists the player for but he did not appear in (healthy scratch / out). Absent on older servers. */

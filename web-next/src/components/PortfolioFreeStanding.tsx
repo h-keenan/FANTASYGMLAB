@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { NavProMarker } from "@/components/NavProMarker";
 import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -17,27 +18,32 @@ import { useSavedLeagues } from "@/lib/useSavedLeagues";
 
 /**
  * Portfolio's Free state: the first (only) saved league's real standing from the same Today snapshot, then the Pro part
- * locked and named. Renders nothing until the standing loads: the upsell card below it is always the fallback, so a
- * failure here never blanks the page. A brand-new account with no saved league gets the connect / sample-league next step
+ * locked and named. Renders nothing until the standing loads (the upsell card below is always the fallback); a failed load
+ * shows a compact retry row instead of silently vanishing. A brand-new account with no saved league gets the connect / sample-league next step
  * (first-time-user audit 2026-11-17: it used to see only the Pro upsell and no way forward).
  */
 export function PortfolioFreeStanding() {
   const { rows, status } = useSavedLeagues(true);
   const first = rows[0] ?? null;
   const [snapshot, setSnapshot] = useState<TeamSnapshot | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!first) return;
     let cancelled = false;
+    setFailed(false);
     api
       .getDashboard(first.league_id)
       .then((res) => {
         if (!cancelled) setSnapshot(res.team_snapshot);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [first]);
+  }, [first, attempt]);
   if (status === "ready" && !first) {
     return (
       <EmptyState title="No saved league yet" subtitle="Connect a league to see your record and rank here, or look around a sample league first.">
@@ -50,6 +56,7 @@ export function PortfolioFreeStanding() {
       </EmptyState>
     );
   }
+  if (first && failed && !snapshot) return <ErrorState compact onRetry={() => setAttempt((n) => n + 1)} message="Could not load your standing" />;
   if (!first || !snapshot) return null;
   const items: StatStripItem[] = [
     { glyph: "record", label: "Record", value: portfolioRecordText(snapshot) },
