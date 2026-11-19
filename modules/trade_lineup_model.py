@@ -43,7 +43,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
 
-from modules import nfl_schedule, player_projections, posture_model
+from modules import age_profile, nfl_schedule, player_projections, posture_model
 from modules.frame_records import frame_records
 from modules.injury_status import category as injury_level, is_ruled_out
 from modules.rankings import age_multiplier
@@ -529,7 +529,7 @@ def profile_roster(df: pd.DataFrame, ctx: ModelContext, *, free_agent: bool = Fa
                 weekly = max(0.5, (high - low) / 2.0)
             sd = float(weekly) * params.sd_inflation.get(basis, 1.3)
         age = _num(row.get("age"))
-        if age is not None and age >= 99:
+        if age is not None and age >= age_profile.UNKNOWN_AGE_SENTINEL:
             age = None
         out.append(
             PlayerPoints(

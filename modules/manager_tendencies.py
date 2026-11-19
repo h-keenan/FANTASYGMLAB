@@ -241,7 +241,7 @@ def _age_at(birth_date: object, timestamp_ms: int) -> float | None:
         return None
     born_ms = datetime(born.year, born.month, born.day, tzinfo=timezone.utc).timestamp() * 1000
     age = (timestamp_ms - born_ms) / _MS_PER_YEAR
-    if age <= 0 or age > 60:
+    if age <= 0 or age > age_profile.MAX_KNOWN_AGE:
         return None
     return round(age, 1)
 

@@ -1635,7 +1635,8 @@ def _asset_age_band(assets: List[Dict[str, Any]]) -> str:
     (legacy 24/25 and 28 cutoffs when DYNASTYGM_CANONICAL_AGE_CURVE is off)."""
 
     return age_profile.group_band(
-        _asset_age_pairs(assets), legacy_avg=_asset_avg_age(assets), legacy_old=28.0, legacy_young=25.0
+        _asset_age_pairs(assets), legacy_avg=_asset_avg_age(assets),
+        legacy_old=age_profile.LEGACY_GROUP_OLD_AVG_AGE, legacy_young=age_profile.LEGACY_GROUP_YOUNG_AVG_AGE
     )
 
 
@@ -1663,7 +1664,7 @@ def _is_throw_in_asset(asset: Dict[str, Any]) -> bool:
         return True
     if score <= 3200 and tier_rank <= 2 and opportunity in {"Buried Depth", "Handcuff"}:
         return True
-    if age >= 28 and score <= 3200 and tier_rank <= 2:
+    if age_profile.at_least(age, age_profile.THROW_IN_VETERAN_MIN_AGE) and score <= 3200 and tier_rank <= 2:
         return True
     return False
 
@@ -1686,7 +1687,7 @@ def _is_premium_market_asset(
             return score >= 5200 or tier_rank >= 3
         return score >= 7600 or tier_rank >= 5
     if pos == "RB":
-        return age > 0 and age <= 26 and (score >= 4200 or tier_rank >= 3)
+        return age_profile.at_most(age, age_profile.PREMIUM_RB_MAX_AGE) and (score >= 4200 or tier_rank >= 3)
     if pos == "WR":
         return score >= 5400 or tier_rank >= 4
     if pos == "TE":
@@ -1712,11 +1713,11 @@ def _is_cornerstone_asset(
 
     if score >= 9800:
         return True
-    if tier_rank >= 5 and 0 < age <= 26:
+    if tier_rank >= 5 and age_profile.at_most(age, age_profile.CORNERSTONE_YOUNG_MAX_AGE):
         return True
-    if pos == "QB" and qb_format in {"Superflex", "2QB"} and tier_rank >= 4 and 0 < age <= 28 and score >= 7600:
+    if pos == "QB" and qb_format in {"Superflex", "2QB"} and tier_rank >= 4 and age_profile.at_most(age, age_profile.CORNERSTONE_SF_QB_MAX_AGE) and score >= 7600:
         return True
-    if pos == "RB" and tier_rank >= 4 and 0 < age <= 24 and score >= 7600 and opportunity == "Elite Opportunity":
+    if pos == "RB" and tier_rank >= 4 and age_profile.at_most(age, age_profile.CORNERSTONE_ELITE_RB_MAX_AGE) and score >= 7600 and opportunity == "Elite Opportunity":
         return True
     return False
 
@@ -2047,7 +2048,7 @@ def partner_acceptance_context(
                 cap -= 0.01
                 age_fit = "poor"
             elif age_band == "prime" or (
-                not age_profile.enabled() and 25 <= incoming_age <= 30
+                not age_profile.enabled() and age_profile.within(incoming_age, age_profile.LEGACY_PRIME_AGES)
             ):
                 age_fit = "good"
     # A rebuilder parting with a pick for a player, no pick back, is the
@@ -2531,7 +2532,7 @@ def evaluate_trade_market_realism(
         elif len(send_players) == 1 and len(receive_players) >= 2:
             score += 4
     elif asset_behavior == "Prospect Chaser":
-        if any(0 < _asset_age(asset) <= 24 for asset in send_players):
+        if any(age_profile.at_most(_asset_age(asset), age_profile.YOUNG_UPSIDE_MAX_AGE) for asset in send_players):
             score += 4
             positives.append(f"{partner_name} typically values younger upside profiles.")
 
@@ -3249,7 +3250,7 @@ def _is_core_or_protected_starter(asset: Dict[str, Any]) -> bool:
         return True
     if score >= 6500:
         return True
-    if 0 < age <= 25 and score >= 5200:
+    if age_profile.at_most(age, age_profile.CORE_YOUNG_MAX_AGE) and score >= 5200:
         return True
     if tier_rank >= TIER_MARKET_RANK["starter"] and score >= 5000:
         return True
@@ -3275,7 +3276,7 @@ def _is_long_term_starter_asset(asset: Dict[str, Any]) -> bool:
         return True
     if score >= 6500:
         return True
-    if 0 < age <= 25 and score >= 5200:
+    if age_profile.at_most(age, age_profile.CORE_YOUNG_MAX_AGE) and score >= 5200:
         return True
     return False
 
@@ -3518,7 +3519,7 @@ def _player_trade_fit(
         age = float(asset.get("age") or 0)
     except Exception:
         age = 0
-    if age >= 27:
+    if age_profile.at_least(age, age_profile.SELL_HIGH_VETERAN_MIN_AGE):
         score += 6
     archetype = _compatible_trade_archetype(
         normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode")),
@@ -3526,7 +3527,7 @@ def _player_trade_fit(
     )
     if (
         archetype in {"Juggernaut", "Young Competitive Team", "Asset Consolidator"}
-        and 0 < age <= 25
+        and age_profile.at_most(age, age_profile.YOUNG_CORE_ARCHETYPE_MAX_AGE)
         and (
             _asset_tier_rank(asset) >= TIER_MARKET_RANK["core starter"]
             or int(asset.get("score") or 0) >= 6000
@@ -3556,11 +3557,11 @@ def _target_trade_fit(
     except Exception:
         age = 0
     my_strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
-    if my_strategy in {"rebuild", "tank"} and 0 < age <= 25:
+    if my_strategy in {"rebuild", "tank"} and age_profile.at_most(age, age_profile.REBUILD_TARGET_MAX_AGE):
         score += 12 if my_strategy == "tank" else 8
-    if my_strategy == "retool" and 0 < age <= 26:
+    if my_strategy == "retool" and age_profile.at_most(age, age_profile.RETOOL_TARGET_MAX_AGE):
         score += 5
-    if team_strategy_mode(my_strategy) in {"contender", "competitive"} and 27 <= age <= 30:
+    if team_strategy_mode(my_strategy) in {"contender", "competitive"} and age_profile.within(age, age_profile.CONTENDER_TARGET_AGES):
         score += 5
     archetype = _compatible_trade_archetype(
         my_strategy,
@@ -3569,9 +3570,9 @@ def _target_trade_fit(
     if archetype in {"Juggernaut", "Young Competitive Team", "Asset Consolidator"}:
         if _asset_tier_rank(asset) >= TIER_MARKET_RANK["star"]:
             score += 10
-        if 0 < age <= 25:
+        if age_profile.at_most(age, age_profile.YOUNG_CORE_ARCHETYPE_MAX_AGE):
             score += 4
-    elif archetype == "Aging Contender" and 26 <= age <= 30:
+    elif archetype == "Aging Contender" and age_profile.within(age, age_profile.AGING_CONTENDER_TARGET_AGES):
         score += 7
     return score
 
@@ -3918,9 +3919,9 @@ def trade_strategy_fit_context(
     younger_return = bool(
         send_age and receive_age and receive_age + 1.0 <= send_age
     )
-    older_return = bool(receive_age and receive_age >= 28.5)
+    older_return = bool(receive_age and receive_age >= age_profile.OLDER_RETURN_MIN_AGE)
     outgoing_young_core = any(
-        _asset_age(asset) <= 25
+        _asset_age(asset) <= age_profile.YOUNG_CORE_ARCHETYPE_MAX_AGE
         and (
             _asset_tier_rank(asset) >= TIER_MARKET_RANK["core starter"]
             or str(asset.get("role") or "") == "Core"
@@ -4332,7 +4333,7 @@ def _trade_reasoning_context(
     elif my_strategy in {"contender", "fringe_contender"} and receive_avg_age and (
         _asset_age_band(receive_assets) == "prime"
         if age_profile.enabled() and _asset_age_pairs(receive_assets)
-        else 26 <= receive_avg_age <= 30
+        else age_profile.within(receive_avg_age, age_profile.CONTENDER_WINDOW_AGES)
     ):
         tags.append("Age Optimization")
         score += 5
@@ -5895,14 +5896,14 @@ def _build_trade_ideas_impl(
                     player_age = float(player.get("age"))
                 except Exception:
                     player_age = 0
-                if active_strategy in {"rebuild", "tank"} and player_age < 26 and player["score"] > 3500:
+                if active_strategy in {"rebuild", "tank"} and player_age < age_profile.REBUILD_SELL_MIN_AGE and player["score"] > 3500:
                     continue
                 for young_target in gated_partner_players:
                     try:
                         target_age = float(young_target.get("age"))
                     except Exception:
                         target_age = 99
-                    if target_age > 25 and active_strategy in {"rebuild", "tank"}:
+                    if target_age > age_profile.REBUILD_TARGET_MAX_AGE and active_strategy in {"rebuild", "tank"}:
                         continue
                     if young_target["score"] >= player["score"]:
                         continue
@@ -5960,7 +5961,7 @@ def _build_trade_ideas_impl(
                     player_age = float(player.get("age"))
                 except Exception:
                     player_age = 0
-                if not require_receive_picks and player_age < 26 and player["score"] > 3000:
+                if not require_receive_picks and player_age < age_profile.REBUILD_SELL_MIN_AGE and player["score"] > 3000:
                     continue
                 pick_packages = [make_package(pick) for pick in useful_picks]
                 for i, first in enumerate(useful_picks):
@@ -6525,7 +6526,7 @@ def _my_player_candidate_reason(
 
     if _is_surplus_asset(my_shape, selected_asset):
         return f"{selected_asset.get('label')} is a realistic chip because he is surplus to your {pos} room."
-    if strategy in {"rebuild", "tank"} and age >= 26:
+    if strategy in {"rebuild", "tank"} and age_profile.at_least(age, age_profile.REBUILD_SELL_MIN_AGE):
         return f"{selected_asset.get('label')} is a candidate because an older {tier or pos} can be converted into younger value or picks."
     if strategy in {"contender", "fringe_contender"} and pos not in injury_positions:
         return f"{selected_asset.get('label')} is movable because you can use this asset to push current lineup strength without opening an injury hole at {pos}."
@@ -6592,9 +6593,9 @@ def _target_fit_reason(
     age = _safe_float(target_asset.get("age"), 0.0)
     if pos in set(my_shape.get("needs") or []):
         return f"This player fits because {pos} is one of your current pressure positions."
-    if strategy in {"rebuild", "tank"} and 0 < age <= 25:
+    if strategy in {"rebuild", "tank"} and age_profile.at_most(age, age_profile.REBUILD_TARGET_MAX_AGE):
         return "This player fits because the age curve lines up with a longer timeline."
-    if strategy in {"contender", "fringe_contender"} and 26 <= age <= 30:
+    if strategy in {"contender", "fringe_contender"} and age_profile.within(age, age_profile.CONTENDER_WINDOW_AGES):
         return "This player fits because the profile helps a win-now roster immediately."
     if int(target_asset.get("score") or 0) >= 9000:
         return "This is an elite consolidation target: the package should pay a premium for a single cornerstone."
@@ -8232,7 +8233,7 @@ def _build_my_player_fallback_ideas(
                 limit=10,
             )
             for receive_assets in pick_packages:
-                min_reason = 6 if selected_age >= 26 or normalize_team_strategy(active_strategy) in {"rebuild", "tank"} else 8
+                min_reason = 6 if age_profile.at_least(selected_age, age_profile.REBUILD_SELL_MIN_AGE) or normalize_team_strategy(active_strategy) in {"rebuild", "tank"} else 8
                 add_fallback_idea(
                     partner_name,
                     partner_mode,

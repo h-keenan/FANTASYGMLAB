@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Sequence
 import numpy as np
 import pandas as pd
 
+from modules import age_profile
 from modules import injury_return_curves
 from modules import injury_status as injury_status_table
 from modules import performance
@@ -1913,7 +1914,7 @@ def opportunity_profile(
     except Exception:
         age = 99.0
 
-    young_upside = age <= 24 or years_exp <= 2
+    young_upside = age <= age_profile.YOUNG_UPSIDE_MAX_AGE or years_exp <= 2
     if str(depth_chart_position or "").strip() or _safe_int(depth_chart_order):
         _append_source_flag(source_flags, "sleeper_depth")
     if _safe_int(depth_chart_order):
@@ -2927,7 +2928,7 @@ def _injury_freshness(news_updated, *, now: float | None = None) -> tuple[float,
 def _injury_future_asset_profile(row) -> bool:
     age = _scalar_number(_row_get(row, "age"))
     years_exp = _scalar_number(_row_get(row, "years_exp"))
-    young_asset = (age == age and age <= 23.0) or (
+    young_asset = (age == age and age <= age_profile.FUTURE_ASSET_MAX_AGE) or (
         years_exp == years_exp and years_exp <= 1.0
     )
     if not young_asset:
@@ -5952,7 +5953,7 @@ def is_probably_stale_free_agent(row) -> bool:
     except Exception:
         age = None
 
-    if age is not None and age >= 40:
+    if age is not None and age >= age_profile.STALE_FA_RETIRED_MIN_AGE:
         return True
 
     search_rank = row.get("search_rank")
@@ -5970,7 +5971,7 @@ def is_probably_stale_free_agent(row) -> bool:
         if last_updated is not None and time.time() - last_updated > 365 * 24 * 60 * 60:
             if search_rank is None or search_rank >= 150:
                 return True
-            if age is not None and age >= 30 and search_rank >= 120:
+            if age is not None and age >= age_profile.STALE_FA_VETERAN_MIN_AGE and search_rank >= 120:
                 return True
             depth_position = str(row.get("depth_chart_position") or "").strip()
             if not depth_position and search_rank is not None and search_rank >= 100:
@@ -5981,7 +5982,7 @@ def is_probably_stale_free_agent(row) -> bool:
         years_exp = int(years_exp) if years_exp is not None else None
     except Exception:
         years_exp = None
-    if years_exp is not None and years_exp >= 12 and age is not None and age >= 35:
+    if years_exp is not None and years_exp >= 12 and age is not None and age >= age_profile.STALE_FA_LONG_CAREER_MIN_AGE:
         if search_rank is None or search_rank >= 120:
             return True
 

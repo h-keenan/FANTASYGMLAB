@@ -47,7 +47,76 @@ TEAM_OLDER_RETOOL_DELTA_YEARS = 1.25
 TEAM_OLDER_TANK_DELTA_YEARS = 1.0
 YOUNGER_RETURN_YEARS = 1.25
 
+# Analyzer-fit team age deltas (years the roster's average age moves because of one trade). Relative, like the
+# deltas above; named here so the verdict's age component and its prose read the same numbers.
+FIT_REBUILD_YOUNGER_STRONG_DELTA = -0.4  # a rebuild gaining this much youth scores the full age credit
+FIT_REBUILD_OLDER_STRONG_DELTA = 0.5  # ... and aging up this much takes the full penalty
+FIT_CONTENDER_OK_OLDER_DELTA = 0.6  # a contender tolerates this much aging when the lineup improves
+FIT_CONTENDER_BAD_OLDER_DELTA = 0.8  # ... but not this much when the lineup does not
+FIT_RETOOL_YOUNGER_DELTA = -0.35
+FIT_RETOOL_OLDER_DELTA = 0.75
+FIT_NOTE_OLDER_DELTA = 0.4  # "pushes the roster older" wording
+FIT_NEGATIVE_OLDER_DELTA = 0.6  # "ages the roster up" negative
+
 PHASES = ("rising", "prime", "declining", "cliff")
+
+# --- Named flat cutoffs ------------------------------------------------------------------------------------------------
+# Surfaces that deliberately use ONE absolute age for every position (a market-value rule, a screen heuristic, a data
+# sanity check) read it from here instead of carrying a literal. Each value is what that surface has always used;
+# naming it does not change it. Position-aware reads (``is_young`` / ``phase`` ...) stay the preferred way to ask "is
+# this player young"; these exist so a deliberate flat cutoff is documented, greppable and guarded
+# (tests/test_no_age_literals_outside_age_profile.py) instead of scattered.
+UNKNOWN_AGE_SENTINEL = 99.0  # the "no birth date" fill value some frames use
+
+# trade_ideas market classification (asset score x age)
+THROW_IN_VETERAN_MIN_AGE = 28.0  # an old, low-tier, low-score asset is a throw-in
+PREMIUM_RB_MAX_AGE = 26.0  # a young RB with a strong score or tier is a premium market asset
+CORNERSTONE_YOUNG_MAX_AGE = 26.0  # an elite-tier player this young is a cornerstone
+CORNERSTONE_SF_QB_MAX_AGE = 28.0  # Superflex QBs keep cornerstone status longer
+CORNERSTONE_ELITE_RB_MAX_AGE = 24.0  # RBs lose cornerstone status early
+CORE_YOUNG_MAX_AGE = 25.0  # a young, high-score player is a core / long-term starter
+
+# trade_ideas fit scoring (who a posture wants to buy, sell or hold)
+SELL_HIGH_VETERAN_MIN_AGE = 27.0  # an older player fits a partner that wants production now
+REBUILD_TARGET_MAX_AGE = 25.0  # a rebuild / tank wants targets this young
+RETOOL_TARGET_MAX_AGE = 26.0
+CONTENDER_TARGET_AGES = (27.0, 30.0)  # (min, max) a contender wants
+AGING_CONTENDER_TARGET_AGES = (26.0, 30.0)
+YOUNG_CORE_ARCHETYPE_MAX_AGE = 25.0  # young-core archetypes (Juggernaut ...) protect assets this young
+REBUILD_SELL_MIN_AGE = 26.0  # a rebuild converts an older player into youth or picks
+CONTENDER_WINDOW_AGES = (26.0, 30.0)  # age band that fits a win-now window (legacy path, curve switch off)
+LEGACY_PRIME_AGES = (25.0, 30.0)  # the old partner-acceptance "prime" band (legacy path, curve switch off)
+LEGACY_GROUP_OLD_AVG_AGE = 28.0  # group_band legacy_old for a trade package
+LEGACY_GROUP_YOUNG_AVG_AGE = 25.0  # group_band legacy_young for a trade package
+OLDER_RETURN_MIN_AGE = 28.5  # a single incoming player this old makes a return "older" for a rebuild
+
+# rankings / waivers / draft heuristics
+YOUNG_UPSIDE_MAX_AGE = 24.0  # a player this young still reads as upside (opportunity, stash, rookie-like draft pool)
+FUTURE_ASSET_MAX_AGE = 23.0  # injury-return "future asset" profile
+STALE_FA_RETIRED_MIN_AGE = 40.0  # a free agent this old is treated as retired
+STALE_FA_VETERAN_MIN_AGE = 30.0  # ... or stale when also unranked and long un-updated
+STALE_FA_LONG_CAREER_MIN_AGE = 35.0  # ... or a 12+ year veteran this old with no market
+
+# Drop-candidates young-upside protection is measured from this window-opening reference (see posture_model).
+YOUTH_RUNWAY_BASE_AGE = 23.0
+
+
+def at_most(age: Any, cutoff: float) -> bool:
+    """``0 < age <= cutoff``: a known age at or under a flat cutoff (missing / zero age never qualifies)."""
+
+    return 0 < age <= cutoff
+
+
+def at_least(age: Any, cutoff: float) -> bool:
+    """``age >= cutoff`` (a missing age compares as the caller's 0 and never qualifies)."""
+
+    return age >= cutoff
+
+
+def within(age: Any, bounds: tuple[float, float]) -> bool:
+    """``min <= age <= max`` for a flat (min, max) age band."""
+
+    return bounds[0] <= age <= bounds[1]
 
 
 def enabled(*, environ: Mapping[str, Any] | None = None) -> bool:
