@@ -88,6 +88,13 @@ describe("ProspectSheet", () => {
     expect(screen.getByTestId("prospect-season-stats")).toHaveTextContent("900");
   });
 
+  it("Stats: the advanced lock comes from the profile itself, so a failed /me never blanks it", async () => {
+    vi.mocked(api.getMe).mockRejectedValue(new Error("me down"));
+    renderSheet();
+    fireEvent.click(await screen.findByRole("tab", { name: "Stats" }));
+    expect(await screen.findByTestId("prospect-advanced-lock")).toHaveTextContent("Pro");
+  });
+
   it("Stats: Pro sees the advanced metrics, no lock", async () => {
     vi.mocked(api.getMe).mockResolvedValue({ user: { entitlement: "premium", profile_status: "ok" } } as never);
     vi.mocked(api.getProspectProfile).mockResolvedValue({ ...profile, advanced_locked: false, advanced: { season: 2026, ppa: { avg: { all: 0.42 } }, usage: { overall: 0.31 } } } as never);

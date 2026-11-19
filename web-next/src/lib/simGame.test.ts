@@ -37,6 +37,7 @@ import {
   simGameGate,
   simGameLiteLine,
   simGamePaywalled,
+  simGatePreview,
   simGamePreviewLine,
   simHeadshotId,
   simPlayerInitials,
@@ -168,6 +169,13 @@ describe("gating", () => {
     expect(simGamePaywalled(over)).toBe(true);
     expect(simGamePaywalled(playing)).toBe(false);
     expect(simGamePaywalled(null)).toBe(false);
+  });
+
+  it("a premium gate with no preview holds the paywalled one, never null (null means Pro)", () => {
+    expect(simGamePaywalled(simGatePreview({ preview: null }))).toBe(true);
+    expect(simGamePaywalled(simGatePreview({}))).toBe(true);
+    const own = { free_season: true, weeks_left: 3, paywall_week: 18, paywalled: false };
+    expect(simGatePreview({ preview: own })).toBe(own);
   });
 });
 

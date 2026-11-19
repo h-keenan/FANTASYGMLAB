@@ -14,7 +14,6 @@ import { WeeklyPointsPanel } from "@/components/WeeklyPointsChartLazy";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { api, type CollegeProspect } from "@/lib/api";
 import { aggregateText, scoutingConfidenceLabel } from "@/lib/collegeScoutingPresentation";
-import { planOf, type Plan } from "@/lib/plan";
 import {
   PROSPECT_NO_STATS,
   PROSPECT_SOURCE_NAME,
@@ -37,7 +36,6 @@ import { confidenceColor } from "@/lib/waiversPresentation";
 interface LoadState {
   profile: ProspectProfileResponse | null;
   failed: boolean;
-  plan: Plan;
   done: boolean;
 }
 
@@ -45,7 +43,7 @@ interface LoadState {
  * The college prospect detail sheet. It IS the shared player quick view (same sheet chrome, hero header, swipeable tabs and
  * weekly chart as an NFL player or a Fantasy Sim player), fed a prospect's own sections through `customSections`:
  * Overview (crowd grade, round, ADP, your report, watchlist), Stats (CFBD season lines + advanced + weekly chart) and
- * Profile (recruiting + hometown). Basics are free; advanced metrics are Pro (`planOf`, withheld by the server too).
+ * Profile (recruiting + hometown). Basics are free; advanced metrics are Pro (the server withholds them and sets advanced_locked).
  * Once he is drafted the normal NFL player card takes over (`sleeper_player_id`). Mobile twin: components/ProspectSheet.tsx.
  */
 export function ProspectSheet({
@@ -70,16 +68,16 @@ export function ProspectSheet({
   onClose: () => void;
 }) {
   const { openPlayer } = usePlayerQuickView();
-  const [state, setState] = useState<LoadState>({ profile: null, failed: false, plan: "unknown", done: false });
+  const [state, setState] = useState<LoadState>({ profile: null, failed: false, done: false });
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.getProspectProfile(prospect.id), api.getMe().catch(() => null)])
-      .then(([profile, me]) => {
-        if (!cancelled) setState({ profile: profile.ok ? profile : null, failed: !profile.ok && profile.reason !== "not_found", plan: planOf(me?.user), done: true });
+    api.getProspectProfile(prospect.id)
+      .then((profile) => {
+        if (!cancelled) setState({ profile: profile.ok ? profile : null, failed: !profile.ok && profile.reason !== "not_found", done: true });
       })
       .catch(() => {
-        if (!cancelled) setState({ profile: null, failed: true, plan: "unknown", done: true });
+        if (!cancelled) setState({ profile: null, failed: true, done: true });
       });
     return () => {
       cancelled = true;
@@ -268,7 +266,7 @@ function ProspectStats({ prospect, state }: { prospect: CollegeProspect; state: 
             PPA is predicted points added per play. Usage is his share of his team&apos;s plays.
           </p>
         </section>
-      ) : profile?.advanced_locked && state.plan === "free" ? (
+      ) : profile?.advanced_locked ? (
         <section className="pqv-stat-season" data-testid="prospect-advanced-lock">
           <div className="flex flex-wrap items-center gap-2">
             <ToneBadge label="Pro" color="var(--color-premium)" />

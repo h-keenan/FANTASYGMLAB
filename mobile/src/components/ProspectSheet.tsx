@@ -17,7 +17,6 @@ import WeeklyPointsChart from './WeeklyPointsChart';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { api, type CollegeProspect } from '../lib/api';
-import { planOf, type Plan } from '../lib/plan';
 import { stubPlayer } from '../lib/playerQuickView';
 import {
   PROSPECT_NO_STATS,
@@ -43,7 +42,6 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 interface LoadState {
   profile: ProspectProfileResponse | null;
   failed: boolean;
-  plan: Plan;
   done: boolean;
 }
 
@@ -62,7 +60,7 @@ function Tiles({ tiles }: { tiles: ProspectTile[] }) {
  * The college prospect detail sheet. It IS the shared player quick view (same sheet, hero header, swipeable tabs and
  * weekly chart as an NFL or Fantasy Sim player), fed a prospect's own sections through `customSections`: Overview (crowd
  * grade, round, ADP, your report, watchlist), Stats (CFBD season lines, advanced, weekly chart) and Profile (recruiting,
- * hometown). Basics are free; advanced metrics are Pro (`planOf`, withheld by the server too). Drafted + mapped hands
+ * hometown). Basics are free; advanced metrics are Pro (the server withholds them and sets advanced_locked). Drafted + mapped hands
  * off to the normal NFL card. Web twin: web-next/src/components/ProspectSheet.tsx.
  */
 export default function ProspectSheet({
@@ -90,17 +88,17 @@ export default function ProspectSheet({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { openPlayer } = usePlayerQuickView();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [state, setState] = useState<LoadState>({ profile: null, failed: false, plan: 'unknown', done: false });
+  const [state, setState] = useState<LoadState>({ profile: null, failed: false, done: false });
   const [season, setSeason] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.getProspectProfile(prospect.id), api.getMe().catch(() => null)])
-      .then(([profile, me]) => {
-        if (!cancelled) setState({ profile: profile.ok ? profile : null, failed: !profile.ok && profile.reason !== 'not_found', plan: planOf(me?.user), done: true });
+    api.getProspectProfile(prospect.id)
+      .then((profile) => {
+        if (!cancelled) setState({ profile: profile.ok ? profile : null, failed: !profile.ok && profile.reason !== 'not_found', done: true });
       })
       .catch(() => {
-        if (!cancelled) setState({ profile: null, failed: true, plan: 'unknown', done: true });
+        if (!cancelled) setState({ profile: null, failed: true, done: true });
       });
     return () => {
       cancelled = true;
@@ -186,7 +184,7 @@ export default function ProspectSheet({
             <Tiles tiles={adv} />
             <AppText style={styles.muted}>PPA is predicted points added per play. Usage is his share of his team&apos;s plays.</AppText>
           </Section>
-        ) : profile?.advanced_locked && state.plan === 'free' ? (
+        ) : profile?.advanced_locked ? (
           <View style={styles.lock} testID="prospect-advanced-lock">
             <ToneBadge label="Pro" color={colors.premium} />
             <AppText style={styles.lockText}>Advanced metrics: PPA and usage</AppText>

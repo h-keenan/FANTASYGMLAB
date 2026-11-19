@@ -6,7 +6,6 @@ import { ButtonLink } from "@/components/Button";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api, type TrackRecordResponse } from "@/lib/api";
-import { planOf } from "@/lib/plan";
 import {
   basicSummary,
   calibrationNote,
@@ -23,7 +22,7 @@ import {
  * sample size; below the minimum sample it says "too early" instead of a rate. Mobile twin:
  * mobile/src/components/TrackRecordModule.tsx; wording: lib/trackRecordView.ts.
  */
-export function TrackRecordView({ record, plan }: { record: TrackRecordResponse; plan: ReturnType<typeof planOf> }) {
+export function TrackRecordView({ record }: { record: TrackRecordResponse }) {
   const { basic, advanced } = record;
   const parts = basicSummary(basic).map((text, index) => ({
     key: `b${index}`,
@@ -31,7 +30,8 @@ export function TrackRecordView({ record, plan }: { record: TrackRecordResponse;
     strong: index === 0,
     tone: index > 0 && text.endsWith("net") ? (basic.net_points_total > 0 ? ("success" as const) : undefined) /* a net loss is muted, never red */ : undefined,
   }));
-  const showLock = !advanced && plan === "free";
+  // The response says whether the advanced block was withheld (`is_pro`), so the lock never depends on a second /me call.
+  const showLock = !advanced && !record.is_pro;
   const levels: TrackLevel[] = ["high", "medium", "low"];
 
   return (
@@ -70,21 +70,36 @@ export function TrackRecordView({ record, plan }: { record: TrackRecordResponse;
   );
 }
 
+export function TrackRecordError() {
+  return (
+    <CompactModule id="track-record" title="Your track record" parts={[{ key: "err", text: "Could not load right now", strong: true }]} testId="track-record-error">
+      <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        Your track record could not load. Pull to refresh or try again in a moment.
+      </p>
+    </CompactModule>
+  );
+}
+
 export function TrackRecordModule() {
-  const [state, setState] = useState<{ record: TrackRecordResponse; plan: ReturnType<typeof planOf> } | null>(null);
+  const [record, setRecord] = useState<TrackRecordResponse | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.getTrackRecord(), api.getMe().catch(() => null)])
-      .then(([record, me]) => {
-        if (!cancelled) setState({ record, plan: planOf(me?.user) });
+    api
+      .getTrackRecord()
+      .then((body) => {
+        if (!cancelled) setRecord(body);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Fail soft: no record (offline, table unreachable) simply hides the module.
-  return state ? <TrackRecordView record={state.record} plan={state.plan} /> : null;
+  // The module stays visible when the read fails: a short error line, never a blank where it used to be.
+  if (failed) return <TrackRecordError />;
+  return record ? <TrackRecordView record={record} /> : null;
 }

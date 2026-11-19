@@ -210,7 +210,9 @@ export function SimWatchReportCard({ ctx, onStartGame, onHub }: { ctx: SimCtx; o
   const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [report, setReport] = useState<SimWatchReport | null>(null);
-  const [isPro, setIsPro] = useState(false);
+  // Plan: the report's own `is_premium`, else the game's free-season preview (null preview = Pro). A failed read never hides the next-run actions.
+  const [planFromReport, setPlanFromReport] = useState<boolean | null>(null);
+  const isPro = planFromReport ?? ctx.preview == null;
   const [failed, setFailed] = useState(false);
   const [story, setStory] = useState(true);
   useEffect(() => {
@@ -219,11 +221,10 @@ export function SimWatchReportCard({ ctx, onStartGame, onHub }: { ctx: SimCtx; o
       .getSimWatchReport(ctx.gameId)
       .then((body) => {
         if (cancelled) return;
+        if (typeof body.is_premium === 'boolean') setPlanFromReport(body.is_premium);
         const parsed = normalizeWatchReport(body.report);
-        if (parsed) {
-          setReport(parsed);
-          setIsPro(body.is_premium === true);
-        } else setFailed(true);
+        if (parsed) setReport(parsed);
+        else setFailed(true);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -238,10 +239,6 @@ export function SimWatchReportCard({ ctx, onStartGame, onHub }: { ctx: SimCtx; o
     [report, ctx.game.you?.name],
   );
 
-  if (failed) return <AppText style={styles.muted}>Your season is saved, but the report card could not load. Try again in a moment.</AppText>;
-  if (!report) return <View style={styles.gap}><SkeletonCard rows={4} /><SkeletonCard rows={6} /></View>;
-
-  const move = simWatchGradeMove(report.draft.then?.grade, report.draft.now.grade);
   const rerun = (same: boolean) => onStartGame(simWatchRerunBody(ctx.game.settings, same) as SimGameCreateBody);
   const goPro = () => {
     setStory(false);
@@ -264,6 +261,19 @@ export function SimWatchReportCard({ ctx, onStartGame, onHub }: { ctx: SimCtx; o
       )}
     </>
   );
+  if (failed) {
+    // The report could not be read or parsed: say so, and keep the next-run actions (the Pro upsell for Free) instead of a blank.
+    return (
+      <View style={styles.gap} testID="watch-report-error">
+        <AppText style={styles.muted}>Your season is saved, but the report card could not load. Try again in a moment.</AppText>
+        {actions}
+        <Button label="All games" variant="ghost" onPress={onHub} />
+      </View>
+    );
+  }
+  if (!report) return <View style={styles.gap}><SkeletonCard rows={4} /><SkeletonCard rows={6} /></View>;
+
+  const move = simWatchGradeMove(report.draft.then?.grade, report.draft.now.grade);
   return (
     <View style={styles.gap} testID="watch-report">
       <AccentCard accent={colors.accent}>
