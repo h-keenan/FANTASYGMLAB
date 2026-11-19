@@ -44,12 +44,48 @@ LEAN_ODDS = 50.0
 SELL_ODDS = 20.0
 DEEP_SELL_ODDS = 8.0
 LEAN_POINTS = 2
+# Early-season calibration (DYNASTYGM_LEAN_CALIBRATION_V1). The simulation is overconfident before about week 6:
+# replayed on 2021-25 point-in-time leagues, preseason "buyers" were told 79% playoff odds and made it 57%, and
+# "sellers" were told 8% and made it 36% (docs/audits/2026-11-historical-replay.md section 5). Before week
+# CALIBRATION_FULL_WEEK the odds are shrunk toward an even playoff chance by a weight that ramps from
+# CALIBRATION_WEEK0_WEIGHT (fit on 2021-23, held out on 2024-25) to 1 (no change) at that week.
+LEAN_CALIBRATION_ENV_KEY = "DYNASTYGM_LEAN_CALIBRATION_V1"
+CALIBRATION_WEEK0_WEIGHT = 0.25
+CALIBRATION_FULL_WEEK = 6
+CALIBRATION_ANCHOR = 50.0
 CONTEND_KEYS = frozenset({"contender", "fringe_contender"})
 REBUILD_KEYS = frozenset({"rebuild", "tank"})
 
 
 def enabled() -> bool:
     return experimental_graduation.graduated_kill_switch_enabled(PLAYOFF_ODDS_CONTEXT_ENV_KEY, default=True)
+
+
+def calibration_enabled() -> bool:
+    return experimental_graduation.graduated_kill_switch_enabled(LEAN_CALIBRATION_ENV_KEY, default=True)
+
+
+def calibration_weight(weeks_played: Any) -> float:
+    """Share of the simulated odds' distance from even that survives at this point in the season (1 = unchanged)."""
+
+    try:
+        weeks = float(weeks_played)
+    except (TypeError, ValueError):
+        return 1.0
+    if weeks != weeks or weeks >= CALIBRATION_FULL_WEEK:
+        return 1.0
+    weeks = max(0.0, weeks)
+    return CALIBRATION_WEEK0_WEIGHT + (1.0 - CALIBRATION_WEEK0_WEIGHT) * weeks / CALIBRATION_FULL_WEEK
+
+
+def calibrated_odds(probability: float, weeks_played: Any) -> float:
+    """Playoff odds (0-100) as the early-season record supports them. Unchanged when the flag is off, the week is
+    unknown or six or more weeks are played."""
+
+    if weeks_played is None or not calibration_enabled():
+        return float(probability)
+    w = calibration_weight(weeks_played)
+    return CALIBRATION_ANCHOR + w * (float(probability) - CALIBRATION_ANCHOR)
 
 
 def _num(value: Any, default: float = 0.0) -> float:
@@ -109,12 +145,17 @@ def lean(
     *,
     posture_key: Any = "",
     core_age_delta: float | None = None,
+    weeks_played: int | None = None,
 ) -> dict[str, Any]:
-    """Buyer / seller / hold for one team with the reasons behind it."""
+    """Buyer / seller / hold for one team with the reasons behind it.
+
+    ``weeks_played`` (regular-season weeks already played) calibrates the odds early in the season; omit it for the
+    raw simulation."""
 
     if not row or row.get("playoff_probability") is None:
         return {"lean": "", "points": 0, "why": []}
-    p = _num(row.get("playoff_probability"))
+    raw_p = _num(row.get("playoff_probability"))
+    p = calibrated_odds(raw_p, weeks_played)
     points = 0
     why: list[str] = []
     if row.get("eliminated"):
@@ -150,8 +191,19 @@ def lean(
             why.append(f"core runs {core_age_delta:.1f} years older than the league")
         else:
             why.append(f"core runs {abs(core_age_delta):.1f} years younger than the league")
+    if abs(p - raw_p) >= 1.0:
+        why.append(f"early-season odds are shrunk toward even: the simulation read {raw_p:.0f}% but is least reliable before week {CALIBRATION_FULL_WEEK}")
     side = "buyer" if points >= LEAN_POINTS else "seller" if points <= -LEAN_POINTS else "hold"
-    return {"lean": side, "points": points, "why": why}
+    return {"lean": side, "points": points, "why": why, "playoff_odds": round(p, 1)}
+
+
+def _weeks_played(odds: Mapping[str, Any] | None) -> int | None:
+    """Regular-season weeks already played, from the simulation's own ``current_week`` (the week about to be played)."""
+
+    try:
+        return max(0, int((odds or {}).get("current_week")) - 1)
+    except (TypeError, ValueError):
+        return None
 
 
 def team_reads(odds: Mapping[str, Any] | None, profile: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -164,6 +216,7 @@ def team_reads(odds: Mapping[str, Any] | None, profile: Mapping[str, Any] | None
         return {}
     ranks = expected_finish_ranks(odds)
     pcts = slot_percentiles(odds)
+    weeks_played = _weeks_played(odds)
     profile_teams = (profile or {}).get("teams") or {}
     cores = [t.get("age", {}).get("core_avg") for t in profile_teams.values() if (t.get("age") or {}).get("core_avg") is not None]
     league_core = sum(float(c) for c in cores) / len(cores) if cores else None
@@ -172,7 +225,7 @@ def team_reads(odds: Mapping[str, Any] | None, profile: Mapping[str, Any] | None
         prof = profile_teams.get(rid) or {}
         core = (prof.get("age") or {}).get("core_avg")
         delta = float(core) - league_core if core is not None and league_core is not None else None
-        read = lean(row, posture_key=(prof.get("posture") or {}).get("key"), core_age_delta=delta)
+        read = lean(row, posture_key=(prof.get("posture") or {}).get("key"), core_age_delta=delta, weeks_played=weeks_played)
         try:
             pct = pcts.get(int(rid))
         except ValueError:
