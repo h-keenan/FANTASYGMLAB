@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Button, ButtonLink } from "@/components/Button";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -17,6 +17,7 @@ import {
   type WrappedBlock,
   type WrappedCard,
   type WrappedDeck,
+  type WrappedPickRow,
   type WrappedPlayer,
   type WrappedTone,
   type WrappedView,
@@ -149,6 +150,26 @@ function PersonaGlyph({ glyph }: { glyph: string }) {
   );
 }
 
+function PickLine({ row, chip = false }: { row: WrappedPickRow; chip?: boolean }) {
+  return (
+    <div className="flex items-center gap-3">
+      {row.player ? <Face player={row.player} size={36} /> : null}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-extrabold">{row.player ? wrappedShortName(row.player.name) : ""}</p>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{row.text}</p>
+      </div>
+      {row.grade ? (
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-extrabold" style={{ border: `1px solid ${toneColor(wrappedGradeTone(row.grade))}`, color: toneColor(wrappedGradeTone(row.grade)) }}>{row.grade}</span>
+          <span className="text-[11px] font-bold tabular-nums" style={{ color: row.delta.startsWith("-") ? "var(--color-text-secondary)" : "var(--color-success)" }}>{row.delta}</span>
+        </div>
+      ) : row.delta ? (
+        chip ? <Chip label={row.delta} tone={row.delta.startsWith("-") ? "neutral" : "good"} /> : <Chip label={row.delta} tone="good" />
+      ) : null}
+    </div>
+  );
+}
+
 export function WrappedCardBody({ card }: { card: WrappedCard }) {
   const view: WrappedView = wrappedView(card);
   switch (view.kind) {
@@ -268,6 +289,63 @@ export function WrappedCardBody({ card }: { card: WrappedCard }) {
           </dl>
         </div>
       );
+    case "rounds":
+      return (
+        <div style={panel} className="flex flex-col gap-4" data-testid="wrapped-rounds">
+          <div className="flex flex-col items-center gap-1">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full text-3xl font-extrabold" style={{ border: `2px solid ${toneColor(wrappedGradeTone(view.grade))}`, color: toneColor(wrappedGradeTone(view.grade)) }}>{view.grade}</span>
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Draft grade{view.then ? ` (${view.then} on draft day)` : ""}</span>
+          </div>
+          <div className="flex flex-col gap-3">
+            {view.rows.map((r) => {
+              const up = r.actual >= r.expected;
+              return (
+                <div key={r.label} className="flex flex-col gap-1.5">
+                  <div className="flex items-baseline justify-between gap-2 text-xs">
+                    <span className="font-bold">{r.label}</span>
+                    <span className="font-bold tabular-nums" style={{ color: up ? "var(--color-success)" : "var(--color-text-secondary)" }}>{Math.round(r.actual)} vs {Math.round(r.expected)} expected</span>
+                  </div>
+                  <div className="h-2 rounded-full" style={{ background: "var(--color-surface-muted)" }}><div className="h-2 rounded-full" style={{ width: `${Math.min(100, (r.actual / r.max) * 100)}%`, background: up ? "var(--color-success)" : "var(--color-border-strong)" }} /></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    case "picks":
+      return (
+        <div style={panel} className="flex flex-col gap-4" data-testid={`wrapped-${card.id}`}>
+          {view.rows.map((r, i) => <PickLine key={i} row={r} />)}
+        </div>
+      );
+    case "valuepair":
+      return (
+        <div className="flex flex-col gap-3" data-testid="wrapped-value">
+          {view.items.map((it) => (
+            <div key={it.label} style={panel} className="flex flex-col gap-2">
+              <span className="text-[11px] font-extrabold uppercase" style={{ ...eyebrow, color: it.tone === "good" ? "var(--color-success)" : "var(--color-text-muted)" }}>{it.label}</span>
+              <PickLine row={it.row} chip />
+            </div>
+          ))}
+        </div>
+      );
+    case "summary":
+      return (
+        <div style={panel} className="flex flex-col items-center gap-4" data-testid="wrapped-summary">
+          <div className="flex flex-col items-center gap-1">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full text-3xl font-extrabold" style={{ border: `2px solid ${toneColor(wrappedGradeTone(view.letter))}`, color: toneColor(wrappedGradeTone(view.letter)) }}>{view.letter}</span>
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Draft grade</span>
+          </div>
+          <dl className="flex w-full flex-col gap-2 border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
+            {view.rows.map((r) => (
+              <div key={r.label} className="flex items-baseline justify-between gap-3">
+                <dt className="text-[11px] font-extrabold uppercase" style={eyebrow}>{r.label}</dt>
+                <dd className="text-right text-sm font-bold" style={{ color: r.tone === "good" ? "var(--color-success)" : undefined }}>{r.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      );
     case "persona":
       return (
         <div style={panel} className="flex flex-col items-center gap-3 text-center" data-testid="wrapped-persona">
@@ -305,7 +383,7 @@ function ShareCardButton({ card, deck, itemId }: { card: WrappedCard; deck: Wrap
 }
 
 /** The full-screen story: one card at a time, tap the sides or use the arrow keys to move, X to close. */
-export function SeasonWrapped({ deck, itemId, onClose, startIndex = 0 }: { deck: WrappedDeck; itemId: string; onClose: () => void; startIndex?: number }) {
+export function SeasonWrapped({ deck, itemId, onClose, startIndex = 0, lastFooter }: { deck: WrappedDeck; itemId: string; onClose: () => void; startIndex?: number; lastFooter?: ReactNode }) {
   const [index, setIndex] = useState(Math.max(0, Math.min(deck.cards.length - 1, startIndex)));
   const last = deck.cards.length - 1;
   const go = useCallback((delta: number) => setIndex((i) => Math.max(0, Math.min(last, i + delta))), [last]);
@@ -352,6 +430,7 @@ export function SeasonWrapped({ deck, itemId, onClose, startIndex = 0 }: { deck:
             <div className="enter-pop"><WrappedCardBody card={card} /></div>
           </div>
         </div>
+        {index === last && lastFooter ? <div className="flex flex-col gap-2">{lastFooter}</div> : null}
         {locked ? <div style={{ height: 40 }} aria-hidden /> : <ShareCardButton card={card} deck={deck} itemId={itemId} />}
       </div>
     </div>

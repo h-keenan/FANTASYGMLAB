@@ -23,6 +23,8 @@ import { SimNotificationBell, useSimNotifications } from '../components/SimNotif
 import SimGameOrb from '../components/SimGameOrb';
 import { SkeletonCard, SkeletonText } from '../components/Skeleton';
 import { SimDraftRecapView, SimGameDraft } from '../components/SimGameDraft';
+import { SimWatchPlayback, SimWatchReportCard, SimWatchSliders } from '../components/SimWatch';
+import { simWatchSliders } from '../lib/simWatch';
 import { SimLeagueTab } from '../components/SimGameLeague';
 import SimOffseasonBar from '../components/SimOffseasonBar';
 import { SimGameOffseason } from '../components/SimGameOffseason';
@@ -455,7 +457,7 @@ export default function GmGameScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [stackHeight, setStackHeight] = useState(0);
   const showBar =
-    flow.view === 'game' && Boolean(game) && (flow.stage === 'week' || flow.stage === 'playoffs') && !draftRecap && !flow.recaps[flow.recapIndex] && !simToResult;
+    flow.view === 'game' && Boolean(game) && (flow.stage === 'week' || flow.stage === 'playoffs') && !draftRecap && !flow.recaps[flow.recapIndex] && !simToResult && simWatchSliders(game?.settings) === null;
   const showOffBar = flow.view === 'game' && Boolean(game) && flow.stage === 'offseason' && !draftRecap && !flow.recaps[flow.recapIndex];
   const anyBar = showBar || showOffBar;
   // Smart pill: the game is its phone host. Pages (draft room, team) register page tabs / a primary action; an action bar hosts them,
@@ -629,6 +631,7 @@ export default function GmGameScreen({ navigation }: Props) {
           dispatch({ type: 'setup' });
           setGameState(null);
         }}
+        onStartGame={(body) => void createGame(body)}
         onDeleted={() => {
           dispatch({ type: 'deleted' });
           setGameState(null);
@@ -766,6 +769,8 @@ function SetupForm({
   const nameLabel = (value: string) => nameChoices.find((c) => c.value === value)?.label ?? 'Random';
   const modes = simSetupModes(options);
   const dynasty = state.mode === 'dynasty';
+  const canWatch = state.start === 'fresh' && !dynasty;
+  const watching = canWatch && state.watch;
   const dynastyNote = simSetupDynastyNote(state);
   const changed = simSetupAdvancedChanged(state, defaults);
   const block = simSetupBlock(state);
@@ -990,8 +995,10 @@ function SetupForm({
         <MotionIn index={custom ? 5 : 2} count={cardCount}>
           <GlassCard>
             <SetupToggleGroup>
-              <SetupToggleRow first label="Auto-set my lineup" note="Starts your best healthy players each week. You can still change it." value={state.auto} onChange={(v) => set('auto', v)} />
+              {watching ? null : <SetupToggleRow first label="Auto-set my lineup" note="Starts your best healthy players each week. You can still change it." value={state.auto} onChange={(v) => set('auto', v)} />}
+              {canWatch ? <SetupToggleRow first={watching} label="Mock draft, then watch the season" note="Draft your team, then the season plays itself on the settings below. Counts as your free season." value={state.watch} onChange={(v) => set('watch', v)} /> : null}
             </SetupToggleGroup>
+            {watching ? <SimWatchSliders waivers={state.watchWaivers} trades={state.watchTrades} onWaivers={(v) => set('watchWaivers', v)} onTrades={(v) => set('watchTrades', v)} /> : null}
           </GlassCard>
         </MotionIn>
       </ScrollView>
@@ -1033,6 +1040,7 @@ function GameScreen({
   onDismissPaywall,
   onHub,
   onNewGame,
+  onStartGame,
   onDeleted,
 }: {
   flow: FlowState;
@@ -1062,6 +1070,7 @@ function GameScreen({
   onDismissPaywall: () => void;
   onHub: () => void;
   onNewGame: () => void;
+  onStartGame: (body: SimGameCreateBody) => void;
   onDeleted: () => void;
 }) {
   const { colors } = useThemeMode();
@@ -1071,12 +1080,13 @@ function GameScreen({
   const stage = flow.stage;
   const recap = flow.recaps[flow.recapIndex];
   const inSeason = (stage === 'week' || stage === 'playoffs') && !draftRecap;
+  const watch = simWatchSliders(game.settings) !== null;
 
   return (
     <SimRowAccordion>
     <View style={styles.stack}>
       <SimGameHeader game={game} onHub={onHub} onTeam={ctx.openTeam} onMore={() => onTab('more')} bell={<SimNotificationBell notif={notif} onOpenTab={onTab} />} />
-      {inSeason && !recap && !paywalled ? <SimStatusChips game={game} onTab={onTab} /> : null}
+      {inSeason && !recap && !paywalled && !watch ? <SimStatusChips game={game} onTab={onTab} /> : null}
 
       <SimPreviewBanner preview={preview} />
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={onDismissPaywall} /> : null}
@@ -1089,8 +1099,12 @@ function GameScreen({
         <SimToResultView result={simToResult} onClose={onSimToDone} onTab={(tab) => onTab(tab)} onForce={onSimToForce} onUndo={onSimToUndo} onGoPro={onGoPro} />
       ) : recap ? (
         <SimWeekRecapStory recap={recap} index={flow.recapIndex} total={flow.recaps.length} ctx={ctx} onNext={onRecapNext} onClose={onRecapClose} onFixLineup={() => { onRecapClose(); onTab('team'); }} />
+      ) : watch && stage === 'final' ? (
+        <SimWatchReportCard ctx={ctx} onStartGame={onStartGame} onHub={onHub} />
       ) : stage === 'final' ? (
         <SimFinalView ctx={ctx} onNewGame={onNewGame} onHub={onHub} />
+      ) : watch && inSeason ? (
+        <SimWatchPlayback ctx={ctx} />
       ) : stage === 'offseason' ? (
         <>
           <FadeInView key={flow.tab}>

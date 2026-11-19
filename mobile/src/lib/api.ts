@@ -4310,6 +4310,8 @@ export const api = {
   getSimLeagueRosters: (gameId: string) => authorizedRequest<SimGameTypes.SimLeagueRostersResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/league/rosters`),
   getSimGameResult: (gameId: string) => authorizedRequest<SimGameTypes.SimGameResultResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/result`),
   // Season Wrapped: the card deck (see lib/wrapped.ts normalizeWrappedDeck). Sim: complete or so-far; real league: season end or so-far.
+  // Draft & Watch report card (see lib/simWatch.ts normalizeWatchReport).
+  getSimWatchReport: (gameId: string) => authorizedRequest<{ report?: unknown; reason?: string; is_premium?: boolean }>(`/v1/sim/games/${encodeURIComponent(gameId)}/watch-report`),
   getSimGameWrapped: (gameId: string) => authorizedRequest<{ wrapped?: unknown; reason?: string }>(`/v1/sim/games/${encodeURIComponent(gameId)}/wrapped`),
   getLeagueWrapped: (leagueId: string) => authorizedRequest<{ wrapped?: unknown; reason?: string }>(`/v1/leagues/${encodeURIComponent(leagueId)}/wrapped`),
   // Dynasty mode and IR / taxi squads (game engine 1.2.0).

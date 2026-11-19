@@ -12,6 +12,7 @@
  */
 
 import { bandSimTone, probabilityBand } from "./verdictTone.ts";
+import { SIM_WATCH_DEFAULTS } from "./simWatch.ts";
 import type { SimAttributeGrade, SimGradeLetter } from "./simGrade";
 import type { SimAchievementsPayload, SimRecapAchievements } from "./simAchievements";
 import type { ReviewGlyph } from "./simReview";
@@ -261,6 +262,10 @@ export interface SimGameSettings {
   slots: SimSlot[];
   user_slot: number;
   auto_lineup: boolean;
+  /** Draft & Watch: 1+ = the waivers and trades below play themselves; absent = an ordinary game (see lib/simWatch.ts). */
+  watch_v?: number;
+  watch_waivers?: string;
+  watch_trades?: string;
   /** League shape (older saves omit these; use simSettingsView). */
   mode?: SimMode;
   te_premium?: number;
@@ -561,6 +566,10 @@ export interface SimGameCreateBody {
   difficulty?: SimDifficulty;
   user_slot?: number | null;
   auto_lineup?: boolean;
+  /** Draft & Watch: a mock draft, then the season plays itself on these sliders (fresh redraft only). */
+  watch?: boolean;
+  watch_waivers?: string;
+  watch_trades?: string;
   team_name?: string;
   /** Fresh league: let the server pick a preset name. */
   random_team_name?: boolean;
@@ -2464,6 +2473,10 @@ export interface SimSetupState {
   difficulty: SimDifficulty;
   slot: string;
   auto: boolean;
+  /** Draft & Watch (fresh redraft): mock draft, then watch the season. Lineups are always auto-set while it is on. */
+  watch: boolean;
+  watchWaivers: string;
+  watchTrades: string;
   /** Custom team name text (used when `nameChoice` is SIM_NAME_CUSTOM). */
   name: string;
   /** Fresh league: SIM_NAME_RANDOM, SIM_NAME_CUSTOM, or a preset name. */
@@ -2508,6 +2521,9 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
     difficulty: o?.difficulty.default ?? "normal",
     slot: "",
     auto: o?.auto_lineup.default ?? false,
+    watch: false,
+    watchWaivers: SIM_WATCH_DEFAULTS.waivers,
+    watchTrades: SIM_WATCH_DEFAULTS.trades,
     name: "",
     nameChoice: SIM_NAME_RANDOM,
     rosterId: "",
@@ -2555,7 +2571,8 @@ export function simCleanTeamName(raw: string): string {
 
 /** The POST /v1/sim/games body for the form. "league" sends only what the league does not decide, and picks the team by roster_id. */
 export function simSetupBody(state: SimSetupState): SimGameCreateBody {
-  const common = { difficulty: state.difficulty, auto_lineup: state.auto, tiebreaker: state.tiebreaker };
+  const watching = state.watch && state.start === "fresh" && state.mode !== "dynasty";
+  const common = { difficulty: state.difficulty, auto_lineup: watching ? true : state.auto, tiebreaker: state.tiebreaker };
   const dynasty = state.mode === "dynasty";
   const reserves: SimGameCreateBody = {
     ...(state.irSlots != null ? { ir_slots: state.irSlots } : {}),
@@ -2594,6 +2611,7 @@ export function simSetupBody(state: SimSetupState): SimGameCreateBody {
     include_def: state.includeDef,
     bench: state.bench,
     mode: dynasty ? "dynasty" : "redraft",
+    ...(watching ? { watch: true, watch_waivers: state.watchWaivers, watch_trades: state.watchTrades } : {}),
     ...(dynasty ? { seasons: state.seasons, rookie_rounds: state.rookieRounds } : {}),
     ...reserves,
     user_slot: state.slot ? Number(state.slot) : null,

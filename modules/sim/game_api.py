@@ -45,6 +45,7 @@ from modules.sim.game_engine import advance, ensure_rank_movement, finish_draft,
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_result import _draft_from_state, build_result
 from modules.sim.game_wrapped import build_wrapped
+from modules.sim.game_watch_report import build_watch_report
 from modules.sim.game_review import build_review
 from modules.sim.game_scoring import default_model
 from modules.sim.game_setup import (
@@ -55,6 +56,10 @@ from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_store import GameConflict, GameLimitReached, GameStore, public_game_row, row_version
 from modules.sim.game_mode import DEFAULT_ROOKIE_ROUNDS, DEFAULT_SEASONS, PICK_YEARS, ROOKIE_ROUNDS, SEASON_CHOICES, mode_options
 from modules.sim.game_types import (
+    DEFAULT_WATCH_TRADES,
+    DEFAULT_WATCH_WAIVERS,
+    WATCH_TRADES,
+    WATCH_WAIVERS,
     BENCH_RANGE,
     DEFAULT_BENCH,
     DEFAULT_FLEX_TYPE,
@@ -534,6 +539,9 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 "difficulty": {"values": list(DIFFICULTIES), "default": "normal"},
                 "user_slot": {"min": 1, "max": max(TEAM_COUNTS), "default": None},
                 "auto_lineup": {"default": True},
+                # Draft & Watch: a mock draft, then the season plays itself on these sliders (lineups are always auto-set).
+                "watch": {"default": False, "waivers": {"values": list(WATCH_WAIVERS), "default": DEFAULT_WATCH_WAIVERS},
+                          "trades": {"values": list(WATCH_TRADES), "default": DEFAULT_WATCH_TRADES}},
                 "team_names": {"values": list(TEAM_NAMES), "max_length": USER_TEAM_NAME_MAX},
                 "tiebreaker": {"values": list(TIEBREAKERS), "default": DEFAULT_TIEBREAKER},
                 # IR and taxi squads (taxi defaults to 4 in dynasty, 0 in redraft; a league import reads its own).
@@ -1339,6 +1347,19 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         result = store.get_result(uid, gid) if state.status == "complete" else None
         events = store.load_events(uid, gid, 0)
         return {**_env(pro, state), "wrapped": build_wrapped(snap, state, events, result, is_pro=pro)}
+
+    @router.get("/games/{game_id}/watch-report")
+    @guarded
+    def get_watch_report(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        """The Draft & Watch report card (draft then vs now, best pick, bust and why, standing, three what-ifs) for a finished watch game."""
+        pro = ctx.is_pro(user)
+        store, uid, row, snap, state = load(user, _gid(game_id))
+        if not snap.settings.watch_v:
+            return {**_env(pro, state, "not_watch")}
+        if state.status != "complete":
+            return {**_env(pro, state, "not_complete")}
+        events = store.load_events(uid, _gid(game_id), 0)
+        return {**_env(pro, state), "report": build_watch_report(snap, state, events)}
 
     @router.get("/games/{game_id}/league/rosters")
     @guarded
