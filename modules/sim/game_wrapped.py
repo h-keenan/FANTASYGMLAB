@@ -26,6 +26,19 @@ PRO_CARDS = ("steal", "trades")
 MIN_WEEKS = 2  # fewer played weeks than this and there is nothing to wrap yet
 
 
+_SUFFIXES = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"}
+
+
+def short_name(name: str | None) -> str:
+    """"Jalen Pruitt" -> "J. Pruitt" (the same rule as the clients' wrappedShortName): body copy never carries a full player name."""
+
+    parts = str(name or "").split()
+    if len(parts) < 2:
+        return parts[0] if parts else ""
+    last = " ".join(parts[-2:]) if parts[-1].lower() in _SUFFIXES and len(parts) > 2 else parts[-1]
+    return f"{parts[0][0].upper()}. {last}"
+
+
 def _r(v: float, places: int = 1) -> float:
     return round(float(v), places)
 
@@ -259,7 +272,7 @@ def build_wrapped(
     if adds:
         lines_.append(f"{adds} waiver pickups, {sum(1 for w in waivers if w['add'] in started)} of them starters")
     if best_w and best_w["add"] in snap.players:
-        lines_.append(f"{snap.players[best_w['add']].name} alone was worth {_r(best_w['net'])} pts")
+        lines_.append(f"{short_name(snap.players[best_w['add']].name)} alone was worth {_r(best_w['net'])} pts")
     if trades:
         lines_.append(f"{len(trades)} trade{'s' if len(trades) != 1 else ''}")
     lines_.append(f"Lineups at {int(round(efficiency * 100))}% of the best you could have set")
