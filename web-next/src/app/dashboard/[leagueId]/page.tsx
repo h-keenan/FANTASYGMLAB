@@ -32,6 +32,11 @@ function DashboardPageBody() {
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   const { lens, lensReady } = useValuationLens(leagueId);
+  // The effect below needs to know WHO is signed in, not which session object: the lazy auth client replaces the object (same
+  // user, same token) when it loads on idle, and keying the fetches on the object re-sent the whole first-paint set a second
+  // time once the first answers had already landed (api.ts reads the token itself, per request).
+  const signedIn = Boolean(session);
+  const userId = session?.user?.id;
 
   const [data, setData] = useState<DashboardResponse | null>(null);
   // League Pulse's source, started in the same tick as the Dashboard request
@@ -48,7 +53,7 @@ function DashboardPageBody() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!session) {
+    if (!signedIn) {
       router.replace("/");
       return;
     }
@@ -114,7 +119,7 @@ function DashboardPageBody() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router, retryToken]);
+  }, [authLoading, signedIn, userId, leagueId, lens, router, retryToken]);
 
   if (authLoading) {
     return <LoadingScreen label="Today" layout="dashboard" />;
