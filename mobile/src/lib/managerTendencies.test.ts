@@ -28,4 +28,3 @@ test('tradeDateLabel formats date and week, degrades to week only, never invents
   assert.equal(tradeDateLabel('', 7), 'Week 7');
   assert.equal(tradeDateLabel(null, null), '');
 });
-
