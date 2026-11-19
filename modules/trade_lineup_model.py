@@ -43,7 +43,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
 
-from modules import age_profile, nfl_schedule, player_projections, posture_model
+from modules import age_profile, nfl_schedule, player_projections, posture_model, value_scale
 from modules.frame_records import frame_records
 from modules.injury_status import category as injury_level, is_ruled_out
 from modules.rankings import age_multiplier
@@ -322,7 +322,7 @@ def _value_curve_ppg(ctx_curves: Mapping[str, list[tuple[float, float]]], pos: s
         idx = min(rank, len(ppgs) - 1)
         return float(ppgs[idx]), True
     top, repl = STATIC_ANCHORS.get(pos, (15.0, 4.0))
-    share = max(0.0, min(1.0, value / STATIC_VALUE_TOP))
+    share = max(0.0, min(1.0, value / (STATIC_VALUE_TOP * value_scale.scale())))
     return repl + (top - repl) * share, False
 
 
@@ -374,7 +374,7 @@ def build_context(
         value_per_point = ratios[len(ratios) // 2]
         k_source = "calibrated"
     else:
-        value_per_point = STATIC_VALUE_PER_POINT
+        value_per_point = STATIC_VALUE_PER_POINT * value_scale.scale()
         k_source = "static"
 
     byes: dict[str, int | None] = {}

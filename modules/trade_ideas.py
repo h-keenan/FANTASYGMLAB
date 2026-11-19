@@ -7,6 +7,8 @@ from itertools import combinations
 from math import exp
 from types import MappingProxyType
 from hashlib import sha256
+import functools
+import inspect
 import json
 import logging
 import time
@@ -54,6 +56,30 @@ from modules.performance import debug_enabled, record_timing
 from modules import age_profile, model_status, partner_context, playoff_context, runtime_trace, usage_roles_targets
 from modules import drop_candidates, trade_cautions, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
+from modules import value_scale
+
+# Absolute point thresholds below are written on the production value scale. ``_vs`` expresses one on the active
+# league's scale (``modules/value_scale.py``, flag DYNASTYGM_SCALE_AWARE_THRESHOLDS_V1): with the flag OFF it returns
+# its argument untouched, so every comparison is bit-identical to the plain literal.
+_vs = value_scale.scaled
+
+
+def _with_league_value_scale(fn):
+    """Run an idea builder under the league's value scale, measured from its own ``df_players`` / ``score_field``."""
+
+    sig = inspect.signature(fn)
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not value_scale.enabled():
+            return fn(*args, **kwargs)
+        bound = sig.bind_partial(*args, **kwargs)
+        arguments = bound.arguments
+        with value_scale.scope(arguments.get("df_players"), str(arguments.get("score_field") or "value_score")):
+            return fn(*args, **kwargs)
+
+    return wrapper
+
 
 # Calibrated to what a pick turns into (docs/audits/2026-11-trade-advice-backtest.md, scripts/
 # trade_advice_backtest.py): the engine-scale dynasty score of the slot-th rookie of the 2021-2025 classes
@@ -1338,9 +1364,9 @@ def finder_closest_note(idea: Mapping[str, Any]) -> Dict[str, Any]:
         reason = f"You would need to add about {max(0, gap):,} more value to reach this."
     else:
         reason = "Not a realistic trade as it stands."
-    if stage != "value_band" and gap >= 600:
+    if stage != "value_band" and gap >= _vs(600):
         reason += f" You would also be asking for about {gap:,} more than you send."
-    elif stage != "value_band" and gap <= -600:
+    elif stage != "value_band" and gap <= _vs(-600):
         reason += f" You would be overpaying by about {-gap:,}."
     return {"stage": stage, "label": "Stretch", "reason": reason, "value_gap": int(gap)}
 
@@ -1365,7 +1391,7 @@ def finder_found_note(idea: Mapping[str, Any]) -> Dict[str, Any] | None:
 
 
 def finder_is_overpay(idea: Mapping[str, Any]) -> bool:
-    return int(idea.get("trade_gain") or 0) <= FINDER_OVERPAY_GAIN
+    return int(idea.get("trade_gain") or 0) <= _vs(FINDER_OVERPAY_GAIN)
 
 
 def split_finder_results(ideas: Sequence[Mapping[str, Any]]) -> tuple[List[Mapping[str, Any]], List[Mapping[str, Any]]]:
@@ -1538,8 +1564,8 @@ def finder_value_band(send_value: int) -> tuple[int, int]:
     to a fixed 1500+ player floor sized for first-round picks."""
 
     send_value = max(0, int(send_value))
-    low = -int(min(1500, max(400, round(send_value * 0.30))))
-    high = int(min(1200, max(400, round(send_value * 0.40))))
+    low = -int(min(_vs(1500), max(_vs(400), round(send_value * 0.30))))
+    high = int(min(_vs(1200), max(_vs(400), round(send_value * 0.40))))
     return low, high
 
 
@@ -1658,13 +1684,13 @@ def _is_throw_in_asset(asset: Dict[str, Any]) -> bool:
     tier_rank = _asset_tier_rank(asset)
     age = _asset_age(asset)
     opportunity = str(asset.get("opportunity_label") or "").strip()
-    if score <= 1800:
+    if score <= _vs(1800):
         return True
-    if score <= 2600 and tier_rank <= 1:
+    if score <= _vs(2600) and tier_rank <= 1:
         return True
-    if score <= 3200 and tier_rank <= 2 and opportunity in {"Buried Depth", "Handcuff"}:
+    if score <= _vs(3200) and tier_rank <= 2 and opportunity in {"Buried Depth", "Handcuff"}:
         return True
-    if age_profile.at_least(age, age_profile.THROW_IN_VETERAN_MIN_AGE) and score <= 3200 and tier_rank <= 2:
+    if age_profile.at_least(age, age_profile.THROW_IN_VETERAN_MIN_AGE) and score <= _vs(3200) and tier_rank <= 2:
         return True
     return False
 
@@ -1684,16 +1710,16 @@ def _is_premium_market_asset(
 
     if pos == "QB":
         if qb_format in {"Superflex", "2QB"}:
-            return score >= 5200 or tier_rank >= 3
-        return score >= 7600 or tier_rank >= 5
+            return score >= _vs(5200) or tier_rank >= 3
+        return score >= _vs(7600) or tier_rank >= 5
     if pos == "RB":
-        return age_profile.at_most(age, age_profile.PREMIUM_RB_MAX_AGE) and (score >= 4200 or tier_rank >= 3)
+        return age_profile.at_most(age, age_profile.PREMIUM_RB_MAX_AGE) and (score >= _vs(4200) or tier_rank >= 3)
     if pos == "WR":
-        return score >= 5400 or tier_rank >= 4
+        return score >= _vs(5400) or tier_rank >= 4
     if pos == "TE":
         if settings.get("te_premium"):
-            return score >= 4200 or tier_rank >= 4
-        return score >= 5200 or tier_rank >= 5
+            return score >= _vs(4200) or tier_rank >= 4
+        return score >= _vs(5200) or tier_rank >= 5
     return False
 
 
@@ -1711,13 +1737,13 @@ def _is_cornerstone_asset(
     opportunity = str(asset.get("opportunity_label") or "").strip()
     qb_format = settings.get("qb_format")
 
-    if score >= 9800:
+    if score >= _vs(9800):
         return True
     if tier_rank >= 5 and age_profile.at_most(age, age_profile.CORNERSTONE_YOUNG_MAX_AGE):
         return True
-    if pos == "QB" and qb_format in {"Superflex", "2QB"} and tier_rank >= 4 and age_profile.at_most(age, age_profile.CORNERSTONE_SF_QB_MAX_AGE) and score >= 7600:
+    if pos == "QB" and qb_format in {"Superflex", "2QB"} and tier_rank >= 4 and age_profile.at_most(age, age_profile.CORNERSTONE_SF_QB_MAX_AGE) and score >= _vs(7600):
         return True
-    if pos == "RB" and tier_rank >= 4 and age_profile.at_most(age, age_profile.CORNERSTONE_ELITE_RB_MAX_AGE) and score >= 7600 and opportunity == "Elite Opportunity":
+    if pos == "RB" and tier_rank >= 4 and age_profile.at_most(age, age_profile.CORNERSTONE_ELITE_RB_MAX_AGE) and score >= _vs(7600) and opportunity == "Elite Opportunity":
         return True
     return False
 
@@ -1739,17 +1765,17 @@ def _asset_tier_label(asset: Mapping[str, Any] | None) -> str:
             if value == rank:
                 return label
     score = int(asset.get("score") or 0)
-    if score >= 9800:
+    if score >= _vs(9800):
         return "elite"
-    if score >= 7600:
+    if score >= _vs(7600):
         return "star"
-    if score >= 5400:
+    if score >= _vs(5400):
         return "core starter"
-    if score >= 4200:
+    if score >= _vs(4200):
         return "starter"
-    if score >= 2600:
+    if score >= _vs(2600):
         return "contributor"
-    if score >= 1800:
+    if score >= _vs(1800):
         return "depth"
     return "developmental"
 
@@ -1762,11 +1788,17 @@ def _cornerstone_consolidation_premium(
 ) -> tuple[int, int]:
     # One formula for both sides: the Trade Analyzer credits/debits the
     # user's side with the same premium (modules.trade_grade).
-    return trade_grade.cornerstone_consolidation_premium(
+    required, unmet = trade_grade.cornerstone_consolidation_premium(
         target_score=target_score,
         headliner_ratio=headliner_ratio,
         first_round_count=first_round_count,
     )
+    league_scale = value_scale.scale()
+    if league_scale != 1.0:
+        # The premium is a rate on the target (scale-free); only the per-first credit is an absolute number.
+        credit = max(0, int(first_round_count)) * trade_grade.CONSOLIDATION_FIRST_ROUND_CREDIT * league_scale
+        unmet = max(0, int(round(required - credit)))
+    return required, unmet
 
 
 def _explicit_acquisition_quality_score(
@@ -1796,13 +1828,13 @@ def _explicit_acquisition_quality_score(
 
     if headliner_pos == "QB" and target_pos and target_pos != "QB":
         if _qb_format_is_superflex(settings) and (
-            _is_premium_market_asset(headliner, settings) or _asset_score(headliner) >= 7000
+            _is_premium_market_asset(headliner, settings) or _asset_score(headliner) >= _vs(7000)
         ):
             quality -= 38
         else:
             quality -= 8
     elif headliner and target_pos in {"RB", "WR", "TE"} and headliner_pos in {"RB", "WR", "TE"}:
-        if _asset_score(headliner) >= 5000 and firsts >= 1:
+        if _asset_score(headliner) >= _vs(5000) and firsts >= 1:
             quality += 18
         if firsts >= 2:
             quality += 10
@@ -1888,8 +1920,8 @@ def _trade_confidence_context(
         value_delta = int(market.get("value_delta") or 0)
     except Exception:
         value_delta = 0
-    if "Temporary Injury Need" in set(reasoning_tags or []) and value_delta < -700:
-        confidence_score -= 24 if value_delta < -1200 else 18
+    if "Temporary Injury Need" in set(reasoning_tags or []) and value_delta < _vs(-700):
+        confidence_score -= 24 if value_delta < _vs(-1200) else 18
 
     market_flags = set(market.get("flags") or [])
     if "protected_outgoing_override" in market_flags:
@@ -1915,7 +1947,7 @@ def _trade_confidence_context(
     fit_exception = (
         my_fit_score >= -8
         and not list(fit.get("my_negatives") or [])
-        and value_delta >= 1200
+        and value_delta >= _vs(1200)
         and "Value Arbitrage" in set(reasoning_tags or [])
     )
     headline_ready = (
@@ -2076,7 +2108,7 @@ def partner_acceptance_context(
     # The absolute floor keeps tiny trades from failing on a handful of points,
     # but it may never let the partner lose more than the hard ceiling.
     def _allowed(edge_cap: float) -> int:
-        out = max(PARTNER_EDGE_MIN_ABS, int(round(edge_cap * max(0, receive_score))))
+        out = max(_vs(PARTNER_EDGE_MIN_ABS), int(round(edge_cap * max(0, receive_score))))
         return min(out, int(round(PARTNER_EDGE_HARD_CEILING * max(0, receive_score))))
 
     allowed_edge = _allowed(cap)
@@ -2204,17 +2236,17 @@ def evaluate_trade_market_realism(
         negatives.append("This adds roster pressure when the cleaner move is consolidation or a one-for-one.")
         flags.append("roster_limit_pressure")
 
-    if partner_net >= 700:
+    if partner_net >= _vs(700):
         score += 8
         positives.append(f"{partner_name} gets a clear raw-value premium.")
-    elif partner_net >= 250:
+    elif partner_net >= _vs(250):
         score += 4
         positives.append(f"{partner_name} gets a slight raw-value premium.")
-    elif partner_net <= -1200:
+    elif partner_net <= _vs(-1200):
         score -= 12
         negatives.append(f"{partner_name} gives up materially more raw value than the return suggests.")
         flags.append("value_gap")
-    elif partner_net <= -500:
+    elif partner_net <= _vs(-500):
         score -= 6
         negatives.append(f"{partner_name} still pays a real value premium.")
         flags.append("value_gap")
@@ -2323,7 +2355,7 @@ def evaluate_trade_market_realism(
         )
         if partner_net < consolidation_premium:
             shortfall = consolidation_premium - partner_net
-            score -= min(20, 6 + shortfall // 500)
+            score -= min(20, 6 + shortfall // _vs(500))
             negatives.append("Breaking a cornerstone usually requires a clearer premium than even-value math.")
             flags.append("consolidation_premium")
 
@@ -2347,19 +2379,19 @@ def evaluate_trade_market_realism(
         user_best_out = incoming_best_score
         user_best_in = outgoing_best_score
         user_value_delta = receive_score - send_score
-        if not user_gets_cornerstone and user_value_delta < 900:
+        if not user_gets_cornerstone and user_value_delta < _vs(900):
             score -= 22
             negatives.append("Your cornerstone assets should not headline a deal without a comparable cornerstone or clear value premium coming back.")
             flags.append("user_core_protection")
             if not allow_focused_core_move:
                 hard_fail_flags.append("user_core_protection")
-        elif user_gets_cornerstone and len(send_assets) > 1 and user_value_delta < 900 and user_best_in < user_best_out + 1000:
+        elif user_gets_cornerstone and len(send_assets) > 1 and user_value_delta < _vs(900) and user_best_in < user_best_out + _vs(1000):
             score -= 18
             negatives.append("Adding extra value on top of your cornerstone needs a much clearer tier-up to headline.")
             flags.append("user_core_protection")
             if not allow_focused_core_move:
                 hard_fail_flags.append("user_core_protection")
-        elif user_gets_cornerstone and user_best_in < user_best_out + 350 and user_value_delta < 500:
+        elif user_gets_cornerstone and user_best_in < user_best_out + _vs(350) and user_value_delta < _vs(500):
             score -= 18
             negatives.append("This asks you to move a cornerstone without a clear upgrade or enough package value back.")
             flags.append("user_core_protection")
@@ -2378,10 +2410,10 @@ def evaluate_trade_market_realism(
         for asset in receive_picks
     )
     clear_headline_upgrade = bool(
-        user_best_in >= user_best_out + 750
+        user_best_in >= user_best_out + _vs(750)
         or (
             user_gets_cornerstone
-            and receive_score - send_score >= 600
+            and receive_score - send_score >= _vs(600)
             and user_best_in >= user_best_out
         )
     )
@@ -2415,11 +2447,11 @@ def evaluate_trade_market_realism(
         flags.append("protected_outgoing_override")
 
     if (
-        user_best_out >= 4000
+        user_best_out >= _vs(4000)
         and user_best_in > 0
         and user_best_in < int(round(user_best_out * 0.78))
         and not receive_has_first
-        and receive_score - send_score < 1200
+        and receive_score - send_score < _vs(1200)
     ):
         score -= 24
         negatives.append("The package replaces the best outgoing asset with a materially weaker headliner.")
@@ -2428,7 +2460,7 @@ def evaluate_trade_market_realism(
 
     if (
         receive_only_low_picks
-        and user_best_out >= 4500
+        and user_best_out >= _vs(4500)
         and user_best_in < int(round(user_best_out * 0.9))
     ):
         score -= 18
@@ -2443,10 +2475,10 @@ def evaluate_trade_market_realism(
         and best_incoming_to_partner
         and str(best_incoming_to_partner.get("position") or "").upper() in {"RB", "WR", "TE"}
         and (
-            receive_score - send_score < 700
+            receive_score - send_score < _vs(700)
             or (
                 len(send_assets) > 1
-                and int(best_outgoing_from_partner.get("score") or 0) < int(best_incoming_to_partner.get("score") or 0) + 1500
+                and int(best_outgoing_from_partner.get("score") or 0) < int(best_incoming_to_partner.get("score") or 0) + _vs(1500)
             )
         )
     ):
@@ -2465,7 +2497,7 @@ def evaluate_trade_market_realism(
         and best_incoming_to_partner
         and (
             _is_premium_market_asset(best_incoming_to_partner, settings)
-            or incoming_best_score >= 7000
+            or incoming_best_score >= _vs(7000)
         )
     ):
         if _qb_format_is_superflex(settings):
@@ -2767,7 +2799,9 @@ def _make_idea(
     }
 
 
-def _value_fits(send_score: int, receive_score: int, low: int = -1200, high: int = 1800) -> bool:
+def _value_fits(send_score: int, receive_score: int, low: int | None = None, high: int | None = None) -> bool:
+    low = _vs(-1200) if low is None else low
+    high = _vs(1800) if high is None else high
     diff = receive_score - send_score
     return low <= diff <= high
 
@@ -2807,7 +2841,7 @@ def _position_value_map(
         starters = max(1, int(resolved_minimums.get(pos, 1) or 1))
         bench = ordered[starters : starters + _BENCH_DEPTH_CREDIT_SLOTS]
         values[pos] = float(
-            sum(ordered[:starters]) + sum(max(0.0, v - REPLACEMENT_LEVEL) for v in bench)
+            sum(ordered[:starters]) + sum(max(0.0, v - _vs(REPLACEMENT_LEVEL)) for v in bench)
         )
     return values
 
@@ -3248,11 +3282,11 @@ def _is_core_or_protected_starter(asset: Dict[str, Any]) -> bool:
         return True
     if tier_rank >= TIER_MARKET_RANK["core starter"]:
         return True
-    if score >= 6500:
+    if score >= _vs(6500):
         return True
-    if age_profile.at_most(age, age_profile.CORE_YOUNG_MAX_AGE) and score >= 5200:
+    if age_profile.at_most(age, age_profile.CORE_YOUNG_MAX_AGE) and score >= _vs(5200):
         return True
-    if tier_rank >= TIER_MARKET_RANK["starter"] and score >= 5000:
+    if tier_rank >= TIER_MARKET_RANK["starter"] and score >= _vs(5000):
         return True
     return False
 
@@ -3274,9 +3308,9 @@ def _is_long_term_starter_asset(asset: Dict[str, Any]) -> bool:
     age = _asset_age(asset)
     if tier_rank >= TIER_MARKET_RANK["core starter"]:
         return True
-    if score >= 6500:
+    if score >= _vs(6500):
         return True
-    if age_profile.at_most(age, age_profile.CORE_YOUNG_MAX_AGE) and score >= 5200:
+    if age_profile.at_most(age, age_profile.CORE_YOUNG_MAX_AGE) and score >= _vs(5200):
         return True
     return False
 
@@ -3311,11 +3345,11 @@ def _temporary_injury_trade_guardrail(
     same_position_cover = bool(send_positions & injury_cover_positions)
     low_cost_outgoing = (
         not send_players
-        or outgoing_best <= 3600
+        or outgoing_best <= _vs(3600)
         or all(not _is_core_or_protected_starter(asset) for asset in send_players)
     )
-    strong_value_win = incoming_best >= outgoing_best + 900
-    long_term_upgrade = incoming_long_term and incoming_best >= outgoing_best + 350
+    strong_value_win = incoming_best >= outgoing_best + _vs(900)
+    long_term_upgrade = incoming_long_term and incoming_best >= outgoing_best + _vs(350)
 
     tags = ["Temporary Injury Need"]
     reasons = [
@@ -3459,7 +3493,7 @@ def _waiver_alternative_guardrail(
         if not alternative:
             continue
         target_score = _safe_int(asset.get("score"))
-        if alternative["score"] < target_score + WAIVER_ALTERNATIVE_MARGIN:
+        if alternative["score"] < target_score + _vs(WAIVER_ALTERNATIVE_MARGIN):
             continue
         if best is None or alternative["score"] > best["alternative"]["score"]:
             best = {
@@ -3530,7 +3564,7 @@ def _player_trade_fit(
         and age_profile.at_most(age, age_profile.YOUNG_CORE_ARCHETYPE_MAX_AGE)
         and (
             _asset_tier_rank(asset) >= TIER_MARKET_RANK["core starter"]
-            or int(asset.get("score") or 0) >= 6000
+            or int(asset.get("score") or 0) >= _vs(6000)
         )
     ):
         score -= 24
@@ -3675,7 +3709,7 @@ def _startable_position_counts(
     values = pd.to_numeric(df_team[field], errors="coerce").fillna(0)
     positions = df_team["position"].astype(str).str.upper()
     return {
-        pos: int(((positions == pos) & (values >= REPLACEMENT_LEVEL)).sum())
+        pos: int(((positions == pos) & (values >= _vs(REPLACEMENT_LEVEL))).sum())
         for pos in CORE_POSITIONS
     }
 
@@ -3687,7 +3721,7 @@ def _asset_position_counts(
     for asset in assets:
         if asset.get("asset_type") != "player":
             continue
-        if startable_only and float(asset.get("score") or 0) < REPLACEMENT_LEVEL:
+        if startable_only and float(asset.get("score") or 0) < _vs(REPLACEMENT_LEVEL):
             continue
         pos = str(asset.get("position") or "").upper()
         if pos in CORE_POSITIONS:
@@ -3913,9 +3947,9 @@ def trade_strategy_fit_context(
     value_gap = _score_assets(receive_assets) - _score_assets(send_assets)
     consolidation = (
         len(send_players) > len(receive_players)
-        and receive_top >= send_top + 350
+        and receive_top >= send_top + _vs(350)
     )
-    immediate_upgrade = receive_top >= send_top + 350
+    immediate_upgrade = receive_top >= send_top + _vs(350)
     younger_return = bool(
         send_age and receive_age and receive_age + 1.0 <= send_age
     )
@@ -3925,7 +3959,7 @@ def trade_strategy_fit_context(
         and (
             _asset_tier_rank(asset) >= TIER_MARKET_RANK["core starter"]
             or str(asset.get("role") or "") == "Core"
-            or int(asset.get("score") or 0) >= 6000
+            or int(asset.get("score") or 0) >= _vs(6000)
         )
         for asset in send_players
         if _asset_age(asset) > 0
@@ -3976,7 +4010,7 @@ def trade_strategy_fit_context(
     if archetype in {"Juggernaut", "Young Competitive Team", "Asset Consolidator"}:
         if consolidation:
             score += 12
-        if receive_top >= 7000:
+        if receive_top >= _vs(7000):
             score += 5
         if outgoing_young_core:
             score -= 18
@@ -3990,7 +4024,7 @@ def trade_strategy_fit_context(
         if outgoing_picks and not immediate_upgrade:
             score -= 10
             risk_label = "Age-Cliff / Future Value Risk"
-        if value_gap < -700:
+        if value_gap < _vs(-700):
             score -= 6
             risk_label = risk_label or "Age-Cliff / Future Value Risk"
         reasons = [
@@ -4010,12 +4044,12 @@ def trade_strategy_fit_context(
     elif archetype in {"Balanced Contender", "Retool Candidate", "One Move Away"}:
         if value_gap >= 0:
             score += 3
-        if abs(value_gap) > 1400:
+        if abs(value_gap) > _vs(1400):
             score -= 6
 
-    if value_gap <= -1800:
+    if value_gap <= _vs(-1800):
         score = min(score, -8)
-    elif value_gap <= -1000:
+    elif value_gap <= _vs(-1000):
         score = min(score, 0)
 
     score = max(-18, min(18, int(score)))
@@ -4154,7 +4188,7 @@ def _stance_framing_supported_by_trade(
     )
     send_top = _top_player_score(send_assets)
     receive_top = _top_player_score(receive_assets)
-    immediate_upgrade = receive_top >= send_top + _STANCE_IMMEDIATE_UPGRADE_SCORE_GAP
+    immediate_upgrade = receive_top >= send_top + _vs(_STANCE_IMMEDIATE_UPGRADE_SCORE_GAP)
 
     rebuild_supported = bool(
         incoming_picks or younger_return or (sheds_aging_player and not older_return)
@@ -4431,13 +4465,13 @@ def _trade_reasoning_context(
             )
 
     score_diff = _score_assets(receive_assets) - _score_assets(send_assets)
-    if score_diff >= 500:
+    if score_diff >= _vs(500):
         tags.append("Value Arbitrage")
         score += 8
         explanations.append("The package carries a positive value gap in your favor.")
 
     if my_strategy in {"contender", "fringe_contender"} and (
-        _top_player_score(receive_assets) >= _top_player_score(send_assets) + 500
+        _top_player_score(receive_assets) >= _top_player_score(send_assets) + _vs(500)
         or outgoing_picks
     ):
         tags.append("Contender Move")
@@ -5082,6 +5116,7 @@ def _partner_contexts(
     return contexts
 
 
+@_with_league_value_scale
 def _build_trade_ideas_impl(
     df_players: pd.DataFrame,
     league_id: str,
@@ -5678,7 +5713,7 @@ def _build_trade_ideas_impl(
                 and (
                     asset["position"] in partner_shape.get("surplus", [])
                     or asset["position"] in my_shape.get("needs", [])
-                    or asset["score"] >= 6500
+                    or asset["score"] >= _vs(6500)
                 )
             ] or [
                 asset
@@ -5703,7 +5738,7 @@ def _build_trade_ideas_impl(
 
         # 1. Consolidate two movable pieces into a real need-position starter.
         for target in partner_target_players[:target_cap]:
-            if target["score"] < 2500:
+            if target["score"] < _vs(2500):
                 continue
             for i, first in enumerate(my_player_assets[:outgoing_cap]):
                 for second in my_player_assets[i + 1 : outgoing_cap + 2]:
@@ -5714,9 +5749,9 @@ def _build_trade_ideas_impl(
                     send_assets = make_package(first, second)
                     receive_assets = make_package(target)
                     send_score = profile.score(send_assets)
-                    if target["score"] <= max(first["score"], second["score"]) + 500:
+                    if target["score"] <= max(first["score"], second["score"]) + _vs(500):
                         continue
-                    if not _value_fits(send_score, target["score"], low=-1800, high=900):
+                    if not _value_fits(send_score, target["score"], low=_vs(-1800), high=_vs(900)):
                         continue
                     fit_bonus = package_fit_priority(send_assets, receive_assets)
                     if fit_bonus < 6:
@@ -5756,8 +5791,8 @@ def _build_trade_ideas_impl(
             asset
             for asset in partner_player_assets
             if str(asset.get("position") or "").upper() in my_surplus
-            and int(asset["score"]) >= my_best_by_pos.get(str(asset.get("position") or "").upper(), 0) + 500
-            and asset["score"] >= 2500
+            and int(asset["score"]) >= my_best_by_pos.get(str(asset.get("position") or "").upper(), 0) + _vs(500)
+            and asset["score"] >= _vs(2500)
         ]
         for target in stacked_targets[:target_cap]:
             target_pos = str(target.get("position") or "").upper()
@@ -5773,7 +5808,7 @@ def _build_trade_ideas_impl(
                     send_assets = make_package(first, second)
                     receive_assets = make_package(target)
                     send_score = profile.score(send_assets)
-                    if not _value_fits(send_score, target["score"], low=-1800, high=900):
+                    if not _value_fits(send_score, target["score"], low=_vs(-1800), high=_vs(900)):
                         continue
                     fit_context = package_fit_context(send_assets, receive_assets)
                     if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
@@ -5812,11 +5847,11 @@ def _build_trade_ideas_impl(
             if player_pos in my_needs and player_pos not in my_surplus:
                 continue
             for target in gated_partner_players:
-                if target["score"] < 1500:
+                if target["score"] < _vs(1500):
                     continue
                 send_assets = make_package(player)
                 receive_assets = make_package(target)
-                if not _value_fits(player["score"], target["score"], low=-1200, high=1200):
+                if not _value_fits(player["score"], target["score"], low=_vs(-1200), high=_vs(1200)):
                     continue
                 if trace is not None:
                     trace.count("candidates")
@@ -5850,18 +5885,18 @@ def _build_trade_ideas_impl(
         # strategy -- the caller said they'd move these picks.
         if not selection_driven and active_strategy in {"contender", "fringe_contender", "retool"} and my_pick_assets:
             for target in partner_target_players[:target_cap]:
-                if target["score"] < 3500:
+                if target["score"] < _vs(3500):
                     continue
                 for player in my_player_assets[:outgoing_cap]:
                     player_pos = str(player.get("position") or "").upper()
                     if player_pos in my_needs and player_pos not in my_surplus:
                         continue
-                    if player["position"] == target["position"] and player["score"] >= target["score"] - 500:
+                    if player["position"] == target["position"] and player["score"] >= target["score"] - _vs(500):
                         continue
                     for pick in my_pick_assets[:4]:
                         send_assets = make_package(player, pick)
                         receive_assets = make_package(target)
-                        if not _value_fits(profile.score(send_assets), target["score"], low=-1800, high=700):
+                        if not _value_fits(profile.score(send_assets), target["score"], low=_vs(-1800), high=_vs(700)):
                             continue
                         fit_bonus = package_fit_priority(send_assets, receive_assets)
                         if fit_bonus < 4:
@@ -5896,7 +5931,7 @@ def _build_trade_ideas_impl(
                     player_age = float(player.get("age"))
                 except Exception:
                     player_age = 0
-                if active_strategy in {"rebuild", "tank"} and player_age < age_profile.REBUILD_SELL_MIN_AGE and player["score"] > 3500:
+                if active_strategy in {"rebuild", "tank"} and player_age < age_profile.REBUILD_SELL_MIN_AGE and player["score"] > _vs(3500):
                     continue
                 for young_target in gated_partner_players:
                     try:
@@ -5907,21 +5942,21 @@ def _build_trade_ideas_impl(
                         continue
                     if young_target["score"] >= player["score"]:
                         continue
-                    if young_target["score"] < 1500:
+                    if young_target["score"] < _vs(1500):
                         continue
                     for pick in partner_pick_assets[:5]:
                         pick_round = int(pick.get("round") or 99)
-                        if player["score"] >= 5000 and young_target["score"] < player["score"] * 0.45:
+                        if player["score"] >= _vs(5000) and young_target["score"] < player["score"] * 0.45:
                             continue
                         if (
-                            player["score"] >= 7500
+                            player["score"] >= _vs(7500)
                             and pick_round != 1
                             and young_target["score"] < player["score"] * 0.65
                         ):
                             continue
                         send_assets = make_package(player)
                         receive_assets = make_package(young_target, pick)
-                        if not _value_fits(player["score"], profile.score(receive_assets), low=-900, high=1600):
+                        if not _value_fits(player["score"], profile.score(receive_assets), low=_vs(-900), high=_vs(1600)):
                             continue
                         fit_bonus = package_fit_priority(send_assets, receive_assets)
                         if fit_bonus < 0:
@@ -5961,7 +5996,7 @@ def _build_trade_ideas_impl(
                     player_age = float(player.get("age"))
                 except Exception:
                     player_age = 0
-                if not require_receive_picks and player_age < age_profile.REBUILD_SELL_MIN_AGE and player["score"] > 3000:
+                if not require_receive_picks and player_age < age_profile.REBUILD_SELL_MIN_AGE and player["score"] > _vs(3000):
                     continue
                 pick_packages = [make_package(pick) for pick in useful_picks]
                 for i, first in enumerate(useful_picks):
@@ -5970,7 +6005,7 @@ def _build_trade_ideas_impl(
                             pick_packages.append(make_package(first, second))
                 for receive_assets in pick_packages:
                     send_assets = make_package(player)
-                    if not _value_fits(player["score"], profile.score(receive_assets), low=-1300, high=2200):
+                    if not _value_fits(player["score"], profile.score(receive_assets), low=_vs(-1300), high=_vs(2200)):
                         continue
                     fit_bonus = package_fit_priority(send_assets, receive_assets)
                     if fit_bonus < 4:
@@ -6030,7 +6065,7 @@ def _build_trade_ideas_impl(
                 for pick in ask_picks:
                     send_assets = make_package(player)
                     receive_assets = make_package(pick)
-                    if not _value_fits(player["score"], profile.score(receive_assets), low=-1100, high=900):
+                    if not _value_fits(player["score"], profile.score(receive_assets), low=_vs(-1100), high=_vs(900)):
                         continue
                     fit_bonus = package_fit_priority(send_assets, receive_assets)
                     if fit_bonus < 0:
@@ -6073,7 +6108,7 @@ def _build_trade_ideas_impl(
             pool_players = [
                 asset
                 for asset in partner_player_assets
-                if int(asset.get("score") or 0) >= 300
+                if int(asset.get("score") or 0) >= _vs(300)
                 and _acquire_candidate_allowed(asset["position"], my_shape, partner_shape)
             ]
             partner_all_picks = [
@@ -6169,7 +6204,7 @@ def _build_trade_ideas_impl(
                     if trace is not None and pool_players:
                         trace.count("value_band")
                     if trace is not None and reach and (
-                        min(int(a["score"]) for a in reach) - send_value <= max(1500, 2 * send_value)
+                        min(int(a["score"]) for a in reach) - send_value <= max(_vs(1500), 2 * send_value)
                     ):
                         # The cheapest player above the selection is actionable
                         # ("add ~X more to reach him"); a player far BELOW it
@@ -6244,7 +6279,7 @@ def _build_trade_ideas_impl(
                         break
 
                 # Picks for picks (move up, move down, consolidate, spread).
-                swap_band = int(min(900, max(250, round(send_value * 0.20))))
+                swap_band = int(min(_vs(900), max(_vs(250), round(send_value * 0.20))))
                 send_signature = sorted((_safe_int(a.get("season")), _safe_int(a.get("round"))) for a in send_assets)
                 receive_pick_packages = [
                     pkg
@@ -6475,7 +6510,7 @@ def _player_hub_path_label(
         if len(send_players) >= 2 and not has_send_pick:
             return "Elite consolidation"
         if has_send_pick and len(send_players) == 1:
-            if firsts and int(send_players[0].get("score") or 0) >= 5000:
+            if firsts and int(send_players[0].get("score") or 0) >= _vs(5000):
                 return "Star + capital"
             return "Player + pick path"
         if has_send_pick:
@@ -6498,13 +6533,13 @@ def _player_hub_path_label(
     if (
         len(receive_players) == 1
         and str(receive_players[0].get("position") or "").upper() == selected_pos
-        and receive_score >= selected_score + 450
+        and receive_score >= selected_score + _vs(450)
     ):
         return f"Upgrade {selected_pos} tier"
     if (
         len(receive_players) == 1
         and str(receive_players[0].get("position") or "").upper() == selected_pos
-        and abs(receive_score - selected_score) <= 900
+        and abs(receive_score - selected_score) <= _vs(900)
     ):
         return "Lateral value pivot"
     if strategy_key in {"contender", "fringe_contender"}:
@@ -6597,7 +6632,7 @@ def _target_fit_reason(
         return "This player fits because the age curve lines up with a longer timeline."
     if strategy in {"contender", "fringe_contender"} and age_profile.within(age, age_profile.CONTENDER_WINDOW_AGES):
         return "This player fits because the profile helps a win-now roster immediately."
-    if int(target_asset.get("score") or 0) >= 9000:
+    if int(target_asset.get("score") or 0) >= _vs(9000):
         return "This is an elite consolidation target: the package should pay a premium for a single cornerstone."
     return "This player fits as a high-end talent upgrade, not as a depth or injury patch."
 
@@ -6901,9 +6936,9 @@ def _blockbuster_should_trigger(
     normal_max: int,
     accepted_ideas: int,
 ) -> bool:
-    if target_value < BLOCKBUSTER_TARGET_FLOOR:
+    if target_value < _vs(BLOCKBUSTER_TARGET_FLOOR):
         return False
-    cannot_clear_expanded = target_value - 1200 > normal_max
+    cannot_clear_expanded = target_value - _vs(1200) > normal_max
     return cannot_clear_expanded or accepted_ideas <= 0
 
 
@@ -6914,7 +6949,7 @@ def _iter_blockbuster_send_packages(
     diagnostics: Dict[str, Any],
 ) -> List[List[Dict[str, Any]]]:
     """Bounded premium-player × premium-pick search. Not a roster Cartesian product."""
-    floor = max(1800, int(target_value * 0.18))
+    floor = max(_vs(1800), int(target_value * 0.18))
     ranked_players = sorted(players, key=_asset_score, reverse=True)
     premium_players = [asset for asset in ranked_players if _asset_score(asset) >= floor][:6]
     if not premium_players:
@@ -6936,8 +6971,8 @@ def _iter_blockbuster_send_packages(
     diagnostics["max_seconds_allowed"] = BLOCKBUSTER_MAX_SECONDS
     diagnostics["max_assets_allowed"] = BLOCKBUSTER_MAX_ASSETS
 
-    min_send = target_value - BLOCKBUSTER_VALUE_HIGH
-    max_send = target_value - BLOCKBUSTER_VALUE_LOW
+    min_send = target_value - _vs(BLOCKBUSTER_VALUE_HIGH)
+    max_send = target_value - _vs(BLOCKBUSTER_VALUE_LOW)
     ranked: List[tuple] = []
     considered = 0
     seen_keys: set[str] = set()
@@ -6967,7 +7002,7 @@ def _iter_blockbuster_send_packages(
                 _safe_int(diagnostics.get("combinations_pruned_by_quality"), 0) + 1
             )
             return
-        throw_ins = sum(1 for asset in players_in if _asset_score(asset) < 1800)
+        throw_ins = sum(1 for asset in players_in if _asset_score(asset) < _vs(1800))
         if throw_ins and (len(players_in) + len(picks_in) >= 4 or throw_ins >= 2):
             diagnostics["combinations_pruned_by_quality"] = (
                 _safe_int(diagnostics.get("combinations_pruned_by_quality"), 0) + 1
@@ -7088,11 +7123,11 @@ def _iter_priced_send_packages(
 
     meaningful = [
         a for a in sorted(players, key=_asset_score, reverse=True)
-        if _asset_score(a) >= PRICED_MIN_ASSET_VALUE
+        if _asset_score(a) >= _vs(PRICED_MIN_ASSET_VALUE)
     ][:PRICED_PLAYER_POOL]
     pool_picks = [
         a for a in sorted(picks, key=_asset_score, reverse=True)
-        if _asset_score(a) >= PRICED_MIN_ASSET_VALUE and _safe_int(a.get("round"), 99) <= 4
+        if _asset_score(a) >= _vs(PRICED_MIN_ASSET_VALUE) and _safe_int(a.get("round"), 99) <= 4
     ][:PRICED_PICK_POOL]
     pool = meaningful + pool_picks
     scored: List[tuple] = []
@@ -7100,10 +7135,10 @@ def _iter_priced_send_packages(
         for package in combinations(pool, size):
             delta = estimated_user_delta(package, [target_asset])
             deal = trade_value_bands.deal_size_for(sum(_asset_score(a) for a in package), _asset_score(target_asset))
-            if delta > trade_value_bands.cuts_for(deal).accept or delta < -PRICED_MAX_OVERPAY:
+            if delta > trade_value_bands.cuts_for(deal).accept or delta < -_vs(PRICED_MAX_OVERPAY):
                 continue
             # Closest to the price first; from above (user pays) beats from below.
-            scored.append((abs(delta) + (0 if delta <= 0 else 250), size, list(package), delta))
+            scored.append((abs(delta) + (0 if delta <= 0 else _vs(250)), size, list(package), delta))
     scored.sort(key=lambda item: (item[0], item[1]))
     diagnostics["priced_pool_size"] = len(pool)
     diagnostics["priced_in_band"] = len(scored)
@@ -7737,6 +7772,7 @@ def _hub_search_result(
     }
 
 
+@_with_league_value_scale
 def _build_my_player_fallback_ideas(
     *,
     df_summary: pd.DataFrame,
@@ -8114,8 +8150,8 @@ def _build_my_player_fallback_ideas(
                 "Expanded one-for-one path",
                 "Expanded search widens the direct value band when simple matches are scarce.",
                 54,
-                low=-2200,
-                high=1400,
+                low=_vs(-2200),
+                high=_vs(1400),
                 min_reason_score=6,
                 min_acceptance_score=54,
                 partner_profile=partner_profile,
@@ -8132,8 +8168,8 @@ def _build_my_player_fallback_ideas(
                     "Expanded player + pick path",
                     "Owned future picks balance a mid-star player when a one-for-one misses the value window.",
                     52,
-                    low=-2400,
-                    high=1800,
+                    low=_vs(-2400),
+                    high=_vs(1800),
                     min_reason_score=6,
                     min_acceptance_score=54,
                     partner_profile=partner_profile,
@@ -8148,7 +8184,7 @@ def _build_my_player_fallback_ideas(
                     "Expanded player + picks path",
                     "Multiple owned picks can balance a player when a one-for-one misses the value window.",
                     51,
-                    low=-2400,
+                    low=_vs(-2400),
                     high=2000,
                     min_reason_score=6,
                     min_acceptance_score=54,
@@ -8166,8 +8202,8 @@ def _build_my_player_fallback_ideas(
                     "Expanded send-side pick balancer",
                     "A complementary owned pick can close a value gap without dropping the focal player.",
                     53,
-                    low=-2400,
-                    high=1800,
+                    low=_vs(-2400),
+                    high=_vs(1800),
                     min_reason_score=6,
                     min_acceptance_score=54,
                     partner_profile=partner_profile,
@@ -8182,8 +8218,8 @@ def _build_my_player_fallback_ideas(
                     "Expanded two-for-one send",
                     "A complementary roster piece plus the focal player can reach a stronger return.",
                     52,
-                    low=-2600,
-                    high=1800,
+                    low=_vs(-2600),
+                    high=_vs(1800),
                     min_reason_score=6,
                     min_acceptance_score=54,
                     partner_profile=partner_profile,
@@ -8201,8 +8237,8 @@ def _build_my_player_fallback_ideas(
                     "Expanded depth-for-upside return",
                     "Expanded search checks two-player return packages when a single asset does not clear the fit gates.",
                     50,
-                    low=-2600,
-                    high=2200,
+                    low=_vs(-2600),
+                    high=_vs(2200),
                     min_reason_score=7,
                     min_acceptance_score=58,
                     partner_profile=partner_profile,
@@ -8219,8 +8255,8 @@ def _build_my_player_fallback_ideas(
                         "Expanded three-asset return",
                         "A wider package can match an elite asset without weakening the existing safety gates.",
                         48,
-                        low=-2800,
-                        high=2400,
+                        low=_vs(-2800),
+                        high=_vs(2400),
                         min_reason_score=7,
                         min_acceptance_score=58,
                         partner_profile=partner_profile,
@@ -8242,8 +8278,8 @@ def _build_my_player_fallback_ideas(
                     "Expanded pick-heavy return",
                     "Expanded search checks owned-pick packages when a direct player match stays thin.",
                     46,
-                    low=-1800,
-                    high=2600,
+                    low=_vs(-1800),
+                    high=_vs(2600),
                     min_reason_score=min_reason,
                     min_acceptance_score=54,
                     partner_profile=partner_profile,
@@ -8373,6 +8409,7 @@ def _player_search_universe_snapshot(
 
 
 @runtime_trace.traced("trade_board_generation", phase="trade_generation")
+@_with_league_value_scale
 def build_player_trade_hub_ideas(
     df_players: pd.DataFrame,
     league_id: str,
@@ -8891,7 +8928,7 @@ def build_player_trade_hub_ideas(
         ):
             diagnostics["no_value_match"] += 1
             diagnostics["rejected_value_window"] = _safe_int(diagnostics.get("rejected_value_window"), 0) + 1
-            record_rejection(send_assets, "value_window", f"outside canonical window {low:+d} to {high:+d}")
+            record_rejection(send_assets, "value_window", f"outside canonical window {int(round(low)):+d} to {int(round(high)):+d}")
             return False
         diagnostics["value_window_pass"] += 1
         diagnostics["candidates_scored"] = _safe_int(diagnostics.get("candidates_scored"), 0) + 1
@@ -9108,7 +9145,7 @@ def build_player_trade_hub_ideas(
     for player in my_player_assets[:12]:
         if player["score"] <= 0:
             continue
-        if not value_candidate([player], low=-1600, high=800):
+        if not value_candidate([player], low=_vs(-1600), high=_vs(800)):
             continue
         rationale = f"One-for-one path if {partner_name} prefers a cleaner positional swap or different roster fit."
         add_hub_idea([player], "Cheapest acquisition path", rationale, 82, min_reason_score=8, min_acceptance_score=56)
@@ -9116,7 +9153,7 @@ def build_player_trade_hub_ideas(
     for player in my_player_assets[:10]:
         for pick in my_pick_assets[:5]:
             send_assets = [player, pick]
-            if not value_candidate(send_assets, low=-1700, high=700):
+            if not value_candidate(send_assets, low=_vs(-1700), high=_vs(700)):
                 continue
             rationale = f"Uses one movable player plus owned draft capital to buy into {target_pos} talent without forcing a full two-for-one."
             add_hub_idea(send_assets, "Player + pick acquisition", rationale, 78, min_reason_score=9, min_acceptance_score=56)
@@ -9124,7 +9161,7 @@ def build_player_trade_hub_ideas(
     for i, first in enumerate(my_player_assets[:10]):
                 for second in my_player_assets[i + 1 : 12]:
                     send_assets = [first, second]
-                    if not value_candidate(send_assets, low=-1800, high=900):
+                    if not value_candidate(send_assets, low=_vs(-1800), high=_vs(900)):
                         continue
                     rationale = f"Turns depth or surplus pieces into one stronger {target_pos} asset when a direct one-for-one is unlikely."
                     add_hub_idea(send_assets, "Surplus-for-need package", rationale, 86, min_reason_score=10, min_acceptance_score=60)
@@ -9133,12 +9170,12 @@ def build_player_trade_hub_ideas(
         early_picks = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 2][:4]
         for i, first in enumerate(early_picks):
             send_assets = [first]
-            if value_candidate(send_assets, low=-2200, high=400):
+            if value_candidate(send_assets, low=_vs(-2200), high=_vs(400)):
                 rationale = f"Pure-pick path if {partner_name} is more interested in future capital than lineup help."
                 add_hub_idea(send_assets, "Pick-only swing", rationale, 68, min_reason_score=8, min_acceptance_score=54)
             for second in early_picks[i + 1 : 4]:
                 send_assets = [first, second]
-                if not value_candidate(send_assets, low=-2200, high=900):
+                if not value_candidate(send_assets, low=_vs(-2200), high=_vs(900)):
                     continue
                 rationale = f"Pick-heavy path if {partner_name} is open to future assets and your roster should keep the current starters intact."
                 add_hub_idea(send_assets, "Pick-heavy package", rationale, 72, min_reason_score=9, min_acceptance_score=54)
@@ -9161,7 +9198,7 @@ def build_player_trade_hub_ideas(
             for j, second in enumerate(expanded_player_assets[i + 1 : 11], start=i + 1):
                 for third in expanded_player_assets[j + 1 : 11]:
                     send_assets = [first, second, third]
-                    if not value_candidate(send_assets, low=-2400, high=1200):
+                    if not value_candidate(send_assets, low=_vs(-2400), high=_vs(1200)):
                         continue
                     add_hub_idea(
                         send_assets,
@@ -9170,15 +9207,15 @@ def build_player_trade_hub_ideas(
                         74,
                         min_reason_score=9,
                         min_acceptance_score=58,
-                        low=-2400,
-                        high=1200,
+                        low=_vs(-2400),
+                        high=_vs(1200),
                         source="expanded",
                     )
         for player in expanded_player_assets[:10]:
             for i, first_pick in enumerate(my_pick_assets[:4]):
                 for second_pick in my_pick_assets[i + 1 : 4]:
                     send_assets = [player, first_pick, second_pick]
-                    if not value_candidate(send_assets, low=-2400, high=1200):
+                    if not value_candidate(send_assets, low=_vs(-2400), high=_vs(1200)):
                         continue
                     add_hub_idea(
                         send_assets,
@@ -9187,15 +9224,15 @@ def build_player_trade_hub_ideas(
                         72,
                         min_reason_score=9,
                         min_acceptance_score=58,
-                        low=-2400,
-                        high=1200,
+                        low=_vs(-2400),
+                        high=_vs(1200),
                         source="expanded",
                     )
         for i, first in enumerate(expanded_player_assets[:8]):
             for second in expanded_player_assets[i + 1 : 9]:
                 for pick in my_pick_assets[:4]:
                     send_assets = [first, second, pick]
-                    if not value_candidate(send_assets, low=-2400, high=1200):
+                    if not value_candidate(send_assets, low=_vs(-2400), high=_vs(1200)):
                         continue
                     add_hub_idea(
                         send_assets,
@@ -9204,8 +9241,8 @@ def build_player_trade_hub_ideas(
                         73,
                         min_reason_score=9,
                         min_acceptance_score=58,
-                        low=-2400,
-                        high=1200,
+                        low=_vs(-2400),
+                        high=_vs(1200),
                         source="expanded",
                     )
         # A premium target can be economically reachable with draft capital
@@ -9220,7 +9257,7 @@ def build_player_trade_hub_ideas(
         for package_size in (3, 4):
             for pick_package in combinations(bounded_picks, package_size):
                 send_assets = list(pick_package)
-                if not value_candidate(send_assets, low=-2400, high=1200):
+                if not value_candidate(send_assets, low=_vs(-2400), high=_vs(1200)):
                     continue
                 add_hub_idea(
                     send_assets,
@@ -9229,8 +9266,8 @@ def build_player_trade_hub_ideas(
                     70,
                     min_reason_score=9,
                     min_acceptance_score=58,
-                    low=-2400,
-                    high=1200,
+                    low=_vs(-2400),
+                    high=_vs(1200),
                     source="expanded",
                     allow_soft_partner_fit=True,
                 )
@@ -9254,8 +9291,8 @@ def build_player_trade_hub_ideas(
             )
             if not value_candidate(
                 send_assets,
-                low=BLOCKBUSTER_VALUE_LOW,
-                high=BLOCKBUSTER_VALUE_HIGH,
+                low=_vs(BLOCKBUSTER_VALUE_LOW),
+                high=_vs(BLOCKBUSTER_VALUE_HIGH),
             ):
                 continue
             add_hub_idea(
@@ -9265,8 +9302,8 @@ def build_player_trade_hub_ideas(
                 76 - (4 * len(send_assets)) + min(6, 2 * sum(1 for asset in send_assets if _safe_int(asset.get("round"), 99) == 1)),
                 min_reason_score=6,
                 min_acceptance_score=40,
-                low=BLOCKBUSTER_VALUE_LOW,
-                high=BLOCKBUSTER_VALUE_HIGH,
+                low=_vs(BLOCKBUSTER_VALUE_LOW),
+                high=_vs(BLOCKBUSTER_VALUE_HIGH),
                 source="expanded",
                 allow_soft_partner_fit=True,
             )
@@ -9285,7 +9322,7 @@ def build_player_trade_hub_ideas(
             selected_asset,
             diagnostics,
         ):
-            if not value_candidate(send_assets, low=-PRICED_MAX_OVERPAY - 3500, high=PRICED_MAX_OVERPAY + 4500):
+            if not value_candidate(send_assets, low=-_vs(PRICED_MAX_OVERPAY) - _vs(3500), high=_vs(PRICED_MAX_OVERPAY) + _vs(4500)):
                 continue
             add_hub_idea(
                 send_assets,
@@ -9347,7 +9384,7 @@ def build_player_trade_hub_ideas(
             normal_package_max_value,
             _safe_int(diagnostics.get("normal_package_max_value"), 0),
         )
-        if reachable < target_value - BLOCKBUSTER_VALUE_HIGH:
+        if reachable < target_value - _vs(BLOCKBUSTER_VALUE_HIGH):
             diagnostics["empty_reason"] = "insufficient_owned_value"
         elif diagnostics.get("blockbuster_mode_triggered") and not ideas:
             diagnostics["empty_reason"] = "rejected_after_blockbuster_envelope"

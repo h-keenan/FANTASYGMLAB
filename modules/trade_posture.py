@@ -34,7 +34,7 @@ import re
 import math
 from typing import Any, Mapping, Sequence
 
-from modules import age_profile, posture_model, projection_calibration
+from modules import age_profile, posture_model, projection_calibration, value_scale
 from modules.team_eval import normalize_team_strategy, team_strategy_label
 from modules.trade_lineup_model import STATIC_VALUE_PER_POINT
 
@@ -278,7 +278,7 @@ def assess(posture: Mapping[str, Any], lineup_model: Mapping[str, Any] | None) -
     win_weight = WINDOW_WIN_WEIGHT.get(key, WINDOW_WIN_WEIGHT["retool"])
     k = _num(lineup_model.get("value_per_point"))
     # Value units per expected win in THIS league's price scale.
-    win_value = win_weight * (k or STATIC_VALUE_PER_POINT) / win_per_point
+    win_value = win_weight * (k or STATIC_VALUE_PER_POINT * value_scale.scale()) / win_per_point
     window_term = win_value * (wins_delta if wins_delta < 0 else GAIN_CREDIT * wins_delta)
 
     present_term = PRESENT_ADJUST.get(key, 0.0) * k * ros_delta
@@ -288,9 +288,10 @@ def assess(posture: Mapping[str, Any], lineup_model: Mapping[str, Any] | None) -
     # >0 converts future into present, <0 converts present into future.
     conversion = (present - future) / 2.0
     orientation = ORIENTATION.get(key, 0.0)
-    misaligned = max(0.0, -orientation * conversion - DIRECTION_DEADBAND)
+    misaligned = max(0.0, -orientation * conversion - DIRECTION_DEADBAND * value_scale.scale())
     direction_term = -DIRECTION_RATE * misaligned
-    direction = "toward_present" if conversion > DIRECTION_MIN_VALUE else "toward_future" if conversion < -DIRECTION_MIN_VALUE else "neutral"
+    direction_min = DIRECTION_MIN_VALUE * value_scale.scale()
+    direction = "toward_present" if conversion > direction_min else "toward_future" if conversion < -direction_min else "neutral"
 
     share = max(0.0, -ros_delta) / ros_before
     costly = win_weight >= WINDOW_WIN_WEIGHT["fringe_contender"] and (
@@ -478,7 +479,7 @@ def sort_rank(idea: Mapping[str, Any]) -> tuple[int, int]:
 
     Ideas without an Analyzer grade rank neutral, so old callers and ideas the
     Analyzer could not grade keep their existing order. The score is bucketed
-    to 500 value units so the established surface key (readiness, tier,
+    to 500 value units (on the league's value scale) so the established surface key (readiness, tier,
     confidence, realism, fit) still decides between comparable ideas.
     """
 
@@ -487,7 +488,7 @@ def sort_rank(idea: Mapping[str, Any]) -> tuple[int, int]:
     bucket = 0
     if rank >= 0 and score is not None:
         try:
-            bucket = int(max(-4, min(4, round(float(score) / 500.0)))) if rank > 0 else 0
+            bucket = int(max(-4, min(4, round(float(score) / (500.0 * value_scale.scale()))))) if rank > 0 else 0
         except (TypeError, ValueError):
             bucket = 0
     return rank, bucket
