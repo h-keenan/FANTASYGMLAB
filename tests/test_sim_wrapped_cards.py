@@ -89,3 +89,29 @@ def test_wrapped_endpoint_phases_and_pro_gate():
         advance(client, gid)
     body = client.get(f"/v1/sim/games/{gid}/wrapped", headers=hdr("pro")).json()
     assert body["wrapped"]["partial"] is True and body["wrapped"]["cards"][0]["id"] == "intro"
+
+
+def _strip_player_objects(node):
+    """Drop the player briefs (their full ``name`` is data the clients shorten); what is left is body copy."""
+    if isinstance(node, dict):
+        if "headshot_id" in node:
+            return None
+        return {k: _strip_player_objects(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_strip_player_objects(v) for v in node]
+    return node
+
+
+def test_body_copy_never_carries_a_full_player_name(played):
+    from modules.sim.game_wrapped import short_name
+
+    snap, state, em = played
+    deck = build_wrapped(snap, state, _fake_moves(snap, state), None, is_pro=True)
+    persona = next(c for c in deck["cards"] if c["id"] == "persona")
+    assert any("alone was worth" in line for line in persona["data"]["lines"])
+    copy = json.dumps(_strip_player_objects(deck["cards"]))
+    for p in snap.players.values():
+        if " " in p.name:
+            assert p.name not in copy, p.name
+    assert short_name("Owen Tillery") == "O. Tillery"
+    assert short_name("Marvin Harrison Jr.") == "M. Harrison Jr."

@@ -340,7 +340,7 @@ export function SeasonWrapped({ deck, itemId, onClose, startIndex = 0 }: { deck:
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden><path d="M5 5l14 14M19 5L5 19" /></svg>
           </button>
         </div>
-        <div className="relative flex flex-1 flex-col gap-5 overflow-y-auto" style={{ minHeight: 0 }}>
+        <div className="relative flex flex-1 flex-col gap-5 overflow-y-auto pt-6" style={{ minHeight: 0 }}>
           <button type="button" className="absolute inset-y-0 left-0 z-10 w-1/4" aria-label="Previous card" onClick={() => go(-1)} disabled={index === 0} />
           <button type="button" className="absolute inset-y-0 right-0 z-10 w-1/4" aria-label="Next card" onClick={() => go(1)} disabled={index === last} />
           <header className="flex flex-col gap-1">
@@ -348,7 +348,7 @@ export function SeasonWrapped({ deck, itemId, onClose, startIndex = 0 }: { deck:
             <h2 className="text-3xl font-extrabold leading-tight">{card.title}</h2>
             {card.sub ? <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{card.sub}</p> : null}
           </header>
-          <div className="my-auto" key={card.id}>
+          <div key={card.id}>
             <div className="enter-pop"><WrappedCardBody card={card} /></div>
           </div>
         </div>

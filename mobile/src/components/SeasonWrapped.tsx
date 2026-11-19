@@ -303,7 +303,7 @@ export function SeasonWrapped({ deck, visible, onClose }: { deck: WrappedDeck; v
             <AppText style={styles.title}>{card.title}</AppText>
             {card.sub ? <AppText style={styles.sub}>{card.sub}</AppText> : null}
           </View>
-          <View style={{ marginVertical: spacing.lg }}>
+          <View style={{ marginTop: spacing.lg }}>
             <CardBody card={card} colors={colors} styles={styles} onUnlock={onUnlock} />
           </View>
         </ScrollView>
@@ -354,7 +354,7 @@ function createStyles(colors: ThemeColors) {
     segments: { flex: 1, flexDirection: 'row', gap: 4 },
     segment: { flex: 1, height: 4, borderRadius: 2 },
     close: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-    body: { flexGrow: 1, padding: spacing.lg, justifyContent: 'center' },
+    body: { flexGrow: 1, padding: spacing.lg, paddingTop: spacing.xl, justifyContent: 'flex-start' },
     eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2, color: colors.textTertiary },
     title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, lineHeight: 34 },
     sub: { fontSize: 14, color: colors.textSecondary },
