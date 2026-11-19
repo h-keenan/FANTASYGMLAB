@@ -41,12 +41,28 @@ def test_all_fresh_is_clean(data_dir):
     assert report["failing"] == []
 
 
-def test_a_stopped_sync_fails_in_season_and_only_warns_off_season(data_dir, monkeypatch):
-    _touch(data_dir / "fantasycalc_values.csv", 24 * 4)
+def _stopped_values_sync_checks(data_dir, monkeypatch):
     assert "values_fantasycalc" in data_freshness.build_report(data_dir=str(data_dir))["failing"]
     monkeypatch.setattr(data_freshness, "_in_season", lambda: False)
     report = data_freshness.build_report(data_dir=str(data_dir))
     assert "values_fantasycalc" not in report["failing"]
+
+
+def test_a_stopped_sync_fails_in_season_and_only_warns_off_season(data_dir, monkeypatch):
+    # Fresh provider cache ON (the production default; conftest pins it off for hermetic tests): the age is the real fetch
+    # timestamp beside the CSV, not the checkout mtime.
+    import json
+
+    monkeypatch.setenv("DYNASTYGM_FRESH_PROVIDER_CACHE_V1", "1")
+
+    (data_dir / "fantasycalc_values.meta.json").write_text(json.dumps({"fetched_at": time.time() - 24 * 4 * 3600}))
+    _stopped_values_sync_checks(data_dir, monkeypatch)
+
+
+def test_a_stopped_sync_fails_with_the_legacy_mtime_switch(data_dir, monkeypatch):
+    monkeypatch.setenv("DYNASTYGM_FRESH_PROVIDER_CACHE_V1", "0")
+    _touch(data_dir / "fantasycalc_values.csv", 24 * 4)
+    _stopped_values_sync_checks(data_dir, monkeypatch)
 
 
 def test_missing_file_fails_in_season(data_dir):

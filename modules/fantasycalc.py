@@ -11,7 +11,7 @@ FANTASYCALC_CACHE_TTL_SECONDS = 6 * 60 * 60
 FANTASYCALC_META_SUFFIX = ".meta.json"  # sidecar sits beside the CSV: data/fantasycalc_values.meta.json
 # Data-truth audit 2026-11-19 (docs/audits/2026-11-data-truth.md, finding 1): a file's mtime is the checkout
 # time in a git deploy, so the committed July seed CSV looked "0s old" to every refresh job and was served as
-# live. With this flag ON the TTL and the "as of" come from a fetched_at timestamp stored beside the CSV
+# live. With this flag ON (the default; set to 0 to restore the old mtime TTL) the TTL and the "as of" come from a fetched_at timestamp stored beside the CSV
 # (written only by a real provider fetch); a CSV with no such timestamp counts as stale and is refetched.
 FRESH_CACHE_FLAG = "DYNASTYGM_FRESH_PROVIDER_CACHE_V1"
 
@@ -21,9 +21,10 @@ def meta_path() -> str:
 
 
 def fresh_cache_enabled() -> bool:
-    from modules.app_config import config_bool
+    from modules.experimental_graduation import graduated_kill_switch_enabled
 
-    return bool(config_bool(FRESH_CACHE_FLAG))
+    # Default ON (2026-11-19, live harness: valid payload, all positions, sane ranges); "0" is the kill switch.
+    return graduated_kill_switch_enabled(FRESH_CACHE_FLAG, default=True)
 
 
 def fetched_at() -> float | None:
