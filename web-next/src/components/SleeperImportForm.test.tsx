@@ -114,6 +114,61 @@ describe("SleeperImportForm", () => {
     expect(screen.getByPlaceholderText("e.g. gridiron_gm")).toHaveValue("someone");
   });
 
+  it("shows a rate-limit message with a retry (never user-not-found) when Sleeper answers 429", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
+      ok: false,
+      status: "rate_limited",
+      username: "someone",
+      leagues: [],
+      message: "Sleeper is limiting requests right now. Wait a minute and try again.",
+    });
+    render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/limiting requests/i));
+    expect(screen.queryByText(/couldn't find a sleeper user/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+  });
+
+  it("says a multi-league list may be incomplete when one season failed, and offers Check again", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
+      ok: true,
+      status: "ok",
+      username: "someone",
+      leagues: [
+        { league_id: "league-a", name: "League A", season: "2026", total_rosters: 12 },
+        { league_id: "league-b", name: "League B", season: "2026", total_rosters: 10 },
+      ],
+      message: "",
+      partial: true,
+      partial_message: "Sleeper did not answer for one season, so this list may be missing leagues. Try again to check.",
+    });
+    render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/may be missing leagues/i));
+    fireEvent.click(screen.getByTestId("check-again"));
+    await waitFor(() => expect(api.lookupSleeperLeagues).toHaveBeenCalledTimes(2));
+  });
+
+  it("explains a Sleeper outage on save instead of saying the league was not found", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
+      ok: true,
+      status: "ok",
+      username: "someone",
+      leagues: [{ league_id: "league-solo", name: "Solo League", season: "2026", total_rosters: 12 }],
+      message: "",
+    });
+    vi.mocked(api.linkSleeperUsername).mockResolvedValue({ ok: true } as never);
+    vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "provider_unavailable", cap: 0 });
+    const onLeagueChosen = vi.fn();
+    render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/sleeper is temporarily unreachable/i));
+    expect(onLeagueChosen).not.toHaveBeenCalled();
+  });
+
   it("tracks a click on the sample league button", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({ ok: false, status: "user_not_found", username: "x", leagues: [], message: "" });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);

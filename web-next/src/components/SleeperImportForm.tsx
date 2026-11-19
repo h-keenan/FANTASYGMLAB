@@ -173,6 +173,8 @@ function SleeperUsernameImport({
   const [leagues, setLeagues] = useState<SleeperLeagueSummary[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [whatIsOpen, setWhatIsOpen] = useState(false);
+  // The last lookup answered for only one of the two seasons: offer "Check again" beside the note.
+  const [partial, setPartial] = useState(false);
   // Set once a save reports the server is warming the league's first-load
   // data; shows real progress until it is ready, then continues.
   const [warming, setWarming] = useState<{ leagueId: string; name: string } | null>(null);
@@ -212,6 +214,7 @@ function SleeperUsernameImport({
     setStatus("loading");
     setMessage(null);
     setConnectError(null);
+    setPartial(false);
     setLeagues([]);
     // Mirrors app.py's load_leagues_for_username, which fires this on every
     // lookup attempt (once per session) regardless of outcome -- this is
@@ -277,6 +280,11 @@ function SleeperUsernameImport({
 
       setLeagues(result.leagues);
       setSelected(defaultLeagueSelection(result.leagues));
+      // One season's lookup failed: the list may be missing leagues. Say so above the Connect button; searching again retries.
+      if (result.partial && result.partial_message) {
+        setMessage(result.partial_message);
+        setPartial(true);
+      }
       setStatus("idle");
     } catch (error) {
       setStatus("error");
@@ -404,6 +412,11 @@ function SleeperUsernameImport({
           <p role="alert" className="m-0 text-xs" style={{ color: "var(--color-warning)" }}>
             {message}
           </p>
+        ) : null}
+        {partial ? (
+          <Button type="button" variant="secondary" size="sm" onClick={() => void handleSubmit()} data-testid="check-again">
+            Check again
+          </Button>
         ) : null}
         <Button type="button" onClick={() => void connectSelected()} disabled={selected.length === 0} loading={status === "saving"} data-testid="connect-selected">
           {connectCtaLabel(selected.length)}

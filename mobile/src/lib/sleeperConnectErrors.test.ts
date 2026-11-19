@@ -28,6 +28,15 @@ test('unknown status falls back to the server message', () => {
   assert.equal(describeSleeperConnectError({ status: 'x', serverMessage: 'Boom' }).message, 'Boom');
 });
 
+test('rate_limited is a retry card, never user_not_found', () => {
+  const e = describeSleeperConnectError({ status: 'rate_limited', username: 'bob' });
+  assert.equal(e.kind, 'network');
+  assert.match(e.message, /limiting requests/);
+  assert.match(e.hint, /try again/);
+  assert.equal(e.offerSample, false);
+  assert.equal(isConnectivityFailure({ status: 429 }), true);
+});
+
 test('isConnectivityFailure', () => {
   assert.equal(isConnectivityFailure({ status: 0 }), true);
   assert.equal(isConnectivityFailure({ status: 503 }), true);

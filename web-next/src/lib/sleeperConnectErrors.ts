@@ -30,6 +30,8 @@ const USERNAME_HINT =
 const NO_LEAGUES_HINT =
   "We check this season and last season. Make sure this is the account that is in your league, or try again once your league for this season exists on Sleeper. You can also try a different username.";
 
+const RATE_LIMIT_HINT = "Sleeper is limiting requests right now. Wait about a minute, then tap the button to try again. Your username is still filled in.";
+
 const NETWORK_HINT = "Check your connection and tap the button to try again. Your username is still filled in.";
 
 export function describeSleeperConnectError(input: {
@@ -56,6 +58,15 @@ export function describeSleeperConnectError(input: {
         offerSample: true,
         offerSleeperSignup: false,
       };
+    case "rate_limited":
+      // Same retry card as a network failure (kind "network"): a rate limit is never "no such user".
+      return {
+        kind: "network",
+        message: "Sleeper is limiting requests right now.",
+        hint: RATE_LIMIT_HINT,
+        offerSample: false,
+        offerSleeperSignup: false,
+      };
     case "unavailable":
     case "network":
       return {
@@ -79,7 +90,7 @@ export function describeSleeperConnectError(input: {
 /** True for a thrown request failure that is a connectivity/server problem. */
 export function isConnectivityFailure(error: unknown): boolean {
   const status = (error as { status?: unknown } | null)?.status;
-  if (typeof status === "number") return status === 0 || status >= 500;
+  if (typeof status === "number") return status === 0 || status === 429 || status >= 500;
   // A bare fetch/network exception with no HTTP status.
   return error instanceof Error;
 }
