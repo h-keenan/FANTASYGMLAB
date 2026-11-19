@@ -1,5 +1,6 @@
 "use client";
 
+import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { RangeCompare } from "@/components/RangeCompare";
@@ -824,6 +825,7 @@ export function MatchupContent({
     <main className="page-shell page-shell-wide">
       {leagueId ? <PageTabBar family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} /> : null}
       <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} ageSeconds={ageSeconds} onRefresh={onRefresh} refreshing={refreshing} />
+      {matchup.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={matchup.sleeper_data_as_of} className="block text-xs" /> : null}
       <MatchupHero matchup={shown} />
       {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="unmapped-starters">

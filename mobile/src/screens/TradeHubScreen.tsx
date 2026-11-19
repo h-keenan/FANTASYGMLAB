@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
+import FreshnessLabel from '../components/FreshnessLabel';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -120,6 +121,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
   const [postureSentence, setPostureSentence] = useState('');
   const [tradeWindow, setTradeWindow] = useState<TradeWindow | undefined>(undefined);
   const [teamStrategy, setTeamStrategy] = useState<string | undefined>(undefined);
+  const [staleAsOf, setStaleAsOf] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adUnlocks, setAdUnlocks] = useState(0);
@@ -152,6 +154,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
       setError(null);
       try {
         const result = await api.getTradeHubIdeas(leagueId, nextStrategy, nextAdUnlocks, nextLens);
+        setStaleAsOf(result.sleeper_data_as_of ?? null);
         setHold(result.hold ?? null);
         setPostureSentence(result.posture_sentence ?? '');
         setTradeWindow(result.trade_window);
@@ -302,6 +305,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               onChange={(key) => (key === 'for_you' ? setViewMode('for_you') : onSelectAllTrades())}
             />
           </View>
+          {staleAsOf ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={staleAsOf} /> : null}
           <SectionHeading
             title={isForYou ? 'Your trade ideas' : 'All trades'}
             info={

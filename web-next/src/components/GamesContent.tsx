@@ -1,5 +1,6 @@
 "use client";
 
+import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
 import { percentColorVar, toneColorVar } from "@/lib/verdictToneCss";
 import { PageTabBar } from "@/components/PageTabBar";
 import { PageTitle } from "@/components/PageTitle";
@@ -139,6 +140,7 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
   const titleAvailable = data.title_odds?.available === true && mine.title_probability != null;
   return (
     <div className="flex flex-col gap-8">
+      {data.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={data.sleeper_data_as_of} className="block text-xs" /> : null}
       <section className="flex flex-col gap-3">
         <div className="glass-surface flex items-center justify-between gap-4 p-4">
           <div className="flex flex-col">
@@ -490,6 +492,7 @@ function PickemPanel({ leagueId }: { leagueId: string }) {
   const index = weeks.indexOf(week);
   return (
     <div className="flex flex-col gap-8">
+      {data.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={data.sleeper_data_as_of} className="block text-xs" /> : null}
       <section className="flex flex-col gap-3">
         <SectionHeading kicker={`Season ${data.season ?? ""}`} note="Pick winners before the week starts. No money, just bragging rights.">
           Week {week}

@@ -465,6 +465,8 @@ export interface PlayoffOddsTeam {
 }
 
 export interface PlayoffOddsResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: true;
   reason: string;
   teams: PlayoffOddsTeam[];
@@ -514,6 +516,8 @@ export interface GamesRosterPlayer {
 }
 
 export interface GamesSeasonSimResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: boolean;
   reason: string;
   is_premium: boolean;
@@ -672,6 +676,8 @@ export interface GamesLeaderboardRow {
 }
 
 export interface GamesPickemResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: boolean;
   available: boolean;
   reason: string;
@@ -1160,6 +1166,8 @@ export interface MatchupRealComparison {
 }
 
 export interface MatchupResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: true;
   /** Sleeper's current week (league settings.leg) — null when the league hasn't started one. */
   week: number | null;
@@ -1214,6 +1222,8 @@ export interface MatchupBigPlay {
 /** One slot of a proposed lineup sent to POST .../matchup/what-if. */
 /** GET /v1/leagues/{id}/live-activity — compact real-score snapshot (modules/live_activity.py). */
 export interface LiveActivitySnapshot {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: true;
   available: boolean;
   reason: string;
@@ -1628,6 +1638,8 @@ export interface RosterOverflow {
 }
 
 export interface WaiversResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: true;
   players: WaiverPlayer[];
   /** Free-agent defenders (DL/LB/DB) in IDP leagues only. Absent/empty otherwise. */
@@ -3696,6 +3708,8 @@ export interface TradeHubHold {
 }
 
 export interface TradeHubResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: true;
   ideas: TradeIdea[];
   reason: string;

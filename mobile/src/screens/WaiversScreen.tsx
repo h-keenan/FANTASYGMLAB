@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
+import FreshnessLabel from '../components/FreshnessLabel';
 import PlayerName from '../components/PlayerName';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { sleeperLeagueUrl } from '../lib/matchupPlanner';
@@ -141,6 +142,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [deepLinkMissing, setDeepLinkMissing] = useState(false);
   const { lens } = useValuationLens(leagueId);
+  const [staleAsOf, setStaleAsOf] = useState<string | null>(null);
   const [freeAgents, setFreeAgents] = useState<WaiverPlayer[] | null>(null);
   // IDP leagues only; empty otherwise.
   const [idpAgents, setIdpAgents] = useState<WaiverPlayer[]>([]);
@@ -199,6 +201,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
           setError(null);
           const result = await api.getLeagueWaivers(leagueId, { lens, limit: 300 });
           if (cancelled) return;
+          setStaleAsOf(result.sleeper_data_as_of ?? null);
           setFreeAgents(result.players);
           setIdpAgents(result.idp_players ?? []);
           setDefenseSlotOpen(result.team_defense?.empty_slot === true);
@@ -476,6 +479,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
       {/* ONE tab row (the Team family strip) and ONE compact control row: the view selector plus the filters
           that belong to that view (web twin: the waiver-controls row). */}
       <PageFamilyTabs family="team" active="waivers" leagueId={leagueId} leagueName={leagueName} />
+      {staleAsOf ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={staleAsOf} /> : null}
       <View style={styles.controlRow} testID="waiver-controls">
         <ViewTabs<string>
           options={TAB_OPTIONS.map((o) => o.label)}

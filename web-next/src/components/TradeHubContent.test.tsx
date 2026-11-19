@@ -87,6 +87,12 @@ function openIdeaCards() {
 }
 
 describe("TradeHubContent For You / All Trades tabs (the app's Trade Hub views)", () => {
+  it("labels the page with its age when the API served last-known provider data", () => {
+    const stale = new Date(Date.now() - 20 * 60_000).toISOString();
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={{ ...RESPONSE, sleeper_data_as_of: stale }} />);
+    expect(screen.getByTestId("freshness-label")).toHaveTextContent(/League data as of 2\dm ago \(may be behind\)/);
+  });
+
   it("opens on For You, loads All Trades on demand, pages with Load more teams and gates free past the cap", async () => {
     const page = (n: number, hasMore: boolean, remainingFree: number) => ({
       ok: true as const,

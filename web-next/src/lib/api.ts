@@ -954,6 +954,8 @@ export interface PlayoffOddsTeam {
 }
 
 export interface PlayoffOddsResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: boolean;
   reason: string;
   teams: PlayoffOddsTeam[];
@@ -1003,6 +1005,8 @@ export interface GamesRosterPlayer {
 }
 
 export interface GamesSeasonSimResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: boolean;
   reason: string;
   is_premium: boolean;
@@ -1161,6 +1165,8 @@ export interface GamesLeaderboardRow {
 }
 
 export interface GamesPickemResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: boolean;
   available: boolean;
   reason: string;
@@ -1310,6 +1316,8 @@ export interface AllTradesResponse {
 }
 
 export interface TradeHubResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: boolean;
   ideas: TradeIdea[];
   reason: string;
@@ -1672,6 +1680,8 @@ export interface RosterOverflow {
 }
 
 export interface WaiversResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: boolean;
   players: WaiverPlayer[];
   /** Free-agent defenders (DL/LB/DB) in IDP leagues only. Absent/empty otherwise. */
@@ -1993,6 +2003,8 @@ export interface MatchupWinProbability {
 }
 
 export interface MatchupResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
   ok: boolean;
   /** Sleeper's current week (league settings.leg) — null when the league
    * hasn't started one. */

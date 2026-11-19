@@ -49,4 +49,4 @@ Legend: current behaviour is before this change. Fix column names the change (fl
 ## Not fixed
 
 - Retry policy (`SLEEPER_REQUEST_MAX_RETRIES`) is unchanged: two short retries on 429/5xx.
-- Per-route stale labels beyond Dashboard and My Team (other `_with_sleeper_as_of` routes still emit `sleeper_data_as_of` but no UI reads it yet).
+- Stale labels now also show on Waivers, Trade Hub, Matchup and Games (season sim and Pick'em), web and app. Still unlabeled: standalone playoff-odds panels, live-activity, and POST routes (what-if, pick, trade-odds-effect), which are not page loads.

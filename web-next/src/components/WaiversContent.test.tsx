@@ -117,6 +117,12 @@ const NEEDS_MODEL: NeedsModel = {
 };
 
 describe("WaiversContent", () => {
+  it("labels the page with its age when the API served last-known provider data", () => {
+    const stale = new Date(Date.now() - 20 * 60_000).toISOString();
+    renderOpen(<WaiversContent leagueName="L" data={{ ...BASE_RESPONSE, sleeper_data_as_of: stale }} />);
+    expect(screen.getByTestId("freshness-label")).toHaveTextContent(/League data as of 2\dm ago \(may be behind\)/);
+  });
+
   it("shows one bigger-upgrade chip with the lineup gain on the flagged top add, and none otherwise", () => {
     const flagged = priorityAdd({ name: "Big Upgrade", bigger_upgrade: true, lineup_ppw: 1.84 });
     const { unmount } = render(

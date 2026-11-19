@@ -207,6 +207,12 @@ function openModule(title: string) {
 describe("MatchupContent", () => {
   beforeEach(() => window.localStorage.clear());
 
+  it("labels the page with its age when the API served last-known provider data", () => {
+    const stale = new Date(Date.now() - 20 * 60_000).toISOString();
+    render(<MatchupContent leagueName="My League" matchup={{ ...PREGAME, sleeper_data_as_of: stale }} />);
+    expect(screen.getByTestId("freshness-label")).toHaveTextContent(/League data as of 2\dm ago \(may be behind\)/);
+  });
+
   it("renders the header with the week and no LIVE badge before games start", () => {
     render(<MatchupContent leagueName="My League" matchup={PREGAME} />);
 

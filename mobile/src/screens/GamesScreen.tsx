@@ -6,6 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import AppText from '../components/AppText';
+import FreshnessLabel from '../components/FreshnessLabel';
 import { SkeletonPage } from '../components/Skeleton';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
@@ -147,6 +148,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
   const titleAvailable = data.title_odds?.available === true && mine.title_probability != null;
   return (
     <View style={styles.section}>
+      {data.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={data.sleeper_data_as_of} /> : null}
       <GlassCard radius="md" style={styles.card}>
         <View>
           <AppText style={[styles.bigOdds, { color: percentColor(colors, mine.playoff_probability) }]}>
@@ -421,6 +423,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
 
   return (
     <View style={styles.section}>
+      {data.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={data.sleeper_data_as_of} /> : null}
       <SectionHeading title={`Week ${week}`} caption="Pick winners before the week starts. No money, just bragging rights." />
       <View style={styles.rowBetween}>
         <Button label="Prev" variant="secondary" disabled={index <= 0} onPress={() => load(weeks[index - 1])} />
