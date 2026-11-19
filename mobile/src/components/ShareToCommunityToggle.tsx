@@ -12,7 +12,7 @@ import Input from './Input';
 import Toggle from './Toggle';
 
 /**
- * Opt-in "Share to community" for a Trade Analyzer result (mirrors web-nex
+ * Opt-in "Share to community" for a Trade Analyzer result (mirrors web-next
  * ShareToCommunityToggle). Off by default; nothing is sent until the user
  * flips it on and presses Share. Hidden when storage is not set up.
  */
@@ -103,7 +103,7 @@ export default function ShareToCommunityToggle({
       </View>
       {on && !sharedId ? (
         <View style={styles.form}>
-          <Inpu
+          <Input
             value={name}
             onChangeText={setName}
             maxLength={SHARE_NAME_MAX}

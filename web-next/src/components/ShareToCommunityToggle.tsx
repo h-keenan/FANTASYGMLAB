@@ -117,7 +117,7 @@ export function ShareToCommunityToggle({
       </div>
       {on && !sharedId ? (
         <div className="flex flex-col gap-2">
-          <Inpu
+          <Input
             type="text"
             value={name}
             maxLength={24}
