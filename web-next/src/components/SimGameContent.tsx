@@ -10,6 +10,8 @@ import { ErrorState } from "@/components/ErrorState";
 import { Input, Select } from "@/components/Input";
 import { PageTitle } from "@/components/PageTitle";
 import { PillRow } from "@/components/PillRow";
+import { SimWatchPlayback, SimWatchReportCard, SimWatchSliders } from "@/components/SimWatch";
+import { simWatchSliders } from "@/lib/simWatch";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimHomeTab } from "@/components/SimGameHome";
@@ -506,6 +508,7 @@ export function SimGameContent() {
           onDismissPaywall={() => dispatch({ type: "dismiss_paywall" })}
           onHub={() => { dispatch({ type: "hub" }); setGameState(null); void refreshList(); }}
           onNewGame={() => { dispatch({ type: "setup" }); setGameState(null); }}
+          onStartGame={(body) => void createGame(body)}
           onDeleted={() => { dispatch({ type: "deleted" }); setGameState(null); void refreshList(); }}
         />
         {sheetPlayer ? (
@@ -659,6 +662,8 @@ function SetupForm({
   const nameChoices = simTeamNameChoices(options);
   const modes = simSetupModes(options);
   const dynasty = state.mode === "dynasty";
+  const canWatch = state.start === "fresh" && !dynasty;
+  const watching = canWatch && state.watch;
   const dynastyNote = simSetupDynastyNote(state);
   const changed = simSetupAdvancedChanged(state, defaults);
   const block = simSetupBlock(state);
@@ -919,10 +924,12 @@ function SetupForm({
         </>
       ) : null}
       <MotionIn index={custom ? 5 : 2} count={cardCount}>
-        <section className="glass-surface p-4 min-w-0" aria-label="Lineup management">
+        <section className="glass-surface p-4 min-w-0 flex flex-col gap-3" aria-label="Lineup management">
           <SetupToggleGroup>
-            <SetupToggleRow first label="Auto-set my lineup" note="Starts your best healthy players each week. You can still change it." checked={state.auto} onChange={(v) => set("auto", v)} />
+            {watching ? null : <SetupToggleRow first label="Auto-set my lineup" note="Starts your best healthy players each week. You can still change it." checked={state.auto} onChange={(v) => set("auto", v)} />}
+            {canWatch ? <SetupToggleRow first={watching} label="Mock draft, then watch the season" note="Draft your team, then the season plays itself on the settings below. Counts as your free season." checked={state.watch} onChange={(v) => set("watch", v)} /> : null}
           </SetupToggleGroup>
+          {watching ? <SimWatchSliders waivers={state.watchWaivers} trades={state.watchTrades} onWaivers={(v) => set("watchWaivers", v)} onTrades={(v) => set("watchTrades", v)} /> : null}
         </section>
       </MotionIn>
       <SetupStickyBar warning={block}>
@@ -965,6 +972,7 @@ function GameScreen({
   onDismissPaywall,
   onHub,
   onNewGame,
+  onStartGame,
   onDeleted,
 }: {
   flow: typeof SIM_FLOW_INITIAL;
@@ -998,6 +1006,7 @@ function GameScreen({
   onDismissPaywall: () => void;
   onHub: () => void;
   onNewGame: () => void;
+  onStartGame: (body: SimGameCreateBody) => void;
   onDeleted: () => void;
 }) {
   const paywalled = simGamePaywalled(preview);
@@ -1007,7 +1016,8 @@ function GameScreen({
   const warnings = simAdvanceWarnings(game);
   const youLine = game.you;
   const inSeason = (stage === "week" || stage === "playoffs") && !draftRecap;
-  const showBar = inSeason && !recap && !simToResult;
+  const watch = simWatchSliders(game.settings) !== null;
+  const showBar = inSeason && !recap && !simToResult && !watch;
   const showOffBar = stage === "offseason" && !draftRecap && !recap;
   const [moreOpen, setMoreOpen] = useState(false);
   // Phones: the footer slides away scrolling down and returns scrolling up (stays while a selection submit is showing).
@@ -1061,7 +1071,7 @@ function GameScreen({
           ))}
         </ul>
       ) : null}
-      {inSeason && !recap && !paywalled ? <SimStatusChips game={game} onTab={onTab} /> : null}
+      {inSeason && !recap && !paywalled && !watch ? <SimStatusChips game={game} onTab={onTab} /> : null}
 
       {stage === "draft" ? (
         <SimGameDraft ctx={ctx} onComplete={onDraftComplete} />
@@ -1071,8 +1081,12 @@ function GameScreen({
         <SimToResultView result={simToResult} onClose={onSimToDone} onTab={(tab) => onTab(tab)} onForce={onSimToForce} onUndo={onSimToUndo} onGoPro={onSimToGoPro} />
       ) : recap ? (
         <SimWeekRecapStory recap={recap} index={flow.recapIndex} total={flow.recaps.length} ctx={ctx} onNext={onRecapNext} onClose={onRecapClose} onFixLineup={() => { onRecapClose(); onTab("team"); }} />
+      ) : watch && stage === "final" ? (
+        <SimWatchReportCard ctx={ctx} onStartGame={onStartGame} onHub={onHub} />
       ) : stage === "final" ? (
         <SimFinalView ctx={ctx} onNewGame={onNewGame} onHub={onHub} />
+      ) : watch && inSeason ? (
+        <SimWatchPlayback ctx={ctx} />
       ) : stage === "offseason" ? (
         <>
           <PillRow

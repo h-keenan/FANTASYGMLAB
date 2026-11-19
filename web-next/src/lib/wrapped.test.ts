@@ -52,4 +52,18 @@ describe("wrapped lib", () => {
     const v = wrappedView(card("mvp", { player: P, pts: 200, over_proj: null, ppg: 14.3, best: { week: null, pts: 30 }, share: 12 }));
     if (v.kind === "hero") expect(v.chip).toBeNull();
   });
+
+  it("draft report cards: rounds, pick rows with a grade, value pair, summary", () => {
+    const rounds = wrappedView(card("watch_draft", { grade: "B+", then: "B", rounds: [{ round: 1, actual: 214, expected: 198 }, { round: 2, actual: 163, expected: 171 }] }));
+    expect(rounds.kind).toBe("rounds");
+    if (rounds.kind === "rounds") expect(rounds.rows[0]).toMatchObject({ label: "Round 1", max: 214 });
+    const busts = wrappedView(card("watch_busts", { rows: [{ player: P, text: "Rd 2, #17 · Missed 5 games: hamstring", grade: "D+", delta: -52.4 }] }));
+    expect(busts.kind === "picks" && busts.rows[0]).toMatchObject({ grade: "D+", delta: "-52.4" });
+    const stung = wrappedView(card("watch_whatif", { rows: [{ player: P, text: "Went right after G. Moreau", delta: 48, grade: null }] }));
+    expect(stung.kind === "picks" && stung.rows[0].delta).toBe("+48 pts");
+    const pair = wrappedView(card("watch_value", { steal: { player: P, text: "Round 5, pick 53 · finished RB14", delta: 38.9 }, reach: { player: P, text: "Round 4, pick 41 · finished WR48", delta: -31 } }));
+    expect(pair.kind === "valuepair" && pair.items.map((i) => i.label)).toEqual(["The steal", "The reach"]);
+    const summary = wrappedView(card("watch_standing", { grade: "B+", rows: [{ label: "Best pick", value: "O. Tillery", tone: "good" }] }));
+    expect(summary.kind === "summary" && summary.rows[0].tone).toBe("good");
+  });
 });

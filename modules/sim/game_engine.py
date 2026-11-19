@@ -37,6 +37,7 @@ from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_posture import update_posture
 from modules.sim.game_scoring import PlayerWeek, ScoringModel, get_model
 from modules.sim.game_state import Emitter, GameState, auto_manage_on
+from modules.sim import game_watch as watch
 from modules.sim.game_usage import group_factors
 from modules.sim.game_types import GameError, GameSnapshot, headshot_id, slot_positions
 from modules.sim.injuries import draw_injury_type
@@ -695,6 +696,10 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
         slots, _ = ev0.best_lineup(state.rosters[user], W)
         em.emit(W, "engine", "lineup_set", team=user, slots=slots, auto=True)
 
+    # 1a. watch_v 1 (Draft & Watch): the user's waiver claims and trade acceptances, played from the sliders chosen before the season
+    if S.watch_v and state.status == "in_season":
+        watch.manage(em, snap, state, seed, W)
+
     # 1b. posture_v 1: every AI team re-reads its standing and playoff odds (buy / sell / hold, with hysteresis) before it shops
     update_posture(em, snap, state, W)
 
@@ -714,6 +719,9 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
         if S.reserves:
             ai_manage_reserves(em, ev, tid)
         em.emit(W, tid, "lineup_set", team=tid, slots=ai_lineup(ev, tid, W, seed), auto=True)
+    if S.watch_v and auto_manage_on(snap, state) and state.lineups[user]:  # the week's trades and adds are in: set the best lineup now
+        slots, _ = ev.best_lineup(state.rosters[user], W)
+        em.emit(W, "engine", "lineup_set", team=user, slots=slots, auto=True)
     auto_filled = fill_empty_slots(em, ev, user, W)
 
     # 5. scoring

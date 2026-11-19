@@ -60,6 +60,14 @@ export interface WrappedDots {
   caption: string;
 }
 
+export interface WrappedPickRow {
+  player: WrappedPlayer | null;
+  text: string;
+  /** A pick's letter grade (Draft & Watch); null on a what-if row. */
+  grade: string | null;
+  delta: string;
+}
+
 export type WrappedView =
   | { kind: "locked"; teaser: string }
   | { kind: "hero"; player: WrappedPlayer | null; hero: string; unit: string | null; chip: string | null; chipTone: WrappedTone; rows: WrappedRow[]; foot: string | null; second: WrappedPlayer | null; secondLabel: string | null }
@@ -69,6 +77,10 @@ export type WrappedView =
   | { kind: "luck"; actual: number; expected: number; max: number; chip: string; actualLabel: string; expectedLabel: string }
   | { kind: "journey"; ranks: number[]; teams: number; peak: string; note: string }
   | { kind: "grade"; overall: string; subs: { label: string; letter: string }[] }
+  | { kind: "rounds"; grade: string; then: string | null; rows: { label: string; actual: number; expected: number; max: number }[] }
+  | { kind: "picks"; rows: WrappedPickRow[] }
+  | { kind: "valuepair"; items: { label: string; row: WrappedPickRow; tone: WrappedTone }[] }
+  | { kind: "summary"; letter: string; rows: { label: string; value: string; tone: WrappedTone | null }[] }
   | { kind: "persona"; name: string; glyph: string; lines: string[]; runnerUp: string | null };
 
 export const WRAPPED_LOCKED_COPY: Record<string, string> = {
@@ -162,6 +174,12 @@ export function normalizeWrappedDeck(raw: unknown): WrappedDeck | null {
   };
 }
 
+function pickRow(raw: unknown, points: boolean): WrappedPickRow {
+  const r = rec(raw);
+  const delta = wrappedNum(r.delta);
+  return { player: player(r.player), text: String(r.text ?? ""), grade: typeof r.grade === "string" ? r.grade : null, delta: delta === null ? "" : points ? `${wrappedSigned(delta, 0)} pts` : wrappedSigned(delta) };
+}
+
 function weekLabel(week: unknown): string {
   const n = wrappedNum(week);
   return n === null ? "" : `Wk ${n}`;
@@ -249,6 +267,21 @@ export function wrappedView(card: WrappedCard): WrappedView {
       const subs = Array.isArray(d.subs) ? d.subs.map((s) => ({ label: String(rec(s).label ?? ""), letter: String(rec(s).letter ?? "-") })) : [];
       return { kind: "grade", overall: String(d.overall ?? "-"), subs };
     }
+    case "watch_draft": {
+      const rows = (Array.isArray(d.rounds) ? d.rounds : []).map((r) => ({ label: `Round ${rec(r).round ?? ""}`, actual: Number(rec(r).actual) || 0, expected: Number(rec(r).expected) || 0, max: 0 }));
+      const max = Math.max(1, ...rows.map((r) => Math.max(r.actual, r.expected)));
+      return { kind: "rounds", grade: String(d.grade ?? "-"), then: typeof d.then === "string" ? d.then : null, rows: rows.map((r) => ({ ...r, max })) };
+    }
+    case "watch_hits":
+    case "watch_busts":
+    case "watch_whatif":
+      return { kind: "picks", rows: (Array.isArray(d.rows) ? d.rows : []).map((r) => pickRow(r, card.id === "watch_whatif")) };
+    case "watch_value":
+      return { kind: "valuepair", items: [{ label: "The steal", row: pickRow(d.steal, false), tone: "good" as WrappedTone }, { label: "The reach", row: pickRow(d.reach, false), tone: "neutral" as WrappedTone }] };
+    case "watch_standing": {
+      const rows = (Array.isArray(d.rows) ? d.rows : []).map((r) => ({ label: String(rec(r).label ?? ""), value: String(rec(r).value ?? ""), tone: rec(r).tone === "good" ? ("good" as WrappedTone) : null }));
+      return { kind: "summary", letter: String(d.grade ?? "-"), rows };
+    }
     case "persona":
       return { kind: "persona", name: String(d.name ?? ""), glyph: String(d.glyph ?? "swap"), lines: Array.isArray(d.lines) ? d.lines.map(String) : [], runnerUp: typeof d.runner_up === "string" ? `Runner-up: ${d.runner_up}` : null };
     default:
@@ -288,6 +321,14 @@ export function wrappedShareModel(card: WrappedCard, deck: Pick<WrappedDeck, "se
       return { ...base, headline: view.ranks.length ? `${wrappedOrdinal(view.ranks[0])} to ${wrappedOrdinal(view.ranks[view.ranks.length - 1])}` : "", chip: view.peak || null };
     case "grade":
       return { ...base, headline: view.overall, unit: "overall", rows: view.subs.map((s) => ({ label: s.label, value: s.letter })) };
+    case "rounds":
+      return { ...base, headline: view.grade, unit: "draft grade", rows: view.rows.map((r) => ({ label: r.label, value: `${Math.round(r.actual)} vs ${Math.round(r.expected)} expected` })) };
+    case "picks":
+      return { ...base, headline: view.rows[0]?.delta ?? "", rows: view.rows.map((r) => ({ label: r.player ? wrappedShortName(r.player.name) : "", value: `${r.text}${r.delta ? ` (${r.delta})` : ""}` })), players: view.rows.map((r) => r.player).filter((p): p is WrappedPlayer => p !== null) };
+    case "valuepair":
+      return { ...base, headline: view.items[0]?.row.delta ?? "", rows: view.items.map((i) => ({ label: `${i.label}: ${i.row.player ? wrappedShortName(i.row.player.name) : ""}`, value: `${i.row.text} (${i.row.delta})` })), players: view.items.map((i) => i.row.player).filter((p): p is WrappedPlayer => p !== null) };
+    case "summary":
+      return { ...base, headline: view.letter, unit: "draft grade", rows: view.rows.map((r) => ({ label: r.label, value: r.value })) };
     case "persona":
       return { ...base, headline: view.name, rows: view.lines.map((l) => ({ label: "", value: l })), chip: view.runnerUp };
     default:

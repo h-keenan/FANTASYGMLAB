@@ -26,6 +26,7 @@ import {
   type WrappedBlock,
   type WrappedCard,
   type WrappedDeck,
+  type WrappedPickRow,
   type WrappedPlayer,
   type WrappedShareModel,
   type WrappedTone,
@@ -45,6 +46,26 @@ function Chip({ label, tone, colors }: { label: string; tone: WrappedTone; color
   return (
     <View style={{ borderWidth: 1, borderColor: color, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 3, backgroundColor: colors.surface, alignSelf: 'flex-start' }}>
       <AppText style={{ color, fontSize: 12, fontWeight: '700' }}>{label}</AppText>
+    </View>
+  );
+}
+
+function PickLine({ row, colors, styles }: { row: WrappedPickRow; colors: ThemeColors; styles: ReturnType<typeof createStyles> }) {
+  return (
+    <View style={styles.headRow}>
+      {row.player ? <Face player={row.player} size={36} /> : null}
+      <View style={{ flex: 1 }}>
+        <AppText style={styles.nameSmall}>{row.player ? wrappedShortName(row.player.name) : ''}</AppText>
+        <AppText style={styles.muted}>{row.text}</AppText>
+      </View>
+      {row.grade ? (
+        <View style={{ alignItems: 'center', gap: 2 }}>
+          <Chip label={row.grade} tone={wrappedGradeTone(row.grade)} colors={colors} />
+          <AppText style={{ fontSize: 12, fontWeight: '700', color: row.delta.startsWith('-') ? colors.textSecondary : colors.success }}>{row.delta}</AppText>
+        </View>
+      ) : row.delta ? (
+        <Chip label={row.delta} tone="good" colors={colors} />
+      ) : null}
     </View>
   );
 }
@@ -240,6 +261,63 @@ function CardBody({ card, colors, styles, onUnlock }: { card: WrappedCard; color
           </View>
         </View>
       );
+    case 'rounds':
+      return (
+        <View style={styles.panel} testID="wrapped-rounds">
+          <View style={styles.center}>
+            <View style={[styles.gradeDisc, { borderColor: toneColor(colors, wrappedGradeTone(view.grade)) }]}>
+              <AppText style={[styles.gradeLetter, { color: toneColor(colors, wrappedGradeTone(view.grade)) }]}>{view.grade}</AppText>
+            </View>
+            <AppText style={styles.muted}>{`Draft grade${view.then ? ` (${view.then} on draft day)` : ''}`}</AppText>
+          </View>
+          {view.rows.map((r) => {
+            const up = r.actual >= r.expected;
+            return (
+              <View key={r.label} style={{ gap: 6 }}>
+                <View style={styles.rowBetween}>
+                  <AppText style={styles.nameSmall}>{r.label}</AppText>
+                  <AppText style={[styles.rowValue, { color: up ? colors.success : colors.textSecondary }]}>{`${Math.round(r.actual)} vs ${Math.round(r.expected)} expected`}</AppText>
+                </View>
+                <View style={styles.track}><View style={{ height: 8, borderRadius: 4, width: `${Math.min(100, (r.actual / r.max) * 100)}%`, backgroundColor: up ? colors.success : colors.borderStrong }} /></View>
+              </View>
+            );
+          })}
+        </View>
+      );
+    case 'picks':
+      return (
+        <View style={styles.panel} testID={`wrapped-${card.id}`}>
+          {view.rows.map((r, i) => <PickLine key={i} row={r} colors={colors} styles={styles} />)}
+        </View>
+      );
+    case 'valuepair':
+      return (
+        <View style={{ gap: spacing.md }} testID="wrapped-value">
+          {view.items.map((it) => (
+            <View key={it.label} style={styles.panel}>
+              <AppText style={[styles.rowLabel, { color: it.tone === 'good' ? colors.success : colors.textTertiary }]}>{it.label.toUpperCase()}</AppText>
+              <PickLine row={it.row} colors={colors} styles={styles} />
+            </View>
+          ))}
+        </View>
+      );
+    case 'summary':
+      return (
+        <View style={[styles.panel, styles.center]} testID="wrapped-summary">
+          <View style={[styles.gradeDisc, { borderColor: toneColor(colors, wrappedGradeTone(view.letter)) }]}>
+            <AppText style={[styles.gradeLetter, { color: toneColor(colors, wrappedGradeTone(view.letter)) }]}>{view.letter}</AppText>
+          </View>
+          <AppText style={styles.muted}>Draft grade</AppText>
+          <View style={[styles.rows, { alignSelf: 'stretch' }]}>
+            {view.rows.map((r) => (
+              <View key={r.label} style={styles.row}>
+                <AppText style={styles.rowLabel}>{r.label.toUpperCase()}</AppText>
+                <AppText style={[styles.rowValue, r.tone === 'good' ? { color: colors.success } : null]}>{r.value}</AppText>
+              </View>
+            ))}
+          </View>
+        </View>
+      );
     case 'persona':
       return (
         <View style={[styles.panel, styles.center]} testID="wrapped-persona">
@@ -253,7 +331,7 @@ function CardBody({ card, colors, styles, onUnlock }: { card: WrappedCard; color
 }
 
 /** The full-screen story: tap the sides to move, X to close. */
-export function SeasonWrapped({ deck, visible, onClose }: { deck: WrappedDeck; visible: boolean; onClose: () => void }) {
+export function SeasonWrapped({ deck, visible, onClose, lastFooter }: { deck: WrappedDeck; visible: boolean; onClose: () => void; lastFooter?: React.ReactNode }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -310,6 +388,7 @@ export function SeasonWrapped({ deck, visible, onClose }: { deck: WrappedDeck; v
         <Pressable style={[styles.tap, { left: 0 }]} onPress={() => go(-1)} accessibilityLabel="Previous card" />
         <Pressable style={[styles.tap, { right: 0 }]} onPress={() => go(1)} accessibilityLabel="Next card" />
         <View style={styles.footer}>
+          {index === last && lastFooter ? <View style={{ gap: spacing.sm, marginBottom: spacing.sm }}>{lastFooter}</View> : null}
           {locked ? null : <Button label="Share this card" variant="accentOutline" onPress={onShare} loading={sharing} />}
         </View>
         {locked ? null : <WrappedShareCard model={model} shareRef={shareRef} />}
