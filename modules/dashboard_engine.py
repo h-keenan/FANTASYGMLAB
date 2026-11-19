@@ -58,7 +58,7 @@ from modules import (
     trade_hub_engine,
 )
 from modules.canonical_recommendation_narrative import build_waiver_narrative
-from modules import bye_cover, league_calendar, roster_value_model
+from modules import bye_cover, derived_cache, league_calendar, roster_value_model
 from modules.compact_fantasy_assets import compact_package
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
 from modules.league_display import _format_score
@@ -702,7 +702,10 @@ def compose_next_move_briefing(
         )
         needed_positions = get_needed_positions(team_needs_assessment, include_fallback=False)
 
-        free_agents_df = players_df[~players_df["player_id"].astype(str).isin(all_rostered_player_ids)]
+        free_agents_df = derived_cache.derive_frame_key(
+            players_df, players_df[~players_df["player_id"].astype(str).isin(all_rostered_player_ids)],
+            "dashboard.free_agents", sorted(str(p) for p in all_rostered_player_ids),
+        )
         if include_trade_and_waiver:
             top_waiver = select_top_waiver_opportunity(
                 free_agents_df, roster_df, league_settings, score_field, needed_positions=needed_positions,

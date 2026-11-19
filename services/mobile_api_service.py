@@ -14527,7 +14527,9 @@ def _gm_plan_outlook_items(
         bye_tile: dict[str, Any] | None = None
         if in_season and roster_df is not None and not roster_df.empty:
             rostered = {str(pid) for r in (sleeper.get_rosters(league_id) or []) for pid in (r.get("players") or []) if pid is not None}
-            free_agents = valued[~valued["player_id"].astype(str).isin(rostered)]
+            free_agents = derived_cache.derive_frame_key(
+                valued, valued[~valued["player_id"].astype(str).isin(rostered)], "gm_plan.free_agents", sorted(rostered)
+            )
             me = ((profile or {}).get("teams") or {}).get(my_roster_id) or {}
             try:
                 picked = waivers_logic.shared_waiver_adds(
