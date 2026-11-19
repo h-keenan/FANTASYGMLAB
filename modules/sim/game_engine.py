@@ -612,6 +612,8 @@ def _your_game(snap, ev, state, user, games, lineups, played, pts, status_of, ro
         "efficiency": round(you_pts / optimal, 4) if optimal > 0 else 1.0,
         "auto_filled_slots": auto_filled,
     }
+    if snap.settings.wrapped_v:  # wrapped_v 1+: the points the user's bench scored (the recap lists only the top ten)
+        out["bench_pts"] = round(sum(pw.points for pid, pw in played.items() if pid in state.rosters[user] and pid not in {p for _, p in lineups[user] if p}), 2)
     rows = [r for r in starters if r["player"]]
     if rows:
         top = max(rows, key=lambda r: (r["pts"], r["player"]["id"]))
@@ -793,6 +795,8 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
                 roles[pid] = [round(scale, 4), round(add, 4)]
         if roles:
             extra["roles"] = roles
+    if S.wrapped_v and kind == "regular":  # wrapped_v 1+: the projection the game showed going into the week, for every owned player
+        extra["proj"] = {pid: round(ev.proj(pid, W), 1) for pid in owners}
     depth: list[dict[str, Any]] = []
     if S.incumbent_v and ev.roles_on and kind == "regular":  # incumbent_v 1+: starters hurt / back are depth chart changes in the story
         depth = _starter_returns(ev, state, W)
