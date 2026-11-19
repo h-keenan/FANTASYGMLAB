@@ -29,7 +29,9 @@ const ROUTES = [
   [/\/v1\/leagues\/[^/]+\/team-rankings$/, () => "team_rankings", { team_rankings: [555, 21] }],
   [/\/v1\/leagues\/[^/]+\/matchup$/, () => "matchup", { matchup: [417, 38] }],
   [/\/v1\/leagues\/[^/]+\/my-team$/, () => "my_team", { my_team: [440, 25] }],
-  [/\/v1\/leagues\/[^/]+\/my-team\/needs$/, () => "my_team", { my_team: [440, 25] }],
+  // The needs payload has a different shape from the my-team body; serving the wrong one crashed the page (positionGroups), so the
+  // harness answers 404 and the page's best-effort path skips the section, like every other unmocked secondary endpoint.
+  [/\/v1\/leagues\/[^/]+\/my-team-needs$/, () => "NOT_FOUND", null],
   // Round 4: the other Desk pages (cold/warm from scripts/bench_endpoints.py on the same fixture).
   [/\/v1\/leagues\/[^/]+\/waivers$/, () => "waivers", { waivers: [940, 100] }],
   [/\/v1\/leagues\/[^/]+\/gm-plan$/, () => "gm_plan", { gm_plan: [2250, 170] }],
@@ -47,6 +49,7 @@ function respond(u, cold) {
   for (const [re, pick, ms] of ROUTES) {
     if (!re.test(u.pathname)) continue;
     const name = pick(u);
+    if (name === "NOT_FOUND") return { ms: cold ? COLD_UNKNOWN : WARM_UNKNOWN, status: 404, body: { detail: "not mocked" } };
     if (name === "LEAGUES") return { ms: cold ? 200 : WARM_UNKNOWN, body: { ok: true, leagues: [{ league_id: "L1", league_name: "Test League", season: "2026" }] } };
     if (!name) return { ms: cold ? LEAGUE_COLD : WARM_UNKNOWN, body: { ok: true, default_lens: "Dynasty", id: "L1", name: "Test League" } };
     const file = BODIES ? `${BODIES}/${name}.${cold ? "cold" : "warm"}.json` : "";
@@ -77,7 +80,7 @@ async function visit(ctx, cold, label) {
   const isToday = (process.env.PAGE || PAGE).startsWith("/dashboard");
   await page.waitForFunction((today) => today
     ? document.querySelector('[data-testid="today-tiles"], [data-testid="today-matchup"], [data-testid="compact-summary"]') && !document.querySelector("main[aria-busy='true']")
-    : document.querySelector("main") && document.querySelector("main").innerText.trim().length > 150 && !document.querySelector("main [aria-busy='true'], main[aria-busy='true']"), isToday, { timeout: Number(process.env.WAIT_MS || 60000) }).catch(async () => { console.log("TIMEOUT", await page.evaluate(() => [...document.querySelectorAll("[data-testid]")].map((e) => e.getAttribute("data-testid")).slice(0, 12).join(",") + " busy=" + document.querySelector("main")?.getAttribute("aria-busy"))); await page.screenshot({ path: "/private/tmp/claude-501/s/timeout.png" }); });
+    : document.querySelector("main") && document.querySelector("main").innerText.trim().length > 150 && !document.querySelector("main [aria-busy='true'], main[aria-busy='true']"), isToday, { timeout: Number(process.env.WAIT_MS || 60000) }).catch(async () => { console.log("TIMEOUT", await page.evaluate(() => [...document.querySelectorAll("[data-testid]")].map((e) => e.getAttribute("data-testid")).slice(0, 12).join(",") + " busy=" + document.querySelector("main")?.getAttribute("aria-busy") + " path=" + location.pathname + " main=" + (document.querySelector("main")?.innerText || "").replace(/\s+/g, " ").slice(0, 160))); await page.screenshot({ path: "/private/tmp/claude-501/s/timeout.png" }); });
   const usefulMs = Date.now() - t0;
   await sleep(800);
   const p = await page.evaluate(() => ({ ...window.__p, js: performance.getEntriesByType("resource").filter((e) => e.name.endsWith(".js")).reduce((a, e) => a + (e.transferSize || 0), 0) }));
@@ -98,7 +101,7 @@ for (let i = 0; i < RUNS; i++) {
       if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
       const r = respond(u, coldMode);
       await sleep(r.ms);
-      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(r.body), headers: cors });
+      return route.fulfill({ status: r.status || 200, contentType: "application/json", body: JSON.stringify(r.body), headers: cors });
     }
     if (u.hostname === "dummy.supabase.co") { await sleep(60); return route.fulfill({ status: 200, contentType: "application/json", body: u.pathname.startsWith("/rest/") ? "[]" : "{}", headers: cors }); }
     if (u.hostname === "localhost") return route.continue();
