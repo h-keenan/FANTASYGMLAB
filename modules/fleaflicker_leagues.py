@@ -68,6 +68,7 @@ ERROR_MESSAGES = {
     "league_not_found": "We couldn't find that Fleaflicker league for that season. Check the league ID and season.",
     "no_teams": "That Fleaflicker league loaded, but it has no teams or rosters yet.",
     "fleaflicker_unavailable": "Fleaflicker didn't respond. Please try again in a moment.",
+    "fleaflicker_rate_limited": "Fleaflicker is limiting requests right now. Please try again in a minute.",
     "mapping_too_low": (
         "That Fleaflicker league loaded, but too few of its players matched FantasyDesk's player list "
         "to value the rosters accurately."
@@ -146,8 +147,9 @@ def _default_fetch(endpoint: str, params: dict[str, Any]) -> Any:
         raise ExternalLeagueError("league_not_found", ERROR_MESSAGES["league_not_found"])
     if response.status_code in (401, 403):
         raise ExternalLeagueError("private_league", ERROR_MESSAGES["private_league"])
+    if response.status_code == 429:
+        raise ExternalLeagueError("fleaflicker_rate_limited", ERROR_MESSAGES["fleaflicker_rate_limited"])
     if response.status_code != 200:
-        # Includes 429: slow down rather than retry.
         raise ExternalLeagueError("fleaflicker_unavailable", ERROR_MESSAGES["fleaflicker_unavailable"])
     try:
         return response.json()

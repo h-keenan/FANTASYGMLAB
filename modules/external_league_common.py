@@ -39,6 +39,27 @@ SNAPSHOT_TTL_SECONDS = 5 * 60
 MAX_UNMAPPED_LISTED = 60
 
 
+TRANSIENT_REASON_SUFFIXES = ("_unavailable", "_rate_limited")
+
+
+def serve_stale_on_failure(exc: Exception) -> bool:
+    """True when `exc` is a transient provider failure (outage, rate limit) and serving the last snapshot is allowed."""
+
+    from modules import provider_errors
+
+    reason = str(getattr(exc, "reason", "") or "")
+    return reason.endswith(TRANSIENT_REASON_SUFFIXES) and provider_errors.flag_enabled(provider_errors.STALE_SNAPSHOT_FLAG)
+
+
+def note_stale_snapshot(key: str, loaded_at: float) -> None:
+    """Record that a last-known snapshot was served, so the response carries `sleeper_data_as_of` (the same age note a Sleeper
+    429 fallback produces)."""
+
+    from modules import sleeper_budget
+
+    sleeper_budget.note_stale_served(f"snapshot:{key}", float(loaded_at))
+
+
 class ExternalLeagueError(RuntimeError):
     """A league could not be loaded. ``reason`` is a stable, client-facing code."""
 
@@ -313,10 +334,20 @@ class SnapshotCache:
                 return cached[1]
             try:
                 snapshot = loader(key)
-            except ExternalLeagueError:
-                return None
+            except ExternalLeagueError as exc:
+                return self._stale_or_none(key, cached, exc)
             self._cache[key] = (time.time(), snapshot)
             return snapshot
+
+    def _stale_or_none(self, key: str, cached: tuple[float, dict[str, Any]] | None, exc: ExternalLeagueError):
+        """A failed refresh serves the last good snapshot (DYNASTYGM_STALE_SNAPSHOT_ON_FAILED_REFRESH_V1), labelled with its age
+        through the request's stale-as-of note, instead of reading as "league not found". Only transient failures qualify: a league
+        that turned private or was deleted must not keep showing old rosters."""
+
+        if cached is not None and serve_stale_on_failure(exc):
+            note_stale_snapshot(key, cached[0])
+            return cached[1]
+        return None
 
     def store(self, key: str, snapshot: dict[str, Any]) -> None:
         self._cache[key] = (time.time(), snapshot)

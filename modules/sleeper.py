@@ -12,7 +12,7 @@ from urllib.parse import quote
 
 import requests
 
-from modules import live_policy, performance, season_clock, sleeper_budget, sleeper_cache
+from modules import live_policy, performance, provider_errors, season_clock, sleeper_budget, sleeper_cache
 from modules.file_lock import ExclusiveFileLock
 
 _log = logging.getLogger("fantasygm.sleeper")
@@ -1217,6 +1217,22 @@ SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS = float(
 _RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
+# Why the last read of a URL failed ("timeout", "http_429", "null_body", ...). _request_json still returns None for every
+# failure (its contract is unchanged); the strict readers below use this to tell "Sleeper is down" from "no such league".
+_FAILURE_KIND_BY_URL: Dict[str, str] = {}
+_FAILURE_KIND_MAX = 1024
+
+
+def _note_failure(url: str, kind: str) -> None:
+    if len(_FAILURE_KIND_BY_URL) >= _FAILURE_KIND_MAX:
+        _FAILURE_KIND_BY_URL.clear()
+    _FAILURE_KIND_BY_URL[url] = kind
+
+
+def failure_kind_for(url: str) -> str | None:
+    return _FAILURE_KIND_BY_URL.get(url)
+
+
 def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | None = None, allow_defer: bool = True, defer_max_age: float | None = None):
     """GET ``url`` as JSON, retrying transient failures with backoff.
 
@@ -1250,6 +1266,7 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
             return known[0]
         if sleeper_budget.should_skip_outright():
             _note_provider_timing(label, 0.0, cache_status="skipped_budget")
+            _note_failure(url, "budget_skipped")
             return None
 
     def _last_known_or_none():
@@ -1275,6 +1292,7 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                 cache_status = "timeout"
                 result = _last_known_or_none()
                 if result is None:
+                    _note_failure(url, "timeout")
                     _log_failure(label, "timeout")
                 return result
             except requests.RequestException:
@@ -1287,6 +1305,7 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                 cache_status = "error"
                 result = _last_known_or_none()
                 if result is None:
+                    _note_failure(url, "network_error")
                     _log_failure(label, "network_error")
                 return result
 
@@ -1299,15 +1318,18 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                     cache_status = "garbage"
                     result = _last_known_or_none()
                     if result is None:
+                        _note_failure(url, "non_json_body")
                         _log_failure(label, "non_json_body")
                     return result
                 if payload is None:
                     cache_status = "garbage"
                     result = _last_known_or_none()
                     if result is None:
+                        _note_failure(url, "null_body")
                         _log_failure(label, "null_body")
                     return result
                 sleeper_budget.remember(url, payload)
+                _FAILURE_KIND_BY_URL.pop(url, None)
                 return payload
             if response.status_code in _RETRYABLE_STATUS_CODES and attempt < retries:
                 attempt += 1
@@ -1319,8 +1341,10 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
                 cache_status = "rate_limited" if response.status_code == 429 else "error"
                 result = _last_known_or_none()
                 if result is None:
+                    _note_failure(url, f"http_{response.status_code}")
                     _log_failure(label, f"http_{response.status_code}")
                 return result
+            _note_failure(url, f"http_{response.status_code}")
             _log_failure(label, f"http_{response.status_code}")
             return None
     finally:
@@ -1749,28 +1773,114 @@ def get_players(refresh: bool = False) -> Dict[str, Any]:
     return _refresh_players_blocking()
 
 
-@lru_cache(maxsize=256)
-def get_user_id(username: str) -> Optional[str]:
-    """
-    Look up a Sleeper user_id from username.[web:4]
-    """
+class _FailureNotCached(Exception):
+    """Raised inside a success-only cached reader: carry the fallback value out without caching it."""
+
+    def __init__(self, value):
+        super().__init__("provider read failed")
+        self.value = value
+
+
+def _cache_successes(maxsize: int):
+    """lru_cache that never remembers a failed provider read.
+
+    The wrapped function raises ``_FailureNotCached(fallback)`` when the provider read failed; the caller still gets the fallback
+    but the next call retries Sleeper. (A plain lru_cache froze one blip into "user not found" / "no drafts" for the whole process.)
+    With DYNASTYGM_PROVIDER_TYPED_ERRORS_V1 off, failures are cached like before."""
+
+    def decorator(fn):
+        cache: Dict[Any, Any] = {}
+        lock = threading.Lock()
+
+        def wrapper(*args):
+            with lock:
+                if args in cache:
+                    return cache[args]
+            try:
+                value = fn(*args)
+            except _FailureNotCached as failed:
+                if provider_errors.typed_errors_enabled():
+                    return failed.value
+                value = failed.value
+            with lock:
+                if len(cache) >= maxsize:
+                    cache.pop(next(iter(cache)), None)
+                cache[args] = value
+            return value
+
+        def cache_clear():
+            with lock:
+                cache.clear()
+
+        wrapper.cache_clear = cache_clear  # type: ignore[attr-defined]
+        wrapper.__wrapped__ = fn  # type: ignore[attr-defined]
+        wrapper.__name__ = fn.__name__
+        wrapper.__doc__ = fn.__doc__
+        return wrapper
+
+    return decorator
+
+
+_NOT_FOUND_KINDS = {"null_body", "http_404", "http_400"}
+
+
+def _lookup_user_id(username: str):
+    """(user_id | None, failure_kind | None). A failure kind means a candidate failed for a reason other than "no such user"."""
+
     username = (username or "").strip()
     if not username:
-        return None
-
+        return None, None
     candidates = []
     for candidate in [username, username.lower(), username.casefold()]:
         if candidate and candidate not in candidates:
             candidates.append(candidate)
-
+    failure = None
     for candidate in candidates:
         url = f"{SLEEPER_BASE}/user/{quote(candidate, safe='')}"
         try:
             data = _request_json("sleeper_user_lookup", url, timeout=5)
-            if isinstance(data, dict) and data.get("user_id"):
-                return data.get("user_id")
-        except Exception:
+        except Exception as exc:
+            _log_failure("sleeper_user_lookup", type(exc).__name__)
+            failure = failure or "network_error"
             continue
+        if isinstance(data, dict) and data.get("user_id"):
+            return data.get("user_id"), None
+        if data is None:
+            kind = failure_kind_for(url)
+            if kind not in _NOT_FOUND_KINDS:
+                failure = failure or kind or "unknown"
+        elif not isinstance(data, dict):
+            failure = failure or "bad_shape"  # malformed shape, not "no such user"
+    return None, failure
+
+
+@_cache_successes(maxsize=256)
+def get_user_id(username: str) -> Optional[str]:
+    """
+    Look up a Sleeper user_id from username.[web:4]
+
+    A transient provider failure returns None for this call only (it is not cached).
+    """
+    user_id, failure = _lookup_user_id(username)
+    if user_id is None and failure:
+        raise _FailureNotCached(None)
+    return user_id
+
+
+def get_user_id_checked(username: str) -> Optional[str]:
+    """Like get_user_id, but an unreachable / rate limited / malformed Sleeper raises a typed ProviderError instead of
+    reading as "no such user". None still means Sleeper answered and has no such user."""
+
+    if not provider_errors.typed_errors_enabled():
+        return get_user_id(username)
+    cached = get_user_id(username)
+    if cached:
+        return cached
+    user_id, failure = _lookup_user_id(username)
+    if user_id:
+        return user_id
+    if failure:
+        raise provider_errors.error_for_failure(failure)
     return None
 
 
@@ -1854,7 +1964,7 @@ def _get_rosters_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
     url = f"{SLEEPER_BASE}/league/{league_id}/rosters"
     try:
         rosters = _live_league_json("sleeper_league_rosters", url)
-        return rosters if isinstance(rosters, list) else []
+        return sanitize_rosters(rosters) if isinstance(rosters, list) else []
     except Exception as exc:
         _log_failure("sleeper_league_rosters", type(exc).__name__, league_id=league_id)
         return []
@@ -1867,6 +1977,84 @@ def get_rosters(league_id: str) -> List[Dict[str, Any]]:
     if _is_espn_league(league_id):
         return _espn_leagues().rosters_payload(league_id)
     return _get_rosters_cached(league_id, _live_league_cache_bucket())
+
+
+def sanitize_rosters(rosters: Any) -> List[Dict[str, Any]]:
+    """Make a partial Sleeper rosters payload safe to read (DYNASTYGM_ROSTER_PAYLOAD_SANITIZE_V1).
+
+    Drops entries that are not objects (nulls, strings) and turns null ``players`` / ``starters`` / ``reserve`` / ``taxi`` into
+    empty lists (Sleeper sends ``players: null`` for a team that has not drafted). Rosters with a missing ``owner_id`` (orphan
+    teams) are kept: they are real teams, they just match no user."""
+
+    if not isinstance(rosters, list):
+        return []
+    if not provider_errors.flag_enabled(provider_errors.ROSTER_SANITIZE_FLAG):
+        return rosters
+    cleaned: List[Dict[str, Any]] = []
+    for roster in rosters:
+        if not isinstance(roster, dict):
+            continue
+        fixed = dict(roster)
+        for key in ("players", "starters", "reserve", "taxi"):
+            # Only repair a key the provider sent as null / a non-list; never invent keys the payload did not have.
+            if key in fixed and not isinstance(fixed[key], list):
+                fixed[key] = []
+        cleaned.append(fixed)
+    return cleaned
+
+
+def _strict_live(label: str, url: str, expected: type):
+    payload = _live_league_json(label, url)
+    if isinstance(payload, expected):
+        return payload
+    if payload is None:
+        raise provider_errors.error_for_failure(failure_kind_for(url))
+    raise provider_errors.ProviderBadResponseError(detail="bad_shape")
+
+
+def diagnose_league_failure(league_id: str, suffix: str = ""):
+    """After an empty league / rosters read: the typed ProviderError for a RECORDED transient failure (outage, 429, unreadable body),
+    else None (a real "no such league" / empty league). No network call: it reads what the failed request noted."""
+
+    if not league_id or _is_espn_league(league_id) or not provider_errors.typed_errors_enabled():
+        return None
+    kind = failure_kind_for(f"{SLEEPER_BASE}/league/{league_id}{suffix}")
+    if kind and kind not in _NOT_FOUND_KINDS:
+        return provider_errors.error_for_failure(kind)
+    return None
+
+
+def diagnose_user_failure(username: str):
+    """Same as diagnose_league_failure for the username -> user_id lookup (no network)."""
+
+    if not provider_errors.typed_errors_enabled():
+        return None
+    name = (username or "").strip()
+    for candidate in dict.fromkeys([name, name.lower(), name.casefold()]):
+        kind = failure_kind_for(f"{SLEEPER_BASE}/user/{quote(candidate, safe='')}") if candidate else None
+        if kind and kind not in _NOT_FOUND_KINDS:
+            return provider_errors.error_for_failure(kind)
+    return None
+
+
+def get_league_checked(league_id: str) -> Dict[str, Any]:
+    """get_league that raises ProviderError (unavailable / rate limited / bad response / league not found) instead of ``{}``.
+    A flag-off or imported-platform league behaves exactly like get_league."""
+
+    if not league_id or _is_espn_league(league_id) or not provider_errors.typed_errors_enabled():
+        return get_league(league_id)
+    league = _strict_live("sleeper_league", f"{SLEEPER_BASE}/league/{league_id}", dict)
+    if not league:
+        raise provider_errors.LeagueNotFoundError(detail="empty_body")
+    return league
+
+
+def get_rosters_checked(league_id: str) -> List[Dict[str, Any]]:
+    """get_rosters that raises ProviderError when Sleeper could not answer. ``[]`` still means a real empty league."""
+
+    if not league_id or _is_espn_league(league_id) or not provider_errors.typed_errors_enabled():
+        return get_rosters(league_id)
+    return sanitize_rosters(_strict_live("sleeper_league_rosters", f"{SLEEPER_BASE}/league/{league_id}/rosters", list))
 
 
 @lru_cache(maxsize=128)
@@ -1891,7 +2079,7 @@ def get_league(league_id: str) -> Dict[str, Any]:
     return _get_league_cached(league_id, _live_league_cache_bucket())
 
 
-@lru_cache(maxsize=128)
+@_cache_successes(maxsize=128)
 def get_league_drafts(league_id: str) -> List[Dict[str, Any]]:
     """
     Get all draft objects attached to a league.
@@ -1901,13 +2089,15 @@ def get_league_drafts(league_id: str) -> List[Dict[str, Any]]:
     url = f"{SLEEPER_BASE}/league/{league_id}/drafts"
     try:
         drafts = _request_json("sleeper_league_drafts", url, timeout=5)
-        return drafts if isinstance(drafts, list) else []
     except Exception as exc:
         _log_failure("sleeper_league_drafts", type(exc).__name__, league_id=league_id)
-        return []
+        raise _FailureNotCached([])
+    if isinstance(drafts, list):
+        return drafts
+    raise _FailureNotCached([])
 
 
-@lru_cache(maxsize=256)
+@_cache_successes(maxsize=256)
 def get_draft(draft_id: str) -> Dict[str, Any]:
     """
     Get metadata for a Sleeper draft.
@@ -1917,13 +2107,15 @@ def get_draft(draft_id: str) -> Dict[str, Any]:
     url = f"{SLEEPER_BASE}/draft/{draft_id}"
     try:
         draft = _request_json("sleeper_draft", url, timeout=5)
-        return draft if isinstance(draft, dict) else {}
     except Exception as exc:
         _log_failure("sleeper_draft", type(exc).__name__)
-        return {}
+        raise _FailureNotCached({})
+    if isinstance(draft, dict):
+        return draft
+    raise _FailureNotCached({})
 
 
-@lru_cache(maxsize=256)
+@_cache_successes(maxsize=256)
 def get_draft_picks(draft_id: str) -> List[Dict[str, Any]]:
     """
     Get all picks made in a Sleeper draft.
@@ -1933,9 +2125,12 @@ def get_draft_picks(draft_id: str) -> List[Dict[str, Any]]:
     url = f"{SLEEPER_BASE}/draft/{draft_id}/picks"
     try:
         picks = _request_json("sleeper_draft_picks", url, timeout=10)
-        return picks if isinstance(picks, list) else []
-    except Exception:
-        return []
+    except Exception as exc:
+        _log_failure("sleeper_draft_picks", type(exc).__name__)
+        raise _FailureNotCached([])
+    if isinstance(picks, list):
+        return picks
+    raise _FailureNotCached([])
 
 
 @lru_cache(maxsize=128)

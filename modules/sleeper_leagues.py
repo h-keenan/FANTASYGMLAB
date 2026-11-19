@@ -9,13 +9,20 @@ from modules import sleeper_budget
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
 
-LeagueLookupStatus = Literal["empty_username", "user_not_found", "no_leagues", "ok", "unavailable"]
+# Set by _resolve_user_id / lookup_user_leagues when the latest provider failure was an HTTP 429 (module-level flag: the
+# lookup is user-initiated and short; the status string is what callers read).
+_last_rate_limited = False
+
+LeagueLookupStatus = Literal["empty_username", "user_not_found", "no_leagues", "ok", "unavailable", "rate_limited"]
 
 
 @dataclass(frozen=True)
 class LeagueLookupResult:
     leagues: List[Dict]
     status: LeagueLookupStatus
+    # True when one season's lookup failed (5xx / 429 / timeout / malformed) but the other answered: the list may be
+    # missing leagues, and the client says so instead of presenting it as complete.
+    partial: bool = False
 
 
 def log_league_import_diagnostic(
@@ -56,7 +63,9 @@ def _username_candidates(username: str) -> List[str]:
 
 
 def _resolve_user_id(username: str) -> tuple[Optional[str], bool]:
-    """Return Sleeper user_id and whether a transport error occurred."""
+    """Return Sleeper user_id and whether a transport error occurred (5xx, 429, timeout, unreadable body)."""
+    global _last_rate_limited
+    _last_rate_limited = False
     transport_error = False
     for candidate in _username_candidates(username):
         url = f"{SLEEPER_BASE}/user/{quote(candidate, safe='')}"
@@ -69,7 +78,9 @@ def _resolve_user_id(username: str) -> tuple[Optional[str], bool]:
         if response.status_code == 404:
             continue
         if response.status_code != 200:
-            if response.status_code >= 500:
+            if response.status_code == 429:
+                _last_rate_limited = True
+            if response.status_code >= 500 or response.status_code == 429:
                 transport_error = True
             continue
         try:
@@ -79,6 +90,8 @@ def _resolve_user_id(username: str) -> tuple[Optional[str], bool]:
             continue
         if isinstance(payload, dict) and payload.get("user_id"):
             return str(payload.get("user_id")), False
+        if payload is not None and not isinstance(payload, dict):
+            transport_error = True  # a list / string where a user object belongs is a bad response, not "no such user"
     return None, transport_error
 
 
@@ -117,8 +130,9 @@ def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLo
 
     user_id, user_lookup_transport_error = _resolve_user_id(username_clean)
     if user_lookup_transport_error and not user_id:
-        log_league_import_diagnostic(stage="username_lookup", status="unavailable")
-        return LeagueLookupResult([], "unavailable")
+        status = "rate_limited" if _last_rate_limited else "unavailable"
+        log_league_import_diagnostic(stage="username_lookup", status=status)
+        return LeagueLookupResult([], status)
     if not user_id:
         log_league_import_diagnostic(stage="username_lookup", status="user_not_found")
         return LeagueLookupResult([], "user_not_found")
@@ -128,6 +142,7 @@ def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLo
 
     seasons_to_try = [season, season - 1]
     transport_error = False
+    rate_limited = False
     merged: List[Dict] = []
     seen_ids: set[str] = set()
     year_ok = False
@@ -141,7 +156,9 @@ def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLo
             transport_error = True
             continue
         if resp.status_code != 200:
-            if resp.status_code >= 500:
+            if resp.status_code == 429:
+                rate_limited = True
+            if resp.status_code >= 500 or resp.status_code == 429:
                 transport_error = True
             continue
         try:
@@ -150,6 +167,8 @@ def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLo
             transport_error = True
             continue
         if not isinstance(leagues, list):
+            if leagues is not None:
+                transport_error = True  # an object where a list belongs: bad response, not "no leagues"
             continue
         year_ok = True
         for lg in leagues:
@@ -169,10 +188,13 @@ def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLo
             league_count=len(merged),
             seasons_scanned=len(seasons_to_try),
         )
-        return LeagueLookupResult(merged, "ok")
-    if transport_error and not year_ok:
-        log_league_import_diagnostic(stage="username_lookup", status="unavailable")
-        return LeagueLookupResult([], "unavailable")
+        return LeagueLookupResult(merged, "ok", partial=transport_error)
+    if transport_error:
+        # One season may have answered with an empty list while the other failed: that is not "no leagues", it is "could not
+        # check". (Before, year_ok masked the failure and the user was told they had no leagues.)
+        status = "rate_limited" if rate_limited else "unavailable"
+        log_league_import_diagnostic(stage="username_lookup", status=status)
+        return LeagueLookupResult([], status)
     log_league_import_diagnostic(stage="username_lookup", status="no_leagues")
     return LeagueLookupResult([], "no_leagues")
 
@@ -259,6 +281,15 @@ def resolve_saved_league_rollover(
     return resolve_current_season_league_id(league_id_clean, lookup.leagues)
 
 
+PARTIAL_LOOKUP_MESSAGE = "Sleeper did not answer for one season, so this list may be missing leagues. Try again to check."
+
+
+def resolve_sleeper_user_id_checked(username: str) -> Optional[str]:
+    """resolve_sleeper_user_id that raises a typed ProviderError when Sleeper could not answer (see modules.provider_errors)."""
+
+    return _sleeper.get_user_id_checked(username)
+
+
 def league_lookup_customer_message(status: LeagueLookupStatus) -> str:
     if status == "empty_username":
         return "Enter a Sleeper username first."
@@ -266,6 +297,8 @@ def league_lookup_customer_message(status: LeagueLookupStatus) -> str:
         return "No Sleeper account matched that username. Check spelling and try again."
     if status == "unavailable":
         return "Sleeper is temporarily unreachable. Wait a moment and try again."
+    if status == "rate_limited":
+        return "Sleeper is limiting requests right now. Wait a minute and try again."
     if status == "no_leagues":
         return (
             "No leagues were found for that Sleeper username in this season or last season. "

@@ -163,6 +163,7 @@ import pandas as pd
 import requests
 
 from modules import (
+    provider_errors,
     espn_credentials,
     free_tier_ledger,
     trade_eval_usage,
@@ -779,6 +780,28 @@ async def _http_exception_handler(request: Request, exc: HTTPException):
             detail,
         )
     return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": detail})
+
+
+def _league_missing_error(league_id: str) -> Exception:
+    """The error for a league read that came back empty: a recorded Sleeper outage / rate limit / bad response is a retryable
+    ProviderError (503/429/502), anything else is the usual 404. Never touches the network."""
+
+    return sleeper.diagnose_league_failure(league_id) or HTTPException(status_code=404, detail="League not found.")
+
+
+@app.exception_handler(provider_errors.ProviderError)
+async def _provider_error_handler(request: Request, exc: provider_errors.ProviderError):
+    """Sleeper (or another provider) could not answer: a specific, retryable message instead of an empty league.
+
+    503 unavailable, 429 rate limited, 502 unreadable response, 404 league not found. `reason` is the stable code clients key on."""
+
+    logger.warning("provider_error %s on %s %s detail=%s", exc.reason, request.method, request.url.path, exc.detail or "-")
+    headers = {"Retry-After": "60" if exc.status_code == 429 else "5"} if exc.retryable else {}
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"ok": False, "error": exc.message, "reason": exc.reason, "retryable": exc.retryable},
+        headers=headers,
+    )
 
 
 @app.exception_handler(model_status.KeeperPricingUnavailable)
@@ -2076,6 +2099,9 @@ def lookup_sleeper_leagues(
             if str(league.get("league_id") or "")
         ],
         "message": sleeper_leagues.league_lookup_customer_message(result.status),
+        # Additive: true when one season's lookup failed, so the list may be missing leagues.
+        "partial": bool(result.partial),
+        "partial_message": sleeper_leagues.PARTIAL_LOOKUP_MESSAGE if result.partial else "",
     }
     if referral_code and result.status in {"ok", "no_leagues"}:
         response["referral"] = _redeem_referral_code(user=user, config=config, code=referral_code)
@@ -2286,6 +2312,10 @@ def save_league(
         # would otherwise become a permanent dead row on the user's Home screen.
         league = sleeper.get_league(league_id)
         if not league:
+            failure = sleeper.diagnose_league_failure(league_id)
+            if failure is not None:
+                # Sleeper could not answer: say so (retryable) instead of "league not found" for a perfectly good league.
+                return {"ok": False, "reason": failure.reason, "message": failure.message, "retryable": True, "cap": 0}
             return {"ok": False, "reason": "league_not_found", "cap": 0}
 
     config = auth_supabase.get_supabase_config()
@@ -2746,7 +2776,7 @@ def get_league_warmup_status(
 def get_league(league_id: str = Depends(resolve_league_path_id), _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     # `default_lens` is the one server-side format decision (redraft ->
     # Non-Dynasty); both clients open on it instead of detecting it themselves.
     default_lens = league_value_settings.default_lens_for_league(league)
@@ -2805,7 +2835,7 @@ def get_league_team_rankings(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     # Player-data availability gate, kept for the specific "no_player_data"
     # reason mobile screens key off of — the same check
@@ -3176,7 +3206,7 @@ def get_league_team_profile(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
     rosters = sleeper.get_rosters(league_id)
@@ -3328,7 +3358,7 @@ def get_league_team_sheet(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     rosters = sleeper.get_rosters(league_id)
     roster = next((r for r in rosters if str(r.get("roster_id")) == str(roster_id)), None)
     if roster is None:
@@ -4227,7 +4257,7 @@ def get_league_draft_center(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     # Pro-only (2026-10-23), checked before any valuation work. The profile
     # is fetched once and reused for roster resolution below.
@@ -4386,7 +4416,7 @@ def get_league_draft_picks(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
     players_df = rankings.load_players(PLAYERS_DB_PATH)
@@ -4726,6 +4756,8 @@ def _resolve_my_roster(
 
     # The username -> user id lookup and the league's roster list do not depend on each other: run both together instead of paying
     # two Sleeper round trips back to back. Either one that fails is simply repeated the usual way below.
+    # Checked readers: a Sleeper outage / rate limit raises a typed ProviderError (503/429 via _provider_error_handler) instead of
+    # reading as "user not found" or "not a member", which told users with a perfectly good league to connect one.
     sleeper_user_id, rosters = prefetch.run_parallel(
         lambda: sleeper_leagues.resolve_sleeper_user_id(sleeper_username),
         lambda: sleeper.get_rosters(league_id),
@@ -4733,10 +4765,17 @@ def _resolve_my_roster(
     if sleeper_user_id is prefetch.FAILED:
         sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
     if not sleeper_user_id:
+        failure = sleeper.diagnose_user_failure(sleeper_username)
+        if failure is not None:
+            raise failure
         return None, "sleeper_user_not_found"
 
     if rosters is prefetch.FAILED:
         rosters = sleeper.get_rosters(league_id)
+    if not rosters:
+        failure = sleeper.diagnose_league_failure(league_id, "/rosters")
+        if failure is not None:
+            raise failure
     for roster in rosters:
         if str(roster.get("owner_id") or "") == sleeper_user_id:
             return roster, ""
@@ -4804,7 +4843,7 @@ def get_league_live_draft_discovery(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     discovery = live_draft.discover_live_drafts(
         league_id,
@@ -5100,7 +5139,7 @@ def get_league_live_draft_state(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     draft = sleeper.get_draft(draft_id)
     if not draft:
@@ -5277,7 +5316,7 @@ def _load_active_live_draft(league_id: str, draft_id: str) -> tuple[dict[str, An
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     draft = sleeper.get_draft(draft_id)
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found.")
@@ -5898,7 +5937,7 @@ def get_league_rankings(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
@@ -5947,7 +5986,7 @@ def get_league_idp_values(
         raise HTTPException(status_code=422, detail="limit must be between 1 and 1000.")
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     from modules import idp_league_values
 
     result = idp_league_values.cached_league_idp_values(league_id, league)
@@ -5981,7 +6020,7 @@ def get_player_rank_in_league(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
@@ -6052,7 +6091,7 @@ def search_league_players(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
     valued = league_value_settings.build_valued_players_frame_cached(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
@@ -6744,7 +6783,7 @@ def post_trade_analyzer(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
     # Free accounts get FREE_WEEKLY_TRADE_EVAL_LIMIT evaluations per week
@@ -7362,7 +7401,7 @@ def _compute_multi_team_trade(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     my_rid = str(my_roster.get("roster_id"))
     status = model_status.ok()
     result = multi_team_trade_engine.analyze_multi_team_trade(
@@ -7492,7 +7531,7 @@ def _compute_multi_team_ideas(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     _targets, untouchables = _fetch_gm_target_player_ids(
@@ -7551,7 +7590,7 @@ def get_multi_team_trade_ideas(
         return {"ok": True, "ideas": [], "reason": reason, "locked": False, "idea_count": 0}
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     trade_window = league_calendar.trade_window(league)
     if trade_window["trade_deadline_passed"]:
         return {
@@ -7623,7 +7662,7 @@ def get_league_recap(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     my_roster_id = ""
     if me:
@@ -7706,7 +7745,7 @@ def get_league_wrapped(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     my_roster, _reason = _resolve_my_roster(_user, league_id)
     try:
         my_roster_id = int((my_roster or {}).get("roster_id") or 0)
@@ -7781,7 +7820,7 @@ def get_league_roundup(
         return not_ready(roster_reason or "no_roster")
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     cache_key = redis_cache.build_cache_key(
         "weekly_roundup", league_id, str(my_roster.get("roster_id")), str(week or "latest"),
@@ -7822,7 +7861,7 @@ def get_league_history(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     chain = league_history.walk_season_chain(league_id, sleeper.get_league)
     if not chain:
@@ -7946,7 +7985,7 @@ def get_league_storylines(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     season = str(league.get("season") or "")
     history_payload = league_history.collect_season_transactions(
@@ -9035,7 +9074,7 @@ def get_guess_the_player_leaderboard(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     empty_response = {
         "ok": True,
@@ -13133,7 +13172,7 @@ def get_league_dashboard(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
     # Imported (ESPN / Fleaflicker / MFL) leagues: the platform's current week and
     # this team's real lineup, fail-soft; no waiver or trade engine (see
@@ -14695,7 +14734,7 @@ def get_gm_plan(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     # Same "leg"/"week" field modules.league_standings already reads off
     # Sleeper's raw league settings — reused, not recomputed.
@@ -15481,7 +15520,7 @@ def get_league_my_team(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
     # Same (league_id, lens)-scoped cache /rankings and friends share — see
@@ -15579,7 +15618,7 @@ def get_league_keepers(
         return {"ok": True, "is_keeper_league": False, "reason": reason}
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
     if not settings.get("_keeper_mode"):
         return {"ok": True, "is_keeper_league": False, "reason": "not_keeper_league"}
@@ -15738,7 +15777,7 @@ def get_league_guillotine(
         return not_gl
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     rosters = sleeper.get_rosters(league_id) or []
     override = _stored_league_type_override(config, user_id, token, league_id)
     league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
@@ -15966,7 +16005,7 @@ def get_league_my_team_needs(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
     valued = league_value_settings.build_valued_players_frame_cached(
@@ -17275,7 +17314,7 @@ def _build_matchup(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
     is_external = external_leagues.is_external_league_key(league_id)
@@ -17937,7 +17976,7 @@ def get_league_waivers(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
     score_field = league_value_settings.valuation_score_field(lens)
@@ -18479,7 +18518,7 @@ def get_trade_hub_ideas(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     roster_id = my_roster.get("roster_id")
     if roster_id is None:
@@ -18644,7 +18683,7 @@ def get_trade_hub_idea_share_card(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     roster_id = my_roster.get("roster_id")
     if roster_id is None:
@@ -19048,7 +19087,7 @@ def get_league_all_trades(
 
     league = sleeper.get_league(league_id)
     if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
+        raise _league_missing_error(league_id)
 
     trade_window = league_calendar.trade_window(league)
     if trade_window["trade_deadline_passed"]:
