@@ -12,6 +12,7 @@ import { PageTitle } from "@/components/PageTitle";
 import { PillRow } from "@/components/PillRow";
 import { SimWatchPlayback, SimWatchReportCard, SimWatchSliders } from "@/components/SimWatch";
 import { simWatchSliders } from "@/lib/simWatch";
+import { useSimCelebrations } from "@/lib/useSimCelebrations";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimHomeTab } from "@/components/SimGameHome";
@@ -1163,6 +1164,7 @@ function GameScreen({
 
 function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => void; onHub: () => void }) {
   const { game, gameId, call } = ctx;
+  const [celebrations, setCelebrations] = useSimCelebrations();
   const s = game.settings;
 
   async function revert(): Promise<boolean> {
@@ -1195,6 +1197,12 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
       >
         <p className="text-sm">Undo this week&apos;s lineup edits, claims, cuts and trades back to how the week started. You cannot undo a week you already advanced.</p>
         <ConfirmInPlace label="Reset this week" buttonVariant="secondary" size="sm" onConfirm={revert} />
+      </CompactModule>
+
+      <CompactModule id="sim.menu.celebrations" title="Celebrations" parts={[{ key: "c", text: celebrations ? "On" : "Off", strong: true }]} tone="accent" persist={false}>
+        <SetupToggleGroup>
+          <SetupToggleRow first label="Celebrations" note="Pick reveals, score roll-ins, win and loss stamps and streak badges." checked={celebrations} onChange={setCelebrations} />
+        </SetupToggleGroup>
       </CompactModule>
 
       <SimRealismModule ctx={ctx} />

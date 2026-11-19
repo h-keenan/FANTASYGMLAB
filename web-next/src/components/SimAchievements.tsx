@@ -21,10 +21,12 @@ import {
   type SimTrophyRow,
 } from "@/lib/simAchievements";
 import { Collapse } from "@/components/ui/Presence";
+import { simStreakNumber } from "@/lib/simMoments";
 import { ProgressFill } from "@/components/Motion";
 
 /** The round badge: a rarity-coloured ring around the glyph (muted and dashed while locked). Decorative; the row carries the name. */
-export function SimAchievementBadge({ a, size = 36 }: { a: Pick<SimAchievement, "icon" | "rarity" | "tone" | "unlocked">; size?: number }) {
+export function SimAchievementBadge({ a, size = 36 }: { a: Pick<SimAchievement, "icon" | "rarity" | "tone" | "unlocked"> & Partial<Pick<SimAchievement, "key" | "detail" | "tier" | "progress">>; size?: number }) {
+  const streak = simStreakNumber(a);
   const color = simAchievementColor(a);
   const style: CSSProperties = {
     width: size,
@@ -37,7 +39,7 @@ export function SimAchievementBadge({ a, size = 36 }: { a: Pick<SimAchievement, 
   };
   return (
     <span className="inline-flex shrink-0 items-center justify-center" style={style} aria-hidden="true" data-testid="achievement-badge" data-rarity={a.rarity} data-unlocked={a.unlocked ? "true" : "false"}>
-      <SimGlyph name={simAchievementGlyph(a.icon)} size={Math.round(size * 0.5)} />
+      {streak !== null ? <span className="font-extrabold tabular-nums" style={{ fontSize: Math.round(size * 0.46) }} data-testid="streak-number">{streak}</span> : <SimGlyph name={simAchievementGlyph(a.icon)} size={Math.round(size * 0.5)} />}
     </span>
   );
 }
