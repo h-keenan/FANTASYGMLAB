@@ -11,9 +11,13 @@
  * link). Keep the wording neutral: the terms also forbid implying a
  * partnership or endorsement.
  */
+import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
+import type { FreshnessDataset } from "@/lib/dataFreshness";
+
 export const FANTASYCALC_URL = "https://fantasycalc.com";
 
-export function ValuesCredit({ className = "" }: { className?: string }) {
+/** `freshness`: which "as of" lines to show under the credit (default values; [] for static pages with no client JS). */
+export function ValuesCredit({ className = "", freshness = ["values"] }: { className?: string; freshness?: readonly FreshnessDataset[] }) {
   return (
     <p
       className={`text-xs ${className}`.trim()}
@@ -30,6 +34,7 @@ export function ValuesCredit({ className = "" }: { className?: string }) {
       >
         FantasyCalc
       </a>
+      {freshness.length > 0 ? <FreshnessLabel datasets={freshness} className="block" /> : null}
     </p>
   );
 }

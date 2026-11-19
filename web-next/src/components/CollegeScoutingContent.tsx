@@ -3,6 +3,7 @@
 import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
 import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
+import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
 import dynamic from "next/dynamic";
 import { useMemo, useState, type ReactNode } from "react";
 
@@ -246,6 +247,7 @@ export function CollegeScoutingContent({
             }
           />
         )}
+        {prospects.length > 0 ? <FreshnessLabel datasets={["prospects"]} className="text-xs" /> : null}
       </header>
 
       {prospects.length === 0 ? (

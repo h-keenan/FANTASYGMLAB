@@ -365,7 +365,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
             <RosterCompositionBar segments={composition} />
           </CompactModule>
         ) : null}
-        <ValuesCredit />
+        <ValuesCredit freshness={['values', 'injuries']} />
       </ScrollView>
     </View>
   );

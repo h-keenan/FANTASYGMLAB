@@ -460,7 +460,7 @@ export function PlayersContent({
           )}
         </CompactModule>
       ) : null}
-      <ValuesCredit />
+      <ValuesCredit freshness={["values", "injuries"]} />
     </main>
   );
 }

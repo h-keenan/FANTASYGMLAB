@@ -623,7 +623,7 @@ export default function PlayerQuickViewSheet({
                 {target && remote ? <Button label="Open Full Profile" onPress={openFullProfile} style={styles.actionButton} /> : null}
               </View>
             </View>
-            {customSections ? null : <ValuesCredit />}
+            {customSections ? null : <ValuesCredit freshness={['values', 'injuries']} />}
           </SheetScrollView>
         </SwipeDismissCard>
       </Pressable>

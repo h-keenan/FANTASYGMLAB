@@ -634,7 +634,7 @@ export function PlayerQuickView({
             </a>
           </div>
         ) : null}
-        {customSections ? null : <ValuesCredit className="text-center" />}
+        {customSections ? null : <ValuesCredit className="text-center" freshness={["values", "injuries"]} />}
         </div>
       </div>
     </div>

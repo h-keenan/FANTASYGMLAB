@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { Linking, StyleSheet, type StyleProp, type ViewStyle, View } from 'react-native';
 
 import AppText from './AppText';
+import FreshnessLabel from './FreshnessLabel';
+import type { FreshnessDataset } from '../lib/dataFreshness';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, typography, type ThemeColors } from '../theme';
 
@@ -16,7 +18,8 @@ import { spacing, typography, type ThemeColors } from '../theme';
  */
 export const FANTASYCALC_URL = 'https://fantasycalc.com';
 
-export default function ValuesCredit({ style }: { style?: StyleProp<ViewStyle> }) {
+/** `freshness`: which "as of" lines to show under the credit (default values). */
+export default function ValuesCredit({ style, freshness = ['values'] }: { style?: StyleProp<ViewStyle>; freshness?: readonly FreshnessDataset[] }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -31,6 +34,7 @@ export default function ValuesCredit({ style }: { style?: StyleProp<ViewStyle> }
           FantasyCalc
         </AppText>
       </AppText>
+      {freshness.length > 0 ? <FreshnessLabel datasets={freshness} /> : null}
     </View>
   );
 }

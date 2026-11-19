@@ -563,7 +563,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
               <>
                 {idpSelected ? <AppText style={styles.idpNote}>{idpMethodNote(idp)}</AppText> : null}
                 <AppText style={styles.idpNote}>{"Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position; tap any player for the full breakdown."}</AppText>
-                <ValuesCredit />
+                <ValuesCredit freshness={['values', 'injuries']} />
               </>
             ) : null}
             </>
