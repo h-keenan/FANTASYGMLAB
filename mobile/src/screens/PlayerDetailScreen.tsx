@@ -1416,6 +1416,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       ringColor={overallRating !== null ? overallRatingColor(overallRating, colors) : colors.accent}
       usageTrend={model?.usage_trend ?? null}
       usageLoading={loading}
+      usageLocked={model?.usage_profile?.gated === true}
       expanded={snapshotExpanded}
       onToggleExpand={overallRating !== null ? () => setSnapshotExpanded((value) => !value) : undefined}
     >

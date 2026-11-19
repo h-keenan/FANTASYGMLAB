@@ -85,6 +85,12 @@ describe("PlayerHeroHeader", () => {
     expect(container.querySelector(".pqv-archetype-pill")).toBeNull();
   });
 
+  it("says Pro, not 'no trend', when the server withheld the usage read from a Free account", () => {
+    renderHero({ usageTrend: null, usageLocked: true });
+    expect(screen.queryByText("No clear trend")).toBeNull();
+    expect(screen.getByText("Pro")).toBeInTheDocument();
+  });
+
   it("shows a placeholder, not 'no trend', while the usage read is loading", () => {
     renderHero({ usageTrend: null, usageLoading: true });
     expect(screen.queryByText("No clear trend")).toBeNull();

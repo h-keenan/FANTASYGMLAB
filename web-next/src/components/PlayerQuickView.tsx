@@ -430,6 +430,7 @@ export function PlayerQuickView({
           usageTrend={model?.usage_trend ?? null}
           simTiles={sim?.heroTiles ?? null}
           usageLoading={loading}
+          usageLocked={model?.usage_profile?.gated === true}
           valueChart={asOf != null ? null : <PlayerValueHistory playerId={identity.player_id} bare />}
           ovrChart={model && !isSim ? <SubRatingRow model={model} bare /> : null}
           depthChartNote={realWorld.showDepthChartNote ? model?.depth_chart_note : null}

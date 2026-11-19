@@ -539,6 +539,7 @@ export default function PlayerQuickViewSheet({
               metaLine={sim?.headerMeta?.line ?? null}
               teamLogo={sim?.headerMeta?.logo ?? null}
               usageLoading={loading}
+              usageLocked={model?.usage_profile?.gated === true}
               valueChart={asOf == null && historyQuery.data && ratingHistoryCaption(historyQuery.data) ? <PlayerValueHistory history={historyQuery.data} /> : null}
               ovrChart={
                 hasSubRatings && !isSim ? (
