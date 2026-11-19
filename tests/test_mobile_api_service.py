@@ -2718,12 +2718,13 @@ def test_draft_center_and_draft_picks_share_one_cached_league_summary(monkeypatc
     assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
 
 
-def test_draft_picks_blends_crowd_scouting_signal_when_enabled(monkeypatch):
-    """The crowdsourced college-scouting signal (modules.college_scouting)
-    is gated off by default (class_strength_signal_enabled() — see its own
-    docstring on why). With the gate on, a real crowd multiplier for the
-    current draft year must actually change class_strength_multiplier on
-    picks for that season versus the gate-off (pure editorial) baseline."""
+from modules import college_scouting as svc_college_scouting  # noqa: E402
+
+
+def test_draft_picks_make_no_scouting_reports_call(monkeypatch):
+    """The crowd class-strength signal was retired (docs/audits/2026-11-college-class-strength-retired.md):
+    the draft-picks endpoint must not fetch scouting reports/prospects, and the
+    class strength on picks is the pure editorial multiplier."""
 
     client = _client(monkeypatch)
 
@@ -2747,23 +2748,20 @@ def test_draft_picks_blends_crowd_scouting_signal_when_enabled(monkeypatch):
                                         headers={"Authorization": "Bearer good-token"},
                                     )
 
-    baseline_picks = _fetch_picks().json()["picks"]
-    baseline_2026 = [p for p in baseline_picks if p["season"] == 2026]
-    assert baseline_2026, "fixture must produce at least one 2026 pick for this test to mean anything"
-    baseline_multiplier = baseline_2026[0]["class_strength_multiplier"]
+    assert not hasattr(svc_college_scouting, "class_strength_signal_enabled")
+    assert not hasattr(svc_college_scouting, "get_cached_crowd_class_strength_by_year")
+    with patch("modules.college_scouting.fetch_all_scouting_reports") as reports_call, patch(
+        "modules.college_scouting.fetch_all_prospects"
+    ) as prospects_call:
+        picks = _fetch_picks().json()["picks"]
+    reports_call.assert_not_called()
+    prospects_call.assert_not_called()
+    picks_2026 = [p for p in picks if p["season"] == 2026]
+    assert picks_2026, "fixture must produce at least one 2026 pick for this test to mean anything"
+    from modules import trade_ideas as _ti
 
-    monkeypatch.setenv("DYNASTYGM_COLLEGE_SCOUTING_CLASS_STRENGTH_SIGNAL", "1")
-    with patch(
-        "modules.college_scouting.get_cached_crowd_class_strength_by_year",
-        return_value={2026: {"multiplier": 1.1, "confidence": "high", "scout_count": 12}},
-    ):
-        blended_picks = _fetch_picks().json()["picks"]
-    blended_2026 = [p for p in blended_picks if p["season"] == 2026]
-    assert blended_2026
-
-    assert blended_2026[0]["class_strength_multiplier"] != baseline_multiplier
-    assert blended_2026[0]["class_strength_multiplier"] == pytest.approx(
-        min(1.25, baseline_multiplier * 1.1), abs=1e-6
+    assert picks_2026[0]["class_strength_multiplier"] == pytest.approx(
+        _ti._rookie_class_strength_multiplier(2026), abs=1e-6
     )
 
 

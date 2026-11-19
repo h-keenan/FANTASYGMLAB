@@ -1,13 +1,14 @@
-"""College football prospect scouting — crowdsourced signal feeding the
-existing rookie draft-class-strength calculation (modules/trade_ideas.py's
-``DEFAULT_CLASS_STRENGTH_BY_YEAR`` / ``_rookie_class_strength_multiplier``).
+"""College football prospect scouting — crowdsourced grades and watchlist.
+
+The crowd grades no longer feed draft-class strength: that signal
+(DYNASTYGM_COLLEGE_SCOUTING_CLASS_STRENGTH_SIGNAL) was retired 2026-11-19, see
+docs/audits/2026-11-college-class-strength-retired.md.
 
 Product shape (coridian_, #college-scouting):
   - SHARED primary system: every signed-in user can submit a scouting grade
     (1-5) + optional round projection + optional note on any prospect. All
     grades for a prospect are pooled into one shared aggregate (avg grade,
-    scout count) — that aggregate, never any single user's opinion, is what
-    can influence draft-class strength.
+    scout count).
   - Personal watchlist layered on top: a simple follow/unfollow list, no
     scouting fields duplicated there (modules.college_scouting only holds
     the shape; the actual watchlist rows live in Supabase table
@@ -24,15 +25,6 @@ screen. ``fetch_all_prospects`` therefore reads only from the real Supabase
 returns an empty list — never invented rows — when that table isn't
 configured, migrated, or reachable. An empty catalog is the honest state
 until a real prospect data source is integrated.
-
-Confidence discipline
-----------------------
-Same "don't fabricate confidence" posture as modules/player_projections.py's
-honest low/high + confidence-label pattern: a prospect (or an entire draft
-class) with zero scouting reports contributes nothing — not a "weak" signal,
-not a "strong" one, just absent — and a class with only a handful of reports
-has its influence shrunk toward neutral (1.0x) rather than trusted at full
-strength. Only a healthy sample size earns full weight.
 """
 
 from __future__ import annotations
@@ -45,25 +37,7 @@ import requests
 from urllib.parse import quote
 
 from modules import auth_supabase
-from modules import experimental_graduation
 
-# Live-fetch gate for the draft-class-strength wiring specifically (separate
-# from the scouting/watchlist CRUD endpoints, which are always available).
-# Defaults OFF — unlike this codebase's usual graduated-default-ON kill
-# switches, this one adds a real (cached, but real) network round trip to
-# two performance-sensitive valuation endpoints
-# (services/mobile_api_service.py's draft-picks and trade-analyzer
-# handlers) for a signal that is a provable no-op (empty dict, neutral
-# 1.0x) until real users have actually submitted scouting reports. Flip
-# DYNASTYGM_COLLEGE_SCOUTING_CLASS_STRENGTH_SIGNAL=1 on once there's a real
-# scouting pool worth blending in.
-CLASS_STRENGTH_SIGNAL_ENV_KEY = "DYNASTYGM_COLLEGE_SCOUTING_CLASS_STRENGTH_SIGNAL"
-
-
-def class_strength_signal_enabled(*, environ: Mapping[str, str] | None = None) -> bool:
-    return experimental_graduation.graduated_kill_switch_enabled(
-        CLASS_STRENGTH_SIGNAL_ENV_KEY, environ=environ, default=False
-    )
 
 # ---------------------------------------------------------------------------
 # Supabase table names (see docs/supabase_college_scouting.sql for schema/RLS)
@@ -111,26 +85,8 @@ def _filter_scouting_relevant_prospects(
 # ---------------------------------------------------------------------------
 MIN_GRADE = 1
 MAX_GRADE = 5
-NEUTRAL_GRADE = 3.0
 MIN_ROUND_PROJECTION = 1
 MAX_ROUND_PROJECTION = 7
-
-# ---------------------------------------------------------------------------
-# Confidence thresholds for the crowd -> class-strength signal. Mirrors
-# modules/player_projections.py's small-sample-penalty posture rather than
-# copying its exact numbers (a different signal, different sample sizes).
-# ---------------------------------------------------------------------------
-MIN_SCOUTS_FOR_MEDIUM_CONFIDENCE = 3
-MIN_SCOUTS_FOR_FULL_CONFIDENCE = 8
-
-# How much one full-confidence grade point (away from neutral) moves the
-# class-strength multiplier. 0.1/point means an average grade of 5.0 reaches
-# +0.2 (1.2x) and an average of 1.0 reaches -0.2 (0.8x) — sized so a single,
-# confident crowd class-strength signal stays within
-# modules.trade_ideas's existing [0.8, 1.25] clamp on its own, before it is
-# even multiplied against the separate editorial class_strength_by_year.
-CLASS_STRENGTH_GRADE_SCALE = 0.1
-CLASS_STRENGTH_CLAMP = (0.8, 1.25)
 
 
 def _safe_text(value: Any, default: str = "") -> str:
@@ -205,74 +161,6 @@ def aggregate_prospect_scouting(reports: Sequence[Mapping[str, Any]]) -> Dict[st
             "scout_count": len(grades),
             "avg_round_projection": round(sum(rounds) / len(rounds), 2) if rounds else None,
             "grade_distribution": distribution,
-        }
-    return result
-
-
-def _confidence_label(scout_count: int) -> str:
-    if scout_count >= MIN_SCOUTS_FOR_FULL_CONFIDENCE:
-        return "high"
-    if scout_count >= MIN_SCOUTS_FOR_MEDIUM_CONFIDENCE:
-        return "medium"
-    return "low"
-
-
-def crowd_class_strength_by_year(
-    prospects: Sequence[Mapping[str, Any]],
-    reports: Sequence[Mapping[str, Any]],
-) -> Dict[int, Dict[str, Any]]:
-    """The shared scouting pool's opinion of each draft class, as a
-    multiplier meant to be combined with (not replace) the existing editorial
-    ``DEFAULT_CLASS_STRENGTH_BY_YEAR`` in modules/trade_ideas.py.
-
-    A draft year with zero valid scouting reports is omitted entirely — the
-    caller (modules.trade_ideas._rookie_class_strength_multiplier) treats an
-    absent year as neutral (1.0x, no effect), never as a strong or weak
-    signal. Small samples are shrunk toward neutral rather than clamped
-    straight to the raw average, same discipline as
-    modules/player_projections.py's small-sample penalty.
-    """
-
-    year_by_prospect_id = {
-        _safe_text(p.get("id")): int(p["draft_year"])
-        for p in prospects
-        if _safe_text(p.get("id")) and str(p.get("draft_year") or "").strip()
-    }
-    total_prospects_by_year: Dict[int, int] = defaultdict(int)
-    for year in year_by_prospect_id.values():
-        total_prospects_by_year[year] += 1
-
-    grades_by_year: Dict[int, List[int]] = defaultdict(list)
-    scouted_prospects_by_year: Dict[int, set] = defaultdict(set)
-    for report in reports:
-        prospect_id = _safe_text(report.get("prospect_id"))
-        year = year_by_prospect_id.get(prospect_id)
-        if year is None:
-            continue
-        grade = normalize_grade(report.get("grade"))
-        if grade is None:
-            continue
-        grades_by_year[year].append(grade)
-        scouted_prospects_by_year[year].add(prospect_id)
-
-    result: Dict[int, Dict[str, Any]] = {}
-    for year, grades in grades_by_year.items():
-        scout_count = len(grades)
-        if scout_count == 0:
-            continue
-        avg_grade = sum(grades) / scout_count
-        raw_multiplier = 1.0 + ((avg_grade - NEUTRAL_GRADE) * CLASS_STRENGTH_GRADE_SCALE)
-        confidence_weight = min(1.0, scout_count / MIN_SCOUTS_FOR_FULL_CONFIDENCE)
-        blended = 1.0 + ((raw_multiplier - 1.0) * confidence_weight)
-        low, high = CLASS_STRENGTH_CLAMP
-        clamped = max(low, min(high, blended))
-        result[year] = {
-            "multiplier": round(clamped, 4),
-            "confidence": _confidence_label(scout_count),
-            "scout_count": scout_count,
-            "avg_grade": round(avg_grade, 2),
-            "prospects_scouted": len(scouted_prospects_by_year[year]),
-            "total_prospects_in_class": total_prospects_by_year.get(year, 0),
         }
     return result
 
@@ -398,7 +286,7 @@ def fetch_all_scouting_reports(
     config: dict, access_token: str, *, timeout: float = 15
 ) -> Tuple[List[Dict[str, Any]], str]:
     """Every user's scouting report — used both to render the shared
-    aggregate and to feed crowd_class_strength_by_year. Fails soft to an
+    aggregate. Fails soft to an
     empty list (never raises) if the table isn't reachable yet.
     """
 
@@ -425,7 +313,7 @@ def fetch_all_scouting_reports(
     return [row for row in rows if isinstance(row, dict)], ""
 
 
-# In-process TTL cache for the crowd class-strength signal (and the raw
+# In-process TTL cache for the raw
 # prospects/reports lists it's built from). This is shared, slow-moving,
 # cross-user data (identical for every caller — pooled grades, not anything
 # scoped to the requesting user), so refetching it from Supabase on every
@@ -438,7 +326,6 @@ def fetch_all_scouting_reports(
 # class as the Player Detail News blocking-RSS-fetch fix (#958) and the
 # NFL-schedule CSV re-parse fix (#960).
 CACHE_TTL_SECONDS = 600.0
-_class_strength_cache: Dict[str, Any] = {"data": None, "fetched_at": 0.0}
 _prospects_cache: Dict[str, Any] = {"data": None, "fetched_at": 0.0}
 _reports_cache: Dict[str, Any] = {"data": None, "fetched_at": 0.0}
 
@@ -496,40 +383,9 @@ def get_cached_all_scouting_reports(
     return reports, error
 
 
-def get_cached_crowd_class_strength_by_year(
-    config: dict,
-    access_token: str,
-    *,
-    now: float | None = None,
-) -> Dict[int, Dict[str, Any]]:
-    """Cached wrapper around crowd_class_strength_by_year for request-time
-    callers (services/mobile_api_service.py). Returns {} (neutral — no
-    effect on valuations) on any fetch failure rather than raising.
-    """
-
-    current_time = time.time() if now is None else now
-    cached = _class_strength_cache.get("data")
-    fetched_at = float(_class_strength_cache.get("fetched_at") or 0.0)
-    if cached is not None and (current_time - fetched_at) < CACHE_TTL_SECONDS:
-        return cached
-
-    prospects, _ = get_cached_all_prospects(config, access_token, now=current_time)
-    reports, error = get_cached_all_scouting_reports(config, access_token, now=current_time)
-    if error:
-        # Don't cache a failure as if it were "no data forever" — just
-        # return neutral for this call and try again next time.
-        return {}
-    signal = crowd_class_strength_by_year(prospects, reports)
-    _class_strength_cache["data"] = signal
-    _class_strength_cache["fetched_at"] = current_time
-    return signal
-
-
 def _reset_cache_for_tests() -> None:
     """Test-only helper — production code never calls this."""
 
-    _class_strength_cache["data"] = None
-    _class_strength_cache["fetched_at"] = 0.0
     _prospects_cache["data"] = None
     _prospects_cache["fetched_at"] = 0.0
     _reports_cache["data"] = None

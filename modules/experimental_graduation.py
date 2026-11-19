@@ -213,5 +213,4 @@ FLAG_REGISTRY: dict[str, dict[str, str]] = {
     "DYNASTYGM_INJURY_RETURN_CURVES_V1": {"default": "on", "owner": "coridian_", "criterion": "flipped ON 2026-11-19: fitted next-4-game production fraction beats the static current-season multiplier out of sample (2024-25) with a CI excluding zero; delete the kill switch after one release", "review": "2026-12-19"},
     "DYNASTYGM_INJURY_RETURN_CURVES_DYNASTY_V1": {"default": "off", "owner": "coridian_", "criterion": "fitted expected games lost into the dynasty horizon model; mean-unbiased but not better than the table on MAE/RMSE out of sample (docs/audits/2026-11-injury-discount.md); flip ON only if a larger sample shows a CI-excluded improvement", "review": "2026-12-19"},
     "DYNASTYGM_FRESH_PROVIDER_CACHE_V1": {"default": "on", "owner": "coridian_", "criterion": "flipped ON 2026-11-19 after the live harness (data-truth audit finding 1); delete the kill switch after one release", "review": "2026-12-19"},
-    "DYNASTYGM_COLLEGE_SCOUTING_CLASS_STRENGTH_SIGNAL": {"default": "off", "owner": "coridian_", "criterion": "flip ON only with a real scouting pool and a backtest; queued", "review": "2026-12-19"},
 }

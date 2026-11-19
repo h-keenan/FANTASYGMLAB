@@ -170,43 +170,6 @@ def test_aggregate_prospect_scouting_pools_valid_reports_only():
     assert agg["p1"]["grade_distribution"][3] == 1
 
 
-def test_crowd_class_strength_zero_reports_is_absent_not_neutral_zero():
-    """A prospect/class with zero scouting entries must not silently read as
-    a strong or weak signal — it should simply not appear in the result."""
-
-    prospects = [{"id": "p1", "draft_year": 2026}]
-    assert cs.crowd_class_strength_by_year(prospects, []) == {}
-
-
-def test_crowd_class_strength_small_sample_is_shrunk_toward_neutral():
-    prospects = [{"id": f"p{i}", "draft_year": 2026} for i in range(10)]
-    # A single, extremely bullish grade (5/5) should not swing the class
-    # signal anywhere near its full theoretical +0.2 — one scout is a "low"
-    # confidence read.
-    reports = [{"user_id": "u1", "prospect_id": "p0", "grade": 5}]
-    signal = cs.crowd_class_strength_by_year(prospects, reports)
-    assert signal[2026]["confidence"] == "low"
-    assert signal[2026]["scout_count"] == 1
-    # Shrunk multiplier: raw would be 1.2 (5 -> +0.2), confidence_weight = 1/8.
-    assert 1.0 < signal[2026]["multiplier"] < 1.05
-
-
-def test_crowd_class_strength_full_sample_reaches_near_full_weight():
-    prospects = [{"id": f"p{i}", "draft_year": 2026} for i in range(10)]
-    reports = [{"user_id": f"u{i}", "prospect_id": "p0", "grade": 5} for i in range(8)]
-    signal = cs.crowd_class_strength_by_year(prospects, reports)
-    assert signal[2026]["confidence"] == "high"
-    # 8 scouts hits MIN_SCOUTS_FOR_FULL_CONFIDENCE -> full weight -> clamped 1.2
-    assert abs(signal[2026]["multiplier"] - 1.2) < 1e-6
-
-
-def test_crowd_class_strength_below_average_grades_pull_multiplier_down():
-    prospects = [{"id": f"p{i}", "draft_year": 2026} for i in range(10)]
-    reports = [{"user_id": f"u{i}", "prospect_id": "p0", "grade": 1} for i in range(8)]
-    signal = cs.crowd_class_strength_by_year(prospects, reports)
-    assert signal[2026]["multiplier"] < 1.0
-
-
 def test_build_prospect_views_marks_my_report_and_watchlist():
     prospects = [
         {"id": "p1", "name": "A", "position": "QB", "school": "X", "draft_year": 2026},
@@ -240,37 +203,6 @@ def test_no_crowd_signal_leaves_existing_class_strength_behavior_unchanged():
 
     assert trade_ideas._rookie_class_strength_multiplier(2026) == 1.15
     assert trade_ideas._rookie_class_strength_multiplier(2099) == 1.0
-
-
-# Test-only fixture prospects, deliberately defined here (not in production
-# code) — modules.college_scouting must never contain an importable
-# fabricated prospect catalog. These exist solely to exercise
-# crowd_class_strength_by_year's grouping-by-draft-year logic.
-_FIXTURE_PROSPECTS = [
-    {"id": "fixture-qb-01", "name": "Fixture QB", "position": "QB", "school": "Fixture U", "draft_year": 2026},
-]
-
-
-def test_crowd_signal_from_real_reports_blends_into_class_strength():
-    reports = [{"user_id": f"u{i}", "prospect_id": "fixture-qb-01", "grade": 5} for i in range(8)]
-    crowd_signal = cs.crowd_class_strength_by_year(_FIXTURE_PROSPECTS, reports)
-
-    editorial_only = trade_ideas._rookie_class_strength_multiplier(2026)
-    blended = trade_ideas._rookie_class_strength_multiplier(
-        2026, None, crowd_signal
-    )
-    assert blended != editorial_only
-    assert blended == max(0.8, min(1.25, editorial_only * crowd_signal[2026]["multiplier"]))
-
-
-def test_crowd_signal_for_unscouted_year_has_no_effect():
-    """A draft year nobody has scouted yet must fall back to the pure
-    editorial multiplier — never fabricate a strong/weak read from silence."""
-
-    crowd_signal = cs.crowd_class_strength_by_year(_FIXTURE_PROSPECTS, [])
-    assert crowd_signal == {}
-    blended = trade_ideas._rookie_class_strength_multiplier(2026, None, crowd_signal)
-    assert blended == trade_ideas._rookie_class_strength_multiplier(2026)
 
 
 # ---------------------------------------------------------------------------
@@ -369,37 +301,6 @@ def test_get_cached_all_scouting_reports_does_not_refetch_within_the_ttl_window(
     cs.get_cached_all_scouting_reports({}, "token", now=2000.0 + cs.CACHE_TTL_SECONDS - 1)
 
     assert calls["n"] == 1
-    cs._reset_cache_for_tests()
-
-
-def test_get_cached_crowd_class_strength_by_year_reuses_the_prospects_and_reports_caches(monkeypatch):
-    """The class-strength wrapper must not duplicate the raw-list fetches:
-    once get_cached_all_prospects/get_cached_all_scouting_reports have
-    already warmed the cache (e.g. from a College Scouting page view in
-    the same process), computing the crowd signal must reuse that data
-    rather than issuing its own second round of Supabase calls."""
-
-    cs._reset_cache_for_tests()
-    monkeypatch.setattr(cs.auth_supabase, "is_configured", lambda config: True)
-    calls = {"n": 0}
-
-    def _get(url, *args, **kwargs):
-        calls["n"] += 1
-        if "college_prospects" in url:
-            return _fake_response(
-                [{"id": "p1", "name": "QB1", "position": "QB", "school": "X", "draft_year": 2026}]
-            )
-        return _fake_response([{"user_id": "u1", "prospect_id": "p1", "grade": 4}])
-
-    monkeypatch.setattr(cs.requests, "get", _get)
-    monkeypatch.setattr(cs.auth_supabase, "rest_api_url", lambda config, table, query: table)
-
-    cs.get_cached_all_prospects({}, "token", now=3000.0)
-    cs.get_cached_all_scouting_reports({}, "token", now=3000.0)
-    assert calls["n"] == 2
-
-    cs.get_cached_crowd_class_strength_by_year({}, "token", now=3000.0)
-    assert calls["n"] == 2  # unchanged — reused both warm caches
     cs._reset_cache_for_tests()
 
 
