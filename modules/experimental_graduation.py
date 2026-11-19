@@ -208,8 +208,8 @@ FLAG_REGISTRY: dict[str, dict[str, str]] = {
     "DYNASTYGM_EXPERIMENTAL_GM_TARGETS": {"default": "on", "owner": "coridian_", "criterion": "kill switch asked for in #232; keep", "review": "2027-02-19"},
     "DYNASTYGM_EXPERIMENTAL_SHARE_CARDS": {"default": "on", "owner": "coridian_", "criterion": "kill switch asked for in #232; keep", "review": "2027-02-19"},
     "DYNASTYGM_EXPERIMENTAL_TEAM_STANCE": {"default": "on", "owner": "coridian_", "criterion": "kill switch kept by design", "review": "2027-02-19"},
-    "DYNASTYGM_FRESH_PROVIDER_CACHE_V1": {"default": "off", "owner": "coridian_", "criterion": "flip ON after scripts/audits/fantasycalc_freshness_harness.py output is read (data-truth audit finding 1); delete the flag after one release", "review": "2026-12-19"},
     "DYNASTYGM_INJURY_HORIZON_V1": {"default": "off", "owner": "coridian_", "criterion": "flip ON only after more injured-player history is collected (backtest n<=19 per horizon, see docs/audits/2026-11-injury-discount.md) and the harness diff is reviewed; queued", "review": "2026-12-19"},
+    "DYNASTYGM_FRESH_PROVIDER_CACHE_V1": {"default": "on", "owner": "coridian_", "criterion": "flipped ON 2026-11-19 after the live harness (data-truth audit finding 1); delete the kill switch after one release", "review": "2026-12-19"},
     "DYNASTYGM_NEWS_VALUE_EVENTS": {"default": "off", "owner": "coridian_", "criterion": "flip ON only after a separate walk-forward backtest passes; queued", "review": "2026-12-19"},
     "DYNASTYGM_COLLEGE_SCOUTING_CLASS_STRENGTH_SIGNAL": {"default": "off", "owner": "coridian_", "criterion": "flip ON only with a real scouting pool and a backtest; queued", "review": "2026-12-19"},
 }

@@ -224,3 +224,23 @@ def test_pro_responses_keep_usage_trend_on_every_endpoint(monkeypatch):
     out = _trend_endpoints(monkeypatch, "premium")
     for endpoint, values in out.items():
         assert values and any(v and v["direction"] == "up" for v in values), endpoint
+
+
+def test_trade_analyzer_role_notes_free_gets_only_a_locked_flag_pro_gets_the_lines():
+    """C3: Free sees a small locked teaser (a boolean, no text), Pro the lines, and no teaser when there is nothing to say."""
+
+    from services import mobile_api_service
+
+    covered = [{"asset_type": "player", "player_id": "9008", "position": "RB", "name": "Rico"}]
+    uncovered = [{"asset_type": "player", "player_id": "q", "position": "QB", "name": "Quinn"}]
+    with patch("modules.nflverse_advanced_stats.load_season", return_value=None), \
+            patch("modules.sleeper.cached_season_player_weekly", return_value=WEEKS):
+        free = mobile_api_service._role_notes_fields(covered, pro=False)
+        pro = mobile_api_service._role_notes_fields(covered, pro=True)
+        free_nothing = mobile_api_service._role_notes_fields(uncovered, pro=False)
+        pro_nothing = mobile_api_service._role_notes_fields(uncovered, pro=True)
+    assert free == {"role_notes_locked": True}
+    assert "Rico" not in json.dumps(free)
+    assert len(pro["role_notes"]) == 1 and pro["role_notes"][0].startswith("Rico:") and "role_notes_locked" not in pro
+    assert free_nothing == {}
+    assert pro_nothing == {"role_notes": []}

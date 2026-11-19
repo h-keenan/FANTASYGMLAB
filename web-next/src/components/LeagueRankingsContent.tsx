@@ -7,6 +7,7 @@ import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { useRef, useState, useSyncExternalStore } from "react";
 
 import { useFlipList } from "@/lib/useFlipList";
+import { useIsPro } from "@/lib/useIsPro";
 
 import { AccentCard } from "@/components/AccentCard";
 import { usePageHelp } from "@/components/PageHelpLines";
@@ -342,6 +343,9 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
   const [state, setState] = useState<"idle" | "loading" | "error" | "ready">("idle");
   const [result, setResult] = useState<PlayoffOddsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A confirmed Free account sees the Pro lock at once: no "Calculate" tap just to learn the page is locked (the server still gates the run).
+  const isPro = useIsPro();
+  const lockedUp = isPro === false || (state === "ready" && result?.is_premium === false);
 
   const calculate = () => {
     setState("loading");
@@ -366,7 +370,7 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
       >
         Playoff Odds
       </SectionHeading>
-      {state === "idle" ? (
+      {state === "idle" && !lockedUp ? (
         <Button onClick={calculate} className="self-start">
           Calculate playoff odds
         </Button>
@@ -379,13 +383,13 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
           {error}
         </p>
       ) : null}
-      {state === "ready" && result && result.is_premium === false ? (
+      {lockedUp ? (
         <PremiumUpsellCard
           bare
           kicker="Playoff Odds"
           leagueName={leagueName}
           example={playoffOddsExample(myTeam, leagueName)}
-          upsell={result.upsell ?? null}
+          upsell={result?.upsell ?? null}
           fallbackTitle="Your real shot at the playoffs"
           fallbackBody="Playoff Odds is a Pro feature: a rest-of-season simulation of your league's real schedule, every team's playoff chance and projected seed. Start your free trial to unlock it."
         />

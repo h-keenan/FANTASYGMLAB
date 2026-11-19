@@ -3758,6 +3758,8 @@ export interface TradeAnalyzerResponse {
   roster_overflow?: RosterOverflow | null;
   /** Pro only, display-only: role-change lines for the players in this package (absent for Free). */
   role_notes?: string[];
+  /** Free only: the package has a role note, but its text is Pro (the client shows one small locked row). */
+  role_notes_locked?: boolean;
 }
 
 /** Trade History (Revision 18) — modules/trade_outcome_results.py's quiet

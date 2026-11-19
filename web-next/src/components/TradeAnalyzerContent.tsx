@@ -8,7 +8,7 @@ import type { RosterOverflow } from "@/lib/api";
 import { RosterOverflowNote } from "@/components/SuggestedDrop";
 import { AccentCard } from "@/components/AccentCard";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { Button } from "@/components/Button";
+import { Button, ButtonLink } from "@/components/Button";
 import { LimitWall } from "@/components/LimitWall";
 import { useAuth } from "@/context/AuthContext";
 import { limitWallForReason, type LimitWallModel } from "@/lib/limitWall";
@@ -708,6 +708,7 @@ export function TradeAnalyzerContent({
   // stays open for offseason planning, this note just says so.
   const [planningNote, setPlanningNote] = useState("");
   const [roleNotes, setRoleNotes] = useState<string[]>([]);
+  const [roleNotesLocked, setRoleNotesLocked] = useState(false);
   const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
   const [rosterOverflow, setRosterOverflow] = useState<RosterOverflow | null>(null);
   // Two teams (this builder) or a 3 to 6 team trade (MultiTeamTradeContent).
@@ -885,6 +886,7 @@ export function TradeAnalyzerContent({
       });
       setPlanningNote(result.planning_note ?? "");
       setRoleNotes(result.role_notes ?? []);
+      setRoleNotesLocked(result.role_notes_locked === true);
       setAssumptions(result.assumptions ?? null);
       setRosterOverflow(result.roster_overflow ?? null);
       trackUse("trade_analyzer", "evaluated", { leagueId, props: { result: result.verdict ? "verdict" : "no_verdict" } });
@@ -1096,6 +1098,18 @@ export function TradeAnalyzerContent({
               {line}
             </span>
           ))}
+        </div>
+      ) : null}
+
+      {roleNotesLocked && !roleNotes.length ? (
+        <div className="glass-surface p-3 flex flex-wrap items-center gap-2" data-testid="trade-role-notes-lock">
+          <ToneBadge label="Pro" color="var(--color-premium)" />
+          <span className="min-w-0 flex-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            Role changes for players in this trade
+          </span>
+          <ButtonLink href="/premium" variant="premium" size="sm">
+            See Pro
+          </ButtonLink>
         </div>
       ) : null}
 

@@ -14,6 +14,7 @@ import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import PickGroupList from '../components/PickGroupList';
 import EmptyState from '../components/EmptyState';
 import PremiumLock from '../components/PremiumLock';
+import { useShowProTags } from '../lib/useShowProTags';
 import GridBackground from '../components/GridBackground';
 import ExchangeSide from '../components/ExchangeSide';
 import PlayerAccordionRow from '../components/PlayerAccordionRow';
@@ -465,6 +466,8 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
   const selectionCount = selectedIds.size + selectedPickIds.size;
 
   const [proLock, setProLock] = useState<{ title?: string; body?: string } | null>(null);
+  // A confirmed Free account sees the Pro lock up front, before it builds a package and searches (the server still gates the search).
+  const confirmedFree = useShowProTags();
   const search = async (playerIds: string[] = Array.from(selectedIds)) => {
     setSearchError(null);
     setSearching(true);
@@ -513,6 +516,19 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
     openQuickView(assetToRankedPlayer(asset), { leagueId, leagueName });
   const openPick = (asset: PresentationAsset) =>
     navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
+
+  if (confirmedFree && !proLock) {
+    return (
+      <View style={[styles.center]}>
+        <PremiumLock
+          feature="trade_finder"
+          leagueName={leagueName}
+          title="Build and search for a trade"
+          description="Trade Finder is a Pro feature: build a custom package and search every roster in your league for a real match. Upgrade to Pro to unlock it."
+        />
+      </View>
+    );
+  }
 
   if (loadingRoster) {
     return <SkeletonPage label="Trade Finder" layout="cards" family="trades" />;

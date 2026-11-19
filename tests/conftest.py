@@ -58,6 +58,15 @@ _PLAYERS_DB_BASELINE = (_data_json_stat(_PLAYERS_DB), _PLAYERS_DB.read_bytes() i
 
 
 @pytest.fixture(autouse=True)
+def _hermetic_fantasycalc_cache(monkeypatch):
+    """The fresh provider cache is default ON in production: with no fetch timestamp the committed seed CSV counts as stale and
+    a test that reaches ``get_dynasty_values`` would call the live provider and rewrite the tracked data/fantasycalc_values.csv.
+    Tests run on the legacy cache read; the tests that exercise the flag set it themselves."""
+
+    monkeypatch.setenv("DYNASTYGM_FRESH_PROVIDER_CACHE_V1", "0")
+
+
+@pytest.fixture(autouse=True)
 def _guard_real_players_db():
     yield
     stat, content = _PLAYERS_DB_BASELINE

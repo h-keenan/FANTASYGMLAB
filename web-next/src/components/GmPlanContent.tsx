@@ -615,11 +615,9 @@ export function GmPlanContent({
   });
   const planWhy = buildPlanWhy(stanceKey, facts, banner ? banner.week : null);
 
-  const planGate = notice ? (
-    <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
-      {notice}
-    </p>
-  ) : !data.is_premium ? (
+  // Gate order matches the app (GmPlanScreen): the Pro lock decides first (the server answers Free with the upsell before any
+  // work), then a reason notice, then the quiet state. `=== false`, like every other gate.
+  const planGate = data.is_premium === false ? (
     <>
       <PremiumUpsellCard
         kicker="GM Plan"
@@ -638,6 +636,10 @@ export function GmPlanContent({
         </p>
       </section>
     </>
+  ) : notice ? (
+    <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
+      {notice}
+    </p>
   ) : quiet ? (
     <EmptyState title="Not enough to build a GM Plan yet." subtitle="We need more of this league's data first." />
   ) : null;
