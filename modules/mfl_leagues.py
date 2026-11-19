@@ -51,10 +51,10 @@ from modules.external_league_common import (
     features_for,
     mapping_blocks_import,
     preview_payload as _preview_payload,
-    safe_float,
     safe_int,
     safe_text,
 )
+from modules.coerce import float_or_default
 from modules.platforms.espn import normalize_espn_team
 
 MFL_PLATFORM = "mfl"
@@ -341,8 +341,8 @@ def normalize_league(
                 wins=safe_int(standing.get("h2hw")),
                 losses=safe_int(standing.get("h2hl")),
                 ties=safe_int(standing.get("h2ht")),
-                points_for=safe_float(safe_text(standing.get("pf")).replace(",", "")),
-                points_against=safe_float(safe_text(standing.get("pa")).replace(",", "")),
+                points_for=float_or_default(safe_text(standing.get("pf")).replace(",", "")),
+                points_against=float_or_default(safe_text(standing.get("pa")).replace(",", "")),
                 players=roster_players,
             )
         )
@@ -409,14 +409,14 @@ def load_league_snapshot(league_key: str) -> dict[str, Any]:
 
 def _live_franchise(item: dict[str, Any]) -> dict[str, Any]:
     starters = [
-        {"platform_id": safe_text(p.get("id")), "points": safe_float(p.get("score"), 0.0) if p.get("score") not in (None, "") else None}
+        {"platform_id": safe_text(p.get("id")), "points": float_or_default(p.get("score"), 0.0) if p.get("score") not in (None, "") else None}
         for p in as_list((item.get("players") or {}).get("player") if isinstance(item.get("players"), dict) else None)
         if isinstance(p, dict) and safe_text(p.get("status")).lower() == "starter"
     ]
     score = item.get("score")
     return {
         "team_id": safe_text(item.get("id")),
-        "points": safe_float(score, 0.0) if score not in (None, "") else None,
+        "points": float_or_default(score, 0.0) if score not in (None, "") else None,
         "starters": starters,
     }
 

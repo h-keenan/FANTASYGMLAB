@@ -37,6 +37,7 @@ from typing import Any, Mapping, Sequence
 from modules import age_profile, posture_model, projection_calibration, value_scale
 from modules.team_eval import normalize_team_strategy, team_strategy_label
 from modules.trade_lineup_model import STATIC_VALUE_PER_POINT
+from modules.coerce import float_or_default
 
 # --- parameters (all approximate; see docs/trade-engine-v2.md) ----------------
 
@@ -229,13 +230,6 @@ def posture_from_strategy(strategy: Any) -> dict[str, Any]:
     return resolve_posture(client_strategy=str(strategy or ""))
 
 
-def _num(value: Any) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def _phi(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
@@ -270,21 +264,21 @@ def assess(posture: Mapping[str, Any], lineup_model: Mapping[str, Any] | None) -
     if not lineup_model or not lineup_model.get("available", True):
         return out
     pts = lineup_model.get("points") or {}
-    ros_delta = _num(pts.get("ros_delta"))
-    ros_before = max(_num(pts.get("ros_before")), 1.0)
-    team_sd = _num(pts.get("team_weekly_sd"))
+    ros_delta = float_or_default(pts.get("ros_delta"))
+    ros_before = max(float_or_default(pts.get("ros_before")), 1.0)
+    team_sd = float_or_default(pts.get("team_weekly_sd"))
     win_per_point = win_prob_per_point_for(team_sd)
     wins_delta = ros_delta * win_per_point
     win_weight = WINDOW_WIN_WEIGHT.get(key, WINDOW_WIN_WEIGHT["retool"])
-    k = _num(lineup_model.get("value_per_point"))
+    k = float_or_default(lineup_model.get("value_per_point"))
     # Value units per expected win in THIS league's price scale.
     win_value = win_weight * (k or STATIC_VALUE_PER_POINT * value_scale.scale()) / win_per_point
     window_term = win_value * (wins_delta if wins_delta < 0 else GAIN_CREDIT * wins_delta)
 
     present_term = PRESENT_ADJUST.get(key, 0.0) * k * ros_delta
 
-    present = _num(lineup_model.get("win_now_delta"))
-    future = _num(lineup_model.get("future_delta"))
+    present = float_or_default(lineup_model.get("win_now_delta"))
+    future = float_or_default(lineup_model.get("future_delta"))
     # >0 converts future into present, <0 converts present into future.
     conversion = (present - future) / 2.0
     orientation = ORIENTATION.get(key, 0.0)
@@ -334,8 +328,8 @@ def posture_sentence(posture: Mapping[str, Any], assessment: Mapping[str, Any], 
     group = posture.get("group")
     standing = posture.get("standing")
     who = "You're " + _PHRASE.get(str(posture.get("key")), "a contender") + (f" ({standing})" if standing else "")
-    pts = abs(_num(assessment.get("lineup_points")))
-    wins = abs(_num(assessment.get("wins_delta")))
+    pts = abs(float_or_default(assessment.get("lineup_points")))
+    wins = abs(float_or_default(assessment.get("wins_delta")))
     span = f" {weeks_text}" if weeks_text else ""
     if assessment.get("lineup_costly"):
         sentence = f"{who}: this costs ~{pts:.0f} lineup points{span}"
@@ -348,7 +342,7 @@ def posture_sentence(posture: Mapping[str, Any], assessment: Mapping[str, Any], 
         return f"{who}: this moves value from your lineup to the future, a step toward a rebuild."
     if assessment.get("direction_misaligned") and assessment.get("direction") == "toward_present" and group == "rebuild":
         return f"{who}: this spends future value on win-now players, away from your rebuild."
-    ros = _num(assessment.get("lineup_points"))
+    ros = float_or_default(assessment.get("lineup_points"))
     if group == "rebuild" and ros <= -5:
         return f"{who}: the ~{abs(ros):.0f} lineup points it costs{span} matter little to your timeline."
     return ""
@@ -368,7 +362,7 @@ def window_overrules_value(
 
     from modules import trade_value_bands as bands
 
-    if not assessment or _num(assessment.get("adjustment")) >= 0:
+    if not assessment or float_or_default(assessment.get("adjustment")) >= 0:
         return False
     return (
         bands.band_for_score(value_delta, deal_size).id in {"smash", "accept"}
@@ -401,7 +395,7 @@ def adjusted_confidence(lineup_model: Mapping[str, Any], adjusted_score: float) 
     """P(sign of the adjusted score is right) using the model's own sigma."""
 
     unc = lineup_model.get("uncertainty") or {}
-    sigma = _num(unc.get("sigma")) or 1.0
+    sigma = float_or_default(unc.get("sigma")) or 1.0
     p = min(_phi(abs(adjusted_score) / sigma), 0.99)
     label = "High confidence" if p >= 0.88 else "Moderate confidence" if p >= 0.70 else "Close call"
     return round(p * 100, 1), label
@@ -446,7 +440,7 @@ def alignment(posture: Mapping[str, Any] | None, assessment: Mapping[str, Any] |
     if not assessment or not assessment.get("available"):
         return NEUTRAL
     group = str((posture or {}).get("group") or GROUP_BY_KEY.get(str((posture or {}).get("key") or "retool"), "retool"))
-    pts = _num(assessment.get("lineup_points"))
+    pts = float_or_default(assessment.get("lineup_points"))
     direction = assessment.get("direction")
     if assessment.get("lineup_costly") or (assessment.get("direction_misaligned") and group != "retool"):
         return COSTLY
@@ -532,7 +526,7 @@ _ROUND_RE = re.compile(r"round\s*(\d)", re.IGNORECASE)
 
 
 def _asset_score(asset: Mapping[str, Any]) -> float:
-    return _num(asset.get("score", asset.get("value_score")))
+    return float_or_default(asset.get("score", asset.get("value_score")))
 
 
 def young_core_for_picks_caution(
@@ -553,7 +547,7 @@ def young_core_for_picks_caution(
         a
         for a in sent
         if a.get("asset_type") == "player"
-        and _num(a.get("age"))
+        and float_or_default(a.get("age"))
         and age_profile.is_young(a.get("position"), a.get("age"), legacy_max=_YOUNG_CORE_MAX_AGE)
     ]
     picks = [a for a in got if a.get("asset_type") == "pick"]
@@ -564,14 +558,14 @@ def young_core_for_picks_caution(
         return ""
     rounds = []
     for pick in picks:
-        numeric = int(_num(pick.get("round")))
+        numeric = int(float_or_default(pick.get("round")))
         match = _ROUND_RE.search(str(pick.get("label") or pick.get("name") or ""))
         rounds.append(numeric or (int(match.group(1)) if match else 0))
     if not rounds or min(rounds) < 2:  # an unreadable label or any 1st: no caution
         return ""
     name = str(best_young.get("name") or best_young.get("label") or "A young starter")
     return (
-        f"Rebuild caution: {name} (age {int(_num(best_young.get('age')))}) is a young core piece, and the picks coming "
+        f"Rebuild caution: {name} (age {int(float_or_default(best_young.get('age')))}) is a young core piece, and the picks coming "
         "back are all 2nd round or later, which rarely turn into starters. The value adds up on paper; "
         "the long-term fit may not."
     )

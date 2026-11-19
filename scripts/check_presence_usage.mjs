@@ -62,6 +62,7 @@ function walk(dir, out = []) {
 
 const problems = [];
 const usedAllow = new Set();
+const usedLayoutAnimation = new Set();
 for (const tree of TREES) {
   for (const file of walk(path.join(root, tree))) {
     const rel = path.relative(root, file).split(path.sep).join("/");
@@ -73,13 +74,15 @@ for (const tree of TREES) {
         if (rel in ALLOWED) usedAllow.add(rel);
         else problems.push(`${rel}:${i + 1}: hand-rolled expander \`${code.slice(0, 70)}\` (use <Collapse open={...}> from the shared Presence module)`);
       }
-      if (/LayoutAnimation\.configureNext/.test(line) && rel.startsWith("mobile/") && !LAYOUT_ANIMATION_ALLOWED.includes(rel)) {
-        problems.push(`${rel}:${i + 1}: LayoutAnimation outside the allowlist (use <Collapse>/<Presence>)`);
+      if (/LayoutAnimation\.configureNext/.test(line) && rel.startsWith("mobile/")) {
+        if (LAYOUT_ANIMATION_ALLOWED.includes(rel)) usedLayoutAnimation.add(rel);
+        else problems.push(`${rel}:${i + 1}: LayoutAnimation outside the allowlist (use <Collapse>/<Presence>)`);
       }
     });
   }
 }
 for (const rel of Object.keys(ALLOWED)) if (!usedAllow.has(rel) && !/Presence\.tsx$/.test(rel)) problems.push(`ALLOWED entry no longer needed (remove it): ${rel}`);
+for (const rel of LAYOUT_ANIMATION_ALLOWED) if (!usedLayoutAnimation.has(rel)) problems.push(`LAYOUT_ANIMATION_ALLOWED entry no longer needed (remove it): ${rel}`);
 
 if (problems.length) {
   console.error(problems.join("\n"));

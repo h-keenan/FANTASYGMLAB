@@ -43,6 +43,7 @@ from modules import (
     sleeper,
     swr_cache,
 )
+from modules.coerce import float_nan_to_default
 
 logger = logging.getLogger("fantasygm.team_profile")
 
@@ -58,14 +59,6 @@ AGE_POSITIONS = ("QB", "RB", "WR", "TE")
 
 def enabled() -> bool:
     return experimental_graduation.graduated_kill_switch_enabled(TEAM_PROFILE_ENV_KEY, default=True)
-
-
-def _num(value: Any, default: float = 0.0) -> float:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return default
-    return out if out == out else default
 
 
 def _clean(value: Any) -> Any:

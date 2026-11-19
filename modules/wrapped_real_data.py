@@ -12,13 +12,7 @@ Projection history and reason tags need a per-week projection snapshot that real
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
-
-
-def _num(v: Any) -> float | None:
-    try:
-        return None if v is None else float(v)
-    except (TypeError, ValueError):
-        return None
+from modules.coerce import float_or_none
 
 
 def roster_season(weeks: Sequence[Sequence[Mapping[str, Any]]], roster_id: int) -> dict[str, Any]:
@@ -27,7 +21,7 @@ def roster_season(weeks: Sequence[Sequence[Mapping[str, Any]]], roster_id: int) 
     best: dict[str, Any] | None = None
     have_bench = False
     for wk, rows in enumerate(weeks, start=1):
-        pts = {r.get("roster_id"): _num(r.get("points")) for r in rows}
+        pts = {r.get("roster_id"): float_or_none(r.get("points")) for r in rows}
         if not any(pts.values()):  # a week not yet played scores nothing for everyone
             continue
         mine = pts.get(roster_id)
@@ -38,7 +32,7 @@ def roster_season(weeks: Sequence[Sequence[Mapping[str, Any]]], roster_id: int) 
             exp += (sum(1.0 for v in others if mine > v) + 0.5 * sum(1.0 for v in others if mine == v)) / len(others)
         row = next(r for r in rows if r.get("roster_id") == roster_id)
         opp = next((r for r in rows if r.get("matchup_id") == row.get("matchup_id") and r.get("roster_id") != roster_id), None)
-        opp_pts = _num(opp.get("points")) if opp is not None else None
+        opp_pts = float_or_none(opp.get("points")) if opp is not None else None
         if opp_pts is not None:
             actual += 1.0 if mine > opp_pts else 0.5 if mine == opp_pts else 0.0
         played += 1
@@ -47,7 +41,7 @@ def roster_season(weeks: Sequence[Sequence[Mapping[str, Any]]], roster_id: int) 
             have_bench = True
             started = set(row.get("starters") or ())
             for pid, v in pp.items():
-                if pid in started or _num(v) is None:
+                if pid in started or float_or_none(v) is None:
                     continue
                 bench_total += float(v)
                 if best is None or float(v) > best["pts"]:

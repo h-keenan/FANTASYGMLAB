@@ -9,6 +9,7 @@ No LLM. No invented historical prices. No invented post-event production.
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
+from modules.coerce import float_nan_to_none_blank
 
 
 PENDING = "Pending"
@@ -41,21 +42,9 @@ def _int(value: object, default: int = 0) -> int:
         return default
 
 
-def _float(value: object) -> float | None:
-    if value in (None, ""):
-        return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    if number != number:  # NaN
-        return None
-    return number
-
-
 def _historical_value(asset: Mapping[str, Any]) -> float | None:
     for key in ("value_at_trade", "historical_value", "value_at_event"):
-        parsed = _float(asset.get(key))
+        parsed = float_nan_to_none_blank(asset.get(key))
         if parsed is not None and parsed > 0:
             return parsed
     return None
@@ -178,18 +167,18 @@ def _asset_label(asset: Mapping[str, Any]) -> str:
 
 
 def _lookup_current(asset: Mapping[str, Any], lookup: Mapping[str, Mapping[str, Any]]) -> float | None:
-    recorded = _float(asset.get("current_value"))
+    recorded = float_nan_to_none_blank(asset.get("current_value"))
     if recorded is not None and recorded > 0:
         return recorded
     for key in ("value_score", "dynasty_score"):
-        parsed = _float(asset.get(key))
+        parsed = float_nan_to_none_blank(asset.get(key))
         if parsed is not None and parsed > 0:
             return parsed
     player_id = _text(asset.get("player_id"))
     row = lookup.get(player_id) if player_id else None
     if isinstance(row, Mapping):
         for key in ("current_value", "value_score", "dynasty_score"):
-            parsed = _float(row.get(key))
+            parsed = float_nan_to_none_blank(row.get(key))
             if parsed is not None and parsed > 0:
                 return parsed
     if _is_pick(asset):
@@ -299,7 +288,7 @@ def price_trade_picks(
                 for asset in side.get(key) or []:
                     if not isinstance(asset, dict) or not _is_pick(asset):
                         continue
-                    if _float(asset.get("current_value")):
+                    if float_nan_to_none_blank(asset.get("current_value")):
                         continue
                     value = canonical_pick_identity_value(asset, pick_index, league_settings=settings)
                     if value and value > 0:

@@ -24,20 +24,13 @@ import math
 from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
+from modules.coerce import float_nan_to_none
 
 POSITIONS: tuple[str, ...] = ("QB", "RB", "WR", "TE")
 # Below this many rosters a "rank within the league" read is noise.
 MIN_LEAGUE_SIZE = 4
 
 _NEEDY = {"short_term_need"}
-
-
-def _num(value: Any) -> float | None:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return None
-    return None if math.isnan(out) else out
 
 
 def position_ranks(df_summary: pd.DataFrame, roster_id: Any) -> list[dict[str, Any]]:
@@ -67,7 +60,7 @@ def position_ranks(df_summary: pd.DataFrame, roster_id: Any) -> list[dict[str, A
 def starter_bench_read(starter_rank: Any, bench_rank: Any, size: int) -> dict[str, Any] | None:
     """Starter strength vs bench depth, as league ranks and a plain label."""
 
-    s, b = _num(starter_rank), _num(bench_rank)
+    s, b = float_nan_to_none(starter_rank), float_nan_to_none(bench_rank)
     if s is None or b is None or size < MIN_LEAGUE_SIZE:
         return None
     gap = b - s
@@ -141,7 +134,7 @@ def surplus_candidates(
             continue
         for player_id in ids:
             row = by_id.get(str(player_id))
-            value = _num(row.get(score_field)) if row is not None else None
+            value = float_nan_to_none(row.get(score_field)) if row is not None else None
             if row is None or value is None or value <= 0:
                 continue
             out.setdefault(position, []).append(
@@ -228,9 +221,9 @@ def pick_capital(
 ) -> dict[str, Any] | None:
     """Future-pick capital: league rank, count, 1sts, and recent 1st flow."""
 
-    rank = _num(row.get("draft_capital_rank"))
-    count = _num(row.get("pick_count"))
-    firsts = _num(row.get("first_rounders"))
+    rank = float_nan_to_none(row.get("draft_capital_rank"))
+    count = float_nan_to_none(row.get("pick_count"))
+    firsts = float_nan_to_none(row.get("first_rounders"))
     if rank is None and count is None:
         return None
     flow = flow or {}

@@ -29,6 +29,7 @@ from modules.fantasycalc import FANTASYCALC_CACHE_PATH, get_dynasty_values
 from modules.frame_records import frame_records
 from modules.player_identity import ensure_identity_columns
 from modules import player_universe
+from modules.coerce import float_or_default_any
 from modules.player_names import loose_name_key, player_name_key
 from modules.valuation_authority import (
     AUTHORITATIVE_COLUMN,
@@ -581,21 +582,18 @@ def weekly_usage_rate(position: str, week_row: Dict[str, Any]) -> float | None:
     # missing key stays unknown.
     played = sleeper_module.week_row_played(week_row)
 
-    def _num(key: str) -> float | None:
+    def _week_stat(key: str) -> float | None:
         if key not in week_row or week_row.get(key) is None:
             return 0.0 if played else None
-        try:
-            value = float(week_row.get(key))
-        except Exception:
-            return None
-        if not np.isfinite(value):
+        value = float_or_default_any(week_row.get(key), None)
+        if value is None or not np.isfinite(value):
             return None
         return value
 
-    targets = _num("targets")
-    receptions = _num("receptions")
-    rush = _num("rush_attempts")
-    pass_att = _num("pass_attempts")
+    targets = _week_stat("targets")
+    receptions = _week_stat("receptions")
+    rush = _week_stat("rush_attempts")
+    pass_att = _week_stat("pass_attempts")
     if position == "RB":
         if rush is None and targets is None:
             return None

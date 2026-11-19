@@ -29,6 +29,7 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from modules import model_status
+from modules.coerce import float_nan_to_default
 from modules import nflverse_advanced_stats as adv_stats
 from modules import sleeper
 
@@ -114,13 +115,13 @@ def _played_rows(sleeper_weeks: Sequence[Mapping[str, Any]]) -> list[dict[str, A
     return [by_week[w] for w in sorted(by_week)]
 
 
-def _num(row: Mapping[str, Any], key: str) -> float:
+def _count(row: Mapping[str, Any], key: str) -> float:
     # Sleeper omits zero-valued stat keys, so an absent count is a real 0.
     try:
-        value = float(row.get(key) or 0.0)
+        raw = row.get(key) or 0.0
     except (TypeError, ValueError):
         return 0.0
-    return value if value == value else 0.0
+    return float_nan_to_default(raw)
 
 
 def _adv_value(adv_row: Mapping[str, Any] | None, key: str, week: int, through_week: int) -> float | None:
@@ -149,7 +150,7 @@ def _weekly_values(
         series["points"].append((week, float(sleeper.week_row_fantasy_points_ppr(row))))
         snap = row.get("snap_share")
         series["snap_share"].append((week, float(snap) if isinstance(snap, (int, float)) else None))
-        carries, targets, receptions = _num(row, "rush_attempts"), _num(row, "targets"), _num(row, "receptions")
+        carries, targets, receptions = _count(row, "rush_attempts"), _count(row, "targets"), _count(row, "receptions")
         series["touches"].append((week, carries + receptions))
         series["opportunities"].append((week, carries + targets))
         adv_row = adv_weeks.get(week) if available else None

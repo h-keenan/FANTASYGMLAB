@@ -25,6 +25,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from modules.coerce import float_or_default
+
 VERDICT_SMASH_ACCEPT = "SMASH ACCEPT"
 VERDICT_ACCEPT = "ACCEPT"
 VERDICT_FAIR = "FAIR / PREFERENCE"
@@ -81,13 +83,10 @@ class Cuts:
 def deal_size_for(send_total: object, receive_total: object) -> float:
     """Deal size = the larger side's total value (never below the floor)."""
 
-    def _num(value: object) -> float:
-        try:
-            return max(0.0, float(value))  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            return 0.0
+    def _non_negative(value: object) -> float:
+        return max(0.0, float_or_default(value))
 
-    return max(_num(send_total), _num(receive_total))
+    return max(_non_negative(send_total), _non_negative(receive_total))
 
 
 def cuts_for(deal_size: object = None) -> Cuts:

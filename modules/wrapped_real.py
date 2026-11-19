@@ -13,15 +13,9 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from modules.wrapped_real_data import roster_season
+from modules.coerce import float_or_default
 
 MIN_WEEKS = 2
-
-
-def _num(v: Any) -> float:
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return 0.0
 
 
 def _ord(n: int) -> str:
@@ -40,7 +34,7 @@ def build_real_wrapped(
 ) -> dict[str, Any]:
     """``weeks[i]`` is Sleeper's ``/matchups/{i+1}`` list; weeks with no points for anyone (not played yet) are skipped."""
 
-    played = [(i + 1, rows) for i, rows in enumerate(weeks) if any(_num(r.get("points")) for r in rows)]
+    played = [(i + 1, rows) for i, rows in enumerate(weeks) if any(float_or_default(r.get("points")) for r in rows)]
     deck: dict[str, Any] = {"kind": "real", "partial": partial, "season_label": f"{season} season" if season else "Season",
                             "team_name": team_name, "cards": []}
     if len(played) < MIN_WEEKS:
@@ -55,13 +49,13 @@ def build_real_wrapped(
         for r in rows:
             by_matchup.setdefault(r.get("matchup_id"), []).append(r)
         for r in rows:
-            pf[r.get("roster_id")] = pf.get(r.get("roster_id"), 0.0) + _num(r.get("points"))
+            pf[r.get("roster_id")] = pf.get(r.get("roster_id"), 0.0) + float_or_default(r.get("points"))
             wins.setdefault(r.get("roster_id"), 0.0)
         mine = next((r for r in rows if r.get("roster_id") == my_roster_id), None)
         for group in by_matchup.values():
             if len(group) == 2:
                 a, b = group
-                pa, pb = _num(a.get("points")), _num(b.get("points"))
+                pa, pb = float_or_default(a.get("points")), float_or_default(b.get("points"))
                 if pa != pb:
                     wins[(a if pa > pb else b).get("roster_id")] += 1.0
                 else:
@@ -72,8 +66,8 @@ def build_real_wrapped(
             journey.append(order.index(my_roster_id) + 1)
         if mine is not None:
             opp = next((r for r in by_matchup.get(mine.get("matchup_id"), []) if r.get("roster_id") != my_roster_id), None)
-            wk_rows.append({"week": wk, "pts": round(_num(mine.get("points")), 2),
-                            "opp_pts": None if opp is None else round(_num(opp.get("points")), 2),
+            wk_rows.append({"week": wk, "pts": round(float_or_default(mine.get("points")), 2),
+                            "opp_pts": None if opp is None else round(float_or_default(opp.get("points")), 2),
                             "opponent": (profiles.get(str(opp.get("roster_id"))) or {}).get("team_name") if opp else None})
     if len(wk_rows) < MIN_WEEKS:
         return deck
@@ -99,7 +93,7 @@ def build_real_wrapped(
         if isinstance(pp, Mapping):
             for pid in (row.get("starters") or ()):
                 if pid in pp and pid != "0":
-                    totals.setdefault(pid, []).append(_num(pp[pid]))
+                    totals.setdefault(pid, []).append(float_or_default(pp[pid]))
     if totals:
         pid, vals = max(totals.items(), key=lambda kv: (sum(kv[1]), kv[0]))
         mine_total = sum(sum(v) for v in totals.values()) or 1.0

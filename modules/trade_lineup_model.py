@@ -55,6 +55,7 @@ from modules.trade_grade import (
     SeasonWindow,
     estimate_injury_absence,
 )
+from modules.coerce import float_finite_or_default, float_finite_or_none
 
 MODEL_VERSION = "trade-engine-v2.0"
 
@@ -139,16 +140,6 @@ def _text(value: Any) -> str:
     return str(value).strip()
 
 
-def _num(value: Any, default: float | None = None) -> float | None:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return default
-    if math.isnan(out) or math.isinf(out):
-        return default
-    return out
-
-
 def _phi(z: float) -> float:
     return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
 
@@ -182,7 +173,7 @@ def scoring_profile(settings: Mapping[str, Any] | None) -> dict[str, float]:
 
     settings = settings or {}
     detected = settings.get("_detected_scoring") if isinstance(settings.get("_detected_scoring"), Mapping) else {}
-    rec = _num(detected.get("rec"))
+    rec = float_finite_or_none(detected.get("rec"))
     if rec is None:
         fmt = _text(settings.get("scoring_format")).lower()
         rec = 0.5 if "half" in fmt else 0.0 if fmt == "standard" else 1.0
@@ -190,7 +181,7 @@ def scoring_profile(settings: Mapping[str, Any] | None) -> dict[str, float]:
     keys = detected.get("te_premium_keys") if isinstance(detected.get("te_premium_keys"), Mapping) else {}
     for key, value in keys.items():
         if "rec" in str(key):
-            te_bonus = max(te_bonus, _num(value, 0.0) or 0.0)
+            te_bonus = max(te_bonus, float_finite_or_default(value, 0.0) or 0.0)
     if settings.get("te_premium") and te_bonus <= 0:
         te_bonus = 0.5
     return {"rec": float(rec), "te_bonus": float(te_bonus)}
@@ -200,8 +191,8 @@ def _league_scored(ppg_ppr: float, row: Mapping[str, Any], position: str, scorin
     """PPR points per game -> the league's scoring, using the player's real
     receptions per game. No receptions on file: the PPR number is kept as is."""
 
-    games = _num(row.get("games_played"))
-    recs = _num(row.get("receptions"))
+    games = float_finite_or_none(row.get("games_played"))
+    recs = float_finite_or_none(row.get("receptions"))
     if not games or games <= 0 or recs is None or position not in {"RB", "WR", "TE"}:
         return ppg_ppr
     recs_pg = recs / games
@@ -281,9 +272,9 @@ def _active_rows(frame: pd.DataFrame, score_column: str, scoring: Mapping[str, f
         pos = _text(row.get("position")).upper()
         if pos not in out:
             continue
-        games = _num(row.get("games_played"), 0.0) or 0.0
-        ppg = _num(row.get("ppg"))
-        value = _num(row.get(score_column))
+        games = float_finite_or_default(row.get("games_played"), 0.0) or 0.0
+        ppg = float_finite_or_none(row.get("ppg"))
+        value = float_finite_or_none(row.get(score_column))
         if ppg is None or value is None or games < 3 or value <= 0:
             continue
         out[pos].append((value, _league_scored(ppg, row, pos, scoring)))
@@ -341,7 +332,7 @@ def build_context(
     slots = _lineup_slots(settings)
     scoring = scoring_profile(settings)
     season = int(season or settings.get("season") or date.today().year)
-    league_size = int(_num(settings.get("league_size"), params.league_size) or params.league_size)
+    league_size = int(float_finite_or_default(settings.get("league_size"), params.league_size) or params.league_size)
     frame = all_players_df if all_players_df is not None else pd.DataFrame()
 
     curves = _active_rows(frame, score_column, scoring)
@@ -499,15 +490,15 @@ def profile_roster(df: pd.DataFrame, ctx: ModelContext, *, free_agent: bool = Fa
         )
         ruled_out = is_ruled_out(status, injury)
         out_all = bool(ruled_out and absence is None)
-        value = _num(row.get(ctx.score_column), None)
+        value = float_finite_or_default(row.get(ctx.score_column), None)
         if value is None:
-            value = _num(row.get("value_score"), _num(row.get("dynasty_score"), 0.0)) or 0.0
+            value = float_finite_or_default(row.get("value_score"), float_finite_or_default(row.get("dynasty_score"), 0.0)) or 0.0
         ppg: float | None = None
         basis = "none"
         if pos in SCORED_POSITIONS:
-            proj = _num(row.get("proj_ppg"))
-            games = _num(row.get("games_played"), 0.0) or 0.0
-            obs = _num(row.get("ppg"))
+            proj = float_finite_or_none(row.get("proj_ppg"))
+            games = float_finite_or_default(row.get("games_played"), 0.0) or 0.0
+            obs = float_finite_or_none(row.get("ppg"))
             prior, _from_data = _value_curve_ppg(ctx.curves, pos, max(0.0, float(value)))
             if proj is not None:
                 # ``proj_scoring_applied``: the baseline was already converted to
@@ -523,12 +514,12 @@ def profile_roster(df: pd.DataFrame, ctx: ModelContext, *, free_agent: bool = Fa
                 ppg, basis = max(0.0, prior), "value_estimate"
         sd = 0.0
         if ppg is not None:
-            weekly = _num(row.get("proj_sd"))
+            weekly = float_finite_or_none(row.get("proj_sd"))
             if weekly is None:
                 low, high = player_projections._v2_range(max(0.0, ppg), pos, "low")
                 weekly = max(0.5, (high - low) / 2.0)
             sd = float(weekly) * params.sd_inflation.get(basis, 1.3)
-        age = _num(row.get("age"))
+        age = float_finite_or_none(row.get("age"))
         if age is not None and age >= age_profile.UNKNOWN_AGE_SENTINEL:
             age = None
         out.append(

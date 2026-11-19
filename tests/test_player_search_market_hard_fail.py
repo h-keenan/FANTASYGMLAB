@@ -17,7 +17,7 @@ from tests.test_trade_trust_and_player_headshots import (
 )
 
 _safe_int = trade_ideas._safe_int
-_safe_float = trade_ideas._safe_float
+_safe_float = trade_ideas.float_or_default_any
 
 
 def _asset(player_id, score, position, **kwargs):

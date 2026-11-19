@@ -24,6 +24,7 @@ import time
 from typing import Any
 
 from modules import league_recaps, redis_cache, sleeper
+from modules.coerce import float_or_default
 
 
 def _safe_positive_int(value: Any, default: int = 0) -> int:
@@ -32,13 +33,6 @@ def _safe_positive_int(value: Any, default: int = 0) -> int:
     except (TypeError, ValueError):
         return default
     return number if number > 0 else default
-
-
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
 
 
 def league_current_streaks(league_id: str) -> dict[int, dict[str, int]]:
@@ -77,11 +71,11 @@ def league_current_streaks(league_id: str) -> dict[int, dict[str, int]]:
                 continue
             ordered = sorted(
                 matchup_rows,
-                key=lambda r: (-_safe_float(r.get("points"), 0.0), _safe_positive_int(r.get("roster_id"), 0)),
+                key=lambda r: (-float_or_default(r.get("points"), 0.0), _safe_positive_int(r.get("roster_id"), 0)),
             )[:2]
             team_a, team_b = ordered[0], ordered[1]
-            score_a = _safe_float(team_a.get("points"), 0.0)
-            score_b = _safe_float(team_b.get("points"), 0.0)
+            score_a = float_or_default(team_a.get("points"), 0.0)
+            score_b = float_or_default(team_b.get("points"), 0.0)
             roster_a = _safe_positive_int(team_a.get("roster_id"), 0)
             roster_b = _safe_positive_int(team_b.get("roster_id"), 0)
             if roster_a <= 0 or roster_b <= 0:

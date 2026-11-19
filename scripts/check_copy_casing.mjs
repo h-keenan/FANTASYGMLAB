@@ -45,14 +45,22 @@ const webByLower = new Map();
 for (const [text, file] of web) webByLower.set(text.toLowerCase(), { text, file });
 
 const problems = [];
+const usedAllow = new Set();
 for (const [text, file] of app) {
   const lower = text.toLowerCase();
-  if (ALLOW.has(lower)) continue;
   const other = webByLower.get(lower);
-  if (other && other.text !== text && !web.has(text)) {
+  const mismatch = other && other.text !== text && !web.has(text);
+  if (ALLOW.has(lower)) {
+    if (mismatch) usedAllow.add(lower);
+    continue;
+  }
+  if (mismatch) {
     problems.push(`"${text}" (${path.relative(root, file)}) vs "${other.text}" (${path.relative(root, other.file)})`);
   }
 }
+
+// An ALLOW entry that excuses no live mismatch would silently excuse a future one: it only shrinks.
+for (const lower of ALLOW) if (!usedAllow.has(lower)) problems.push(`ALLOW entry "${lower}" no longer excuses a case-only mismatch (remove it)`);
 
 if (problems.length) {
   console.error("Heading casing differs between web and app (use sentence case, same string in both):");

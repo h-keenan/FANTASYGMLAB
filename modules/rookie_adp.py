@@ -29,6 +29,7 @@ from typing import Any, Mapping
 import requests
 
 from modules import app_config, player_names
+from modules.coerce import float_nan_to_none
 
 SOURCE = "ffc"
 SOURCE_LABEL = "Fantasy Football Calculator"
@@ -114,14 +115,6 @@ def fetch_ffc(fmt: str, year: int, *, teams: int = TEAMS, session: Any = None) -
     return payload
 
 
-def _num(value: Any) -> float | None:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    return number if number == number else None
-
-
 def parse_payload(payload: Mapping[str, Any] | None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """(meta, players) with only well-formed rows kept. Empty window -> no players."""
 
@@ -132,7 +125,7 @@ def parse_payload(payload: Mapping[str, Any] | None) -> tuple[dict[str, Any], li
     for raw in payload.get("players") or []:
         if not isinstance(raw, Mapping):
             continue
-        adp = _num(raw.get("adp"))
+        adp = float_nan_to_none(raw.get("adp"))
         name = str(raw.get("name") or "").strip()
         position = str(raw.get("position") or "").strip().upper()
         if adp is None or adp <= 0 or not name or position not in POSITIONS:
@@ -145,10 +138,10 @@ def parse_payload(payload: Mapping[str, Any] | None) -> tuple[dict[str, Any], li
                 "team": str(raw.get("team") or "").strip().upper(),
                 "adp": round(adp, 2),
                 "adp_formatted": str(raw.get("adp_formatted") or ""),
-                "times_drafted": int(_num(raw.get("times_drafted")) or 0),
-                "high": _num(raw.get("high")),
-                "low": _num(raw.get("low")),
-                "stdev": _num(raw.get("stdev")),
+                "times_drafted": int(float_nan_to_none(raw.get("times_drafted")) or 0),
+                "high": float_nan_to_none(raw.get("high")),
+                "low": float_nan_to_none(raw.get("low")),
+                "stdev": float_nan_to_none(raw.get("stdev")),
             }
         )
     return dict(meta), rows
@@ -385,8 +378,8 @@ def fetch_latest(fmt: str, *, config: AdpConfig | None = None) -> dict[str, Any]
     players: dict[str, dict[str, Any]] = {}
     for sid, row in _first_per_player(current).items():
         prev = baseline.get(sid)
-        adp = _num(row.get("adp"))
-        prev_adp = _num(prev.get("adp")) if prev else None
+        adp = float_nan_to_none(row.get("adp"))
+        prev_adp = float_nan_to_none(prev.get("adp")) if prev else None
         players[sid] = {
             "adp": adp,
             "adp_formatted": row.get("adp_formatted"),
@@ -457,7 +450,7 @@ def find_prospect_adp(name: str, position: str, sleeper_id: str | None = None, *
         hit = [r for r in rows if player_names.normalize_player_name(r.get("name") or "") == key and str(r.get("position") or "").upper() == str(position or "").upper()]
     if len(hit) != 1:
         return None
-    adp = _num(hit[0].get("adp"))
+    adp = float_nan_to_none(hit[0].get("adp"))
     if adp is None:
         return None
     return {
@@ -517,10 +510,10 @@ def value_vs_adp(our_rank: float | None, entry: Mapping[str, Any] | None) -> dic
     more than the room does). Always carries sample size and spread so ADP is never alone."""
 
     entry = entry or {}
-    adp = _num(entry.get("adp"))
+    adp = float_nan_to_none(entry.get("adp"))
     if adp is None:
         return {"adp": None, "delta": None, "verdict": None, "thin_sample": None, "trend": None, "read": None}
-    drafts = int(_num(entry.get("drafts")) or 0)
+    drafts = int(float_nan_to_none(entry.get("drafts")) or 0)
     thin = drafts < THIN_SAMPLE_DRAFTS
     delta = round(adp - our_rank, 1) if our_rank else None
     if delta is None:
@@ -537,13 +530,13 @@ def value_vs_adp(our_rank: float | None, entry: Mapping[str, Any] | None) -> dic
             "reach": "ADP is higher than our rank",
         }[verdict]
         parts.append(f"{label} ({delta:+.1f})")
-    low, high, stdev = entry.get("low"), entry.get("high"), _num(entry.get("stdev"))
+    low, high, stdev = entry.get("low"), entry.get("high"), float_nan_to_none(entry.get("stdev"))
     if low is not None and high is not None:
         parts.append(f"range {high:g}-{low:g}")
     if stdev is not None and stdev >= 6:
         parts.append("wide spread, drafters disagree")
     parts.append(f"{drafts} drafts" + (" (thin sample)" if thin else ""))
-    trend = _num(entry.get("trend"))
+    trend = float_nan_to_none(entry.get("trend"))
     if trend is not None and abs(trend) >= 1:
         parts.append(f"ADP {'rising' if trend < 0 else 'falling'} {abs(trend):.1f} since {entry.get('trend_since')}")
     return {
@@ -562,7 +555,7 @@ def build_rookie_board(
     """``rookies``: dicts with player_id/name/position/team/score. Our rookie rank comes from
     score order; ADP from the snapshot. Players without ADP stay listed with adp None."""
 
-    ordered = sorted(rookies, key=lambda r: -(_num(r.get("score")) or 0))
+    ordered = sorted(rookies, key=lambda r: -(float_nan_to_none(r.get("score")) or 0))
     players = (snapshot or {}).get("players") or {}
     board = []
     for rank, row in enumerate(ordered, start=1):
@@ -614,7 +607,7 @@ def _fantasycalc_values(num_qbs: int) -> dict[str, float]:
     for item in data if isinstance(data, list) else []:
         player = item.get("player") if isinstance(item, Mapping) else None
         sid = str((player or {}).get("sleeperId") or "")
-        value = _num(item.get("value"))
+        value = float_nan_to_none(item.get("value"))
         if sid and value and value > 0:
             out[sid] = value
     return out
@@ -641,7 +634,7 @@ def estimate_sf_adp(players: Mapping[str, Mapping[str, Any]], ratios: Mapping[st
     Missing ratio = 1.0 (no change). All ratios 1 reproduces the 1QB order exactly; the
     sort is deterministic (ties fall back to 1QB ADP, then id)."""
 
-    items = [(sid, _num(e.get("adp"))) for sid, e in players.items()]
+    items = [(sid, float_nan_to_none(e.get("adp"))) for sid, e in players.items()]
     items = [(sid, adp) for sid, adp in items if adp is not None]
     slots = sorted(adp for _sid, adp in items)
     ordered = sorted(items, key=lambda it: (it[1] / float(ratios.get(it[0], 1.0) or 1.0), it[1], it[0]))

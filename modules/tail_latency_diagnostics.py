@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from typing import Any, Iterator
 
 from modules import performance
+from modules.coerce import float_if_number
 from modules import startup_cold_path
 
 
@@ -668,11 +669,11 @@ def maybe_emit_summary(
                 slowest_stage = str(name)
 
     # Exclusive stage fields (sum of record_stage_duration / milestone gaps).
-    auth_storage_wait_ms = _num(durations.get("auth_storage_wait") or durations.get("auth_storage_handshake"))
-    auth_apply_ms = _num(durations.get("auth_payload_applied"))
-    profile_fetch_ms = _num(durations.get("profile_fetch"))
-    entitlement_ms = _num(durations.get("entitlement_fetch"))
-    league_restore_ms = _num(durations.get("league_restore"))
+    auth_storage_wait_ms = _ms(durations.get("auth_storage_wait") or durations.get("auth_storage_handshake"))
+    auth_apply_ms = _ms(durations.get("auth_payload_applied"))
+    profile_fetch_ms = _ms(durations.get("profile_fetch"))
+    entitlement_ms = _ms(durations.get("entitlement_fetch"))
+    league_restore_ms = _ms(durations.get("league_restore"))
     auth_ms = round(
         sum(
             float(v or 0.0)
@@ -687,16 +688,16 @@ def maybe_emit_summary(
         1,
     )
     provider_total_ms = round(sum(float(v or 0) for v in provider_ms.values()), 1)
-    player_frame_ms = _num(durations.get("players") or durations.get("players_disk_load"))
-    prepared_frame_ms = _num(durations.get("prepared_frame"))
-    league_context_ms = _num(durations.get("league_context"))
-    trade_inventory_ms = _num(durations.get("trade_inventory"))
-    briefing_assembly_ms = _num(durations.get("briefing_assembly") or durations.get("briefing"))
-    compose_ms = _num(durations.get("compose"))
-    package_store_ms = _num(
+    player_frame_ms = _ms(durations.get("players") or durations.get("players_disk_load"))
+    prepared_frame_ms = _ms(durations.get("prepared_frame"))
+    league_context_ms = _ms(durations.get("league_context"))
+    trade_inventory_ms = _ms(durations.get("trade_inventory"))
+    briefing_assembly_ms = _ms(durations.get("briefing_assembly") or durations.get("briefing"))
+    compose_ms = _ms(durations.get("compose"))
+    package_store_ms = _ms(
         durations.get("package_store") or durations.get("package_serialize")
     )
-    presentation_ms = _num(durations.get("presentation") or durations.get("shell_chrome"))
+    presentation_ms = _ms(durations.get("presentation") or durations.get("shell_chrome"))
 
     # Exclusive accounted work (do not double-count nested provider under stages).
     accounted_ms = round(
@@ -721,7 +722,7 @@ def maybe_emit_summary(
         1,
     )
     # Prefer interactive_stable / dashboard_complete as the wall for unexplained.
-    wall_ms = _num(buckets.get("interactive_stable")) or _num(buckets.get("dashboard_complete"))
+    wall_ms = _ms(buckets.get("interactive_stable")) or _ms(buckets.get("dashboard_complete"))
     unexplained_ms = None
     if wall_ms is not None:
         unexplained_ms = round(max(0.0, float(wall_ms) - accounted_ms), 1)
@@ -742,11 +743,11 @@ def maybe_emit_summary(
         "startup_session_id": _safe_label(session_id, limit=32),
         "run_count": run_count,
         "process_temperature": temperature,
-        "loading_dismissed_ms": _num(buckets.get("loading_dismissed")),
-        "first_useful_ms": _num(buckets.get("first_useful")),
-        "game_plan_ready_ms": _num(buckets.get("game_plan_ready")),
-        "dashboard_complete_ms": _num(buckets.get("dashboard_complete")),
-        "interactive_stable_ms": _num(buckets.get("interactive_stable")),
+        "loading_dismissed_ms": _ms(buckets.get("loading_dismissed")),
+        "first_useful_ms": _ms(buckets.get("first_useful")),
+        "game_plan_ready_ms": _ms(buckets.get("game_plan_ready")),
+        "dashboard_complete_ms": _ms(buckets.get("dashboard_complete")),
+        "interactive_stable_ms": _ms(buckets.get("interactive_stable")),
         # Exclusive stage durations (not inclusive milestone gaps).
         "auth_ms": auth_ms,
         "auth_storage_wait_ms": auth_storage_wait_ms,
@@ -756,7 +757,7 @@ def maybe_emit_summary(
         "league_restore_ms": league_restore_ms,
         "provider_ms": provider_total_ms,
         "player_frame_ms": player_frame_ms,
-        "player_disk_ms": _num(durations.get("players_disk_load") or durations.get("players")),
+        "player_disk_ms": _ms(durations.get("players_disk_load") or durations.get("players")),
         "prepared_frame_ms": prepared_frame_ms,
         "league_context_ms": league_context_ms,
         "trade_inventory_ms": trade_inventory_ms,
@@ -778,7 +779,7 @@ def maybe_emit_summary(
         "post_ready_rebuild_count": len(post_ready),
         "process_cache_survival": survival,
         "milestone_elapsed_ms": {
-            key: _num(value) for key, value in list(marks.items())[:24] if _num(value) is not None
+            key: _ms(value) for key, value in list(marks.items())[:24] if _ms(value) is not None
         },
         "stage_duration_semantics": "exclusive",
     }
@@ -887,7 +888,6 @@ def _emit(entry: Mapping[str, Any]) -> None:
         pass
 
 
-def _num(value: Any) -> float | None:
-    if isinstance(value, (int, float)):
-        return round(float(value), 1)
-    return None
+def _ms(value: Any) -> float | None:
+    number = float_if_number(value)
+    return None if number is None else round(number, 1)

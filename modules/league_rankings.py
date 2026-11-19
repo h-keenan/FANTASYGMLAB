@@ -22,7 +22,8 @@ import pandas as pd
 from modules import prefetch
 
 from modules import experimental_graduation, league_value_settings, rankings, redis_cache, sleeper, swr_cache, trade_ideas
-from modules.league_value_settings import _safe_float, _safe_positive_int
+from modules.coerce import float_or_default_any
+from modules.league_value_settings import _safe_positive_int
 from modules.rank_tie_metadata import add_rank_tie_metadata
 from modules.team_eval import (
     build_league_summary,
@@ -48,11 +49,11 @@ def safe_pick_value(pick: dict) -> int:
         return value
     base_score = _safe_positive_int(pick.get("base_score"), 0)
     if base_score > 0:
-        future_discount = max(0.1, _safe_float(pick.get("future_discount"), 1.0))
-        team_modifier = max(0.5, _safe_float(pick.get("team_modifier"), 1.0))
-        format_multiplier = max(0.3, _safe_float(pick.get("format_multiplier"), 1.0))
-        class_strength_multiplier = max(0.5, _safe_float(pick.get("class_strength_multiplier"), 1.0))
-        prospect_strength_multiplier = max(0.5, _safe_float(pick.get("prospect_strength_multiplier"), 1.0))
+        future_discount = max(0.1, float_or_default_any(pick.get("future_discount"), 1.0))
+        team_modifier = max(0.5, float_or_default_any(pick.get("team_modifier"), 1.0))
+        format_multiplier = max(0.3, float_or_default_any(pick.get("format_multiplier"), 1.0))
+        class_strength_multiplier = max(0.5, float_or_default_any(pick.get("class_strength_multiplier"), 1.0))
+        prospect_strength_multiplier = max(0.5, float_or_default_any(pick.get("prospect_strength_multiplier"), 1.0))
         return int(
             round(
                 base_score

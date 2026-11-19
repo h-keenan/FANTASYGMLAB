@@ -32,6 +32,7 @@ import pandas as pd
 
 from modules.player_identity import normalize_player_id
 from modules.platforms.espn import ESPNPlatformAdapter
+from modules.coerce import float_or_default
 
 MAPPING_BLOCK_THRESHOLD = 0.60
 SNAPSHOT_TTL_SECONDS = 5 * 60
@@ -54,13 +55,6 @@ def safe_text(value: Any) -> str:
 def safe_int(value: Any, default: int = 0) -> int:
     try:
         return int(float(value))
-    except (TypeError, ValueError):
-        return default
-
-
-def safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        return float(value)
     except (TypeError, ValueError):
         return default
 
@@ -258,7 +252,7 @@ def build_snapshot(
 
 def mapping_blocks_import(snapshot: dict[str, Any]) -> bool:
     diagnostics = snapshot.get("diagnostics") or {}
-    return safe_float(diagnostics.get("matched_rate")) < MAPPING_BLOCK_THRESHOLD
+    return float_or_default(diagnostics.get("matched_rate")) < MAPPING_BLOCK_THRESHOLD
 
 
 def preview_payload(

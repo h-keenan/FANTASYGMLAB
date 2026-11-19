@@ -8,6 +8,7 @@ from modules.rank_tie_metadata import add_rank_tie_metadata
 from modules.record_signal import blend_percentile_with_record, season_progress_fraction
 from modules.sleeper import get_league_roster_profiles
 from modules.platforms.sleeper import get_sleeper_adapter
+from modules.coerce import float_or_default_any
 
 STARTER_SLOTS = {
     "QB": 1,
@@ -89,14 +90,6 @@ def known_player_ages(values) -> pd.Series:
 def _safe_int(value, default: int = 0) -> int:
     try:
         parsed = int(value)
-    except Exception:
-        return default
-    return parsed
-
-
-def _safe_float(value, default: float = 0.0) -> float:
-    try:
-        parsed = float(value)
     except Exception:
         return default
     return parsed
@@ -1057,10 +1050,10 @@ def _archetype_profile(archetype: str, row: pd.Series, cutoffs: dict) -> dict:
     franchise_rank = _safe_int(row.get("franchise_rank"), 99)
     draft_rank = _safe_int(row.get("draft_capital_rank"), 99)
     bench_rank = _safe_int(row.get("bench_rank"), 99)
-    injury_burden = _safe_float(row.get("injury_burden"), 0.0)
+    injury_burden = float_or_default_any(row.get("injury_burden"), 0.0)
     injured_starters = _safe_int(row.get("injured_starters"), 0)
     health_flag = str(row.get("health_flag") or "Stable")
-    top_heavy_ratio = _safe_float(row.get("top_heavy_ratio"), 0.0)
+    top_heavy_ratio = float_or_default_any(row.get("top_heavy_ratio"), 0.0)
     impact_tier_starters = _safe_int(row.get("impact_tier_starters"), 0)
     elite_tier_count = _safe_int(row.get("elite_tier_count"), 0)
 
@@ -1285,12 +1278,12 @@ def _assign_team_archetype(row: pd.Series, league_size: int) -> dict:
     bench_rank = _safe_int(row.get("bench_rank"), 99)
     age_rank = _safe_int(row.get("age_rank"), 99)
     draft_rank = _safe_int(row.get("draft_capital_rank"), 99)
-    current = _safe_float(row.get("_current_strength"), 0.5)
-    future = _safe_float(row.get("_future_strength"), 0.5)
-    youth = _safe_float(row.get("_youth_strength"), 0.5)
-    draft = _safe_float(row.get("_draft_strength"), 0.5)
-    fragility = _safe_float(row.get("_fragility"), 0.5)
-    injury_burden = _safe_float(row.get("injury_burden"), 0.0)
+    current = float_or_default_any(row.get("_current_strength"), 0.5)
+    future = float_or_default_any(row.get("_future_strength"), 0.5)
+    youth = float_or_default_any(row.get("_youth_strength"), 0.5)
+    draft = float_or_default_any(row.get("_draft_strength"), 0.5)
+    fragility = float_or_default_any(row.get("_fragility"), 0.5)
+    injury_burden = float_or_default_any(row.get("injury_burden"), 0.0)
     impact_tier_starters = _safe_int(row.get("impact_tier_starters"), 0)
     elite_tier_count = _safe_int(row.get("elite_tier_count"), 0)
 
@@ -1384,14 +1377,14 @@ def refine_team_directions(df_summary: pd.DataFrame) -> pd.DataFrame:
 
     def choose_strategy(row) -> str:
         baseline = normalize_team_strategy(row.get("strategy") or row.get("mode"))
-        current = _safe_float(row.get("_current_strength"), 0.5)
-        future = _safe_float(row.get("_future_strength"), 0.5)
-        starter = _safe_float(row.get("_starter_strength"), 0.5)
-        bench = _safe_float(row.get("_bench_strength"), 0.5)
-        youth = _safe_float(row.get("_youth_strength"), 0.5)
-        draft = _safe_float(row.get("_draft_strength"), 0.5)
-        health = _safe_float(row.get("_health_strength"), 0.5)
-        fragility_score = _safe_float(row.get("_fragility"), 0.5)
+        current = float_or_default_any(row.get("_current_strength"), 0.5)
+        future = float_or_default_any(row.get("_future_strength"), 0.5)
+        starter = float_or_default_any(row.get("_starter_strength"), 0.5)
+        bench = float_or_default_any(row.get("_bench_strength"), 0.5)
+        youth = float_or_default_any(row.get("_youth_strength"), 0.5)
+        draft = float_or_default_any(row.get("_draft_strength"), 0.5)
+        health = float_or_default_any(row.get("_health_strength"), 0.5)
+        fragility_score = float_or_default_any(row.get("_fragility"), 0.5)
 
         # Health is already part of current_strength, so this gate should only
         # screen out truly injury-cratered contenders instead of blocking an

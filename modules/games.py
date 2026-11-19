@@ -28,6 +28,7 @@ import pandas as pd
 import requests
 
 from modules import app_config, auth_supabase, team_eval
+from modules.coerce import float_or_default
 from modules.community_shared_trades import is_missing_table
 
 PICKS_TABLE = "games_pickem_picks"
@@ -104,17 +105,18 @@ def validate_roster_change(
 def compare_odds(baseline: Mapping[str, Any], scenario: Mapping[str, Any]) -> dict[str, Any]:
     """Change between two simulator team rows for the same team."""
 
-    def num(row: Mapping[str, Any], key: str) -> float:
+    def num_of(row: Mapping[str, Any], key: str) -> float:
         try:
-            return float(row.get(key) or 0.0)
+            raw = row.get(key) or 0.0
         except (TypeError, ValueError):
             return 0.0
+        return float_or_default(raw)
 
-    playoff = round(num(scenario, "playoff_probability") - num(baseline, "playoff_probability"), 1)
+    playoff = round(num_of(scenario, "playoff_probability") - num_of(baseline, "playoff_probability"), 1)
     return {
         "playoff_probability": playoff,
-        "median_final_wins": round(num(scenario, "median_final_wins") - num(baseline, "median_final_wins")),
-        "median_seed": int(num(scenario, "median_seed") - num(baseline, "median_seed")),
+        "median_final_wins": round(num_of(scenario, "median_final_wins") - num_of(baseline, "median_final_wins")),
+        "median_seed": int(num_of(scenario, "median_seed") - num_of(baseline, "median_seed")),
         "within_noise": abs(playoff) < NOISE_POINTS,
     }
 

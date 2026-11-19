@@ -33,13 +33,7 @@ import pandas as pd
 from modules import derived_cache, player_eligibility, rankings, redis_cache, sleeper, swr_cache, valuation_anchors
 from modules.player_tiers import assign_player_tiers
 from modules.rankings import current_availability_multiplier
-
-
-def _safe_float(value, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except Exception:
-        return default
+from modules.coerce import float_or_default_any
 
 
 def _safe_positive_int(value, default: int) -> int:
@@ -180,7 +174,7 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
     # Missing ``rec`` must remain the default with source=default — never treat
     # an empty scoring blob as proof of PPR.
     if "rec" in scoring:
-        rec_score = _safe_float(scoring.get("rec"), 0.0)
+        rec_score = float_or_default_any(scoring.get("rec"), 0.0)
         if rec_score >= 0.95:
             settings["scoring_format"] = "PPR"
         elif rec_score >= 0.45:
@@ -199,13 +193,13 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
     ]
     te_bonus_present = any(key in scoring for key in te_bonus_keys)
     settings["te_premium"] = any(
-        _safe_float(scoring.get(key), 0.0) > 0
+        float_or_default_any(scoring.get(key), 0.0) > 0
         for key in te_bonus_keys
     )
     if te_bonus_present:
         settings["_sources"]["te_premium"] = "Sleeper"
         settings["_detected_scoring"]["te_premium_keys"] = {
-            key: _safe_float(scoring.get(key), 0.0)
+            key: float_or_default_any(scoring.get(key), 0.0)
             for key in te_bonus_keys
             if key in scoring
         }
@@ -213,7 +207,7 @@ def detect_league_value_settings_from_payload(league: dict | None) -> dict:
     # Detected-but-unused scoring facts (do not fake support).
     for key in ("pass_td", "pass_int", "fum_lost", "bonus_rec_yd_100", "bonus_rush_yd_100", "fd_rec", "fd_rush"):
         if key in scoring:
-            settings["_detected_scoring"][key] = _safe_float(scoring.get(key), 0.0)
+            settings["_detected_scoring"][key] = float_or_default_any(scoring.get(key), 0.0)
 
     # The league's raw numeric scoring weights, so projections can be converted
     # to this league's scoring at the source (modules.projection_calibration).
@@ -709,7 +703,7 @@ def league_settings_adjustment_components(
 
     pass_td = ones.copy()
     detected = (settings.get("_detected_scoring") or {}) if isinstance(settings.get("_detected_scoring"), dict) else {}
-    pass_td_points = _safe_float(detected.get("pass_td"), 0.0)
+    pass_td_points = float_or_default_any(detected.get("pass_td"), 0.0)
     # Only model the common 6-pt vs ~4-pt gap; ignore exotic values.
     if pass_td_points >= 5.5:
         pass_td = pass_td.mask(positions == "QB", 1.0 + (0.045 * passing.clip(lower=0.30)))

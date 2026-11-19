@@ -38,6 +38,7 @@ import time
 from typing import Any, Callable
 
 import pandas as pd
+from modules.coerce import float_or_default
 
 ESPN_PLATFORM = "espn"
 ESPN_LEAGUE_KEY_PREFIX = "espn:"
@@ -197,13 +198,6 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
-
-
 def normalize_espn_league_id(value: Any) -> str:
     text = _safe_text(value)
     return text if text.isdigit() and len(text) <= 12 else ""
@@ -316,7 +310,7 @@ def _scoring_settings(settings: Any) -> dict[str, float]:
             continue
         key = _SCORING_ABBR_TO_SLEEPER.get(_safe_text(item.get("abbr")).upper())
         if key:
-            scoring[key] = _safe_float(item.get("points"))
+            scoring[key] = float_or_default(item.get("points"))
             if key == "rec":
                 base_reception = scoring[key]
     raw = getattr(settings, "_raw_scoring_settings", None)
@@ -327,7 +321,7 @@ def _scoring_settings(settings: Any) -> dict[str, float]:
         overrides = item.get("pointsOverrides") if isinstance(item.get("pointsOverrides"), dict) else {}
         te_points = overrides.get(_ESPN_TE_SLOT_ID, overrides.get(int(_ESPN_TE_SLOT_ID)))
         if te_points is not None:
-            bonus = _safe_float(te_points) - _safe_float(base_reception if base_reception is not None else item.get("points"))
+            bonus = float_or_default(te_points) - float_or_default(base_reception if base_reception is not None else item.get("points"))
             if bonus > 0:
                 scoring["bonus_rec_te"] = round(bonus, 3)
     return scoring
@@ -427,7 +421,7 @@ def build_snapshot(
             score = scores[week_index] if week_index < len(scores) else None
             pairings[str(roster_id)] = {
                 "opponent": str(opponent_id) if opponent_id and opponent_id != roster_id else "",
-                "points": _safe_float(score) if isinstance(score, (int, float)) and score > 0 else None,
+                "points": float_or_default(score) if isinstance(score, (int, float)) and score > 0 else None,
             }
         rosters.append(
             {
@@ -442,11 +436,11 @@ def build_snapshot(
                     "wins": _safe_int(getattr(team, "wins", 0)),
                     "losses": _safe_int(getattr(team, "losses", 0)),
                     "ties": _safe_int(getattr(team, "ties", 0)),
-                    "fpts": int(_safe_float(getattr(team, "points_for", 0.0))),
-                    "fpts_decimal": int(round((_safe_float(getattr(team, "points_for", 0.0)) % 1) * 100)),
-                    "fpts_against": int(_safe_float(getattr(team, "points_against", 0.0))),
+                    "fpts": int(float_or_default(getattr(team, "points_for", 0.0))),
+                    "fpts_decimal": int(round((float_or_default(getattr(team, "points_for", 0.0)) % 1) * 100)),
+                    "fpts_against": int(float_or_default(getattr(team, "points_against", 0.0))),
                     "fpts_against_decimal": int(
-                        round((_safe_float(getattr(team, "points_against", 0.0)) % 1) * 100)
+                        round((float_or_default(getattr(team, "points_against", 0.0)) % 1) * 100)
                     ),
                 },
                 "metadata": {"team_name": team_name},
@@ -778,7 +772,7 @@ def users_payload(league_key: str) -> list[dict[str, Any]]:
 
 def mapping_blocks_import(snapshot: dict[str, Any]) -> bool:
     diagnostics = snapshot.get("diagnostics") or {}
-    return _safe_float(diagnostics.get("matched_rate")) < ESPN_MAPPING_BLOCK_THRESHOLD
+    return float_or_default(diagnostics.get("matched_rate")) < ESPN_MAPPING_BLOCK_THRESHOLD
 
 
 def preview_payload(snapshot: dict[str, Any]) -> dict[str, Any]:

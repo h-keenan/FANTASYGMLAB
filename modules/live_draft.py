@@ -15,6 +15,7 @@ import requests
 from modules import age_profile, live_draft_context, performance, player_tier_identity, player_tiers
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.sleeper import SLEEPER_BASE
+from modules.coerce import float_nan_to_default_blank
 
 
 LIVE_DRAFT_POLL_INTERVAL_SECONDS = 12
@@ -54,16 +55,6 @@ def safe_int(value: Any, default: int = 0) -> int:
         if value is None or value == "":
             return default
         return int(float(value))
-    except (TypeError, ValueError):
-        return default
-
-
-def safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        if value is None or value == "":
-            return default
-        result = float(value)
-        return result if pd.notna(result) else default
     except (TypeError, ValueError):
         return default
 
@@ -364,16 +355,16 @@ def build_recommendation_briefings(
         overall_rank = safe_int(row.get("overall_rank"), index + 1)
         adp = next(
             (
-                safe_float(row.get(field))
+                float_nan_to_default_blank(row.get(field))
                 for field in adp_fields
-                if field in row.index and safe_float(row.get(field)) > 0
+                if field in row.index and float_nan_to_default_blank(row.get(field)) > 0
             ),
             None,
         )
         adp_delta = round(adp - overall_rank, 1) if adp is not None else None
-        roster_fit = safe_float(row.get("roster_fit_score"))
-        adjustment = safe_float(row.get("league_adjusted_draft_score")) - safe_float(row.get("base_value"))
-        confidence = "High" if safe_float(row.get("base_value")) > 0 and abs(adjustment) <= 12 else "Moderate"
+        roster_fit = float_nan_to_default_blank(row.get("roster_fit_score"))
+        adjustment = float_nan_to_default_blank(row.get("league_adjusted_draft_score")) - float_nan_to_default_blank(row.get("base_value"))
+        confidence = "High" if float_nan_to_default_blank(row.get("base_value")) > 0 and abs(adjustment) <= 12 else "Moderate"
         need_label = (
             f"Fills {position} need"
             if position in roster_needs

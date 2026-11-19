@@ -15,6 +15,7 @@ from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_identity import ensure_identity_columns
 from modules.player_names import normalize_player_name as _canonical_player_name
 from modules.roster_needs import assessment_from_model, room_records
+from modules.coerce import float_nan_to_default
 
 
 CORE_DRAFT_POSITIONS = ("QB", "RB", "WR", "TE", "K")
@@ -52,14 +53,6 @@ def normalize_player_id(value: Any) -> str:
     except (TypeError, ValueError):
         pass
     return text
-
-
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return default
-    return number if pd.notna(number) else default
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -230,7 +223,7 @@ def grade_completed_draft_pick(
     if player_row is None:
         return "Ungraded", "Unmatched Sleeper player; grade unavailable."
     row = player_row if isinstance(player_row, (pd.Series, dict)) else {}
-    value = _safe_float(row.get(score_field, row.get("value_score")), 0.0)
+    value = float_nan_to_default(row.get(score_field, row.get("value_score")), 0.0)
     if value <= 0:
         return "Ungraded", "No player value available."
 
@@ -361,7 +354,7 @@ def completed_pick_review_rows(
                     my_roster_id is not None
                     and roster_id == int(my_roster_id)
                 ),
-                "value": _safe_float(row.get(score_field, row.get("value_score")), 0.0)
+                "value": float_nan_to_default(row.get(score_field, row.get("value_score")), 0.0)
                 if row is not None
                 else 0.0,
                 "value_rank": pick_relative_rank or 0,
@@ -1137,14 +1130,14 @@ def build_recommendation_buckets(
         if upside_pick is not None:
             add_bucket("Upside Pick", upside_pick, _player_note(upside_pick, bucket="Upside Pick"))
 
-    leader_score = _safe_float(best_overall.get("_score"), 0.0)
+    leader_score = float_nan_to_default(best_overall.get("_score"), 0.0)
     if need_positions:
         reach_candidates = board[
             board["position"].fillna("").astype(str).str.upper().isin(need_positions)
         ].copy()
         if not reach_candidates.empty:
             reach = reach_candidates.iloc[0]
-            if leader_score and _safe_float(reach.get("_score"), 0.0) < leader_score * 0.82:
+            if leader_score and float_nan_to_default(reach.get("_score"), 0.0) < leader_score * 0.82:
                 add_bucket(
                     "Avoid / Reach Warning",
                     reach,

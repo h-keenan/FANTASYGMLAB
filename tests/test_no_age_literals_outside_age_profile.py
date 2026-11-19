@@ -82,3 +82,9 @@ def test_guard_allows_named_constants_and_durations(tmp_path):
         "    return age <= age_profile.CORE_YOUNG_MAX_AGE or age_seconds > 86400 or age <= 0\n"
     )
     assert _offences(ok, root=tmp_path) == []
+
+
+def test_sim_exemption_is_still_needed():
+    """The modules/sim exemption must still excuse something; once the sim has no age literal, drop the exemption."""
+    offences = [o for path in sorted(SIM.rglob("*.py")) for o in _offences(path)]
+    assert offences, "modules/sim has no age-cutoff literal any more: remove the SIM exemption from _sources()"

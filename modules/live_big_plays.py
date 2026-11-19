@@ -21,6 +21,7 @@ import time
 from typing import Any, Mapping
 
 from modules import redis_cache
+from modules.coerce import number_or_default
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +42,8 @@ _SCORED_STATS: tuple[str, ...] = (
 )
 
 
-def _num(value: Any) -> float:
-    return float(value) if isinstance(value, (int, float)) and value == value else 0.0
-
-
 def _delta(prev: Mapping[str, Any], nxt: Mapping[str, Any], key: str) -> float:
-    return _num(nxt.get(key)) - _num(prev.get(key))
+    return number_or_default(nxt.get(key)) - number_or_default(prev.get(key))
 
 
 def score_stat_delta(
@@ -61,7 +58,7 @@ def score_stat_delta(
         return None
     total = 0.0
     for key in _SCORED_STATS:
-        weight = _num(scoring_settings.get(key))
+        weight = number_or_default(scoring_settings.get(key))
         if weight:
             total += weight * _delta(prev or {}, nxt, key)
     return round(total, 1)
@@ -154,14 +151,14 @@ def derive_events(
             continue
         points: float | None = None
         if current.get("points") is not None and before.get("points") is not None:
-            points = round(_num(current["points"]) - _num(before["points"]), 1)
+            points = round(number_or_default(current["points"]) - number_or_default(before["points"]), 1)
         if points is None or abs(points) < 0.05:
             points = score_stat_delta(before.get("stats"), current.get("stats"), scoring_settings)
         if points is None or abs(points) < 0.05:
             continue
         events.append(
             {
-                "id": f"{key}:{round(_num(current.get('points')), 1)}:{play['description']}",
+                "id": f"{key}:{round(number_or_default(current.get('points')), 1)}:{play['description']}",
                 "at": int(now * 1000),
                 "player_id": current.get("player_id"),
                 "name": current.get("name"),
@@ -225,16 +222,16 @@ def ingest(
     except Exception:  # noqa: BLE001 - never breaks the matchup
         logger.debug("big play state unavailable", exc_info=True)
         return []
-    events = [e for e in state.get("events", []) if now * 1000 - _num(e.get("at")) <= EVENT_RETENTION_SECONDS * 1000]
+    events = [e for e in state.get("events", []) if now * 1000 - number_or_default(e.get("at")) <= EVENT_RETENTION_SECONDS * 1000]
     baseline = state.get("snap") or {}
-    if snapshot and baseline and now - _num(state.get("t")) <= MAX_BASELINE_AGE_SECONDS:
+    if snapshot and baseline and now - number_or_default(state.get("t")) <= MAX_BASELINE_AGE_SECONDS:
         seen = {e.get("id") for e in events}
         fresh = [
             e
             for e in derive_events(baseline, snapshot, now=now, scoring_settings=scoring_settings)
             if e["id"] not in seen
         ]
-        events = sorted(fresh + events, key=lambda e: -_num(e.get("at")))[:MAX_STORED_EVENTS]
+        events = sorted(fresh + events, key=lambda e: -number_or_default(e.get("at")))[:MAX_STORED_EVENTS]
     if snapshot:
         try:
             client.set(key, json.dumps({"t": now, "snap": snapshot, "events": events}), ex=STATE_TTL_SECONDS)

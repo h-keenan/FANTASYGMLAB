@@ -34,6 +34,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from modules import age_profile, experimental_graduation
+from modules.coerce import float_nan_to_default
 
 PLAYOFF_ODDS_CONTEXT_ENV_KEY = "DYNASTYGM_PLAYOFF_ODDS_CONTEXT_V1"
 # Share of the slot percentile that comes from the simulated finish (the rest is the
@@ -88,14 +89,6 @@ def calibrated_odds(probability: float, weeks_played: Any) -> float:
     return CALIBRATION_ANCHOR + w * (float(probability) - CALIBRATION_ANCHOR)
 
 
-def _num(value: Any, default: float = 0.0) -> float:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return default
-    return out if out == out else default
-
-
 def _teams(odds: Mapping[str, Any] | None) -> list[Mapping[str, Any]]:
     if not odds or not odds.get("ok") or not odds.get("teams"):
         return []
@@ -108,7 +101,7 @@ def expected_finish_ranks(odds: Mapping[str, Any] | None) -> dict[str, int]:
     teams = _teams(odds)
     ordered = sorted(
         teams,
-        key=lambda t: (-_num(t.get("playoff_probability")), -_num(t.get("median_final_wins")), _num(t.get("median_seed"), 99)),
+        key=lambda t: (-float_nan_to_default(t.get("playoff_probability")), -float_nan_to_default(t.get("median_final_wins")), float_nan_to_default(t.get("median_seed"), 99)),
     )
     return {str(t.get("roster_id")): i for i, t in enumerate(ordered, start=1)}
 
@@ -154,7 +147,7 @@ def lean(
 
     if not row or row.get("playoff_probability") is None:
         return {"lean": "", "points": 0, "why": []}
-    raw_p = _num(row.get("playoff_probability"))
+    raw_p = float_nan_to_default(row.get("playoff_probability"))
     p = calibrated_odds(raw_p, weeks_played)
     points = 0
     why: list[str] = []

@@ -45,7 +45,7 @@ def _legacy_evaluate_swap(rvc, drop_ids, add_rows=()):
         if not add_frame.empty
         else add_frame
     )
-    add_value_by_id = {str(r["player_id"]): rvm._num(r.get(rvc.score_field)) for r in frame_records(add_values)}
+    add_value_by_id = {str(r["player_id"]): rvm.float_finite_or_default(r.get(rvc.score_field)) for r in frame_records(add_values)}
     receive = [
         rvm._asset(str(r["player_id"]), rvm._text(r.get("name")), add_value_by_id.get(str(r["player_id"]), 0.0))
         for r in add_rows
@@ -448,9 +448,9 @@ def test_active_rows_and_build_context_values_ignore_unread_columns():
         pos = tlm._text(row.get("position")).upper()
         if pos not in full:
             continue
-        games = tlm._num(row.get("games_played"), 0.0) or 0.0
-        ppg = tlm._num(row.get("ppg"))
-        value = tlm._num(row.get("dynasty_score"))
+        games = tlm.float_finite_or_default(row.get("games_played"), 0.0) or 0.0
+        ppg = tlm.float_finite_or_none(row.get("ppg"))
+        value = tlm.float_finite_or_none(row.get("dynasty_score"))
         if ppg is None or value is None or games < 3 or value <= 0:
             continue
         full[pos].append((value, tlm._league_scored(ppg, row, pos, scoring)))
