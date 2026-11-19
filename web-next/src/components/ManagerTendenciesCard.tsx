@@ -1,5 +1,6 @@
 "use client";
 
+import { bestEffort } from "@/lib/bestEffort";
 import Link from "next/link";
 
 import { ToneBadge } from "@/components/ToneBadge";
@@ -32,7 +33,7 @@ export function ManagerTendenciesCard({
       .then((result) => {
         if (!cancelled) setData(result);
       })
-      .catch(() => {});
+      .catch(bestEffort("manager_tendencies"));
     return () => {
       cancelled = true;
     };

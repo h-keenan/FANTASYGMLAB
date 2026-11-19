@@ -1,5 +1,6 @@
 "use client";
 
+import { bestEffort } from "@/lib/bestEffort";
 import { useEffect, useState } from "react";
 
 import { PillRow } from "@/components/PillRow";
@@ -25,9 +26,7 @@ export function useGuillotineState(leagueId: string | undefined, lens: string = 
       .then((result) => {
         if (!cancelled) setData(result);
       })
-      .catch(() => {
-        /* the card renders nothing on failure */
-      });
+      .catch(bestEffort("guillotine_status")); // the card renders nothing on failure
     return () => {
       cancelled = true;
     };

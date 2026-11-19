@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { PillRow } from "@/components/PillRow";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -22,6 +23,9 @@ type Tab = "buy_low" | "sell_high";
  */
 export function ValueSignalsCard({ leagueId }: { leagueId: string }) {
   const [data, setData] = useState<ValueSignalsResponse | null>(null);
+  // A failed load used to leave the skeleton on screen forever.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [tab, setTab] = useState<Tab>("buy_low");
 
   useEffect(() => {
@@ -31,12 +35,26 @@ export function ValueSignalsCard({ leagueId }: { leagueId: string }) {
       .then((result) => {
         if (!cancelled) setData(result);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
+  if (!data && failed) {
+    return (
+      <ErrorState
+        compact
+        message="Could not load buy low and sell high"
+        onRetry={() => {
+          setFailed(false);
+          setAttempt((n) => n + 1);
+        }}
+      />
+    );
+  }
   if (!data) return <SkeletonBlock height={96} />;
   if (data.status === "unavailable") return null;
   const status = signalsStatusMessage(data);

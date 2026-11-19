@@ -102,4 +102,17 @@ describe("ShareToCommunityToggle", () => {
     fireEvent.click(screen.getByRole("switch"));
     await waitFor(() => expect(mocks.deleteSharedCommunityTrade).toHaveBeenCalledWith("t1"));
   });
+
+  it("puts the switch back on and says so when stopping the share fails", async () => {
+    mocks.getSharedCommunityTrades.mockResolvedValue({ ok: true, available: true, trades: [] });
+    mocks.shareCommunityTrade.mockResolvedValue({ ok: true, trade: trade() });
+    mocks.deleteSharedCommunityTrade.mockRejectedValue(new Error("down"));
+    render(<ShareToCommunityToggle verdict={verdict} sendAssets={send} receiveAssets={receive} />);
+    fireEvent.click(await screen.findByRole("switch"));
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await screen.findByText(/Shared\./);
+    fireEvent.click(screen.getByRole("switch"));
+    expect(await screen.findByText("Could not stop sharing this trade. Try again.")).toBeInTheDocument();
+    expect(screen.getByRole("switch")).toBeChecked();
+  });
 });

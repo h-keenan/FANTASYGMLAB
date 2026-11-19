@@ -72,7 +72,18 @@ export default function ShareToCommunityToggle({
     setOn(false);
     setSharedId(null);
     setError('');
-    if (id) void api.deleteSharedCommunityTrade(id).catch(() => {});
+    if (!id) return;
+    // A failed delete must not leave the switch saying "off" while the trade is still public.
+    api
+      .deleteSharedCommunityTrade(id)
+      .then((result) => {
+        if (result?.ok === false) throw new Error('not ok');
+      })
+      .catch(() => {
+        setOn(true);
+        setSharedId(id);
+        setError('Could not stop sharing this trade. Try again.');
+      });
   };
 
   return (

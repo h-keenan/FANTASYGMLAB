@@ -1,5 +1,6 @@
 "use client";
 
+import { bestEffort } from "@/lib/bestEffort";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
@@ -31,7 +32,7 @@ export function PlayerValueHistory({ playerId, bare = false }: { playerId: strin
       .then((result) => {
         if (!cancelled) setHistory(result);
       })
-      .catch(() => {});
+      .catch(bestEffort("player_value_history"));
     return () => {
       cancelled = true;
     };

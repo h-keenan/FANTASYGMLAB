@@ -149,8 +149,18 @@ export default function TradeHistoryScreen({ navigation }: Props) {
               available={shared.available}
               trades={shared.trades}
               onDelete={(id) => {
+                const removed = shared.trades.find((t) => t.id === id);
                 setShared((cur) => ({ ...cur, trades: cur.trades.filter((t) => t.id !== id) }));
-                void api.deleteSharedCommunityTrade(id).catch(() => {});
+                // A failed delete must put the trade back (it is still public), not let it vanish until the next reload.
+                const restore = () => {
+                  if (removed) setShared((cur) => (cur.trades.some((t) => t.id === id) ? cur : { ...cur, trades: [removed, ...cur.trades] }));
+                };
+                api
+                  .deleteSharedCommunityTrade(id)
+                  .then((result) => {
+                    if (result?.ok === false) restore();
+                  })
+                  .catch(restore);
               }}
               onReport={(id) => void api.reportSharedCommunityTrade(id).catch(() => {})}
             />

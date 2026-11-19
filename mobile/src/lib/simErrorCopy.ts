@@ -20,6 +20,7 @@ export const SIM_LOAD_ERROR = {
   finalResult: "Could not load your final result",
   playerHistory: "Could not load this player's history",
   pastSeasons: "Could not load past seasons",
+  roster: "Could not load rosters",
   simSeasons: "Could not load this player's sim seasons",
   options: "Could not load the options",
 } as const;

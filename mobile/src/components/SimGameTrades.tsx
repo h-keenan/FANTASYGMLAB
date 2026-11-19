@@ -312,6 +312,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [draft, dispatch] = useReducer(simTradeReducer, SIM_TRADE_EMPTY);
   const [teamsAttempt, setTeamsAttempt] = useState(0);
+  // A failed roster load must not leave the builder silently empty ("nothing to trade").
+  const [rosterFailed, setRosterFailed] = useState(false);
+  const [rosterAttempt, setRosterAttempt] = useState(0);
   const [partnerLoaded, setPartnerLoaded] = useState<{ partner: string; players: SimGamePlayer[] } | null>(null);
   const [mine, setMine] = useState<SimGamePlayer[]>([]);
   // The verdict is stored with the offer it answers, so a changed offer
@@ -336,12 +339,18 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
     let cancelled = false;
     api
       .getSimGameTeam(gameId, teamId)
-      .then((b) => !cancelled && setMine([...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])]))
-      .catch(() => {});
+      .then((b) => {
+        if (cancelled) return;
+        setMine([...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])]);
+        setRosterFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setRosterFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [gameId, teamId, ctx.tick]);
+  }, [gameId, teamId, ctx.tick, rosterAttempt]);
 
   useEffect(() => {
     const partnerId = draft.partner;
@@ -349,12 +358,18 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
     let cancelled = false;
     api
       .getSimGameTeam(gameId, partnerId)
-      .then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: [...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])] }))
-      .catch(() => {});
+      .then((b) => {
+        if (cancelled) return;
+        setPartnerLoaded({ partner: partnerId, players: [...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])] });
+        setRosterFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setRosterFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [gameId, draft.partner, ctx.tick]);
+  }, [gameId, draft.partner, ctx.tick, rosterAttempt]);
   const partnerRoster = partnerLoaded && partnerLoaded.partner === draft.partner ? partnerLoaded.players : [];
 
   // "Trade for him" from the Players tab: preselect the partner and the player.
@@ -415,6 +430,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
     return <ErrorState title={SIM_LOAD_ERROR.teams} message={teamsFailed} onRetry={() => {
           setTeamsAttempt((n) => n + 1);
         }} />;
+  }
+  if (rosterFailed) {
+    return <ErrorState title={SIM_LOAD_ERROR.roster} message="Check your connection and try again." onRetry={() => setRosterAttempt((n) => n + 1)} />;
   }
   if (!teams) return <SkeletonCard rows={4} />;
   if (teams.length === 0) return <EmptyState icon="people-outline" title="No teams to trade with" subtitle="This league has no other teams to trade with right now." />;
