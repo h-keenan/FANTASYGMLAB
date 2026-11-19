@@ -195,6 +195,7 @@ export function SimPlayerChip({
   onOpen,
   quick = false,
   nonInteractive,
+  shortName = false,
 }: {
   player: SimPlayerRef;
   size?: number;
@@ -208,6 +209,8 @@ export function SimPlayerChip({
   quick?: boolean;
   /** Opt out of the default tap (reason sentence): only where the chip sits inside another Pressable that already opens or does something. */
   nonInteractive?: string;
+  /** Always the short form ("M. Hale"), the shared PlayerName `short` prop, for tight lists. */
+  shortName?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -219,7 +222,7 @@ export function SimPlayerChip({
     <View style={[styles.identity, muted && styles.muted]}>
       <PlayerAvatar playerId={simHeadshotId(player)} name={player.name} position={player.pos} team={player.team} size={size} />
       <View style={styles.identityText}>
-        <PlayerName name={player.name} style={styles.playerName} />
+        <PlayerName name={player.name} short={shortName} style={styles.playerName} />
         <View style={styles.sublineRow}>
           {hidePosition ? null : <PositionBadge position={player.pos} />}
           <AppText style={styles.subline}>

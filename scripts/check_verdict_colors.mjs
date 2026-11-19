@@ -50,6 +50,14 @@ const DANGER_TONE = /(["'])danger\1|var\(--color-danger\)|\bcolors\.danger\b/;
 const STRIPE_DANGER = /\baccent\s*=\s*\{?[^;]*injur[^;]*\?[^;]*(var\(--color-danger\)|colors\.danger|["']danger["'])/i;
 
 const SEND_DANGER = /(You (?:send|sent)\b|side\s*===\s*['"]send['"]).*(var\(--color-danger\)|colors\.danger\b)/;
+// The trade picker header / side-summary dot for the user's own side (2026-11-18): the dot colour came from a tone prop
+// ("danger" for You send) mapped with a ternary, so the line never said "You send" and slipped past rule 8. Two shapes:
+//   10a. a tone === "danger" ternary that yields the red token (tone === "danger" ? var(--color-danger) : ...);
+//   10b. a side === "send" ternary that yields the red token (side === 'send' ? colors.danger : ...).
+// The send side is neutral grey (a sideDotColor helper maps tone "danger" to the muted token).
+const TONE_DANGER_RED = /\btone\s*===?\s*["']danger["']\s*\?\s*["'`]?(var\(--color-danger\)|colors\.danger\b)/;
+const SIDE_SEND_RED = /\b\w*[sS]ide\s*===?\s*["']send["']\s*\?\s*["'`]?(var\(--color-danger\)|colors\.danger\b)/;
+
 // A "Give" / "You give" label (or its dot: side === "give" ? "var(--color-danger)") is neutral grey ("Get" may stay green): giving a player is not a loss verdict, so it is never red.
 const GIVE_LABEL = />\s*(You give|Give)\s*<|["'`]You give["'`]|\bside\s*===?\s*["']give["']\s*\?\s*(["']danger["']|["'`]?var\(--color-danger\)|colors\.danger)/;
 
@@ -86,6 +94,11 @@ export function scanText(rel, text) {
     }
     if (SEND_DANGER.test(line)) {
       problems.push(`${rel}:${i + 1}: the send side of a trade is coloured red (${line.trim().slice(0, 80)}); the user's own side is neutral grey`);
+      return;
+    }
+    // A full semantic tone map (tone === 'success' ? ... : tone === 'danger' ? ...) is not a side dot: only the two-way ternary is flagged.
+    if (TRADE_FILE.test(rel) && ((TONE_DANGER_RED.test(line) && (line.match(/\btone\s*===?/g) || []).length === 1) || SIDE_SEND_RED.test(line))) {
+      problems.push(`${rel}:${i + 1}: a trade side dot maps tone "danger" / the send side to red (${line.trim().slice(0, 80)}); the user's own side is neutral grey (use the sideDotColor helper)`);
       return;
     }
     if (STRIPE_VERDICT.test(line)) {

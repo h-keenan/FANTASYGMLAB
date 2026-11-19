@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SIM_CELEBRATIONS_KEY, simCelebrationsParse, simCelebrationsSerialize, simMomentShortName, simPickBoardNote, simPickMomentGrade, simStreakNumber, simWeekStamp } from "./simMoments";
+import { SIM_CELEBRATIONS_KEY, simCelebrationsParse, simCelebrationsSerialize, simBoardRows, simMomentShortName, simPickBoardNote, simPickMomentGrade, simStreakNumber, simWeekStamp } from "./simMoments";
 
 const starter = (name: string, pts: number) => ({ player: { name }, pts, flag: null });
 
@@ -47,5 +47,15 @@ describe("Sim moments lib", () => {
     expect(simStreakNumber({ key: "loss_streak", detail: "8 losses in a row.", tier: 8 })).toBe(8);
     expect(simStreakNumber({ key: "closest_win", detail: "Won by just 0.4" })).toBeNull();
     expect(simMomentShortName("Marvin Harrison Jr.")).toBe("M. Harrison Jr.");
+  });
+});
+
+describe("simBoardRows", () => {
+  it("holds back the pick being revealed until it is revealed", () => {
+    const board = [{ pick_no: 3 }, { pick_no: 7 }, { pick_no: 12 }, { pick_no: 15 }];
+    const current = { pick_no: 15 };
+    expect(simBoardRows(board, current, false)).toEqual([{ pick_no: 12 }, { pick_no: 7 }, { pick_no: 3 }]);
+    expect(simBoardRows(board, current, true)).toEqual([{ pick_no: 15 }, { pick_no: 12 }, { pick_no: 7 }]);
+    expect(simBoardRows([{ pick_no: 15 }], current, false)).toEqual([]);
   });
 });

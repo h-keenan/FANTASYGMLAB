@@ -40,6 +40,16 @@ export function simPickBoardNote(valueOverAdp: number | null | undefined): strin
   return `${v > 0 ? "+" : "-"}${Math.abs(v)} slots`;
 }
 
+/**
+ * The "Your board so far" rows under the pick-reveal card: your last three picks, newest first. The pick being revealed is
+ * already in `board` (the draft response includes it), so it is held back until the card has flipped: showing "J. Pruitt
+ * Rd 1, #7" under a face-down card spoils the reveal. Once `revealed`, it is included (and the view animates it in).
+ */
+export function simBoardRows<T extends { pick_no: number }>(board: T[], current: { pick_no: number }, revealed: boolean): T[] {
+  const visible = revealed ? board : board.filter((p) => p.pick_no !== current.pick_no);
+  return visible.slice(-3).reverse();
+}
+
 interface StandingRowLike {
   is_you?: boolean;
   wins?: number;

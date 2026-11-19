@@ -722,7 +722,7 @@ describe("TradeAnalyzerContent", () => {
       // Default active side is "send" — switch asset type to Picks and add it.
       fireEvent.click(screen.getByRole("button", { name: /^You send/ }));
       fireEvent.click(screen.getByRole("tab", { name: /Picks/ }));
-      fireEvent.click(screen.getByRole("button", { name: "Add 2027 Round 1" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add 2027 1st" }));
       fireEvent.click(screen.getByRole("button", { name: /^Add 1 to trade/ }));
       expect(screen.getByRole("button", { name: "Remove 2027 1st" })).toBeInTheDocument();
 

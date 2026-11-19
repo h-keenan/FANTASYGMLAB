@@ -31,6 +31,11 @@ import {
 } from "@/lib/tradeSheetPicker";
 import { SheetHeader } from "@/components/ui/SheetChrome";
 
+/** Header / summary dot colour for a side: the user's own "danger" (You send) side is the shared neutral grey (never red), a "success" (You get) side stays green. */
+function sideDotColor(tone: "danger" | "success" | "neutral"): string {
+  return tone === "danger" ? "var(--color-text-muted)" : tone === "success" ? "var(--color-success)" : "var(--color-accent)";
+}
+
 /**
  * The shared trade piece picker. Tapping a side of a trade (You send / You get,
  * or one team of a multi-team trade) opens this as a bottom sheet on phones and
@@ -151,7 +156,7 @@ export function TradePickerSheet<T = unknown>({
     }
   }
 
-  const toneColor = tone === "danger" ? "var(--color-danger)" : tone === "success" ? "var(--color-success)" : "var(--color-accent)";
+  const toneColor = sideDotColor(tone);
   const groups = state.tab === "picks" ? groupSheetItems(visible) : [{ key: "all", label: "", items: visible }];
 
   const dialog = (
@@ -444,7 +449,7 @@ export function TradeSideSummary({
   testId?: string;
 }) {
   const summary = summarizeItems(items);
-  const color = tone === "danger" ? "var(--color-danger)" : "var(--color-success)";
+  const color = sideDotColor(tone);
   const parts = [summary.players ? `${summary.players} player${summary.players === 1 ? "" : "s"}` : "", summary.picks ? `${summary.picks} pick${summary.picks === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
   return (
     <div className="glass-surface flex min-w-0 flex-col gap-1 p-2" data-testid={testId}>
