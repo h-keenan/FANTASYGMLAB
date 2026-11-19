@@ -793,8 +793,8 @@ def _generate_trade_idea_records_cached(
     untouchable_player_ids: tuple[str, ...],
     gm_target_player_ids: tuple[str, ...],
     keeper_round_penalty: int,
-    usage_roles_pro: bool,
     _bucket: int,
+    usage_roles_pro: bool = False,
 ) -> list[dict[str, Any]]:
     league = sleeper.get_league(league_id)
     if not league:
@@ -929,12 +929,11 @@ def generate_trade_idea_records_cached(
         tuple(sorted({str(pid) for pid in untouchable_player_ids if str(pid)})),
         tuple(sorted({str(pid) for pid in gm_target_player_ids if str(pid)})),
         keepers_module.clamp_round_penalty(keeper_round_penalty),
-        # Handshake 10b: role nudge = flag AND the usage Pro gate (Free never sees role flags).
-        bool(usage_roles_pro) and usage_roles_targets_module.enabled(),
         # Round 4: the league-state fingerprint (settings, rosters, traded picks, players/values files) replaces the clock
         # bucket, so the entry is served stale-while-revalidate and a real change is a different key.
         f"{league_value_settings.league_state_fingerprint(league_id, players_db_path)}"
         f"|pc={int(partner_context_module.enabled())}{int(partner_context_module.ask_pick_enabled())}"
+        # Handshake 10b: role nudge = flag AND the usage Pro gate (Free never sees role flags).
         f"|{usage_roles_targets_module.fingerprint_token(usage_roles_pro)}",
     )
     cache_key = redis_cache.build_cache_key("trade_hub_ideas", *key)
@@ -942,7 +941,9 @@ def generate_trade_idea_records_cached(
         cache_key=cache_key,
         fresh_ttl_seconds=TRADE_HUB_IDEAS_TTL_SECONDS,
         stale_ttl_seconds=TRADE_HUB_IDEAS_STALE_TTL_SECONDS,
-        compute=lambda: _generate_trade_idea_records_cached(*key),
+        compute=lambda: _generate_trade_idea_records_cached(
+            *key, usage_roles_pro=bool(usage_roles_pro) and usage_roles_targets_module.enabled()
+        ),
         lock_timeout_seconds=_TRADE_HUB_IDEAS_LOCK_TIMEOUT_SECONDS,
     )
     # `posture` (the caller's resolved team posture) is stamped OUTSIDE the
