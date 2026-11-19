@@ -20,9 +20,6 @@ import { DeferredTradeOutcomePrompt } from "@/components/DeferredTradeOutcomePro
 import { BRAND_NAME } from "@/lib/brand";
 import { OG_IMAGE } from "@/lib/seo/site";
 import { BootScripts } from "@/components/BootScripts";
-import { getNonce } from "@/lib/nonce";
-import { env } from "@/lib/env";
-import { storageKey } from "@/lib/supabaseKeys";
 
 // Share previews (Discord, X, iMessage): a static 1200x630 branded card
 // (public/og-image.png) with the large-image Twitter card; see OG_IMAGE.
@@ -54,16 +51,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
-  // Per-request CSP nonce from src/proxy.ts; reading it also makes every route dynamic, which nonces require.
-  const nonce = await getNonce();
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     // suppressHydrationWarning: the boot script below may set data-theme on
     // <html> (a forced Day/Night choice) before React hydrates.
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
-        {/* Preconnects + THEME_BOOT_SCRIPT + early-fetch script (see components/BootScripts.tsx); the inline scripts carry the CSP nonce. */}
-        <BootScripts nonce={nonce} apiBase={env.apiBaseUrl} storageKey={storageKey} />
+        {/* Preconnects + THEME_BOOT_SCRIPT + early-fetch script (see components/BootScripts.tsx) (hashed by the CSP, so no nonce is read here). */}
+        <BootScripts />
       </head>
       <body className="min-h-dvh flex flex-col">
         {/* coridian_, 2026-10-18: "Add that moving background from signup

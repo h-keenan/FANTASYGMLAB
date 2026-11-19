@@ -1,24 +1,32 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { BOOT_SCRIPTS } from "@/components/BootScripts";
 import { CSP_HEADER_NAME, NONCE_HEADER, buildCsp, generateNonce } from "@/lib/csp";
-import { LANDING_PENDING_SCRIPT } from "@/lib/landingPending";
-import { LANDING_SHARE_SCRIPT } from "@/lib/landingShare";
+import { prerenderedScriptHashes } from "@/lib/staticCspHashes";
 
 /**
- * Per-request Content-Security-Policy-Report-Only with a fresh nonce (lib/csp.ts). The nonce and the policy are set on the
- * REQUEST headers so Next applies the nonce to its own scripts during server rendering and app/layout.tsx can read it
- * (lib/nonce.ts); the policy is also set on the RESPONSE. Report-only: nothing is blocked.
+ * Content-Security-Policy-Report-Only, chosen per request (lib/csp.ts):
+ *  - a prerendered route (its HTML exists under .next/server/app) gets a hash policy and stays static;
+ *  - every other route gets a fresh nonce on the REQUEST headers (Next applies it to its own scripts while rendering) and
+ *    on the response.
+ * Report-only: nothing is blocked.
  */
 export function proxy(request: NextRequest) {
-  const nonce = generateNonce();
-  const policy = buildCsp({
-    nonce,
+  const common = {
     isDev: process.env.NODE_ENV === "development",
     apiBase: process.env.NEXT_PUBLIC_API_BASE_URL,
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
     sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-    hashedScripts: [LANDING_PENDING_SCRIPT, LANDING_SHARE_SCRIPT],
-  });
+    hashedScripts: BOOT_SCRIPTS(),
+  };
+  const staticHashes = prerenderedScriptHashes(request.nextUrl.pathname);
+  if (staticHashes) {
+    const response = NextResponse.next();
+    response.headers.set(CSP_HEADER_NAME, buildCsp({ ...common, scriptHashSources: staticHashes }));
+    return response;
+  }
+  const nonce = generateNonce();
+  const policy = buildCsp({ ...common, nonce });
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(NONCE_HEADER, nonce);
   requestHeaders.set(CSP_HEADER_NAME, policy);

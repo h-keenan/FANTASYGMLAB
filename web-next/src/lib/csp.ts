@@ -14,8 +14,12 @@
  *    font add does not become a violation.
  *  - There is no third-party analytics script: analytics events post to the API origin (lib/analytics.ts).
  *
- * Scripts: nonce + 'strict-dynamic' only, never 'unsafe-inline'. The landing page's two inline scripts are constant strings
- * rendered by a synchronous server component (app/page.tsx), so they are allowed by sha256 hash instead of a nonce. Styles: React `style={{}}` props render as inline style
+ * Scripts, never 'unsafe-inline'. Two policies, chosen per request in src/proxy.ts:
+ *  - DYNAMIC routes: nonce + 'strict-dynamic' (Next nonces its own inline scripts from the request CSP header).
+ *  - PRERENDERED routes (marketing/SEO, which must stay static for performance): no nonce is possible, so the inline
+ *    scripts of the served HTML are allowed by sha256 hash (lib/staticCspHashes.ts) and external scripts by 'self'.
+ *  - The root layout's two boot scripts are constant per build (no per-request data), so they are hashed in both policies;
+ *    the layout therefore never reads the nonce and never forces dynamic rendering. Styles: React `style={{}}` props render as inline style
  * ATTRIBUTES in server HTML, which only 'unsafe-inline' can allow, so style-src-attr carries it (an inline style attribute
  * cannot run script); style ELEMENTS stay on nonce/self, which is where the injection risk is.
  */
@@ -63,13 +67,16 @@ export function sentryOriginFromDsn(dsn: string | undefined | null): string | nu
 }
 
 export interface CspOptions {
-  nonce: string;
+  /** Per-request nonce for DYNAMIC routes (Next applies it to its own inline scripts). Omit for prerendered routes. */
+  nonce?: string;
   isDev?: boolean;
   apiBase?: string;
   supabaseUrl?: string;
   sentryDsn?: string;
   /** Constant inline script bodies to allow by sha256 hash (the exact text between the <script> tags). */
   hashedScripts?: string[];
+  /** Ready-made 'sha256-...' sources (e.g. read from a prerendered route's HTML, lib/staticCspHashes.ts). */
+  scriptHashSources?: string[];
 }
 
 /** 'sha256-<base64>' CSP source for an inline script body. */
@@ -81,7 +88,7 @@ function unique(values: Array<string | null | undefined>): string[] {
   return [...new Set(values.filter((v): v is string => Boolean(v)))];
 }
 
-export function buildCsp({ nonce, isDev = false, apiBase, supabaseUrl, sentryDsn, hashedScripts = [] }: CspOptions): string {
+export function buildCsp({ nonce, isDev = false, apiBase, supabaseUrl, sentryDsn, hashedScripts = [], scriptHashSources = [] }: CspOptions): string {
   const api = originOf(apiBase);
   const supabase = originOf(supabaseUrl);
   const sentry = sentryOriginFromDsn(sentryDsn);
@@ -90,8 +97,18 @@ export function buildCsp({ nonce, isDev = false, apiBase, supabaseUrl, sentryDsn
   const directives: Array<[string, string[]]> = [
     ["default-src", ["'self'"]],
     // React uses eval for dev-only stack reconstruction; production never needs it.
-    ["script-src", ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'", ...hashedScripts.map(scriptHashSource), ...(isDev ? ["'unsafe-eval'"] : [])]],
-    ["style-src-elem", ["'self'", `'nonce-${nonce}'`, GOOGLE_FONTS_STYLES]],
+    [
+      "script-src",
+      [
+        "'self'",
+        // 'strict-dynamic' only with a nonce: without one it would also distrust the parser-inserted <script src> tags.
+        ...(nonce ? [`'nonce-${nonce}'`, "'strict-dynamic'"] : []),
+        ...hashedScripts.map(scriptHashSource),
+        ...scriptHashSources,
+        ...(isDev ? ["'unsafe-eval'"] : []),
+      ],
+    ],
+    ["style-src-elem", ["'self'", ...(nonce ? [`'nonce-${nonce}'`] : []), GOOGLE_FONTS_STYLES]],
     ["style-src-attr", ["'unsafe-inline'"]],
     ["img-src", img],
     ["font-src", ["'self'", "data:", GOOGLE_FONTS_FILES]],
