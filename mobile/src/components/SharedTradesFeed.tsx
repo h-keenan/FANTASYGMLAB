@@ -1,4 +1,5 @@
 import ConfirmInPlace from './ConfirmInPlace';
+import { toneColor } from '../lib/verdictToneTheme';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -39,7 +40,6 @@ export default function SharedTradesFeed({
   const [reported, setReported] = useState<Set<string>>(new Set());
   if (!available) return null;
 
-  const toneColor = { success: colors.success, danger: colors.danger, accent: colors.accent, neutral: colors.textSecondary };
   const visible = trades.filter((trade) => !reported.has(trade.id));
 
   return (
@@ -47,16 +47,16 @@ export default function SharedTradesFeed({
       <AppText style={styles.heading}>Shared by users</AppText>
       {visible.length === 0 ? <AppText style={styles.muted}>Nothing shared yet.</AppText> : null}
       {visible.map((trade) => (
-        <AccentCard key={trade.id} accent={toneColor[gradeTone(trade.grade)]} compact>
+        <AccentCard key={trade.id} accent={toneColor(colors, gradeTone(trade.grade))} compact>
           <View style={styles.headerRow}>
-            <AnonymousTeamPair color={toneColor[gradeTone(trade.grade)]} />
+            <AnonymousTeamPair color={toneColor(colors, gradeTone(trade.grade))} />
             <View style={styles.headerText}>
               <AppText style={styles.name} numberOfLines={1}>
                 {trade.display_name}
               </AppText>
               {formatDate(trade.created_at) ? <AppText style={styles.muted}>{formatDate(trade.created_at)}</AppText> : null}
             </View>
-            <ToneBadge label={trade.band || trade.grade} color={toneColor[gradeTone(trade.grade)]} />
+            <ToneBadge label={trade.band || trade.grade} color={toneColor(colors, gradeTone(trade.grade))} />
           </View>
           {trade.why ? <AppText style={styles.why}>{trade.why}</AppText> : null}
           <AppText style={styles.sideLabel}>Sent</AppText>

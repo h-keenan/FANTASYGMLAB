@@ -86,14 +86,6 @@ export function sampleFill(sampleSize: number, minSample: number): number {
   return Math.max(0, Math.min(1, sampleSize / target));
 }
 
-/** Grade tone slug (server) -> shared semantic color token. */
-export function gradeToneColor(tone: string | null | undefined): string {
-  if (tone === "success") return "var(--color-success)";
-  if (tone === "positive") return "var(--color-accent)";
-  if (tone === "risk") return "var(--color-danger)";
-  return "var(--color-text-muted)";
-}
-
 /** "2026-10-04" -> "Oct 4, 2026 · Wk 5" (week-only fallback; "" if neither). */
 export function tradeDateLabel(date: string | null | undefined, week?: number | null): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date ?? "");

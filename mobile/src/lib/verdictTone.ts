@@ -100,3 +100,33 @@ export function bandCompactTone(band: VerdictBand): "success" | "muted" | "warni
 export function bandSimTone(band: VerdictBand): "success" | "accent" | "warning" | "danger" {
   return band === "good" ? "success" : band === "caution" ? "warning" : band === "bad" ? "danger" : "accent";
 }
+
+/** Colour tokens a server grade / verdict tone slug can map to. Never red: the product rule is no red verdicts. */
+export type ToneToken = "success" | "accent" | "warning" | "muted";
+
+/**
+ * THE grade-tone -> colour token map (positive green/accent, risk amber, never red). Every grade chip (league recaps,
+ * manager tendencies / "Their history", shared trades) goes through this instead of its own ladder. Danger / decline
+ * words read amber here: a risk is a caution, not a red verdict.
+ */
+export function toneToken(tone: string | null | undefined): ToneToken {
+  switch (tone) {
+    case "success":
+    case "accept":
+      return "success";
+    case "positive":
+    case "accent":
+    case "counter":
+      return "accent";
+    case "warning":
+    case "risk":
+    case "caution":
+    case "danger":
+    case "bad":
+    case "negative":
+    case "decline":
+      return "warning";
+    default:
+      return "muted";
+  }
+}

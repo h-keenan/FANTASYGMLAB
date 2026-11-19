@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { findManagerRow, gradeToneSlug, headlineChips, tradeDateLabel } from './managerTendencies.ts';
+import { findManagerRow, headlineChips, tradeDateLabel } from './managerTendencies.ts';
 
 test('headlineChips splits and drops not-enough-data lead-ins', () => {
   assert.deepEqual(headlineChips('Targets WRs. Sells picks.'), ['Targets WRs', 'Sells picks']);
@@ -27,12 +27,4 @@ test('tradeDateLabel formats date and week, degrades to week only, never invents
   assert.equal(tradeDateLabel('2026-10-04', 0), 'Oct 4, 2026');
   assert.equal(tradeDateLabel('', 7), 'Week 7');
   assert.equal(tradeDateLabel(null, null), '');
-});
-
-test('gradeToneSlug maps server tones to semantic colors', () => {
-  assert.equal(gradeToneSlug('success'), 'success');
-  assert.equal(gradeToneSlug('positive'), 'accent');
-  assert.equal(gradeToneSlug('risk'), 'danger');
-  assert.equal(gradeToneSlug('neutral'), 'muted');
-  assert.equal(gradeToneSlug(undefined), 'muted');
 });

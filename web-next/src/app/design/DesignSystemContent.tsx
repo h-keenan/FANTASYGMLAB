@@ -592,7 +592,7 @@ export function DesignSystemContent() {
                 <ToneBadge label="Starter" color="var(--color-success)" />
                 <ToneBadge label="Bench" color="var(--color-opportunity)" />
                 <ToneBadge label="Sell high" color="var(--color-warning)" />
-                <ToneBadge label="Risk" color="var(--color-danger)" />
+                <ToneBadge label="Danger" color="var(--color-danger)" />
                 <ToneBadge label="Pro" color="var(--color-premium)" />
                 <ToneBadge label="Info" color="var(--color-information)" />
               </div>

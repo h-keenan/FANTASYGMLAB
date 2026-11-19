@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { bandCompactTone, bandSimTone, bandToken, deltaBand, percentBand, percentWord, probabilityBand, probabilityWord, verdictBand } from "./verdictTone";
+import { bandCompactTone, bandSimTone, bandToken, deltaBand, percentBand, percentWord, probabilityBand, probabilityWord, toneToken, verdictBand } from "./verdictTone";
+import { toneColorVar } from "./verdictToneCss";
 import { bandColorVar, percentColorVar, verdictColorVar } from "./verdictToneCss";
 import { simHeadline, simOddsTone } from "./simPresentation.ts";
 import { simWinChanceTone as gameTone } from "./simGame";
@@ -108,5 +109,24 @@ describe("label and percentage come from one source", () => {
     expect(f(0.4)).toMatch(/coin flip/);
     expect(f(0.39)).not.toMatch(/coin flip/);
     expect(f(0.6)).toMatch(/good shape/);
+  });
+});
+
+describe("toneToken", () => {
+  it("maps positive green/accent and risk amber, never red", () => {
+    expect(toneToken("success")).toBe("success");
+    expect(toneToken("positive")).toBe("accent");
+    expect(toneToken("accent")).toBe("accent");
+    expect(toneToken("risk")).toBe("warning");
+    expect(toneToken("warning")).toBe("warning");
+    expect(toneToken("danger")).toBe("warning");
+    expect(toneToken("pending")).toBe("muted");
+    expect(toneToken(undefined)).toBe("muted");
+  });
+  it("never yields a danger css colour for any tone", () => {
+    for (const t of ["success", "positive", "accent", "risk", "warning", "danger", "bad", "decline", "pending", "x", null])
+      expect(toneColorVar(t)).not.toContain("danger");
+    expect(toneColorVar("risk")).toBe("var(--color-warning)");
+    expect(toneColorVar("pending")).toBe("var(--color-text-muted)");
   });
 });

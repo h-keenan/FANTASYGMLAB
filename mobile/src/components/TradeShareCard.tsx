@@ -40,7 +40,7 @@ function bandColor(band: string, fallback: string): string {
 const HEADLINE_COLOR: Record<TradeVerdict['tone'], string> = {
   accept: colors.accent,
   counter: colors.premium,
-  decline: colors.danger,
+  decline: colors.warning,
   fair: colors.textPrimary,
   // Trade Hub's own suggestions — nobody has accepted or declined anything.
   idea: colors.accent,
