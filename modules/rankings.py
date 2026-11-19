@@ -2684,6 +2684,23 @@ _INJURY_AGE_CURVE = {
 }
 
 
+# Data-truth follow-up 2026-11-19 (docs/audits/2026-11-injury-discount.md): the dynasty injury discount was a flat
+# severity multiplier (an IR'd 25-year-old lost ~23% of his whole composite), and an injury also stacked the status-derived
+# 0.72 roster-presence penalty (Sleeper reports IR'd players as "Inactive"). Backtest 2021-2025: injured players' market value
+# did not fall further relative to healthy peers by more than ~0-9% after the market had priced the injury. Flag
+# DYNASTYGM_INJURY_HORIZON_V1 (default OFF) scales the dynasty discount by what an injury actually costs a multi-year
+# horizon: expected games lost over the horizon, times the age durability already in the curve (relative to its youngest
+# anchor), and counts the injury once (the status that IS the injury no longer adds the 0.72 penalty).
+INJURY_HORIZON_ENV_KEY = "DYNASTYGM_INJURY_HORIZON_V1"
+DYNASTY_HORIZON_GAMES = 3 * 17
+
+
+def injury_horizon_enabled() -> bool:
+    from modules.app_config import config_bool
+
+    return bool(config_bool(INJURY_HORIZON_ENV_KEY))
+
+
 def injury_multiplier_for_age(status: str, injury_status: str = "", age=None) -> float:
     """Injury multiplier scaled by age; null/invalid age falls back to the flat value."""
 
@@ -2693,7 +2710,15 @@ def injury_multiplier_for_age(status: str, injury_status: str = "", age=None) ->
     try:
         age_value = float(age)
     except (TypeError, ValueError):
-        return flat
+        age_value = float("nan")
+    if injury_horizon_enabled() and level != "healthy":
+        weeks = injury_status_table.classify(status, injury_status).weeks_out
+        if weeks is not None:
+            games_cost = min(1.0, float(weeks) / DYNASTY_HORIZON_GAMES)
+            durability = 1.0
+            if points is not None and np.isfinite(age_value):
+                durability = min(1.0, float(np.interp(age_value, [a for a, _ in points], [m for _, m in points])) / points[0][1])
+            return float((1.0 - games_cost) * durability)
     if points is None or not np.isfinite(age_value):
         return flat
     ages = [a for a, _ in points]
@@ -2735,7 +2760,10 @@ def risk_multiplier(status: str, team: str, search_rank, injury_status: str = ""
     if not team or not str(team).strip():
         return 0.35
     injury_risk = injury_multiplier_for_age(status, injury_status, age)
-    base_risk = non_injury_risk_multiplier(status, team, search_rank)
+    base_status = status
+    if injury_horizon_enabled() and injury_level(status, injury_status) != "healthy":
+        base_status = ""  # the non-Active status (Sleeper "Inactive" for IR) IS the injury: count it once
+    base_risk = non_injury_risk_multiplier(base_status, team, search_rank)
     return min(base_risk, injury_risk)
 
 
