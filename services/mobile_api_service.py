@@ -7017,6 +7017,13 @@ def _compute_trade_analyzer(
         model_status.add(analyzer_status, "drop_model_failed")
         overflow = None
 
+    # The before-trade half of the fit (healthy roster, starter snapshot, injury
+    # context) depends only on the roster, so the request's verdict and every
+    # counter-offer regrade share one instead of rebuilding it per package.
+    current_context = trade_analyzer_fit.prepare_current_roster_context(
+        my_team_df, None, strategy, settings, score_field, my_team_needs
+    )
+
     fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
         my_team_df=my_team_df,
         all_players_df=valued,
@@ -7026,6 +7033,7 @@ def _compute_trade_analyzer(
         strategy=strategy,
         lineup_settings=settings,
         score_field=score_field,
+        current_context=current_context,
         waiver_df=waiver_pool,
         posture=posture,
         forced_drop_assets=(overflow or {}).get("forced_assets") or None,
@@ -7109,6 +7117,7 @@ def _compute_trade_analyzer(
                     strategy=strategy,
                     lineup_settings=settings,
                     score_field=score_field,
+                    current_context=current_context,
                     waiver_df=waiver_pool,
                     posture=posture,
                     forced_drop_assets=(cand_overflow or {}).get("forced_assets") or None,
