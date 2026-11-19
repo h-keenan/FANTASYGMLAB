@@ -1,0 +1,25 @@
+{
+ "date": "2023-10-20",
+ "weeks_completed": 6,
+ "poisoned_rows": 19094,
+ "frame_identical_under_poison": true,
+ "frame_columns_compared": 76,
+ "ideas_clean": 92,
+ "ideas_identical_under_poison": true,
+ "ideas_wall_clock": 75,
+ "ideas_identical_wall_vs_frozen": false,
+ "confidence_frozen": {
+  "High": 63,
+  "Medium": 27,
+  "Low": 2
+ },
+ "confidence_wall_clock": {
+  "Low": 75
+ },
+ "trust_frozen": {
+  "pass": 92
+ },
+ "trust_wall_clock": {
+  "degraded": 75
+ }
+}
