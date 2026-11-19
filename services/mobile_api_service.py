@@ -460,8 +460,8 @@ class _RedisFixedWindowRateLimiter:
                 client.expire(redis_key, window_seconds)
         except redis_cache.RedisError:
             logger.warning(
-                "Redis unreachable for rate limiter key %s; failing open (request allowed).",
-                key,
+                "Redis unreachable for rate limiter scope %s; failing open (request allowed).",
+                key.split("|", 1)[0],
                 exc_info=True,
             )
             return True, 0.0
@@ -486,6 +486,21 @@ class _RedisFixedWindowRateLimiter:
 _rate_limiter = _RedisFixedWindowRateLimiter()
 
 
+# Per-IP ceiling across every identity. The per-identity bucket below is keyed on a hash of the raw Authorization
+# header, so a caller sending a fresh bogus bearer token per request would otherwise get a fresh bucket every time
+# (and each bogus token also costs a GoTrue lookup in require_user). The IP-wide bucket is this many times the
+# per-identity limit: roomy enough for many real users behind one NAT, but finite.
+RATE_LIMIT_IP_CEILING_MULTIPLIER = int(os.environ.get("RATE_LIMIT_IP_CEILING_MULTIPLIER", "5"))
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",")[0].strip() if forwarded else ""
+    if not ip:
+        ip = request.client.host if request.client else "unknown"
+    return ip
+
+
 def _client_rate_limit_key(request: Request) -> str:
     """Bucket by client IP, further split by caller identity when present.
 
@@ -496,10 +511,7 @@ def _client_rate_limit_key(request: Request) -> str:
     token is require_user's job, not this middleware's.
     """
 
-    forwarded = request.headers.get("x-forwarded-for", "")
-    ip = forwarded.split(",")[0].strip() if forwarded else ""
-    if not ip:
-        ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     authorization = request.headers.get("authorization", "")
     if authorization:
         fingerprint = hashlib.sha256(authorization.encode("utf-8")).hexdigest()[:16]
@@ -537,6 +549,14 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
         allowed, retry_after = await asyncio.to_thread(
             _rate_limiter.hit, f"{scope}|{client_key}", limit, window
         )
+        if allowed and request.headers.get("authorization"):
+            # Rotating the Authorization value must not mint a fresh budget: also count against the IP alone.
+            allowed, retry_after = await asyncio.to_thread(
+                _rate_limiter.hit,
+                f"{scope}-ip|{_client_ip(request)}",
+                max(1, limit * max(1, RATE_LIMIT_IP_CEILING_MULTIPLIER)),
+                window,
+            )
         if not allowed:
             logger.warning(
                 "Rate limit exceeded: %s %s scope=%s",
