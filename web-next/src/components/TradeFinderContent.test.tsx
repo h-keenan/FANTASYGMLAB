@@ -22,6 +22,9 @@ import type {
  * render via the same card Trade Hub uses.
  */
 
+const proState: { value: boolean | null } = { value: null };
+vi.mock("@/lib/useIsPro", () => ({ useIsPro: () => proState.value }));
+
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
@@ -135,6 +138,7 @@ function openIdeaCards() {
 
 describe("TradeFinderContent", () => {
   beforeEach(() => {
+    proState.value = null;
     // No Team Situation declared, by default — the same "retool" behavior
     // every test below already expects. The dedicated test further down
     // overrides this to assert a declared stance's real strategy flows
@@ -567,5 +571,13 @@ describe("TradeFinderContent trade deadline", () => {
     );
     expect(screen.getByText("Trade deadline has passed; trades reopen after the season.")).toBeInTheDocument();
     expect(screen.queryByText(/Find Realistic Trades/)).not.toBeInTheDocument();
+  });
+
+  it("shows the Pro upsell up front for a confirmed Free account, before any package is built or searched", () => {
+    proState.value = false;
+    render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
+    expect(screen.getByText("Build and search for a trade")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Find Realistic Trades/ })).not.toBeInTheDocument();
+    expect(api.getTradeFinderIdeas).not.toHaveBeenCalled();
   });
 });

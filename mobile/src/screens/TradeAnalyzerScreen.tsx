@@ -218,6 +218,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const { isGuest } = useAuth();
   const [planningNote, setPlanningNote] = useState('');
   const [roleNotes, setRoleNotes] = useState<string[]>([]);
+  const [roleNotesLocked, setRoleNotesLocked] = useState(false);
   const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
   const [rosterOverflow, setRosterOverflow] = useState<RosterOverflow | null>(null);
 
@@ -508,6 +509,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       });
       setPlanningNote(result.planning_note ?? '');
       setRoleNotes(result.role_notes ?? []);
+      setRoleNotesLocked(result.role_notes_locked === true);
       setAssumptions(result.assumptions ?? null);
       setRosterOverflow(result.roster_overflow ?? null);
       trackUse('trade_analyzer', 'evaluated', {
@@ -647,6 +649,12 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
                   {line}
                 </AppText>
               ))}
+            </View>
+          ) : null}
+          {roleNotesLocked && !roleNotes.length ? (
+            <View style={styles.roleNotesLock} testID="trade-role-notes-lock">
+              <AppText style={styles.roleNote}>Pro: role changes for players in this trade</AppText>
+              <Button label="See Pro" variant="premium" size="sm" onPress={() => navigation.navigate('Paywall')} />
             </View>
           ) : null}
           {verdict ? (
@@ -1286,6 +1294,7 @@ function createStyles(colors: ThemeColors) {
   error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   planningNote: { color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: spacing.sm },
   roleNotes: { gap: spacing.xs, marginBottom: spacing.sm },
+  roleNotesLock: { gap: spacing.sm, alignItems: 'flex-start', marginBottom: spacing.sm },
   roleNotesTitle: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
   roleNote: { fontSize: 14.5, lineHeight: 20, color: colors.textSecondary },
   });

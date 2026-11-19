@@ -7,6 +7,9 @@ import { LeagueRankingsContent } from "./LeagueRankingsContent";
 import type { LeagueTeamRankingsResponse, PlayoffOddsResponse, TeamRanking } from "@/lib/api";
 import { api } from "@/lib/api";
 
+const proState: { value: boolean | null } = { value: null };
+vi.mock("@/lib/useIsPro", () => ({ useIsPro: () => proState.value }));
+
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
@@ -203,5 +206,19 @@ describe("LeagueRankingsContent", () => {
     await waitFor(() =>
       expect(screen.getByText("Playoff odds will be available once the regular season begins.")).toBeInTheDocument(),
     );
+  });
+
+  it("shows the Pro lock at once for a confirmed Free account, before any Calculate tap", () => {
+    proState.value = false;
+    render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
+    expect(screen.queryByRole("button", { name: "Calculate playoff odds" })).toBeNull();
+    expect(screen.getByText("Your real shot at the playoffs")).toBeInTheDocument();
+    expect(api.getLeaguePlayoffOdds).not.toHaveBeenCalled();
+  });
+
+  it("keeps the Calculate button while the plan is unknown or Pro", () => {
+    proState.value = null;
+    render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
+    expect(screen.getByRole("button", { name: "Calculate playoff odds" })).toBeInTheDocument();
   });
 });

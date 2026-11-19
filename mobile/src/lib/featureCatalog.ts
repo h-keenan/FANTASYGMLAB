@@ -52,7 +52,7 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
 
   { id: 'my-team', group: 'lineup', name: 'My Team', line: 'Your roster, lineup, strengths and needs.', route: 'MyTeam', leagueScoped: true, icon: 'shirt-outline', color: accentFor('my-team') },
   { id: 'matchup', group: 'lineup', name: 'Matchup', line: "This week's win odds and any swap worth making.", route: 'Matchup', leagueScoped: true, icon: 'american-football-outline', color: accentFor('matchup') },
-  { id: 'gm-plan', group: 'lineup', name: 'GM Plan', line: 'Set rebuilding, competing or balanced and get a roadmap.', extra: 'Pro adds focus areas.', route: 'GmPlan', leagueScoped: true, icon: 'map-outline', color: accentFor('gm-plan') },
+  { id: 'gm-plan', group: 'lineup', name: 'GM Plan', line: 'Set rebuilding, competing or balanced and get a roadmap.', extra: 'Pro unlocks the whole roadmap.', route: 'GmPlan', leagueScoped: true, icon: 'map-outline', color: accentFor('gm-plan') },
 
   { id: 'waivers', group: 'pickup', name: 'Waivers', line: 'Ranked pickups for your roster, with FAAB bid guidance.', extra: 'Pro adds the FAAB shortlist and usage stats.', route: 'Waivers', leagueScoped: true, icon: 'swap-horizontal-outline', color: accentFor('waivers') },
   { id: 'draft-center', group: 'pickup', name: 'Draft Center', line: 'Your picks, draft stance and college scouting in one place.', pro: true, route: 'DraftCenter', leagueScoped: true, icon: 'albums-outline', color: accentFor('draft-center') },

@@ -23,6 +23,8 @@ import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import DeadlineCard from '../components/DeadlineCard';
 import TradeHubHoldCard from '../components/TradeHubHoldCard';
 import MultiTeamIdeasSection from '../components/MultiTeamIdeasSection';
+import { isEspnLeagueId } from '../lib/leaguePlatform';
+import { TRADE_HUB_UPGRADE_LABEL, tradeHubGateBody, tradeHubGateTitle } from '../lib/tradeHubGate';
 import TradeIdeaCard, { impactTagConfig, type ImpactTagKey } from '../components/TradeIdeaCard';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
@@ -433,7 +435,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               onUpgrade={() => navigation.navigate('Paywall')}
             />
           )}
-          {isForYou ? <MultiTeamIdeasSection leagueId={leagueId} leagueName={leagueName} lens={lens} navigation={navigation} /> : null}
+          {isForYou && !isEspnLeagueId(leagueId) ? <MultiTeamIdeasSection leagueId={leagueId} leagueName={leagueName} lens={lens} navigation={navigation} /> : null}
           <ValueSignalsCard leagueId={leagueId} leagueName={leagueName} />
           <ValuesCredit />
         </>
@@ -473,7 +475,7 @@ function AllTradesFooter({
         <AppText style={styles.gateBody}>
           Free shows {entitlement?.free_limit} ideas across All Trades. Go Pro to browse every team.
         </AppText>
-        <Button label="Upgrade to Pro" variant="premium" onPress={onUpgrade} style={styles.gatePrimaryButton} />
+        <Button label={TRADE_HUB_UPGRADE_LABEL} variant="premium" onPress={onUpgrade} style={styles.gatePrimaryButton} />
       </AnimatedCard>
     );
   }
@@ -501,13 +503,8 @@ function TradeHubGateCard({
       <View style={styles.gateIconDisc}>
         <Ionicons name="lock-closed" size={20} color={colors.premium} />
       </View>
-      <AppText style={styles.gateTitle}>
-        {entitlement.hidden_count} more {entitlement.hidden_count === 1 ? 'idea' : 'ideas'} on this board
-      </AppText>
-      <AppText style={styles.gateBody}>
-        Free shows the top {entitlement.free_limit}. Watch a quick ad to reveal {entitlement.ad_bonus_per_unlock}{' '}
-        more, or go Pro to unlock the full board.
-      </AppText>
+      <AppText style={styles.gateTitle}>{tradeHubGateTitle(entitlement.hidden_count)}</AppText>
+      <AppText style={styles.gateBody}>{tradeHubGateBody(entitlement.free_limit, canWatchMoreAds ? entitlement.ad_bonus_per_unlock : null)}</AppText>
       <View style={styles.gateButtonRow}>
         {canWatchMoreAds ? (
           <Button

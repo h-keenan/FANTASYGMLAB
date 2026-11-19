@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { ESPN_COOKIE_STEPS, ESPN_LOGIN_WHY, espnCredentialFailureMessage, espnRouteSupported, importedPlatformLabel, isEspnLeagueId, leagueHomeRoute, notAvailableMessage } from './leaguePlatform.ts';
@@ -51,4 +53,9 @@ test('ESPN login copy explains both cookies and prefers the server message', () 
   assert.equal(espnCredentialFailureMessage({ reason: 'x', message: 'Server says.' }), 'Server says.');
   assert.match(espnCredentialFailureMessage({ reason: 'not_configured' }), /isn't available yet/);
   assert.match(espnCredentialFailureMessage(null), /Check both values/);
+});
+
+test("Trade Hub only mounts the multi-team module for non-ESPN leagues (web TradeHubContent has the same guard)", () => {
+  const source = readFileSync(join(process.cwd(), "src/screens/TradeHubScreen.tsx"), "utf8");
+  assert.match(source, /isForYou && !isEspnLeagueId\(leagueId\) \? <MultiTeamIdeasSection/);
 });

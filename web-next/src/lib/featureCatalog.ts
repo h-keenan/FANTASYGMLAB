@@ -51,7 +51,7 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
 
   { id: "my-team", group: "lineup", name: "My Team", line: "Your roster, lineup, strengths and needs.", segment: "my-team", leagueScoped: true, glyph: "myTeam", color: accentVar("my-team") },
   { id: "matchup", group: "lineup", name: "Matchup", line: "This week's win odds and any swap worth making.", segment: "matchup", leagueScoped: true, glyph: "matchup", color: accentVar("matchup") },
-  { id: "gm-plan", group: "lineup", name: "GM Plan", line: "Set rebuilding, competing or balanced and get a roadmap.", extra: "Pro adds focus areas.", segment: "gm-plan", leagueScoped: true, glyph: "gmPlan", color: accentVar("gm-plan") },
+  { id: "gm-plan", group: "lineup", name: "GM Plan", line: "Set rebuilding, competing or balanced and get a roadmap.", extra: "Pro unlocks the whole roadmap.", segment: "gm-plan", leagueScoped: true, glyph: "gmPlan", color: accentVar("gm-plan") },
 
   { id: "waivers", group: "pickup", name: "Waivers", line: "Ranked pickups for your roster, with FAAB bid guidance.", extra: "Pro adds the FAAB shortlist and usage stats.", segment: "waivers", leagueScoped: true, glyph: "waivers", color: accentVar("waivers") },
   { id: "draft-center", group: "pickup", name: "Draft Center", line: "Your picks, draft stance and college scouting in one place.", pro: true, segment: "draft-center", leagueScoped: true, glyph: "draftCenter", color: accentVar("draft-center") },
