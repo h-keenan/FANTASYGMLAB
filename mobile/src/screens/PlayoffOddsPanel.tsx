@@ -2,6 +2,7 @@ import { percentColor } from '../lib/verdictToneTheme';
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
+import FreshnessLabel from '../components/FreshnessLabel';
 import ToneBadge from '../components/ToneBadge';
 import ErrorState from '../components/ErrorState';
 import { useFocusEffect } from '@react-navigation/native';
@@ -44,6 +45,7 @@ export default function PlayoffOddsPanel({ leagueId, leagueName }: { leagueId: s
   const [slopeFitted, setSlopeFitted] = useState(false);
   const [myRosterId, setMyRosterId] = useState<string>('');
   const [locked, setLocked] = useState<{ title: string; body: string } | null>(null);
+  const [staleAsOf, setStaleAsOf] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +64,7 @@ export default function PlayoffOddsPanel({ leagueId, leagueName }: { leagueId: s
             setLocked(oddsResult.upsell ?? { title: '', body: '' });
             return;
           }
+          setStaleAsOf(oddsResult.sleeper_data_as_of ?? null);
           setTeams(oddsResult.teams ?? []);
           setReason(oddsResult.reason ?? '');
           setWeeksRemaining(oddsResult.weeks_remaining ?? null);
@@ -148,6 +151,7 @@ export default function PlayoffOddsPanel({ leagueId, leagueName }: { leagueId: s
               title="Playoff odds"
               info={<InfoMark label="Playoff Odds" lines={[methodologyNote, copy.help('playoffOddsIntro'), copy.help('playoffOddsTerms')]} />}
             />
+            {staleAsOf ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={staleAsOf} /> : null}
           </View>
         }
         renderItem={({ item, index }) => (
