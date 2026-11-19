@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import AppText from './AppText';
+import FreshnessLabel from './FreshnessLabel';
 import { SkeletonList } from './Skeleton';
 import EmptyState from './EmptyState';
 import PlayerName from './PlayerName';
@@ -316,6 +317,7 @@ export default function CollegeScoutingPanel({
   const openProspect = openId ? prospects.find((row) => row.id === openId) ?? null : null;
   return (
     <View style={styles.panel}>
+      <FreshnessLabel datasets={['prospects']} />
       {openProspect ? (
         <ProspectSheet
           key={openProspect.id}

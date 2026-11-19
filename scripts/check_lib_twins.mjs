@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 export const IDENTICAL = [
   "accountDeletionCopy.ts",
   "adpPresentation.ts",
+  "dataFreshness.ts",
   "prospectProfile.ts",
   "appHeader.ts",
   "leagueCrest.ts",
@@ -156,6 +157,7 @@ export const MIRRORED = [
   "bottomNav.ts",
   "bottomPillStore.ts",
   "useBottomPillContext.ts",
+  "useDataFreshness.ts",
   "bottomBarMetrics.ts",
   "dropsPresentation.ts",
   "experienceCopy.ts",

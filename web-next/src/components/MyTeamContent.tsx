@@ -403,7 +403,7 @@ export function MyTeamContent({
           </div>
         </CompactModule>
       ) : null}
-      <ValuesCredit />
+      <ValuesCredit freshness={["values", "injuries"]} />
     </main>
   );
 }

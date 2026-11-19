@@ -933,7 +933,7 @@ export function WaiversContent({
           ) : null}
         </section>
       ) : null}
-      <ValuesCredit />
+      <ValuesCredit freshness={["values", "injuries"]} />
     </main>
   );
 }

@@ -72,7 +72,7 @@ export default function MethodologyPage() {
           that's public (no login or paywall) and in the initial HTML without
           JavaScript. This page is a server-rendered, unauthenticated route,
           so this credit is that link. See ValuesCredit.tsx. */}
-      <ValuesCredit />
+      <ValuesCredit freshness={[]} />
     </main>
   );
 }

@@ -533,7 +533,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
               listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.3, animated: true });
             }, 300);
           }}
-          ListFooterComponent={<ValuesCredit />}
+          ListFooterComponent={<ValuesCredit freshness={['values', 'injuries']} />}
           key={`${tab}-${viewMode}`}
           data={tab === 'explore' ? filtered : tab === 'watchlist' ? watchlistPlayers : []}
           keyExtractor={(item) => item.player_id}
