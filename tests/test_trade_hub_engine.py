@@ -828,3 +828,56 @@ def test_finder_closest_options_go_through_the_same_trust_enforcement():
     assert result == []
     assert [i["partner_team_name"] for i in trace.enforced_closest] == ["A"]
     assert len(calls) == 2  # real ideas, then the near misses
+
+
+# --- Hold on a value bar (DYNASTYGM_HOLD_VALUE_EDGE_V1) -----------------------------------------------------
+
+
+def _vcard(edge, loss=0.0, gain=0, conf="High"):
+    return {"trade_gain": gain, "confidence_label": conf, "impact_tag": "", "market_edge": edge, "partner_loss_ratio": loss}
+
+
+def test_hold_value_edge_flag_default_on_and_kill_switch(monkeypatch):
+    monkeypatch.delenv(trade_hub_engine.HOLD_VALUE_EDGE_ENV_KEY, raising=False)
+    assert trade_hub_engine.hold_value_edge_enabled() is True
+    monkeypatch.setenv(trade_hub_engine.HOLD_VALUE_EDGE_ENV_KEY, "0")
+    assert trade_hub_engine.hold_value_edge_enabled() is False
+
+
+def test_golden_hold_when_every_acceptable_idea_costs_more_than_the_market_bar(monkeypatch):
+    monkeypatch.delenv(trade_hub_engine.HOLD_VALUE_EDGE_ENV_KEY, raising=False)
+    # high engine gain and High confidence no longer carry a Hold: the engine's own gain has no outcome signal
+    cards = [_vcard(-400, gain=900), _vcard(-251, gain=800)]
+    hold = trade_hub_engine.build_hold_verdict(cards, strategy="retool")
+    assert hold["reason"] == "no_market_edge" and hold["verdict"] == "hold" and hold["ideas_optional"] is True
+    assert any("fair deal for you on market value" in w["text"] for w in hold["why"])
+
+
+def test_a_card_at_the_market_bar_that_the_partner_can_accept_clears_it(monkeypatch):
+    monkeypatch.delenv(trade_hub_engine.HOLD_VALUE_EDGE_ENV_KEY, raising=False)
+    assert trade_hub_engine.build_hold_verdict([_vcard(trade_hub_engine.HOLD_MIN_MARKET_EDGE)], strategy="retool") is None
+    # low engine gain and Low confidence do not make Hold on their own any more
+    assert trade_hub_engine.build_hold_verdict([_vcard(300, gain=10, conf="Low")], strategy="retool") is None
+
+
+def test_a_lopsided_idea_does_not_clear_the_bar_however_good_its_edge(monkeypatch):
+    monkeypatch.delenv(trade_hub_engine.HOLD_VALUE_EDGE_ENV_KEY, raising=False)
+    hold = trade_hub_engine.build_hold_verdict([_vcard(2000, loss=0.08)], strategy="retool")
+    assert hold["reason"] == "no_market_edge"
+    assert trade_hub_engine.build_hold_verdict([_vcard(2000, loss=0.08), _vcard(10, loss=0.01)], strategy="retool") is None
+
+
+def test_flag_off_and_legacy_cards_keep_the_old_bar(monkeypatch):
+    monkeypatch.setenv(trade_hub_engine.HOLD_VALUE_EDGE_ENV_KEY, "0")
+    hold = trade_hub_engine.build_hold_verdict([_vcard(5000, gain=10, conf="Low")], strategy="retool")
+    assert hold["reason"] == "none_clear_bar"
+    monkeypatch.delenv(trade_hub_engine.HOLD_VALUE_EDGE_ENV_KEY, raising=False)
+    legacy = {"trade_gain": 10, "confidence_label": "Low", "impact_tag": ""}  # no market_edge: nothing to judge on value
+    assert trade_hub_engine.build_hold_verdict([legacy], strategy="retool")["reason"] == "none_clear_bar"
+
+
+def test_cards_carry_the_value_bar_inputs():
+    card = trade_hub_engine.project_trade_idea_card({"market_edge": 321, "user_edge_ratio": 0.0123, "send_assets": [], "receive_assets": []})
+    assert card.market_edge == 321 and card.partner_loss_ratio == 0.0123
+    bare = trade_hub_engine.project_trade_idea_card({"send_assets": [], "receive_assets": []})
+    assert bare.market_edge is None and bare.partner_loss_ratio is None

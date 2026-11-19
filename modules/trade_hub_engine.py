@@ -369,6 +369,10 @@ class TradeIdeaCard:
     # their position need, their posture, the age fit ("Fills their TE hole ·
     # they're contending"). From trade_ideas.partner_acceptance_context.
     partner_fit_reason: str = ""
+    # What the user gains in player market value (market_value_edge) and the share of its value the partner
+    # gives up: the two inputs of the Hold verdict's value bar. None when not computed.
+    market_edge: int | None = None
+    partner_loss_ratio: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -394,6 +398,22 @@ class TradeIdeaCard:
             "roster_overflow": self.roster_overflow,
             "partner_fit_reason": self.partner_fit_reason,
         }
+
+
+def _optional_int(value: Any) -> int | None:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return int(round(out)) if out == out else None
+
+
+def _optional_float(value: Any) -> float | None:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if out == out else None
 
 
 def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = False) -> TradeIdeaCard:
@@ -439,6 +459,8 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
         lineup_points=idea.get("posture_lineup_points"),
         roster_overflow=dict(idea["roster_overflow"]) if isinstance(idea.get("roster_overflow"), Mapping) else None,
         partner_fit_reason=_safe_text(idea.get("partner_fit_reason")),
+        market_edge=_optional_int(idea.get("market_edge")),
+        partner_loss_ratio=_optional_float(idea.get("user_edge_ratio")),
     )
 
 
@@ -1500,6 +1522,22 @@ HOLD_CONTENDER_TOP_FRACTION = 1 / 3
 # Below this fraction of the regular season the record is too small a sample.
 HOLD_SMALL_SAMPLE_SEASON_FRACTION = 0.15
 
+# DYNASTYGM_HOLD_VALUE_EDGE_V1: the old bar (confidence Low or gain under 200) had no signal in the replay audit
+# (a team told to hold had the same chance an idea would have helped, 36.7% vs 36.6%). The value bar is the one
+# the replay does support: an idea clears when the partner can accept it (partner loss within the engine's soft
+# ratio) AND it does not cost the user more than HOLD_MIN_MARKET_EDGE of player market value. Hold is shown when
+# no idea clears. Chosen on 2021-23, confirmed on 2024-25 (the best acceptable idea of a held team lost lineup
+# points and playoff odds; of an acting team it gained both).
+HOLD_VALUE_EDGE_ENV_KEY = "DYNASTYGM_HOLD_VALUE_EDGE_V1"
+HOLD_MIN_MARKET_EDGE = -250
+HOLD_MAX_PARTNER_LOSS = trade_hub_presentation.EDGE_ORDER_ACCEPT_RATIO
+
+
+def hold_value_edge_enabled() -> bool:
+    from modules import experimental_graduation
+
+    return experimental_graduation.graduated_kill_switch_enabled(HOLD_VALUE_EDGE_ENV_KEY, default=True)
+
 POSTURE_SENTENCES = {
     "contender": "You're competing now, so ideas favor current value.",
     "fringe_contender": "You're in the hunt, so ideas favor players who help soon.",
@@ -1516,6 +1554,13 @@ def posture_sentence(strategy: object) -> str:
 
 
 def _idea_clears_bar(card: Mapping[str, Any]) -> bool:
+    if hold_value_edge_enabled() and card.get("market_edge") is not None:
+        loss = card.get("partner_loss_ratio")
+        try:
+            acceptable = loss is None or float(loss) <= HOLD_MAX_PARTNER_LOSS
+            return acceptable and int(card["market_edge"]) >= HOLD_MIN_MARKET_EDGE
+        except (TypeError, ValueError):
+            return False
     if trade_visual_language.confidence_level(_safe_text(card.get("confidence_label"))) == "low":
         return False
     try:
@@ -1561,6 +1606,7 @@ def build_hold_verdict(
         }
 
     clearing = [card for card in cards if _idea_clears_bar(card)]
+    value_bar = hold_value_edge_enabled() and any(card.get("market_edge") is not None for card in cards)
     has_high_impact = any(_safe_text(card.get("impact_tag")) == "high_impact" for card in cards)
     top_third = bool(power_rank and team_count and power_rank <= max(1, round(team_count * HOLD_CONTENDER_TOP_FRACTION)))
 
@@ -1568,7 +1614,7 @@ def build_hold_verdict(
     if not cards:
         reason = "no_ideas"
     elif not clearing:
-        reason = "none_clear_bar"
+        reason = "no_market_edge" if value_bar else "none_clear_bar"
     elif competing and top_third and not has_high_impact:
         reason = "contender_no_need"
     elif in_season and 0 < season_progress < HOLD_SMALL_SAMPLE_SEASON_FRACTION and not has_high_impact:
@@ -1578,6 +1624,8 @@ def build_hold_verdict(
 
     if not cards:
         fact("ideas", "No trade idea fit your roster and your league's rosters today.")
+    elif not clearing and value_bar:
+        fact("ideas", "No idea is both easy for the other side to accept and a fair deal for you on market value.")
     elif not clearing:
         fact("ideas", "None of today's ideas is a clear win for you: each is a small gain or a long shot.")
     elif reason == "contender_no_need":
@@ -1586,7 +1634,7 @@ def build_hold_verdict(
         fact("context", "It's early in the season, so records and trends say little yet.")
     if power_rank and team_count:
         fact("competition", f"Your team ranks #{power_rank} of {team_count} for power in this league.")
-    if competing and reason in {"contender_no_need", "none_clear_bar"}:
+    if competing and reason in {"contender_no_need", "none_clear_bar", "no_market_edge"}:
         fact("posture", "You're competing now, so a small gain rarely beats keeping your lineup intact.")
     return {
         "verdict": "hold",
