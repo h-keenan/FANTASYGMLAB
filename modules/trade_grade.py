@@ -239,6 +239,61 @@ def starter_strength_adjustment(lineup_delta: float, strategy: str) -> int:
     return int(round(float(lineup_delta or 0) * starter_strength_weight(strategy)))
 
 
+# --- roster redundancy (trade-advice audit P1-3) -------------------------------
+
+REDUNDANCY_ENV_KEY = "DYNASTYGM_ROSTER_REDUNDANCY_V1"
+# Share of market value a player keeps as a trade chip when he cannot start for
+# the roster that holds him (the audit left "how much liquidity value a bench
+# asset keeps" as an owner decision; 0.6 is the proposal).
+BENCH_CHIP_RETENTION = 0.6
+
+
+def roster_redundancy_enabled() -> bool:
+    """Default OFF: the first reading needs owner approval (audit section 8, item 3)."""
+
+    from modules.app_config import config_value
+
+    return config_value(REDUNDANCY_ENV_KEY).strip().casefold() in {"1", "true", "yes", "on"}
+
+
+def roster_redundancy_adjustment(
+    send_assets: Sequence[Mapping[str, Any]],
+    receive_assets: Sequence[Mapping[str, Any]],
+    *,
+    current_starter_ids: set[str],
+    post_starter_ids: set[str],
+    value_of,
+) -> tuple[int, str]:
+    """Price what a player adds to the lineup, not full market value, when he cannot start.
+
+    A received player outside the post-trade optimal lineup, or a sent player
+    outside the current one, keeps only BENCH_CHIP_RETENTION of his market value.
+    Receiving surplus therefore reads lower and selling surplus reads higher.
+    Picks are untouched. Returns (points, explanation).
+    """
+
+    haircut = 1.0 - BENCH_CHIP_RETENTION
+    received_bench = [
+        a for a in receive_assets
+        if a.get("asset_type") == "player" and str(a.get("player_id") or "") not in post_starter_ids
+    ]
+    sent_bench = [
+        a for a in send_assets
+        if a.get("asset_type") == "player" and str(a.get("player_id") or "") not in current_starter_ids
+    ]
+    recv = sum(max(0.0, float(value_of(a))) for a in received_bench)
+    sent = sum(max(0.0, float(value_of(a))) for a in sent_bench)
+    points = int(round(haircut * (sent - recv)))
+    if not points:
+        return 0, ""
+    parts = []
+    if recv:
+        parts.append(f"{len(received_bench)} received player(s) cannot start for this roster")
+    if sent:
+        parts.append(f"{len(sent_bench)} sent player(s) are surplus to this roster")
+    return points, "; ".join(parts) + f" (bench value kept at {BENCH_CHIP_RETENTION:.0%}, {points:+,})"
+
+
 # --- season window -----------------------------------------------------------
 
 FANTASY_SEASON_WEEKS = 17

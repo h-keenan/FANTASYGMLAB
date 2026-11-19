@@ -340,3 +340,35 @@ def test_value_words_read_the_same_score_as_the_verdict_not_the_raw_delta():
     assert verdict.value_delta == -1300
     assert verdict.value_summary == "Large value gap against you"
     assert verdict.ui_verdict == "DECLINE"
+
+
+# --- roster redundancy (audit P1-3) ----------------------------------------------
+
+
+def _player(pid, score):
+    return {"asset_type": "player", "player_id": pid, "score": score}
+
+
+def test_redundancy_flag_defaults_off(monkeypatch):
+    monkeypatch.delenv(trade_grade.REDUNDANCY_ENV_KEY, raising=False)
+    assert trade_grade.roster_redundancy_enabled() is False
+    monkeypatch.setenv(trade_grade.REDUNDANCY_ENV_KEY, "1")
+    assert trade_grade.roster_redundancy_enabled() is True
+
+
+def test_receiving_a_player_who_cannot_start_is_discounted():
+    points, note = trade_grade.roster_redundancy_adjustment(
+        [], [_player("qb2", 5000)], current_starter_ids=set(), post_starter_ids=set(),
+        value_of=lambda a: a["score"],
+    )
+    assert points == -2000 and "cannot start" in note
+
+
+def test_selling_surplus_is_credited_and_starters_and_picks_are_untouched():
+    points, _ = trade_grade.roster_redundancy_adjustment(
+        [_player("qb2", 5000), _player("qb1", 9000), {"asset_type": "pick", "score": 4000}],
+        [_player("wr", 6000)],
+        current_starter_ids={"qb1"}, post_starter_ids={"wr"},
+        value_of=lambda a: a["score"],
+    )
+    assert points == 2000
