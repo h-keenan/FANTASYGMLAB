@@ -77,6 +77,7 @@ DEFAULT_DB_PATH = ROOT / "data" / "players.db"
 DEFAULT_SIBLING_PATHS: tuple[Path, ...] = (
     ROOT / "data" / "sleeper_players.json",
     ROOT / "data" / "fantasycalc_values.csv",
+    ROOT / "data" / "fantasycalc_values.meta.json",
     ROOT / "data" / "depth_chart_snapshots.json",
 )
 REFRESH_SUBPROCESS_SCRIPT = ROOT / "scripts" / "refresh_players_db_subprocess.py"
