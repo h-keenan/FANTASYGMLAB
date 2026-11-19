@@ -42,7 +42,7 @@ function PlayerHead({ player, size = 44 }: { player: WrappedPlayer; size?: numbe
     <div className="flex items-center gap-3">
       <Face player={player} size={size} />
       <div className="min-w-0">
-        <p className="truncate text-base font-extrabold">{wrappedShortName(player.name)}</p>
+        <p className="text-base font-extrabold">{wrappedShortName(player.name)}</p>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{[player.pos, player.team].filter(Boolean).join(" · ")}</p>
       </div>
     </div>

@@ -37,6 +37,9 @@ const TEMPLATE_FILES = [
 ];
 // Files allowed to render a raw <PlayerAvatar>/<PlayerName>: path (relative to repo root) -> reason.
 export const RAW_ALLOWLIST = {
+  "web-next/src/components/SeasonWrapped.tsx": "the full-screen Season Wrapped story: player sheets would open underneath it, so a tap on a card player would only hide the story; each card is a shareable summary",
+  "mobile/src/components/SeasonWrapped.tsx": "the full-screen Season Wrapped story: player sheets would open underneath it, so a tap on a card player would only hide the story; each card is a shareable summary",
+  "mobile/src/components/WrappedShareCard.tsx": "exempt: a rendered share-card image, not interactive UI",
   "web-next/src/components/ui/TradeSummaryRow.tsx": "the collapsed summary avatars are decorative (aria-hidden); every player opens PQV from the expanded exchange rows (ExchangeSide)",
   "web-next/src/components/GmPlanSteps.tsx": "the avatars sit inside a trade row's expand toggle and are decorative; every player opens PQV from the expanded exchange rows (ExchangeSide)",
   "mobile/src/components/GmPlanSteps.tsx": "the avatars sit inside a trade row's expand toggle and are decorative; every player opens PQV from the expanded exchange rows (ExchangeSide)",

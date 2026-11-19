@@ -10,7 +10,8 @@ import * as Sharing from 'expo-sharing';
 import AppText from './AppText';
 import Button from './Button';
 import PlayerAvatar from './PlayerAvatar';
-import ShareCardChrome, { CARD_WIDTH } from './ShareCardChrome';
+import { CARD_WIDTH } from './ShareCardChrome';
+import WrappedShareCard, { WRAPPED_SHARE_HEIGHT } from './WrappedShareCard';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -30,7 +31,6 @@ import {
   type WrappedTone,
 } from '../lib/wrapped';
 
-const SHARE_HEIGHT = 480;
 
 function toneColor(colors: ThemeColors, tone: WrappedTone): string {
   return tone === 'good' ? colors.success : tone === 'warm' ? colors.warning : colors.textSecondary;
@@ -44,7 +44,7 @@ function Chip({ label, tone, colors }: { label: string; tone: WrappedTone; color
   const color = toneColor(colors, tone);
   return (
     <View style={{ borderWidth: 1, borderColor: color, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 3, backgroundColor: colors.surface, alignSelf: 'flex-start' }}>
-      <AppText style={{ color, fontSize: 11, fontWeight: '700' }}>{label}</AppText>
+      <AppText style={{ color, fontSize: 12, fontWeight: '700' }}>{label}</AppText>
     </View>
   );
 }
@@ -66,7 +66,7 @@ function CardBody({ card, colors, styles, onUnlock }: { card: WrappedCard; color
     <View style={styles.headRow}>
       <Face player={p} size={size} />
       <View style={{ flex: 1 }}>
-        <AppText style={styles.name} numberOfLines={1}>{wrappedShortName(p.name)}</AppText>
+        <AppText style={styles.name}>{wrappedShortName(p.name)}</AppText>
         <AppText style={styles.muted}>{[p.pos, p.team].filter(Boolean).join(' · ')}</AppText>
       </View>
     </View>
@@ -252,41 +252,6 @@ function CardBody({ card, colors, styles, onUnlock }: { card: WrappedCard; color
   }
 }
 
-/** The card as an exported share graphic (fixed dark palette, captured offscreen). */
-function ShareCapture({ model, shareRef }: { model: WrappedShareModel; shareRef: React.RefObject<View | null> }) {
-  const dark = useThemeMode().colors;
-  return (
-    <View style={{ position: 'absolute', left: -2000, top: 0 }} pointerEvents="none">
-      <ShareCardChrome ref={shareRef as React.RefObject<View>} kind="Season Wrapped" height={SHARE_HEIGHT}>
-        <AppText style={{ color: dark.accent, fontSize: 10, fontWeight: '800', letterSpacing: 2, marginTop: 6 }}>{model.eyebrow}</AppText>
-        <AppText style={{ color: '#f7f8fa', fontSize: 24, fontWeight: '900', marginTop: 2 }}>{model.title}</AppText>
-        {model.players.length ? (
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-            {model.players.slice(0, 2).map((p) => (
-              <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Face player={p} size={32} />
-                <AppText style={{ color: '#f7f8fa', fontWeight: '800', fontSize: 13 }}>{wrappedShortName(p.name)}</AppText>
-              </View>
-            ))}
-          </View>
-        ) : null}
-        <AppText style={{ color: '#f7f8fa', fontSize: model.headline.length > 10 ? 34 : 56, fontWeight: '900', marginTop: 12 }}>
-          {model.headline}
-          {model.unit ? <AppText style={{ fontSize: 16, color: '#a8adb7' }}> {model.unit}</AppText> : null}
-        </AppText>
-        {model.chip ? <AppText style={{ color: '#4ADE80', fontWeight: '700', fontSize: 13, marginTop: 4 }}>{model.chip}</AppText> : null}
-        {model.rows.slice(0, 4).map((r, i) => (
-          <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-            <AppText style={{ color: '#a8adb7', fontSize: 12, fontWeight: '700' }}>{r.label}</AppText>
-            <AppText style={{ color: '#f7f8fa', fontSize: 13, fontWeight: '800' }}>{r.value}</AppText>
-          </View>
-        ))}
-        <AppText style={{ color: '#a8adb7', fontSize: 11, marginTop: 12 }}>{[model.teamName, model.seasonLabel].filter(Boolean).join(' · ')}</AppText>
-      </ShareCardChrome>
-    </View>
-  );
-}
-
 /** The full-screen story: tap the sides to move, X to close. */
 export function SeasonWrapped({ deck, visible, onClose }: { deck: WrappedDeck; visible: boolean; onClose: () => void }) {
   const { colors } = useThemeMode();
@@ -307,7 +272,7 @@ export function SeasonWrapped({ deck, visible, onClose }: { deck: WrappedDeck; v
   const onShare = async () => {
     setSharing(true);
     try {
-      const uri = await captureRef(shareRef, { format: 'png', quality: 1, result: 'tmpfile', width: CARD_WIDTH * 3, height: SHARE_HEIGHT * 3 });
+      const uri = await captureRef(shareRef, { format: 'png', quality: 1, result: 'tmpfile', width: CARD_WIDTH * 3, height: WRAPPED_SHARE_HEIGHT * 3 });
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share this card' });
         return;
@@ -347,7 +312,7 @@ export function SeasonWrapped({ deck, visible, onClose }: { deck: WrappedDeck; v
         <View style={styles.footer}>
           {locked ? null : <Button label="Share this card" variant="accentOutline" onPress={onShare} loading={sharing} />}
         </View>
-        {locked ? null : <ShareCapture model={model} shareRef={shareRef} />}
+        {locked ? null : <WrappedShareCard model={model} shareRef={shareRef} />}
       </View>
     </Modal>
   );
@@ -390,7 +355,7 @@ function createStyles(colors: ThemeColors) {
     segment: { flex: 1, height: 4, borderRadius: 2 },
     close: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
     body: { flexGrow: 1, padding: spacing.lg, justifyContent: 'center' },
-    eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: colors.textTertiary },
+    eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2, color: colors.textTertiary },
     title: { fontSize: 30, fontWeight: '800', color: colors.textPrimary, lineHeight: 34 },
     sub: { fontSize: 14, color: colors.textSecondary },
     tap: { position: 'absolute', top: 110, bottom: 90, width: '25%' },
@@ -398,7 +363,7 @@ function createStyles(colors: ThemeColors) {
     panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
     locked: { alignItems: 'center', borderColor: colors.premium },
     lockDisc: { width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accentMuted },
-    proTag: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: colors.premium },
+    proTag: { fontSize: 12, fontWeight: '800', letterSpacing: 1.2, color: colors.premium },
     bar: { height: 8, borderRadius: 4, backgroundColor: colors.backgroundElevated, alignSelf: 'stretch' },
     center: { alignItems: 'center', gap: spacing.sm },
     hero: { fontWeight: '800', color: colors.textPrimary },
@@ -411,7 +376,7 @@ function createStyles(colors: ThemeColors) {
     rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     rows: { gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: spacing.md },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
-    rowLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1, color: colors.textTertiary },
+    rowLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 1, color: colors.textTertiary },
     rowValue: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
     dots: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: colors.accent },

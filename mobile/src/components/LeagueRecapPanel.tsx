@@ -189,7 +189,6 @@ export default function LeagueRecapPanel({
     <View style={styles.root}>
       {weekStrip}
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-        <SeasonWrappedLauncher label="Your season, wrapped" load={() => api.getLeagueWrapped(leagueId).then((b) => b.wrapped)} />
         {loading ? (
           <SkeletonRegion label="Weekly recap" style={styles.stack}>
             <SkeletonStatusHeader rows={0} />
@@ -202,6 +201,7 @@ export default function LeagueRecapPanel({
             <RecapBody recap={recap} myRosterId={myRosterId} rosterMap={rosterMap} openTeam={openTeam} onShare={() => setShareOpen(true)} onOpenTrades={() => navigation.navigate('TradeHistory')} />
           </PresenceSwap>
         )}
+        <SeasonWrappedLauncher label="Your season, wrapped" load={() => api.getLeagueWrapped(leagueId).then((b) => b.wrapped)} />
       </ScrollView>
       <RecapSharePreviewModal visible={shareOpen} onClose={() => setShareOpen(false)} leagueName={leagueName} recap={recap} rosterMap={rosterMap} />
       {profile ? (

@@ -150,10 +150,10 @@ export function LeagueRecapsContent({
         <PageControl>
           <ViewTabs label="League memory view" className="min-w-0 flex-1" value={view} options={MEMORY_VIEWS.map((v) => ({ value: v, label: v }))} onChange={(value) => setView(value as MemoryView)} />
         </PageControl>
+        {body}
         {view === "Recaps" ? (
           <SeasonWrappedLauncher label="Your season, wrapped" itemId={leagueId} variant="accentOutline" load={() => api.getLeagueWrapped(leagueId).then((b) => b.wrapped)} />
         ) : null}
-        {body}
       </div>
     </Shell>
   );
