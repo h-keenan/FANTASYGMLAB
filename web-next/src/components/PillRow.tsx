@@ -219,7 +219,7 @@ export function PillRow({
             padding: slim ? `0 ${slimTabInset(options.length)}px` : equalFit ? "0 var(--space-xs)" : mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
             background: track ? (isActive ? "color-mix(in srgb, var(--color-accent) 16%, transparent)" : "transparent") : isActive && !slim && !glass ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
-            color: glass ? undefined : track ? (isActive ? "var(--color-accent)" : "var(--color-text-secondary)") : isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",
+            color: glass ? undefined : track ? (isActive ? "var(--color-accent)" : "var(--color-text-secondary)") : isActive ? (slim ? "var(--color-text-primary)" : "var(--segmented-active-fg, var(--color-text-primary))") : "var(--color-text-secondary)", // slim has no filled segment, so the on-accent (white in light) active fg would vanish on the sheet
             // The sliding underline replaces the static one once measured (not drawn on the pill track).
             boxShadow: isActive && !indicator && !glass && !track ? "inset 0 -2px 0 var(--color-information)" : "none",
             borderLeft: index === 0 || slim || glass || track ? "none" : "var(--border-width-default) solid var(--color-border)",

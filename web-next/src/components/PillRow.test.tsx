@@ -10,6 +10,11 @@ const OPTIONS = [
 ];
 
 describe("PillRow", () => {
+  it("slim (in-sheet) active label never uses the on-accent colour (white in light mode, invisible on a transparent tab)", () => {
+    render(<PillRow options={OPTIONS} active="trades" onSelect={() => {}} slim />);
+    expect(screen.getByRole("tab", { name: "Trades" }).style.color).toBe("var(--color-text-primary)");
+  });
+
   it("is a tablist of tabs with aria-selected and roving tabindex", () => {
     render(<PillRow options={OPTIONS} active="trades" onSelect={() => {}} ariaLabel="Filter" />);
     expect(screen.getByRole("tablist", { name: "Filter" })).toBeInTheDocument();
