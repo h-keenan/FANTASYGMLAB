@@ -19,6 +19,8 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { PulseChip } from "@/components/Motion";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { SimDraftBar } from "@/components/SimDraftBar";
+import { SimPickReveal } from "@/components/SimMoments";
+import { useSimCelebrations } from "@/lib/useSimCelebrations";
 import { api } from "@/lib/api";
 import { simDraftBarModel, simDraftNeedPills, simDraftSummaryParts, simDraftSurvival, simRecentPickCards } from "@/lib/simDraft";
 import { simGradeOf } from "@/lib/simGrade";
@@ -137,6 +139,8 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     return () => clearTimeout(id);
   }, [queue.ids, gameId, call]);
 
+  const [celebrate] = useSimCelebrations();
+  const [reveal, setReveal] = useState<{ pick: SimDraftPick; board: SimDraftPick[] } | null>(null);
   const applyResult = useCallback(
     (body: { picks?: SimDraftPick[]; draft?: Partial<SimDraftState>; completed?: boolean; recap?: SimDraftRecap | null; game?: typeof game }, auto = false) => {
       const made = body.picks ?? [];
@@ -169,6 +173,10 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     pickInFlight.current = false;
     if (body) {
       applyResult(body);
+      // The pick moment (Celebrations on): your pick's card flips, then the grade pops. Not on the draft's last pick: the recap follows.
+      const youId = ctx.game.you?.team_id;
+      const mine = youId && !body.completed ? (body.picks ?? []).find((m) => m.team_id === youId) : undefined;
+      if (celebrate && mine) setReveal({ pick: mine, board: [...(draft?.picks ?? []), ...(body.picks ?? [])].filter((m) => m.team_id === youId) });
       setOptimistic(null);
       // Refresh the hint for the next turn.
       api
@@ -460,6 +468,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       ) : (
         side(panel as Exclude<Panel, "board">)
       )}
+      {reveal ? <SimPickReveal pick={reveal.pick} board={reveal.board} onDone={() => setReveal(null)} /> : null}
     </div>
   );
 }

@@ -37,6 +37,8 @@ const TEMPLATE_FILES = [
 ];
 // Files allowed to render a raw <PlayerAvatar>/<PlayerName>: path (relative to repo root) -> reason.
 export const RAW_ALLOWLIST = {
+  "web-next/src/components/SimMoments.tsx": "the pick reveal is a full-screen moment: the revealed player is the card itself (the board rows below use SimPlayerChip, tappable); a sheet would open underneath it",
+  "mobile/src/components/SimMoments.tsx": "the pick reveal is a full-screen moment: the revealed player is the card itself (the board rows below use SimPlayerChip, tappable); a sheet would open underneath it",
   "web-next/src/components/SeasonWrapped.tsx": "the full-screen Season Wrapped story: player sheets would open underneath it, so a tap on a card player would only hide the story; each card is a shareable summary",
   "mobile/src/components/SeasonWrapped.tsx": "the full-screen Season Wrapped story: player sheets would open underneath it, so a tap on a card player would only hide the story; each card is a shareable summary",
   "mobile/src/components/WrappedShareCard.tsx": "exempt: a rendered share-card image, not interactive UI",

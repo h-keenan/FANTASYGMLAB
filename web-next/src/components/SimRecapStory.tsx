@@ -1,5 +1,6 @@
 "use client";
 
+import { SimWeekStamp } from "@/components/SimMoments";
 import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
@@ -234,6 +235,7 @@ export function SimWeekRecapStory({
               </div>
             ) : null}
             {result.kind === "game" ? <p className="text-base font-bold">{result.margin}</p> : null}
+            {result.kind === "game" ? <SimWeekStamp key={recap.week} recap={recap} /> : null}
           </HeroZone>
           {result.kind === "game" ? (
             <div className="ui-recap-rows">

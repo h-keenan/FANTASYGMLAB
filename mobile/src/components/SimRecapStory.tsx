@@ -7,6 +7,7 @@ import StoryCarousel, { type StoryPage } from './StoryCarousel';
 import { SimWeekRecapView } from './SimGameRecap';
 import CircularProgressRing from './CircularProgressRing';
 import { Confetti, CountUp, MotionIn } from './Motion';
+import { SimWeekStamp } from './SimMoments';
 import { SimPlayerChip, SimPlayerLine, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
 import { SimTeamIdentity, SimTeamLogo } from './SimTeamIdentity';
 import RecapCard from './RecapCard';
@@ -248,6 +249,7 @@ export default function SimWeekRecapStory({
               </View>
             ) : null}
             {result.kind === 'game' ? <AppText style={[common.bodyStrong, { textAlign: 'center' }]}>{result.margin}</AppText> : null}
+            {result.kind === 'game' ? <SimWeekStamp key={recap.week} recap={recap} /> : null}
           </HeroZone>
           {result.kind === 'game' ? (
             <View style={{ gap: 8 }}>

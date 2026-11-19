@@ -25,6 +25,8 @@ import { SimDraftBar } from './SimDraftBar';
 import { simDraftBarModel, simDraftNeedPills, simDraftSummaryParts, simDraftSurvival, simRecentPickCards } from '../lib/simDraft';
 import { simGradeOf } from '../lib/simGrade';
 import { LetterGrade } from './LetterGrade';
+import { SimPickReveal } from './SimMoments';
+import { useSimCelebrations } from '../lib/useSimCelebrationsNative';
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
@@ -143,6 +145,8 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     };
   }, [gameId, hint, loadState, madePicks, ctx.tick]);
 
+  const [celebrate] = useSimCelebrations();
+  const [reveal, setReveal] = useState<{ pick: SimDraftPick; board: SimDraftPick[] } | null>(null);
   const applyResult = useCallback(
     (body: { picks?: SimDraftPick[]; draft?: Partial<SimDraftState>; completed?: boolean; recap?: SimDraftRecap | null; game?: typeof game }, auto = false) => {
       const made = body.picks ?? [];
@@ -176,6 +180,10 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     setOptimistic(null);
     if (body) {
       applyResult(body);
+      // The pick moment (Celebrations on): your pick's card flips, then the grade pops. Not on the draft's last pick: the recap follows.
+      const youId = ctx.game.you?.team_id;
+      const mine = youId && !body.completed ? (body.picks ?? []).find((m) => m.team_id === youId) : undefined;
+      if (celebrate && mine) setReveal({ pick: mine, board: [...(draft?.picks ?? []), ...(body.picks ?? [])].filter((m) => m.team_id === youId) });
       // Refresh the hint for the next turn.
       api
         .getSimDraft(gameId, 'page=1&page_size=1')
@@ -454,6 +462,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       />
       )}
       {panel === 'board' ? board : side()}
+      {reveal ? <SimPickReveal pick={reveal.pick} board={reveal.board} onDone={() => setReveal(null)} /> : null}
     </View>
   );
 }

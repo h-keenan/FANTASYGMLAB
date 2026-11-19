@@ -22,6 +22,7 @@ import {
   type SimTrophyRow,
 } from '../lib/simAchievements';
 import { Collapse } from './Presence';
+import { simStreakNumber } from '../lib/simMoments';
 import { ProgressFill } from './Motion';
 
 /** The lib names web CSS tokens; the app resolves the same semantic tokens from its theme. */
@@ -38,8 +39,9 @@ export function useAchievementColor() {
 }
 
 /** The round badge: a rarity-coloured ring around the glyph (muted while locked). Decorative; the row carries the name. */
-export function SimAchievementBadge({ a, size = 36 }: { a: Pick<SimAchievement, 'icon' | 'rarity' | 'tone' | 'unlocked'>; size?: number }) {
+export function SimAchievementBadge({ a, size = 36 }: { a: Pick<SimAchievement, 'icon' | 'rarity' | 'tone' | 'unlocked'> & Partial<Pick<SimAchievement, 'key' | 'detail' | 'tier' | 'progress'>>; size?: number }) {
   const colorOf = useAchievementColor();
+  const streak = simStreakNumber(a);
   const color = colorOf(a);
   return (
     <View
@@ -48,7 +50,7 @@ export function SimAchievementBadge({ a, size = 36 }: { a: Pick<SimAchievement, 
       testID="achievement-badge"
       style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: color + (a.unlocked ? 'B3' : '59'), backgroundColor: a.unlocked ? color + '24' : 'transparent', opacity: a.unlocked ? 1 : 0.8 }}
     >
-      <SimGlyph name={simAchievementGlyph(a.icon)} color={color} size={Math.round(size * 0.5)} />
+      {streak !== null ? <AppText style={{ color, fontSize: Math.max(12, Math.round(size * 0.46)), fontWeight: '800' }} testID="streak-number">{streak}</AppText> : <SimGlyph name={simAchievementGlyph(a.icon)} color={color} size={Math.round(size * 0.5)} />}
     </View>
   );
 }
