@@ -831,6 +831,23 @@ def verify_email_token_hash(
     return payload, ""
 
 
+TYPED_ERRORS_FLAG = "DYNASTYGM_AUTH_PROVIDER_TYPED_ERRORS_V1"
+
+
+class TransientAuthError(str):
+    """An auth-user lookup error that says nothing about the session: GoTrue was unreachable, rate limited, answered 5xx or
+    sent back something unreadable. A ``str`` so every existing ``(user, error)`` caller keeps working; the API turns it into
+    a retryable 503 instead of a 401 that would sign a healthy user out (docs/audits/2026-11-auth-offline-error-paths.md)."""
+
+    retry_after: int = 5
+
+
+def _transient(message: str, retry_after: int = 5) -> TransientAuthError:
+    error = TransientAuthError(message)
+    error.retry_after = retry_after
+    return error
+
+
 def fetch_auth_user(config: dict, access_token: str) -> tuple[dict | None, str]:
     """Load the Auth user for an access token (confirmation callback enrichment)."""
 
@@ -847,10 +864,17 @@ def fetch_auth_user(config: dict, access_token: str) -> tuple[dict | None, str]:
                 timeout=15,
             )
     except Exception:
-        return None, "Could not reach Supabase Auth."
+        return None, _transient("Could not reach Supabase Auth.")
+    if response.status_code == 429:
+        return None, _transient(_safe_error(response), 30)
+    if response.status_code >= 500:
+        return None, _transient(_safe_error(response))
     if response.status_code >= 400:
         return None, _safe_error(response)
-    payload = response.json()
+    try:
+        payload = response.json()
+    except Exception:
+        return None, _transient("Supabase Auth sent back something unreadable.")
     return (payload if isinstance(payload, dict) else None), ""
 
 

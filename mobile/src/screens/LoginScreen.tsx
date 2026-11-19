@@ -24,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { hasPassedAgeGate } from '../lib/ageGate';
 import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
 import { trackUse } from '../lib/analytics';
+import { SESSION_ENDED_NOTICE } from '../lib/sessionEnded';
 import { AUTH_PROMISE_LINE, SAMPLE_TRY_LABEL } from '../lib/sampleLeague';
 import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -34,7 +35,7 @@ import Input from '../components/Input';
 const LEGAL_PAGES = (legalContent as { pages: Record<string, { title: string; sections: ContentSection[] }> }).pages;
 
 export default function LoginScreen() {
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword, sessionEnded } = useAuth();
   const { colors } = useThemeMode();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<{ navigate: (name: string) => void }>();
@@ -211,7 +212,7 @@ export default function LoginScreen() {
         ) : null}
 
         {error ? <AppText style={styles.error}>{error}</AppText> : null}
-        {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
+        {notice || sessionEnded ? <AppText style={styles.notice}>{notice ?? SESSION_ENDED_NOTICE}</AppText> : null}
 
         {resetMode ? (
           <>

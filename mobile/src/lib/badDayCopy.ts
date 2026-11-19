@@ -26,6 +26,24 @@ export const LEAGUE_GONE_ACTION = "Choose another league";
 export const SERVER_ERROR_MESSAGE = "Our servers hit a snag. Try again in a moment.";
 export const SERVICE_BUSY_MESSAGE = "We are busy right now. Try again in a moment.";
 export const OFFLINE_ERROR_MESSAGE = "Could not reach the server. Check your connection and try again.";
+export const FORBIDDEN_MESSAGE = "Your account cannot open this. If your plan just changed, refresh the page or sign in again.";
+export const BAD_RESPONSE_MESSAGE = "We got an unexpected reply from the server. Try again in a moment.";
+/** Codes the server attaches to auth failures: only `session_invalid` means the user must sign in again. */
+export const AUTH_UNAVAILABLE_CODE = "auth_unavailable";
+export const SESSION_INVALID_CODE = "session_invalid";
+
+/**
+ * A failed session lookup (supabase getSession error) that says nothing about whether the user is signed in: the token could
+ * not be refreshed because the device is offline or the auth service is down. auth-js keeps the stored session in that case,
+ * so this must read as "offline, retry", never "session ended" (which signs the user out).
+ */
+export function isRetryableSessionLookupError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { name?: unknown; status?: unknown; message?: unknown };
+  if (e.name === "AuthRetryableFetchError") return true;
+  if (typeof e.status === "number" && (e.status === 0 || e.status === 429 || e.status >= 500)) return true;
+  return typeof e.message === "string" && /failed to fetch|network request failed|load failed|network error|timed? ?out/i.test(e.message);
+}
 
 export type ErrorKind = "session" | "league_gone" | "offline" | "server" | "other";
 
@@ -45,9 +63,11 @@ export function classifyErrorMessage(message: string): ErrorKind {
  */
 export function friendlyStatusMessage(status: number, detail: string): string {
   const text = detail.trim();
-  const generic = !text || /^request failed( with status |\s*\()\s*\d{3}/i.test(text);
-  if (!generic) return text;
+  const generic = !text || /^request failed( with status |\s*\()\s*\d{3}/i.test(text) || /^request failed\.?$/i.test(text);
+  // Whatever the server wrote for a 401, the client's one message routes to the shared "session ended" state.
   if (status === 401) return "Not signed in.";
+  if (!generic) return text;
+  if (status === 403) return FORBIDDEN_MESSAGE;
   if (status === 429 || status === 503) return SERVICE_BUSY_MESSAGE;
   if (status >= 500) return SERVER_ERROR_MESSAGE;
   // 4xx keeps the client's generic fallback: callers (Sim mutations) detect it to substitute their own sentence.

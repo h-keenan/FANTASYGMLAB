@@ -7,6 +7,7 @@ import { AgeGate } from "./AgeGate";
 import { hasPassedAgeGate, setPassedAgeGate } from "@/lib/ageGateStorage";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
+import { SESSION_ENDED_NOTICE } from "@/lib/sessionEnded";
 
 /**
  * Ports modules/account_ui.py's render_mobile_auth_entry sign-in/create-
@@ -64,11 +65,11 @@ import { Input } from "@/components/Input";
  * resolves automatically either way (Zach's ask).
  */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
-  const { signIn, signUp, signInWithOAuth, upgradeGuestWithEmail, isGuest, callbackNotice, resetPassword } = useAuth();
+  const { signIn, signUp, signInWithOAuth, upgradeGuestWithEmail, isGuest, callbackNotice, resetPassword, sessionEnded } = useAuth();
   // Guest (anonymous) sessions are upgraded in place so the user id and saved
   // data are kept; the notice explains the rare cases where that is impossible.
   const [localNotice, setNotice] = useState<string | null>(null);
-  const notice = localNotice ?? callbackNotice?.message ?? null;
+  const notice = localNotice ?? callbackNotice?.message ?? (sessionEnded ? SESSION_ENDED_NOTICE : null);
   // Set once linking failed and the user must opt in to a plain sign-in.
   const [plainOAuthChosen, setPlainOAuth] = useState(false);
   const plainOAuth = plainOAuthChosen || Boolean(callbackNotice);

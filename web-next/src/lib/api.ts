@@ -1,5 +1,5 @@
 import type { DraftSignalRow } from "./draftSignals";
-import { friendlyStatusMessage, OFFLINE_ERROR_MESSAGE } from "./badDayCopy";
+import { BAD_RESPONSE_MESSAGE, friendlyStatusMessage, isRetryableSessionLookupError, OFFLINE_ERROR_MESSAGE } from "./badDayCopy";
 import { normalizeProspectProfile, type ProspectProfileResponse } from "./prospectProfile";
 import { normalizeCollegeProspects, normalizeLeagueRankings, normalizeMe, normalizeCommissionerIntegrity, normalizeCommunityTrades, normalizeLeagueRosters, normalizeLeagueTeamProfiles, normalizeSharedCommunityTrades } from "./apiDefaults";
 import type { SimNotificationsResponse } from "@/lib/simNotifications";
@@ -130,25 +130,31 @@ async function performRequestOnce<T>(
   }
 
   let body: unknown = null;
+  let bodyUnreadable = false;
   try {
     body = await response.json();
   } catch {
     body = null;
+    bodyUnreadable = response.status !== 204 && response.headers.get("Content-Length") !== "0";
   }
 
   if (!response.ok) {
-    const detail =
-      body && typeof body === "object" && "detail" in body
-        ? String((body as { detail?: unknown }).detail ?? "")
-        : "";
-    const code =
-      body && typeof body === "object" && typeof (body as { code?: unknown }).code === "string"
-        ? (body as { code: string }).code
-        : undefined;
+    // The API writes `error` (FastAPI's own shape is `detail`): read both so a specific server message is not dropped.
+    const fields = body && typeof body === "object" ? (body as { detail?: unknown; error?: unknown; code?: unknown; reason?: unknown }) : {};
+    const detailField = fields.detail ?? fields.error;
+    const detail = typeof detailField === "string" ? detailField : "";
+    const codeField = fields.code ?? fields.reason;
+    const code = typeof codeField === "string" ? codeField : undefined;
     const retryAfter = parseRetryAfterSeconds(response.headers.get("Retry-After"));
     const apiError = new ApiError(response.status, friendlyStatusMessage(response.status, detail), code, retryAfter);
     if (!isServerBusyError(apiError)) reportApiFailure(response.status);
     throw apiError;
+  }
+
+  // A 2xx that is not JSON is a proxy or error page (HTML), not data: a null body would crash the screen downstream.
+  if (bodyUnreadable) {
+    reportApiFailure(502);
+    throw new ApiError(502, BAD_RESPONSE_MESSAGE, "bad_response");
   }
 
   if (isFreeLeagueLockedBody(body)) {
@@ -158,25 +164,36 @@ async function performRequestOnce<T>(
   return maskIfPrivate(body) as T;
 }
 
+/**
+ * The current access token. A session lookup that failed because the device is offline or the auth service is down is NOT a
+ * signed-out session (auth-js keeps the stored session and retries): say so, so the user gets "check your connection" and a retry
+ * instead of "session ended" with a button that signs them out.
+ */
+async function requireAccessToken(): Promise<{ accessToken: string; userId?: string }> {
+  const { data, error } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!accessToken) {
+    if (error && isRetryableSessionLookupError(error)) throw new ApiError(0, OFFLINE_ERROR_MESSAGE);
+    throw new ApiError(401, "Not signed in.");
+  }
+  return { accessToken, userId: data.session?.user?.id };
+}
+
 async function authorizedRequest<T>(
   path: string,
   init?: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal; idempotent?: boolean },
 ): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
-  if (!accessToken) {
-    throw new ApiError(401, "Not signed in.");
-  }
+  const { accessToken, userId } = await requireAccessToken();
   const method = init?.method ?? "GET";
   if (method !== "GET") {
     // A write may change what any read returns: never serve a reused read after one.
     clearRequestCache();
-    return performRequest<T>(path, init, accessToken, data.session?.user?.id);
+    return performRequest<T>(path, init, accessToken, userId);
   }
-  if (init?.signal) return performRequest<T>(path, init, accessToken, data.session?.user?.id);
+  if (init?.signal) return performRequest<T>(path, init, accessToken, userId);
   // Same user + same privacy view + same path: one request, however many callers (see requestCache.ts).
   return coalesceRead<T>(`${accessToken}|${isPrivacyMode() ? "p" : "-"}|${path}`, isCacheablePath(path), () =>
-    performRequest<T>(path, init, accessToken, data.session?.user?.id),
+    performRequest<T>(path, init, accessToken, userId),
   );
 }
 
@@ -186,11 +203,7 @@ async function authorizedBillingRequest<T>(
   name: BillingFunction,
   init?: { method?: "GET" | "POST"; jsonBody?: unknown },
 ): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
-  if (!accessToken) {
-    throw new ApiError(401, "Not signed in.");
-  }
+  const { accessToken } = await requireAccessToken();
   return billingRequest<T>(name, accessToken, init);
 }
 
@@ -205,11 +218,7 @@ async function authorizedBinaryRequest(
   baseUrl: string = env.apiBaseUrl,
   jsonBody?: unknown,
 ): Promise<Blob> {
-  const { data } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
-  if (!accessToken) {
-    throw new ApiError(401, "Not signed in.");
-  }
+  const { accessToken } = await requireAccessToken();
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
