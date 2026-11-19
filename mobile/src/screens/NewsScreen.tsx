@@ -22,6 +22,7 @@ import { getLastLeague, type LastLeague } from '../lib/lastLeague';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { api, type AlertsResponse, type NewsItem, type NewsResponse } from '../lib/api';
+import { useLatestGate } from '../lib/useLatestGate';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { newsPlayerIdentities } from '../lib/newsIdentity';
 import { alsoReportedLine } from '../lib/playerNews';
@@ -259,18 +260,22 @@ function NflNews({ route, tab, onTab }: { route?: { params?: NewsParams }; tab: 
   const [feedStatus, setFeedStatus] = useState<NewsResponse['status']>(undefined);
   const [newsFilter, setNewsFilter] = useState<NewsFilterKey>('all');
 
+  // The player filter can change in place; an older player's answer must not replace the newer one.
+  const newsGate = useLatestGate();
   const load = useCallback(async () => {
+    const isCurrent = newsGate.begin();
     setError(null);
     try {
       const result = playerId ? await api.getPlayerNews(playerId, 10, { groupDuplicates: true }) : await api.getNews(30);
+      if (!isCurrent()) return;
       setItems(result.items);
       setFeedStatus('status' in result ? result.status : undefined);
     } catch (err) {
-      setError(toUserErrorMessage(err, 'Failed to load news.'));
+      if (isCurrent()) setError(toUserErrorMessage(err, 'Failed to load news.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [playerId]);
+  }, [newsGate, playerId]);
 
   useEffect(() => {
     void load();

@@ -105,6 +105,8 @@ export default function NewsPage() {
       });
     return () => {
       cancelled = true;
+      // The previous league's roster digest must not stay up under the new league (or after a failed load).
+      setAlerts(null);
     };
   }, [session, rosterLeagueId]);
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createSingleFlight } from '../lib/latestRequest';
 import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
@@ -33,6 +34,7 @@ export default function ShareToCommunityToggle({
   const [busy, setBusy] = useState(false);
   const [sharedId, setSharedId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [shareFlight] = useState(() => createSingleFlight());
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +52,9 @@ export default function ShareToCommunityToggle({
   if (!available || !isShareableGrade(verdict.ui_verdict)) return null;
 
   const share = async () => {
+    await shareFlight.run(shareOnce);
+  };
+  const shareOnce = async () => {
     setBusy(true);
     setError('');
     try {

@@ -76,8 +76,14 @@ export default function CommissionerScreen({ route, navigation }: Props) {
   const draftOrder: DraftOrderRule = ruleQuery.data ?? 'unknown';
   // Changing it saves server-side and re-keys the integrity read (a refetch with the new rule).
   const setDraftOrder = (value: DraftOrderRule) => {
+    const previous = queryClient.getQueryData<DraftOrderRule>(queryKeys.draftOrderRule(leagueId));
     queryClient.setQueryData(queryKeys.draftOrderRule(leagueId), value);
-    api.setDraftOrderRule(leagueId, value).catch(() => {});
+    // A failed save must not leave the screen showing a rule the server never stored.
+    api.setDraftOrderRule(leagueId, value).catch(() => {
+      if (queryClient.getQueryData(queryKeys.draftOrderRule(leagueId)) === value) {
+        queryClient.setQueryData(queryKeys.draftOrderRule(leagueId), previous ?? 'unknown');
+      }
+    });
   };
   useScreenHeaderTitle(navigation, 'Commissioner', leagueName);
 

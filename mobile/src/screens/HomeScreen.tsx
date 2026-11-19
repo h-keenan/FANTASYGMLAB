@@ -1,6 +1,7 @@
 import ConfirmInPlace from '../components/ConfirmInPlace';
 import { useNotice } from '../components/NoticeToast';
 import { funnelStepIndex } from '../lib/firstRunFlow';
+import { createSingleFlight } from '../lib/latestRequest';
 import { isProOrNull, planOf } from '../lib/plan';
 import { trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import FreeLimitNote from '../components/FreeLimitNote';
@@ -345,7 +346,12 @@ export default function HomeScreen({ navigation, route }: Props) {
 
   // Saves every checked league, newest season first: the first goes through the full save flow (routing, warm-up,
   // cap card); the rest are saved quietly after it, and the plan's cap never blocks the one that opened.
+  // `addBusy` clears between the first save and the quiet extras, so a second tap in that gap would save the same leagues again.
+  const [connectFlight] = useState(() => createSingleFlight());
   const connectSelected = async () => {
+    await connectFlight.run(connectSelectedOnce);
+  };
+  const connectSelectedOnce = async () => {
     const plan = planSaves(addSelected, addOptions ?? []);
     if (plan.length === 0) return;
     const [first, ...rest] = plan;

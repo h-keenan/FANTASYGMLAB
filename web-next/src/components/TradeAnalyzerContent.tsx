@@ -12,7 +12,7 @@ import { Button, ButtonLink } from "@/components/Button";
 import { LimitWall } from "@/components/LimitWall";
 import { useAuth } from "@/context/AuthContext";
 import { limitWallForReason, type LimitWallModel } from "@/lib/limitWall";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ToneBadge } from "@/components/ToneBadge";
 import { TradeOddsEffect } from "@/components/TradeOddsEffect";
 
@@ -76,6 +76,7 @@ import { MultiTeamTradeContent, TradeModeToggle, type TradeMode } from "@/compon
 import { TradeValueBar } from "@/components/TradeValueBar";
 import { dealSizeFor, valueDirectionLabel } from "@/lib/tradeValueBands.generated";
 import { isEspnLeagueId } from "@/lib/leaguePlatform";
+import { useLatestGate } from "@/lib/useLatestGate";
 import type { MultiTransfer } from "@/lib/multiTeamTrade";
 
 /**
@@ -871,8 +872,25 @@ export function TradeAnalyzerContent({
     setVerdict(null);
   }
 
+  // An answer only applies to the exact trade it was asked about: any edit to the assets or the partner retires the
+  // outstanding request, so a slow answer for the old selection can never land on the new one.
+  const analyzeGate = useLatestGate();
+  const selectionKey = [
+    sendPlayers.map((p) => p.player_id).join(","),
+    receivePlayers.map((p) => p.player_id).join(","),
+    sendPicks.map((p) => p.pick_id).join(","),
+    receivePicks.map((p) => p.pick_id).join(","),
+    selectedTeamId,
+  ].join("|");
+  useEffect(() => {
+    analyzeGate.cancel();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the retired request will never clear this itself
+    setAnalyzing(false);
+  }, [analyzeGate, selectionKey]);
+
   async function analyze() {
     if (quickMode) return;
+    const isCurrent = analyzeGate.begin();
     setAnalyzeError(null);
     setLimitWall(null);
     setAnalyzing(true);
@@ -884,6 +902,7 @@ export function TradeAnalyzerContent({
         receivePickIds: receivePicks.map((p) => p.pick_id),
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? "" : selectedTeamId,
       });
+      if (!isCurrent()) return;
       setPlanningNote(result.planning_note ?? "");
       setRoleNotes(result.role_notes ?? []);
       setRoleNotesLocked(result.role_notes_locked === true);
@@ -898,9 +917,9 @@ export function TradeAnalyzerContent({
         else setAnalyzeError(analyzeFailureMessage(result.reason));
       }
     } catch (err) {
-      setAnalyzeError(err instanceof Error ? err.message : "Could not analyze this trade.");
+      if (isCurrent()) setAnalyzeError(err instanceof Error ? err.message : "Could not analyze this trade.");
     } finally {
-      setAnalyzing(false);
+      if (isCurrent()) setAnalyzing(false);
     }
   }
 
