@@ -35,7 +35,6 @@ export default function PortfolioFreeStanding() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   useEffect(() => {
     let cancelled = false;
-    setFailed(false);
     getLastLeague()
       .then(async (last) => {
         if (cancelled) return;
@@ -68,7 +67,11 @@ export default function PortfolioFreeStanding() {
       />
     );
   }
-  if (failed && !snapshot) return <ErrorState compact title="Could not load your standing" onRetry={() => setAttempt((n) => n + 1)} />;
+  const retry = () => {
+    setFailed(false);
+    setAttempt((n) => n + 1);
+  };
+  if (failed && !snapshot) return <ErrorState compact title="Could not load your standing" onRetry={retry} />;
   if (!league || !snapshot) return null;
   return (
     <AccentCard accent={colors.accent} style={styles.card}>

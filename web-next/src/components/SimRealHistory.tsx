@@ -25,8 +25,6 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
 
   useEffect(() => {
     let cancelled = false;
-    setFailed(false);
-    setLogFailed(false);
     api
       .getPlayerCareer(playerId)
       .then((body) => {
@@ -52,6 +50,8 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
   }, [playerId, asOf, attempt]);
 
   const retry = () => {
+    setFailed(false);
+    setLogFailed(false);
     setCareer(null);
     setLog(null);
     setAttempt((n) => n + 1);

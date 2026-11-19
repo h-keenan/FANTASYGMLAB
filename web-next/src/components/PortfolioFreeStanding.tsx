@@ -31,7 +31,6 @@ export function PortfolioFreeStanding() {
   useEffect(() => {
     if (!first) return;
     let cancelled = false;
-    setFailed(false);
     api
       .getDashboard(first.league_id)
       .then((res) => {
@@ -56,7 +55,11 @@ export function PortfolioFreeStanding() {
       </EmptyState>
     );
   }
-  if (first && failed && !snapshot) return <ErrorState compact onRetry={() => setAttempt((n) => n + 1)} message="Could not load your standing" />;
+  const retry = () => {
+    setFailed(false);
+    setAttempt((n) => n + 1);
+  };
+  if (first && failed && !snapshot) return <ErrorState compact onRetry={retry} message="Could not load your standing" />;
   if (!first || !snapshot) return null;
   const items: StatStripItem[] = [
     { glyph: "record", label: "Record", value: portfolioRecordText(snapshot) },
