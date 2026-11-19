@@ -1,5 +1,23 @@
 # News-driven value events (2026-10)
 
+> **RETIRED 2026-11-19 (band-aid audit #4).** The `DYNASTYGM_NEWS_VALUE_EVENTS` layer, its store, the
+> injury-sync hook and the original proxy backtest were deleted; output at the default (off) is unchanged.
+> Re-test on official nflverse `Out` reports (point-in-time, 2021-2025; harness
+> `scripts/news_value_events_ab_backtest.py`, needs the nflverse stats/injury/games CSVs and DynastyProcess
+> snapshots in a local data dir), layer on vs off with the production incremental formula:
+>
+> - Next-4-game points, held-out 2023/2024/2025, n = 62/67/90 Out events: MAE gain +0.10/+0.12/+0.22 pts
+>   (95% CIs all above zero) on a ~22 pt MAE, i.e. ~0.7%; Spearman identical to three decimals
+>   (.520 vs .520), so no ranking change.
+> - Market value (DynastyProcess, next snapshot ~6-7 weeks later), 2023-25, n = 12 Out events: log-MAE gain
+>   -0.0007, 95% CI [-0.033, +0.031]. No detectable benefit; n is too small to say more.
+> - The layer only moves a value where the age-curve injury multiplier is above 0.81 (young Out players),
+>   needs an event store shared between the cron host and the API that was never provisioned, and opens
+>   events only for transitions seen while on. Cost exceeds a ~0.7% point-prediction gain, so it was deleted.
+> - Side finding: Out players realise ~0.48 of trailing PPG over the next four games versus the 0.83
+>   implied by the static age-curve multiplier. That gap belongs to the injury table, not to this layer.
+
+
 Closes the top finding of `docs/logic-audit-2026-10-r2.md` ("no news-to-value link beyond
 Sleeper injury status") **conservatively**. Shipped behind `DYNASTYGM_NEWS_VALUE_EVENTS`
 (default `0`): merging changes nothing in production.
