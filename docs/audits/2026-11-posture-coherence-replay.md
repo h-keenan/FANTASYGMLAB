@@ -76,6 +76,7 @@ the review target for deletion with the 2026-12-19 flag review.
 Test changes: assertions about the default only. `test_coherence_flag_off_is_the_default` became `test_coherence_flag_on_is_the_default`. The existing pre-coherence goldens
 (`tests/fixtures/posture_golden.json`, unchanged, not regenerated) are now checked with the flag switched OFF in a subprocess (the flag is read at import), and the flag-OFF floor
 subprocess also sets coherence OFF. `posture_golden_coherence.json` (the ON golden) is unchanged and still passes.
+`tests/test_trade_grade.py::test_injury_cost_depends_on_posture_duration_role_and_season` asserted a strict rebuild > tank injury cost, which the owner-approved floor (both 0.20) removes by design: it now runs against the pre-coherence weights unchanged, and a new test pins the ON behaviour (contender > retool > rebuild == tank > 0).
 
 ## Limits
 

@@ -101,7 +101,17 @@ def _cost(strategy, absence, window=IN_SEASON, starts=True, value=6000):
     return trade_grade.injury_availability_cost(value, absence, strategy=strategy, window=window, starts=starts)
 
 
-def test_injury_cost_depends_on_posture_duration_role_and_season():
+def test_injury_cost_posture_ordering_with_coherence_on_floors_rebuild_and_tank_together():
+    """Coherence ON (default): injury weights are floored at the starter weight, so rebuild and tank price a missed week alike."""
+    out = trade_grade.estimate_injury_absence("Active", "Out", window=IN_SEASON)
+    contender, retool, rebuild, tank = (_cost(s, out) for s in ("contender", "retool", "rebuild", "tank"))
+    assert contender > retool > rebuild == tank > 0
+    assert trade_grade.INJURY_POSTURE_WEIGHTS["rebuild"] == trade_grade.INJURY_POSTURE_WEIGHTS["tank"] == 0.20
+
+
+def test_injury_cost_depends_on_posture_duration_role_and_season(monkeypatch):
+    # Pre-coherence weights (flag OFF): the original strict ordering and numbers, unchanged.
+    monkeypatch.setattr(trade_grade, "INJURY_POSTURE_WEIGHTS", dict(trade_grade.posture_model._INJURY_POSTURE_BASE))
     out = trade_grade.estimate_injury_absence("Active", "Out", window=IN_SEASON)
     ir = trade_grade.estimate_injury_absence("Inactive", "IR", window=IN_SEASON)
 
