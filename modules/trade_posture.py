@@ -34,9 +34,9 @@ import re
 import math
 from typing import Any, Mapping, Sequence
 
-from modules import age_profile, projection_calibration
+from modules import age_profile, posture_model, projection_calibration
 from modules.team_eval import normalize_team_strategy, team_strategy_label
-from modules.trade_lineup_model import POSTURE_WEIGHTS, STATIC_VALUE_PER_POINT
+from modules.trade_lineup_model import STATIC_VALUE_PER_POINT
 
 # --- parameters (all approximate; see docs/trade-engine-v2.md) ----------------
 
@@ -66,38 +66,10 @@ from modules.trade_lineup_model import POSTURE_WEIGHTS, STATIC_VALUE_PER_POINT
 # a +4.2k contender sale that cost 107 lineup points from +252 into -1601. It
 # does not touch trades that keep or add lineup (gains are credited at a
 # quarter), nor sales that cost under a win and clear a very large value gap.
-WINDOW_WIN_WEIGHT: dict[str, float] = {
-    "contender": 1.0,
-    "fringe_contender": 0.7,
-    "retool": 0.15,
-    "rebuild": 0.0,
-    "tank": 0.0,
-}
-# The net weight on REAL lineup points a rebuilding team puts on a point of ROS lineup change (value units
-# per point = the model's k), relative to the market's 1.0: rebuild ~0.65, tank ~0.40. A rebuilding team's
-# short-term lineup, up or down, is worth less than the market's present-value share says. Contender-side
-# emphasis is the wins term below, not this table.
-NET_POINT_WEIGHT_TARGET: dict[str, float] = {"rebuild": 0.65, "tank": 0.40}
-# Extra weight beyond what ``trade_lineup_model.POSTURE_WEIGHTS`` already applies. DERIVED, not hand-set:
-# the lineup model's own posture weight (1.0 + the starter-strength weight, so it moves with the P1-5 floor)
-# plus this adjustment lands on the net target above. With the old weights (rebuild 1.05, tank 1.00) that is
-# the long-standing -0.40 / -0.60; with the 0.20 floor (both 1.20) it is -0.55 / -0.80, so raising the
-# starter-strength weight does not silently change how a rebuilder or tank prices a lineup point here.
-PRESENT_ADJUST: dict[str, float] = {
-    "contender": 0.0,
-    "fringe_contender": 0.0,
-    "retool": 0.0,
-    **{posture: round(target - POSTURE_WEIGHTS[posture][0], 4) for posture, target in NET_POINT_WEIGHT_TARGET.items()},
-}
-# Where a posture wants its assets: +1 = present (lineup now), -1 = future
-# (youth, picks). Retool is deliberately neutral.
-ORIENTATION: dict[str, float] = {
-    "contender": 1.0,
-    "fringe_contender": 0.6,
-    "retool": 0.0,
-    "rebuild": -0.8,
-    "tank": -1.0,
-}
+WINDOW_WIN_WEIGHT = posture_model.WINDOW_WIN_WEIGHT
+NET_POINT_WEIGHT_TARGET = posture_model.NET_POINT_WEIGHT_TARGET
+PRESENT_ADJUST = posture_model.PRESENT_ADJUST  # DERIVED from the net target in modules/posture_model.py (#2168)
+ORIENTATION = posture_model.ORIENTATION
 # Share of the *misaligned* present<->future conversion (value units) charged
 # as a direction penalty.
 DIRECTION_RATE = 0.10

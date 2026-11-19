@@ -38,6 +38,7 @@ from modules import partner_context as partner_context_module
 from modules import usage_roles_targets as usage_roles_targets_module
 from modules import league_calendar
 from modules import player_quick_view
+from modules import posture_model
 from modules import redis_cache
 from modules import sleeper
 from modules import swr_cache
@@ -73,18 +74,8 @@ def _safe_text(value: object, default: str = "") -> str:
 DEFAULT_ANALYZER_STRATEGY = "retool"
 
 
-# Trade-advice audit P1-5: under the starter-floor flag (trade_grade.STARTER_FLOOR_ENV_KEY,
-# default ON) the rebuild / tank youth bonus is halved, since trades handing the user the
-# younger side trailed the market (0.591 vs 0.618).
-YOUTH_BONUS_TEMPER = 0.5
-
-
-def _tempered_youth_points(points: tuple[tuple[float, float], ...]) -> tuple[tuple[float, float], ...]:
-    from modules import trade_grade
-
-    if not trade_grade._starter_floor_enabled():
-        return points
-    return tuple((age, 1.0 + (mult - 1.0) * YOUTH_BONUS_TEMPER) for age, mult in points)
+# The youth-bonus tempering (trade-advice audit P1-5) and every other posture table live in modules/posture_model.py.
+YOUTH_BONUS_TEMPER = posture_model.YOUTH_BONUS_TEMPER
 
 
 def apply_strategy_age_curve(df: pd.DataFrame, strategy: str, score_field: str) -> pd.DataFrame:
@@ -117,33 +108,11 @@ def apply_strategy_age_curve(df: pd.DataFrame, strategy: str, score_field: str) 
     def decline(pos_list, start, floor):
         return sd(ages, start, floor).where(positions.isin(pos_list), 1.0)
 
-    if strategy_key == "contender":
-        multiplier = sy(ages, ((22.0, 0.98), (25.0, 1.04), (30.0, 1.04), (32.0, 1.0)))
-        multiplier = multiplier * decline(["RB"], 29, 0.94)
-    elif strategy_key == "fringe_contender":
-        multiplier = sy(ages, ((22.0, 1.01), (24.0, 1.01), (25.0, 1.025), (29.0, 1.025), (31.0, 1.0)))
-        multiplier = multiplier * decline(["RB", "WR", "TE"], 31, 0.96)
-    elif strategy_key == "retool":
-        multiplier = sy(ages, ((22.0, 1.04), (25.0, 1.04), (26.0, 1.01), (29.0, 1.01), (31.0, 1.0)))
-        multiplier = multiplier * decline(["RB"], 28, 0.91) * decline(["WR", "TE"], 31, 0.94)
-    elif strategy_key == "rebuild":
-        multiplier = sy(ages, _tempered_youth_points(((23.0, 1.10), (25.0, 1.06), (26.0, 1.02), (28.0, 1.0))))
-        multiplier = (
-            multiplier
-            * decline(["RB"], 28, 0.82)
-            * decline(["WR"], 30, 0.86)
-            * decline(["TE"], 31, 0.88)
-            * decline(["QB"], 34, 0.92)
-        )
-    elif strategy_key == "tank":
-        multiplier = sy(ages, _tempered_youth_points(((23.0, 1.15), (25.0, 1.09), (26.0, 1.0))))
-        multiplier = (
-            multiplier
-            * decline(["RB"], 27, 0.75)
-            * decline(["WR"], 30, 0.80)
-            * decline(["TE"], 31, 0.84)
-            * decline(["QB"], 34, 0.88)
-        )
+    curve = posture_model.AGE_CURVES.get(strategy_key)
+    if curve is not None:
+        multiplier = sy(ages, posture_model.youth_points(curve))
+        for pos_list, start, floor in curve.declines:
+            multiplier = multiplier * decline(list(pos_list), start, floor)
 
     for column, league_column in (
         ("dynasty_score", "league_dynasty_score"),
@@ -190,13 +159,7 @@ def apply_strategy_age_curve(df: pd.DataFrame, strategy: str, score_field: str) 
     return curved
 
 
-_PICK_STRATEGY_MULTIPLIERS = {
-    "contender": 0.88,
-    "fringe_contender": 0.95,
-    "retool": 1.02,
-    "rebuild": 1.16,
-    "tank": 1.25,
-}
+_PICK_STRATEGY_MULTIPLIERS = posture_model.PICK_SCORE_MULTIPLIER
 
 
 def strategy_adjusted_pick_score_multiplier(base_multiplier: float, strategy: str) -> float:

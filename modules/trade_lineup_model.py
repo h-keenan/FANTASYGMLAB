@@ -43,14 +43,13 @@ from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
 
-from modules import nfl_schedule, player_projections
+from modules import nfl_schedule, player_projections, posture_model
 from modules.frame_records import frame_records
 from modules.injury_status import category as injury_level, is_ruled_out
 from modules.rankings import age_multiplier
 from modules.team_eval import _lineup_slots, normalize_team_strategy
 from modules.trade_grade import (
     CURRENT_SEASON_VALUE_SHARE,
-    STARTER_STRENGTH_WEIGHTS,
     FANTASY_SEASON_WEEKS,
     InjuryAbsence,
     SeasonWindow,
@@ -72,9 +71,7 @@ SKILL_POSITIONS = ("QB", "RB", "WR", "TE")
 # strategy age curve and the strategy pick multiplier); weighting it again
 # would double count. The relative weight between this season and the
 # future is therefore w_now / w_future: contender 1.50, rebuild 1.05.
-POSTURE_WEIGHTS: dict[str, tuple[float, float]] = {
-    posture: (1.0 + starter_weight, 1.0) for posture, starter_weight in STARTER_STRENGTH_WEIGHTS.items()
-}
+POSTURE_WEIGHTS = posture_model.POSTURE_WEIGHTS  # derived from the starter-strength weight in modules/posture_model.py
 
 # Documented static anchors (PPR PPG) used ONLY when the league-wide frame has
 # too few players with real stats to calibrate from: (top, replacement),
@@ -1020,7 +1017,7 @@ def evaluate_trade(
     then not read."""
 
     params = ctx.params
-    w_now, w_fut = POSTURE_WEIGHTS.get(ctx.strategy, POSTURE_WEIGHTS["retool"])
+    w_now, w_fut = posture_model.lineup_weights(ctx.strategy)
     weeks = ctx.weeks
     # Weeks that count, each weighted by the chance the team is still playing in it.
     rem = sum(ctx.window.weight(w) for w in weeks)

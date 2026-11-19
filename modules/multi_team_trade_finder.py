@@ -63,6 +63,7 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 from modules import multi_team_trade as mt
+from modules import posture_model
 from modules import multi_team_trade_engine as engine
 from modules import roster_value_model, trade_analyzer_fit, trade_grade, trade_veto, trade_value_bands as bands
 
@@ -83,8 +84,8 @@ NEED_TIERS = ("primary", "secondary")
 NEED_TIER_WEIGHT = {"primary": 2.0, "secondary": 1.0}
 PICK_POSITION = "PICK"
 # Posture group -> how much a team wants draft capital back (0 = never needs one).
-PICK_WANT_BY_GROUP = {"rebuild": 2.0, "retool": 1.0, "contender": 0.0}
-PICK_SENDER_GROUPS = frozenset({"contender"})
+PICK_WANT_BY_GROUP = posture_model.PICK_WANT_BY_GROUP
+PICK_SENDER_GROUPS = posture_model.PICK_SENDER_GROUPS
 EDGE_PICKS = 2  # picks offered per directed edge (at most one rides in any single option)
 MAX_PICKS_PER_IDEA = 2
 VETO_BLOCK_BANDS = frozenset({trade_veto.BAND_LOPSIDED, trade_veto.BAND_OUTRAGE})

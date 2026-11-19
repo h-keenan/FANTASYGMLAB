@@ -33,7 +33,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 import pandas as pd
 
-from modules import age_profile, model_status, roster_value_model as rvm
+from modules import age_profile, model_status, posture_model, roster_value_model as rvm
 from modules.frame_records import frame_records
 
 MODEL_VERSION = "drop-candidates-v1"
@@ -48,13 +48,7 @@ DROP_MAX_VALUE_SHARE = 0.15
 SWAP_MIN_GAIN_SHARE = 0.01
 # Young-upside protection by posture: (max age for skill players, QB age bump,
 # minimum healthy value as a share of the high-value threshold).
-YOUTH_PROTECTION = {
-    "tank": (26.0, 1.0, 0.10),
-    "rebuild": (25.0, 2.0, 0.12),
-    "retool": (24.0, 2.0, 0.20),
-    "fringe_contender": (23.0, 2.0, 0.28),
-    "contender": (23.0, 2.0, 0.35),
-}
+YOUTH_PROTECTION = posture_model.YOUTH_PROTECTION
 # Reference window-opening age the legacy YOUTH_PROTECTION ages were tuned against
 # (the skill-position prime window opens around 23).
 YOUTH_RUNWAY_BASE_AGE = 23.0

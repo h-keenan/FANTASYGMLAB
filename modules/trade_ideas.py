@@ -35,7 +35,7 @@ from modules.team_eval import (
     team_strategy_label,
     team_strategy_mode,
 )
-from modules import season_clock
+from modules import posture_model, season_clock
 from modules import roster_value_model
 from modules.roster_needs import SHALLOW_POSITIONS, assessment_from_model, room_records, true_shallow_position_needs
 from modules.rankings import (
@@ -1583,9 +1583,7 @@ def _pick_send_posture_terms(send_assets: List[Dict[str, Any]], my_shape: Mappin
     if not picks:
         return 0, 0
     strategy = normalize_team_strategy(my_shape.get("strategy") or my_shape.get("mode"))
-    priority_term = 6 * picks if strategy in {"contender", "fringe_contender"} else picks if strategy == "retool" else -7 * picks
-    fit_term = {"tank": -16, "rebuild": -12, "retool": -2}.get(strategy, 0)
-    return priority_term, fit_term
+    return posture_model.pick_sale_terms(strategy, picks)
 
 
 def _has_pick(assets: List[Dict[str, Any]]) -> bool:

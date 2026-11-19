@@ -86,6 +86,7 @@ from typing import Any, Iterable, Mapping, Sequence
 import pandas as pd
 
 from modules import injury_status as injury_table
+from modules import posture_model
 from modules import model_status, season_clock
 from modules.frame_records import frame_records
 from modules.player_state_authority import is_suspended
@@ -222,37 +223,13 @@ def full_consolidation_premium(
 
 # --- starter strength --------------------------------------------------------
 
-STARTER_STRENGTH_WEIGHTS: dict[str, float] = {
-    "contender": 0.50,
-    "fringe_contender": 0.35,
-    "retool": 0.15,
-    "rebuild": 0.05,
-    "tank": 0.0,
-}
-
-# Trade-advice audit P1-5 (owner-approved 2026-11-18): realized two-season lineup
-# points are ~0.55-0.6 of a market point at EVERY posture, so rebuild/tank weights
-# of 0.05 / 0 under-price starting points. Default ON (0/false/no/off disables; read at import
-# because trade_lineup_model.POSTURE_WEIGHTS derives from this table). trade_posture.PRESENT_ADJUST is
-# DERIVED from this table (it keeps the net lineup-point weight at rebuild 0.65 / tank 0.40), so the floor
-# does not change how a rebuilder or tank prices a lineup point in season; rebuild and tank are floored at
-# 0.20 and their youth bonus is tempered (trade_hub_engine). Retool stays at 0.15.
-STARTER_FLOOR_ENV_KEY = "DYNASTYGM_STARTER_WEIGHT_FLOOR_V1"
-STARTER_WEIGHT_FLOOR = 0.20
-STARTER_FLOOR_POSTURES = ("rebuild", "tank")
-
-
-def _starter_floor_enabled() -> bool:
-    from modules.app_config import config_value
-
-    return config_value(STARTER_FLOOR_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
-
-
-if _starter_floor_enabled():
-    STARTER_STRENGTH_WEIGHTS = {
-        k: (max(v, STARTER_WEIGHT_FLOOR) if k in STARTER_FLOOR_POSTURES else v)
-        for k, v in STARTER_STRENGTH_WEIGHTS.items()
-    }
+# The tables live in modules/posture_model.py (the one posture model); these names stay for existing importers.
+# Trade-advice audit P1-5 (owner-approved 2026-11-18): see posture_model for the starter-weight floor and its flag.
+STARTER_FLOOR_ENV_KEY = posture_model.STARTER_FLOOR_ENV_KEY
+STARTER_WEIGHT_FLOOR = posture_model.STARTER_WEIGHT_FLOOR
+STARTER_FLOOR_POSTURES = posture_model.STARTER_FLOOR_POSTURES
+STARTER_STRENGTH_WEIGHTS = posture_model.STARTER_STRENGTH_WEIGHTS
+_starter_floor_enabled = posture_model.starter_floor_enabled
 
 
 def starter_strength_weight(strategy: str) -> float:
@@ -491,13 +468,7 @@ def _playoff_schedule(settings: Mapping[str, Any]) -> tuple[int | None, int, flo
 INJURY_STATUS_DEFAULT_WEEKS: dict[str, float] = injury_table.default_weeks_by_key()
 SURGERY_MIN_WEEKS = 6.0
 
-INJURY_POSTURE_WEIGHTS: dict[str, float] = {
-    "contender": 0.95,
-    "fringe_contender": 0.75,
-    "retool": 0.45,
-    "rebuild": 0.15,
-    "tank": 0.05,
-}
+INJURY_POSTURE_WEIGHTS = posture_model.INJURY_POSTURE_WEIGHTS
 CURRENT_SEASON_VALUE_SHARE = 0.40
 NON_STARTER_AVAILABILITY_WEIGHT = 0.25
 INJURY_COST_CAP_SHARE = 0.25
