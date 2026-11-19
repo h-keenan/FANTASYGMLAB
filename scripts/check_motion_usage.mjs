@@ -53,7 +53,12 @@ function walk(dir, out = []) {
 
 export function scan() {
   const problems = [];
-  const allowed = (rel, line) => LAYOUT_TRANSITION_ALLOW.some((a) => a.file === rel && line.includes(a.needle));
+  const used = new Set();
+  const allowed = (rel, line) => {
+    const hit = LAYOUT_TRANSITION_ALLOW.find((a) => a.file === rel && line.includes(a.needle));
+    if (hit) used.add(hit);
+    return Boolean(hit);
+  };
   for (const tree of ["web-next/src", "mobile/src"]) {
     for (const abs of walk(path.join(root, tree))) {
       const rel = path.relative(root, abs).split(path.sep).join("/");
@@ -75,6 +80,10 @@ export function scan() {
         }
       });
     }
+  }
+  // An entry that no longer excuses anything would silently excuse a future regression at the same spot.
+  for (const a of LAYOUT_TRANSITION_ALLOW) {
+    if (!used.has(a)) problems.push(`${a.file}  LAYOUT_TRANSITION_ALLOW entry "${a.needle}" no longer matches a flagged line; remove it`);
   }
   for (const rel of REDUCED_AWARE) {
     const abs = path.join(root, rel);
