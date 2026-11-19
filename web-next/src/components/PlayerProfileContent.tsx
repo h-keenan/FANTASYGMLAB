@@ -231,6 +231,7 @@ export function PlayerProfileContent({
         positionRank={player.position_rank}
         usageTrend={model?.usage_trend ?? null}
         usageLoading={loading}
+        usageLocked={model?.usage_profile?.gated === true}
         depthChartNote={model?.depth_chart_note}
         rookie={rookieBadge(bio)}
       />

@@ -5808,7 +5808,7 @@ def _project_team_injury_narrative(context: Any) -> dict[str, Any]:
     }
 
 
-def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
+def _project_ranking_row(row: pd.Series, score_field: str, *, pro: bool = False) -> dict[str, Any]:
     overall_rank = row.get("canonical_overall_rank")
     if pd.isna(overall_rank):
         overall_rank = row.get("overall_rank")
@@ -5829,7 +5829,10 @@ def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
         "position_rank": _clean_json_value(position_rank),
         "rank_unavailable_reason": _clean_json_value(row.get("rank_unavailable_reason")),
         "opportunity_label": _clean_json_value(row.get("opportunity_label")),
-        "usage_trend": _project_usage_trend(row),
+        # The weekly-recency read is a Pro usage signal (same gate as the
+        # advanced usage profile): withheld server-side for Free callers, so a
+        # share card or list built from this row can never show it.
+        "usage_trend": _project_usage_trend(row) if pro else None,
         # 0-99 "OVR" badge — see player_quick_view.overall_ratings_for_pool.
         # Computed by the caller over the full ranked pool (before any
         # limit=N truncation) and stashed on "_overall_rating_col" so this
@@ -5890,7 +5893,7 @@ def get_league_rankings(
     league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
     limit: int = 100,
-    _user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """League-adjusted player rankings — shares the exact same valuation
     engine as the web app (modules.league_value_settings, extracted from
@@ -5929,9 +5932,10 @@ def get_league_rankings(
     ranked = _ranked_pool(valued, scoring_context, score_field, rated=True)
 
     ranked = ranked.sort_values(score_field, ascending=False).head(limit)
+    pro = _is_pro_caller(user)
     players = []
     for _, row in ranked.iterrows():
-        projected = _project_ranking_row(row, score_field)
+        projected = _project_ranking_row(row, score_field, pro=pro)
         projected["stats"] = player_quick_view.rankings_stat_entries_for_row(row)
         players.append(projected)
     return {"ok": True, "players": players}
@@ -5973,7 +5977,7 @@ def get_player_rank_in_league(
     player_id: str,
     league_id: str = Depends(require_league_access),
     lens: str = "Dynasty",
-    _user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """One player's league-adjusted rank, looked up directly instead of
     truncated out of a top-N /rankings list. Player Detail calls this itself
@@ -6010,7 +6014,7 @@ def get_player_rank_in_league(
     matches = ranked[ranked["player_id"] == player_id]
     if matches.empty:
         return {"ok": True, "player": None}
-    return {"ok": True, "player": _project_ranking_row(matches.iloc[0], score_field)}
+    return {"ok": True, "player": _project_ranking_row(matches.iloc[0], score_field, pro=_is_pro_caller(user))}
 
 
 MAX_PLAYER_SEARCH_LIMIT = 50
@@ -6026,7 +6030,7 @@ def search_league_players(
     position: str = "",
     limit: int = 25,
     available_only: bool = False,
-    _user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Name search (`q`) or exact id lookup (`ids`) over the FULL valued pool,
     not the top-N /rankings window.
@@ -6085,9 +6089,10 @@ def search_league_players(
         matches = player_search.search_ranked_players(
             ranked, q, score_field=score_field, position=position, limit=limit
         )
+    pro = _is_pro_caller(user)
     players = []
     for _, row in matches.iterrows():
-        projected = _project_ranking_row(row, score_field)
+        projected = _project_ranking_row(row, score_field, pro=pro)
         projected["stats"] = player_quick_view.rankings_stat_entries_for_row(row)
         players.append(projected)
     return {"ok": True, "players": players}
@@ -9844,7 +9849,7 @@ def _quick_view_stats_dict(stats: player_quick_view.PlayerQuickViewStats) -> dic
 def _project_player_model(
     row: pd.Series, players_df: pd.DataFrame | None = None, *, pro: bool = False
 ) -> dict[str, Any]:
-    """The web dossier's "Model" grid — market/opportunity/scarcity/role/age/
+    """The web dossier's "Model" grid (``usage_trend`` is Pro: null for Free) — market/opportunity/scarcity/role/age/
     confidence/workload-trend — ported from app.py's player-card assembly
     (~app.py:4098-4110). Every field here is a plain column already present
     on the same row build_stats_view/build_executive_snapshot already read;
@@ -9890,7 +9895,7 @@ def _project_player_model(
         "age_score_label": "Age Score" if age_score_native else "Age Lens",
         "opportunity_confidence": _clean_json_value(row.get("opportunity_confidence")),
         "workload_trend": _clean_json_value(row.get("workload_trend")),
-        "usage_trend": _project_usage_trend(row),
+        "usage_trend": _project_usage_trend(row) if pro else None,
         "depth_chart_note": _project_depth_chart_note(row),
         "usage_profile": _project_usage_profile(row, players_df, pro=pro),
         "decision_fit_narrative": player_quick_view.decision_fit_narrative(players_df, row),

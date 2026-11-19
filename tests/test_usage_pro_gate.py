@@ -165,3 +165,62 @@ def test_trade_analyzer_role_notes_helper_only_names_covered_players():
             patch("modules.sleeper.cached_season_player_weekly", return_value=WEEKS):
         notes = mobile_api_service._role_change_notes(assets)
     assert len(notes) == 1 and notes[0].startswith("Rico:")
+
+
+# --- C9: the weekly-recency ``usage_trend`` read is Pro on EVERY endpoint ---------------------------------
+
+_TREND = dict(recency_sample_n=7, recency_trend=0.22, recency_confidence=1.0)
+_LEAGUE = {
+    "scoring_settings": {"rec": 1.0},
+    "settings": {"type": 2},
+    "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+    "total_rosters": 12,
+}
+
+
+def _trend_endpoints(monkeypatch, entitlement):
+    """usage_trend from quick-view, rankings, players/search and players/{id}/rank for a player with a clear trend."""
+
+    from tests.test_mobile_api_service import _fake_players_frame
+
+    client = _client(monkeypatch)
+    monkeypatch.setattr("services.mobile_api_service._fetch_profile_fields", lambda *a, **k: {"entitlement": entitlement})
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_saved_leagues_cached",
+        lambda *a, **k: ([{"league_id": "abc", "sleeper_username": "gm_dynasty"}], ""),
+    )
+    auth = Mock(status_code=200)
+    auth.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    headers = {"Authorization": "Bearer good-token"}
+    frame = _fake_players_frame()
+    for column, value in _TREND.items():
+        frame[column] = value
+    pid = str(frame["player_id"].iloc[0])
+    with patch("requests.get", return_value=auth), patch("modules.sleeper.get_league", return_value=_LEAGUE), \
+            patch("modules.rankings.load_players", return_value=frame), \
+            patch("modules.player_eligibility.filter_current_fantasy_players", side_effect=lambda df, **kw: df):
+        quick = client.get(f"/v1/players/{pid}/quick-view", headers=headers)
+        rankings = client.get("/v1/leagues/abc/rankings?lens=Dynasty", headers=headers)
+        search = client.get(f"/v1/leagues/abc/players/search?ids={pid}", headers=headers)
+        rank = client.get(f"/v1/leagues/abc/players/{pid}/rank", headers=headers)
+    for response in (quick, rankings, search, rank):
+        assert response.status_code == 200
+    return {
+        "quick": [quick.json()["model"]["usage_trend"]],
+        "rankings": [p["usage_trend"] for p in rankings.json()["players"]],
+        "search": [p["usage_trend"] for p in search.json()["players"]],
+        "rank": [rank.json()["player"]["usage_trend"]],
+    }
+
+
+def test_free_responses_never_carry_usage_trend_on_any_endpoint(monkeypatch):
+    out = _trend_endpoints(monkeypatch, "free")
+    for endpoint, values in out.items():
+        assert values, endpoint
+        assert all(v is None for v in values), endpoint
+
+
+def test_pro_responses_keep_usage_trend_on_every_endpoint(monkeypatch):
+    out = _trend_endpoints(monkeypatch, "premium")
+    for endpoint, values in out.items():
+        assert values and any(v and v["direction"] == "up" for v in values), endpoint

@@ -5160,6 +5160,10 @@ def _usage_trend_frame(player_id: str, **recency):
 
 def test_quick_view_model_exposes_the_usage_trend_read(monkeypatch):
     client = _client(monkeypatch)
+    # The usage-trend read is Pro (Free is pinned null in test_usage_pro_gate).
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields", lambda *a, **k: {"entitlement": "premium"}
+    )
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -5193,6 +5197,9 @@ def test_quick_view_model_exposes_the_usage_trend_read(monkeypatch):
 
 def test_quick_view_model_sends_no_usage_trend_below_the_display_gate(monkeypatch):
     client = _client(monkeypatch)
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields", lambda *a, **k: {"entitlement": "premium"}
+    )
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
@@ -5270,6 +5277,10 @@ def test_quick_view_usage_profile_failure_is_reported_not_hidden(monkeypatch):
 
 def test_rankings_rows_carry_the_usage_trend_beside_opportunity_label(monkeypatch):
     client = _client(monkeypatch)
+    # Pro view; Free rows carry usage_trend null (tests/test_usage_pro_gate.py).
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields", lambda *a, **k: {"entitlement": "premium"}
+    )
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
