@@ -622,6 +622,16 @@ def evaluate_trade_analyzer_fit(
         values={**receive_values, **send_values},
     )
     legacy_starter_adjustment = trade_grade.starter_strength_adjustment(lineup_delta, strategy_key)
+    redundancy_adjustment, redundancy_note = 0, ""
+    if trade_grade.roster_redundancy_enabled():
+        redundancy_adjustment, redundancy_note = trade_grade.roster_redundancy_adjustment(
+            send_assets,
+            receive_assets,
+            current_starter_ids=_starter_ids(current_snapshot),
+            post_starter_ids=_starter_ids(post_snapshot),
+            value_of=score_asset_value,
+        )
+    raw_value_delta += redundancy_adjustment
 
     # Trade engine v2 (docs/trade-engine-v2.md): in season, ONE expected
     # lineup-points model replaces the three older single-signal pieces (the
