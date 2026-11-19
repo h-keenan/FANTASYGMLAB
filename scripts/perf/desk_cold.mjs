@@ -32,6 +32,8 @@ const ROUTES = [
   [/\/v1\/leagues\/[^/]+\/my-team\/needs$/, () => "my_team", { my_team: [440, 25] }],
   // Round 4: the other Desk pages (cold/warm from scripts/bench_endpoints.py on the same fixture).
   [/\/v1\/leagues\/[^/]+\/waivers$/, () => "waivers", { waivers: [940, 100] }],
+  [/\/v1\/leagues\/[^/]+\/gm-plan$/, () => "gm_plan", { gm_plan: [2250, 170] }],
+  [/\/v1\/leagues\/[^/]+\/trade-finder$/, () => "trade_finder", { trade_finder: [40, 2] }],
   [/\/v1\/leagues\/[^/]+\/trade-hub$/, () => "trade_hub", { trade_hub: [2400, 6] }],
   [/\/v1\/leagues-glance$/, () => "leagues_glance", { leagues_glance: [3500, 2] }],
   [/\/v1\/leagues\/[^/]+$/, () => null, null],

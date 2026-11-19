@@ -37,6 +37,7 @@ from __future__ import annotations
 import copy
 import logging
 import math
+import time
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -44,7 +45,7 @@ import numpy as np
 
 import pandas as pd
 
-from modules import age_profile, model_status, trade_lineup_model as tlm
+from modules import age_profile, derived_cache, model_status, trade_lineup_model as tlm
 from modules.frame_records import frame_records
 from modules.injury_status import is_ruled_out
 from modules.rankings import injury_level
@@ -988,8 +989,22 @@ class LeagueNeeds:
         return self.by_roster.get(str(roster_id))
 
 
-_LEAGUE_NEEDS_CACHE: list[tuple[tuple, Any, LeagueNeeds]] = []
-_LEAGUE_NEEDS_CACHE_MAX = 6
+_LEAGUE_NEEDS_CACHE: list[tuple[tuple, Any, LeagueNeeds, float]] = []
+_LEAGUE_NEEDS_CACHE_MAX = 16
+# A frame tag names a shared-cache entry, not a snapshot, so an entry keyed on tags is reused for at most the derived-cache
+# window (the same bound every other tag-keyed memo uses). Entries keyed on object identity are exact and never age out.
+_LEAGUE_NEEDS_TAG_TTL = derived_cache.DEFAULT_TTL_SECONDS
+
+
+def _frame_identity(frame: pd.DataFrame | None) -> tuple | None:
+    """Cache identity of an input frame: its shared-cache content tag when it has one (``derived_cache.tag_frame``), so two
+    requests (or two surfaces) holding separate copies of the same cached frame share one need model; otherwise the object
+    itself (an untagged or since-modified frame only matches itself)."""
+
+    if frame is None:
+        return None
+    tag = derived_cache.frame_key(frame) if derived_cache.ENABLED else ""
+    return ("tag", tag) if tag else ("id", id(frame))
 
 
 def _rosters_signature(rosters: Iterable[Mapping[str, Any]]) -> tuple:
@@ -1035,13 +1050,17 @@ def league_needs(
 
     league = league or {}
     settings = dict(settings)
-    pool_id = id(pool) if pool is not None else None
+    pool_id = _frame_identity(pool)
     settings_key = repr(sorted((str(k), repr(v)) for k, v in settings.items()))
     wanted = None if only_roster_ids is None else frozenset(str(r) for r in only_roster_ids)
-    base_key = (id(valued), pool_id, score_field, strategy, _rosters_signature(rosters), settings_key)
+    base_key = (_frame_identity(valued), pool_id, score_field, strategy, _rosters_signature(rosters), settings_key)
     key = base_key + (wanted,)
-    for entry_key, _held, cached in _LEAGUE_NEEDS_CACHE:
+    now = time.monotonic()
+    tagged = "tag" in {ident[0] for ident in (base_key[0], pool_id) if ident}
+    for entry_key, _held, cached, stored_at in _LEAGUE_NEEDS_CACHE:
         if entry_key == key or (wanted is not None and entry_key == base_key + (None,)):
+            if tagged and now - stored_at > _LEAGUE_NEEDS_TAG_TTL:
+                continue
             return cached
 
     out_status = model_status.merge(status)
@@ -1079,6 +1098,6 @@ def league_needs(
                 logger.warning("need model failed (roster=%s)", rid, exc_info=True)
                 model_status.add(out_status, "need_model_failed")
     result = LeagueNeeds(by_roster=by_roster, status=out_status)
-    _LEAGUE_NEEDS_CACHE.append((key, (valued, pool), result))
+    _LEAGUE_NEEDS_CACHE.append((key, (valued, pool), result, now))
     del _LEAGUE_NEEDS_CACHE[:-_LEAGUE_NEEDS_CACHE_MAX]
     return result
