@@ -69,27 +69,33 @@ export default function ManagerTendenciesChips({
   const chips = headlineChips(findManagerRow(data, teamName, rosterId)?.headline);
   if (chips.length === 0) return null;
   return (
-    <View style={styles.row} accessibilityLabel="How this manager trades">
+    <View style={styles.block} accessibilityLabel="How this manager trades">
       <AppText style={styles.label}>Their history</AppText>
-      {chips.map((chip) => (
-        <View key={chip} style={styles.chip}>
-          <AppText style={styles.chipText} numberOfLines={1}>
-            {chip}
-          </AppText>
-        </View>
-      ))}
+      <View style={styles.row}>
+        {chips.map((chip) => (
+          <View key={chip} style={styles.chip}>
+            <AppText style={styles.chipText} numberOfLines={1}>
+              {chip}
+            </AppText>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
-    label: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', color: colors.textTertiary, alignSelf: 'center' },
+    block: { gap: spacing.xs, marginTop: spacing.xs },
+    row: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.xs, rowGap: spacing.xs },
+    label: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', color: colors.textTertiary },
     chip: {
+      minHeight: 28,
+      justifyContent: 'center',
+      maxWidth: '100%',
       paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
-      borderRadius: radii.sm,
+      paddingVertical: 3,
+      borderRadius: radii.pill,
       borderWidth: 1,
       borderColor: colors.glassBorder,
       backgroundColor: colors.glass,

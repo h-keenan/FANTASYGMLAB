@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import { SimPlayerChip } from "@/components/SimGameParts";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import type { SimDraftPick } from "@/lib/simGame";
-import { simMomentShortName, simPickBoardNote, simPickMomentGrade, simWeekStamp, type SimMomentTone } from "@/lib/simMoments";
+import { simBoardRows, simMomentShortName, simPickBoardNote, simPickMomentGrade, simWeekStamp, type SimMomentTone } from "@/lib/simMoments";
 import { useReducedMotion } from "@/lib/useMotion";
 import { useSimCelebrations } from "@/lib/useSimCelebrations";
 
@@ -40,7 +40,7 @@ export function SimPickReveal({ pick, board, onDone }: { pick: SimDraftPick; boa
     const id = setTimeout(() => setPhase("front"), 240);
     return () => clearTimeout(id);
   }, [phase]);
-  const rows = board.slice(-3).reverse();
+  const rows = simBoardRows(board, pick, phase === "front");
   const turn: CSSProperties = { transform: phase === "flip" ? "rotateY(90deg)" : "rotateY(0deg)", transition: "transform 240ms ease-in-out" };
   return (
     <div role="dialog" aria-modal="true" aria-label="Your pick" className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ background: "rgba(0, 0, 0, 0.72)" }} data-testid="pick-reveal">
@@ -76,8 +76,8 @@ export function SimPickReveal({ pick, board, onDone }: { pick: SimDraftPick; boa
             {rows.map((r) => {
               const g = simPickMomentGrade(r.value_over_adp);
               return (
-                <div key={r.pick_no} className="flex items-center gap-2">
-                  <SimPlayerChip player={r.player} size={32} quick className="min-w-0 flex-1" extra={<span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Rd {r.round}, #{r.pick_no}</span>} />
+                <div key={r.pick_no} className={`flex items-center gap-2 ${r.pick_no === pick.pick_no && !reduced ? "enter-pop" : ""}`} data-testid="board-row">
+                  <SimPlayerChip player={r.player} size={32} quick shortName className="min-w-0 flex-1" extra={<span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Rd {r.round}, #{r.pick_no}</span>} />
                   <div className="flex flex-col items-center">
                     <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold" style={{ border: `1px solid ${toneColor(g.tone)}`, color: toneColor(g.tone) }}>{g.letter}</span>
                     <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{simPickBoardNote(r.value_over_adp)}</span>

@@ -69,22 +69,24 @@ export function ManagerTendenciesCard({
   if (chips.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5" aria-label="How this manager trades">
+    <div className="flex flex-col gap-1.5" aria-label="How this manager trades">
       <span
         className="text-xs uppercase font-bold"
         style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
       >
         Their history
       </span>
-      {chips.map((chip) => (
-        <span
-          key={chip}
-          className="px-1.5 py-0.5 text-xs font-bold"
-          style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
-        >
-          {chip}
-        </span>
-      ))}
+      <ul className="flex flex-wrap gap-1.5" aria-label="Their trade habits">
+        {chips.map((chip) => (
+          <li
+            key={chip}
+            className="inline-flex min-h-7 max-w-full items-center rounded-full px-2.5 py-1 text-xs font-bold"
+            style={{ background: "var(--color-surface-muted)", border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}
+          >
+            <span className="truncate">{chip}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

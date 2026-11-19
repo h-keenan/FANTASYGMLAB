@@ -127,7 +127,7 @@ export default function TradePickerSheet<T = unknown>({
   const pickCount = visibleItems.length - playerCount;
   const atMax = max != null && state.selected.length >= max;
   const filterCount = activeFilterCount(state.filters);
-  const toneColor = tone === 'danger' ? colors.danger : tone === 'success' ? colors.successBright : colors.accent;
+  const toneColor = sideDotColor(colors, tone);
 
   // Section headers for picks (by season); players are one flat list.
   const listData = useMemo(() => {
@@ -348,6 +348,11 @@ function FilterGroup({ title, children, styles }: { title: string; children: Rea
   );
 }
 
+/** Dot colour for a side: the user's own "danger" (You send) side is the shared neutral grey (never red); "success" (You get) stays green. */
+function sideDotColor(colors: ThemeColors, tone: 'danger' | 'success' | 'neutral'): string {
+  return tone === 'danger' ? colors.textTertiary : tone === 'success' ? colors.successBright : colors.accent;
+}
+
 function FilterChip({ label, on, onPress, styles, colors }: { label: string; on: boolean; onPress: () => void; styles: ReturnType<typeof createStyles>; colors: ThemeColors }) {
   return (
     <Pressable
@@ -398,7 +403,7 @@ export function TradeSideSummary({
       >
         <View style={styles.sideText}>
           <View style={styles.sideLabelRow}>
-            <View style={[styles.sideDot, { backgroundColor: tone === 'danger' ? colors.danger : colors.successBright }]} />
+            <View style={[styles.sideDot, { backgroundColor: sideDotColor(colors, tone) }]} />
             <AppText style={styles.sideLabel}>{label}</AppText>
           </View>
           {items.length ? (

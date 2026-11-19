@@ -29,6 +29,7 @@ export function PlayerIdentity({
   leading,
   after,
   className = "min-w-0",
+  shortName = false,
   children,
 }: {
   /** Quick View payload. Omit for a non-interactive identity. */
@@ -50,6 +51,8 @@ export function PlayerIdentity({
   after?: ReactNode;
   /** Wrapper classes; pass "flex-1 min-w-0" to make the identity fill the row. */
   className?: string;
+  /** Always the short form ("J. Surname"), the shared PlayerName `short` prop. */
+  shortName?: boolean;
   /** Subline content ("MIA · Age 23"). */
   children?: ReactNode;
 }) {
@@ -61,6 +64,7 @@ export function PlayerIdentity({
       <div className="flex flex-col gap-0.5 min-w-0">
         <PlayerName
           name={name}
+          short={shortName}
 
           className="text-sm font-bold"
           style={{ color: muted ? "var(--color-text-secondary)" : "var(--color-text-primary)" }}

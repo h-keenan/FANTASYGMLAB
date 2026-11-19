@@ -28,6 +28,19 @@ describe("verdict colour guard", () => {
     // Trade History "-12 pts" in red and its red verdict stripe (2026-11-17).
     expect(run('{ key: "pts", tone: netPts > 0 ? "success" : netPts < 0 ? "danger" : undefined }')).toHaveLength(1);
     expect(run("const accent = verdict ? verdictToneColorVar(verdict) : outcomeToneColorVar(o);")).toHaveLength(1);
+    // The trade picker header "You send" dot was red: tone "danger" mapped to the red token on a line that never said "You send".
+    const scanTrade = (text: string) =>
+      JSON.parse(
+        execFileSync(
+          "node",
+          ["-e", `import(${JSON.stringify(script)}).then((m) => console.log(JSON.stringify(m.scanText("TradePickerSheet.tsx", ${JSON.stringify(text)}))))`],
+          { encoding: "utf8" },
+        ),
+      ) as string[];
+    expect(scanTrade('const toneColor = tone === "danger" ? "var(--color-danger)" : "var(--color-success)";')).toHaveLength(1);
+    expect(scanTrade("backgroundColor: tone === 'danger' ? colors.danger : colors.successBright }")).toHaveLength(1);
+    expect(scanTrade("const dot = side === 'send' ? colors.danger : colors.success;")).toHaveLength(1);
+    expect(scanTrade('const toneColor = sideDotColor(tone);')).toHaveLength(0);
     // The "You send" dot of the shared TradeScale was pink/red (a quoted var(--color-danger) slipped past the Give rule).
     expect(run('background: side === "give" ? "var(--color-danger)" : "var(--color-success)"')).toHaveLength(1);
     expect(run('background: side === "give" ? "var(--color-text-muted)" : "var(--color-success)"')).toHaveLength(0);

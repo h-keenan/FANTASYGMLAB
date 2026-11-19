@@ -5,7 +5,9 @@ import { SimPickReveal, SimWeekStamp } from "@/components/SimMoments";
 import { SIM_CELEBRATIONS_KEY } from "@/lib/simMoments";
 
 vi.mock("@/components/PlayerAvatar", () => ({ PlayerAvatar: () => <span /> }));
-vi.mock("@/components/SimGameParts", () => ({ SimPlayerChip: ({ player }: { player: { name: string } }) => <span>{player.name}</span> }));
+vi.mock("@/components/SimGameParts", () => ({
+  SimPlayerChip: ({ player, shortName }: { player: { name: string }; shortName?: boolean }) => <span data-short={shortName ? "1" : "0"}>{player.name}</span>,
+}));
 
 const pick = { pick_no: 7, round: 1, team_id: "me", player: { id: "1", name: "Jalen Pruitt", pos: "WR", team: "CIN", headshot_id: "1" }, adp: 13, value_over_adp: 6, auto: false } as never;
 const recap = {
@@ -33,6 +35,28 @@ describe("Sim moments", () => {
     expect(screen.getByText("+6 over his slot")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onDone).toHaveBeenCalled();
+  });
+
+  it("the board holds back the pick being revealed until the card flips, then shows it", async () => {
+    vi.useFakeTimers();
+    const earlier = { ...(pick as object), pick_no: 3, round: 1, player: { id: "2", name: "Marcus Hale", pos: "RB", team: "DAL", headshot_id: "2" } } as never;
+    render(<SimPickReveal pick={pick} board={[earlier, pick]} onDone={vi.fn()} />);
+    // Face down: only the earlier pick is on the board; the pick under the card is not spoiled.
+    expect(screen.getAllByTestId("board-row")).toHaveLength(1);
+    expect(screen.queryByText("Jalen Pruitt")).toBeNull();
+    expect(screen.getByText("Marcus Hale")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Tap to reveal your pick" }));
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getAllByTestId("board-row")).toHaveLength(2);
+    expect(screen.getByText("Jalen Pruitt")).toBeTruthy();
+  });
+
+  it("board rows use the short player name", () => {
+    const earlier = { ...(pick as object), pick_no: 3, player: { id: "2", name: "Marcus Hale", pos: "RB", team: "DAL", headshot_id: "2" } } as never;
+    render(<SimPickReveal pick={pick} board={[earlier, pick]} onDone={vi.fn()} />);
+    expect(screen.getByText("Marcus Hale").getAttribute("data-short")).toBe("1");
   });
 
   it("week stamp rolls in, then stamps with the record and a J. Surname note", async () => {

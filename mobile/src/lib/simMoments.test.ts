@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { simCelebrationsParse, simCelebrationsSerialize, simPickMomentGrade, simStreakNumber, simWeekStamp } from './simMoments.ts';
+import { simBoardRows, simCelebrationsParse, simCelebrationsSerialize, simPickMomentGrade, simStreakNumber, simWeekStamp } from './simMoments.ts';
 
 test('Celebrations defaults to on', () => {
   assert.equal(simCelebrationsParse(null), true);
@@ -22,4 +22,12 @@ test('pick grade and week stamp', () => {
 test('streak badge number', () => {
   assert.equal(simStreakNumber({ key: 'win_streak', detail: '5 wins in a row (through week 7).' }), 5);
   assert.equal(simStreakNumber({ key: 'closest_win', detail: 'Won by 0.4' }), null);
+});
+
+test('simBoardRows holds back the pick being revealed until it is revealed', () => {
+  const board = [{ pick_no: 3 }, { pick_no: 7 }, { pick_no: 12 }, { pick_no: 15 }];
+  const current = { pick_no: 15 };
+  assert.deepEqual(simBoardRows(board, current, false), [{ pick_no: 12 }, { pick_no: 7 }, { pick_no: 3 }]);
+  assert.deepEqual(simBoardRows(board, current, true), [{ pick_no: 15 }, { pick_no: 12 }, { pick_no: 7 }]);
+  assert.deepEqual(simBoardRows([{ pick_no: 15 }], current, false), []);
 });

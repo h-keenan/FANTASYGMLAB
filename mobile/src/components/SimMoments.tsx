@@ -7,7 +7,7 @@ import PlayerAvatar from './PlayerAvatar';
 import { SimPlayerChip } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { SimDraftPick } from '../lib/simGame';
-import { simMomentShortName, simPickBoardNote, simPickMomentGrade, simWeekStamp, type SimMomentTone } from '../lib/simMoments';
+import { simBoardRows, simMomentShortName, simPickBoardNote, simPickMomentGrade, simWeekStamp, type SimMomentTone } from '../lib/simMoments';
 import { useReducedMotion } from '../lib/useMotion';
 import { useSimCelebrations } from '../lib/useSimCelebrationsNative';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -42,7 +42,7 @@ export function SimPickReveal({ pick, board, onDone }: { pick: SimDraftPick; boa
   useEffect(() => {
     if (reduced) pop.setValue(1);
   }, [reduced, pop]);
-  const rows = board.slice(-3).reverse();
+  const rows = simBoardRows(board, pick, phase === 'front');
   const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] });
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onDone}>
@@ -78,9 +78,13 @@ export function SimPickReveal({ pick, board, onDone }: { pick: SimDraftPick; boa
               {rows.map((r) => {
                 const g = simPickMomentGrade(r.value_over_adp);
                 return (
-                  <View key={r.pick_no} style={styles.boardRow}>
+                  <Animated.View
+                    key={r.pick_no}
+                    style={[styles.boardRow, r.pick_no === pick.pick_no ? { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] } : null]}
+                    testID="board-row"
+                  >
                     <View style={{ flex: 1 }}>
-                      <SimPlayerChip player={r.player} size={32} quick extra={<AppText style={styles.muted}>{`Rd ${r.round}, #${r.pick_no}`}</AppText>} />
+                      <SimPlayerChip player={r.player} size={32} quick shortName extra={<AppText style={styles.muted}>{`Rd ${r.round}, #${r.pick_no}`}</AppText>} />
                     </View>
                     <View style={{ alignItems: 'center' }}>
                       <View style={[styles.smallGrade, { borderColor: toneColor(colors, g.tone) }]}>
@@ -88,7 +92,7 @@ export function SimPickReveal({ pick, board, onDone }: { pick: SimDraftPick; boa
                       </View>
                       <AppText style={styles.muted}>{simPickBoardNote(r.value_over_adp)}</AppText>
                     </View>
-                  </View>
+                  </Animated.View>
                 );
               })}
             </View>

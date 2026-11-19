@@ -168,6 +168,7 @@ export function SimPlayerChip({
   onOpen,
   quick = false,
   nonInteractive,
+  shortName = false,
 }: {
   player: SimPlayerRef;
   size?: number;
@@ -191,6 +192,8 @@ export function SimPlayerChip({
    * link that already does something; every other chip opens the player sheet when the game provides one.
    */
   nonInteractive?: string;
+  /** Always the short form ("M. Hale"), the shared PlayerName `short` prop, for tight lists. */
+  shortName?: boolean;
 }) {
   const openSheet = useContext(SimOpenPlayerContext);
   const inScope = useContext(TapScopeContext);
@@ -200,6 +203,7 @@ export function SimPlayerChip({
       playerId={real}
       fallbackLabel={simPlayerInitials(player)}
       name={player.name}
+      shortName={shortName}
       position={hidePosition ? null : player.pos}
       injuryStatus={player.status === "out" ? "Out" : null}
       muted={muted}

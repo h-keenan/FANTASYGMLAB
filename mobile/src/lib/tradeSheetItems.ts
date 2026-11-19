@@ -1,5 +1,6 @@
 import type { DraftPickAsset, RankedPlayer } from './api';
 import { conditionsFor, itemKey, type SheetItem } from './tradeSheetPicker';
+import { pickCompactLabel } from './tradeIdeaPick';
 
 /** A ranked player as a sheet-picker item (`ref` hands the player back). Mirrors web's tradeAnalyzerPresentation. */
 export function playerToSheetItem(player: RankedPlayer): SheetItem<RankedPlayer> {
@@ -26,7 +27,7 @@ export function pickToSheetItem(pick: DraftPickAsset): SheetItem<DraftPickAsset>
     key: itemKey('pick', pick.pick_id),
     kind: 'pick',
     id: pick.pick_id,
-    label: pick.label ?? 'Draft pick',
+    label: pickCompactLabel(pick.label, pick.season, pick.round),
     position: null,
     team: null,
     age: null,

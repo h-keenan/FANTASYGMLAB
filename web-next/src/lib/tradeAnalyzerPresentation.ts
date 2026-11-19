@@ -16,6 +16,7 @@
 import type { DraftPickAsset, RankedPlayer, TradeAsset } from "./api";
 import { notReadyReasonMessage } from "./notReadyMessages";
 import { conditionsFor, itemKey, type SheetItem } from "./tradeSheetPicker";
+import { pickCompactLabel } from "./tradeIdeaPick";
 
 export const ALL_TEAMS_ID = "__all__";
 export const POSITION_FILTERS = ["QB", "RB", "WR", "TE", "K", "DEF"];
@@ -110,7 +111,7 @@ export function pickToSheetItem(pick: DraftPickAsset): SheetItem<DraftPickAsset>
     key: itemKey("pick", pick.pick_id),
     kind: "pick",
     id: pick.pick_id,
-    label: pick.label ?? "Draft pick",
+    label: pickCompactLabel(pick.label, pick.season, pick.round),
     position: null,
     team: null,
     age: null,
