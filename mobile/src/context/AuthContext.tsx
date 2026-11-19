@@ -27,6 +27,7 @@ import {
   type AuthResult,
 } from '../lib/guestConversion';
 import { clearAuthenticatedQueryCache } from '../lib/queryClient';
+import { isForcedSignOut } from '../lib/sessionEnded';
 import { identifyRevenueCatUser, signOutRevenueCatUser } from '../lib/revenuecat';
 import { syncLastLeagueFromServer } from '../lib/lastLeague';
 import { syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotifications';
@@ -62,6 +63,8 @@ interface AuthContextValue {
    * lib/guestConversion.ts for why this is a materially different state
    * from a signed-out session. */
   isGuest: boolean;
+  /** True after a sign-out the user did not ask for (revoked on another device, account removed): the login screen says why. */
+  sessionEnded?: boolean;
   /**
    * Fix 3 (welcome/signup audit): upgrades the CURRENT guest session into a
    * real account in place via Supabase's own anonymous -> permanent
@@ -81,6 +84,10 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const sessionRef = useRef<Session | null>(null);
+  // Set while the user's own sign-out / account deletion runs, so it is not reported as "your session ended".
+  const userSignOutRef = useRef(false);
   const { syncDensityFromServer } = useDensity();
   const { syncLevelFromServer } = useExperienceLevel();
   const { syncModeFromServer } = useThemeMode();
@@ -145,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await handleAuthenticatedUserId(nextUserId);
       if (!isMounted) return;
 
+      sessionRef.current = data.session;
       setSession(data.session);
       setLoading(false);
       if (data.session) {
@@ -162,6 +170,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await handleAuthenticatedUserId(nextUserId);
           if (!isMounted) return;
 
+          if (isForcedSignOut({ event, hadSession: Boolean(sessionRef.current), userInitiated: userSignOutRef.current })) {
+            setSessionEnded(true);
+          } else if (nextSession) {
+            setSessionEnded(false);
+          }
+          if (event === 'SIGNED_OUT') userSignOutRef.current = false;
+          sessionRef.current = nextSession;
           setSession(nextSession);
           // Signed out: drop the cached experience level so beginner copy
           // never carries over to whoever signs in next.
@@ -225,6 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       isGuest: canConvertGuestToAccount(session),
+      sessionEnded,
       convertGuestToAccount: async (email, password) => {
         const validationError = validateGuestConversionInput(email, password);
         if (validationError) return { error: validationError };
@@ -247,6 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       signOut: async () => {
+        userSignOutRef.current = true;
         // Push-token unregistering needs the still-active session/access
         // token to call the backend, so it must run before anything below
         // invalidates it.
@@ -291,6 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Same ordering/guarantee as signOut above: push-token unregister
         // first (needs the still-live session), then best-effort
         // sign-out/cache-teardown that always completes via `finally`.
+        userSignOutRef.current = true;
         await unregisterCurrentPushToken();
         try {
           await supabase.auth.signOut();
@@ -304,7 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: null };
       },
     }),
-    [session, loading],
+    [session, loading, sessionEnded],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

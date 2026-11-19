@@ -1,7 +1,7 @@
 "use client";
 
 import type { Session } from "@supabase/supabase-js";
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { trackFeatureUse } from "@/lib/analytics";
 import { billingRequest } from "@/lib/billingClient";
@@ -19,6 +19,8 @@ import {
   type GuestUpgradeFailure,
 } from "@/lib/guestUpgrade";
 import { clearPortfolioSnapshots } from "@/lib/portfolioSnapshot";
+import { storeCurrentPathForReturnAfterSignIn } from "@/lib/protectedRouteReturn";
+import { clearSessionEnded, isForcedSignOut, markSessionEnded, readSessionEnded } from "@/lib/sessionEnded";
 import { supabase } from "@/lib/supabase";
 
 /** Current in-app location (path + query + hash) to come back to after auth. */
@@ -30,6 +32,14 @@ function currentLocationPath(): string {
 function safeLocalStorage(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function safeSessionStorage(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.sessionStorage;
   } catch {
     return null;
   }
@@ -97,6 +107,8 @@ interface AuthContextValue {
    * real but the user hasn't actually proven a new password yet, so normal
    * app content should not be reachable (see PasswordRecoveryGate). */
   recoveryPending: boolean;
+  /** True after a sign-out the user did not ask for (revoked elsewhere, account removed, other tab): the sign-in form says why. */
+  sessionEnded?: boolean;
   /** Finishes a recovery: sets the new password on the recovery session.
    * Clears recoveryPending on success so the gate unmounts. */
   completeRecovery: (password: string) => Promise<{ error: string | null }>;
@@ -109,6 +121,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [callbackNotice, setCallbackNotice] = useState<AuthContextValue["callbackNotice"]>(null);
   const [recoveryPending, setRecoveryPending] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const sessionRef = useRef<Session | null>(null);
+  // Set while the user's own sign-out / account deletion is running, so it is not reported as "your session ended".
+  const userSignOutRef = useRef(false);
 
   // A failed provider link comes back as error params on the callback URL.
   useEffect(() => {
@@ -155,12 +171,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void (async () => {
       const { data } = await supabase.auth.getSession();
       if (!isMounted) return;
+      sessionRef.current = data.session;
+      // A forced sign-out followed by a reload: the note must still be there when the sign-in form shows.
+      if (!data.session && readSessionEnded(safeSessionStorage())) setSessionEnded(true);
       setSession(data.session);
       setLoading(false);
     })();
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!isMounted) return;
+      if (isForcedSignOut({ event, hadSession: Boolean(sessionRef.current), userInitiated: userSignOutRef.current })) {
+        // Pages are about to bounce a null session to "/": remember why, and where the user was, before they do.
+        markSessionEnded(safeSessionStorage());
+        storeCurrentPathForReturnAfterSignIn();
+        setSessionEnded(true);
+      } else if (nextSession) {
+        clearSessionEnded(safeSessionStorage());
+        setSessionEnded(false);
+      }
+      if (event === "SIGNED_OUT") userSignOutRef.current = false;
+      sessionRef.current = nextSession;
       setSession(nextSession);
       setLoading(false);
       // Fired once the recovery link in the email is opened and Supabase
@@ -269,6 +299,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       signOut: async () => {
+        userSignOutRef.current = true;
         setRecoveryPending(false);
         // The cached Portfolio is one person's leagues: gone with the session.
         clearPortfolioSnapshots(safeLocalStorage());
@@ -287,6 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (e) {
           return { error: e instanceof Error ? e.message : "Could not delete the account." };
         }
+        userSignOutRef.current = true;
         await supabase.auth.signOut();
         return { error: null };
       },
@@ -295,6 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       recoveryPending,
+      sessionEnded,
       completeRecovery: async (password) => {
         const { error } = await supabase.auth.updateUser({ password });
         if (error) return { error: error.message };
@@ -302,7 +335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: null };
       },
     }),
-    [session, loading, callbackNotice, recoveryPending],
+    [session, loading, callbackNotice, recoveryPending, sessionEnded],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -779,7 +779,13 @@ async def _http_exception_handler(request: Request, exc: HTTPException):
             user_id or "anonymous",
             detail,
         )
-    return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": detail})
+    content: dict[str, Any] = {"ok": False, "error": detail}
+    code = getattr(exc, "code", None)
+    if isinstance(code, str) and code:
+        content["code"] = code
+        content["reason"] = code
+        content["retryable"] = exc.status_code >= 500
+    return JSONResponse(status_code=exc.status_code, content=content, headers=exc.headers)
 
 
 def _league_missing_error(league_id: str) -> Exception:
@@ -1007,6 +1013,32 @@ def _maybe_schedule_players_refresh() -> None:
         pass
 
 
+AUTH_TYPED_ERRORS_FLAG = auth_supabase.TYPED_ERRORS_FLAG
+AUTH_UNAVAILABLE_MESSAGE = "We could not check your sign-in just now. Try again in a moment."
+
+
+def auth_error_typed_enabled() -> bool:
+    from modules.experimental_graduation import graduated_kill_switch_enabled
+
+    return graduated_kill_switch_enabled(AUTH_TYPED_ERRORS_FLAG)
+
+
+class SessionInvalid(HTTPException):
+    """The auth provider answered and rejected the token (expired, revoked, user deleted). Clients ask the user to sign in."""
+
+    def __init__(self, detail: str):
+        super().__init__(status_code=401, detail=detail)
+        self.code = "session_invalid"
+
+
+class AuthProviderUnavailable(HTTPException):
+    """The auth provider could not answer. Retryable; clients must NOT treat it as a signed-out session."""
+
+    def __init__(self, retry_after: int = 5):
+        super().__init__(status_code=503, detail=AUTH_UNAVAILABLE_MESSAGE, headers={"Retry-After": str(retry_after)})
+        self.code = "auth_unavailable"
+
+
 def require_user(
     request: Request,
     authorization: str | None = Header(default=None),
@@ -1025,6 +1057,11 @@ def require_user(
         raise HTTPException(status_code=503, detail="Accounts are not configured.")
     user, error = auth_supabase.fetch_auth_user_cached(config, token)
     if not user:
+        if isinstance(error, auth_supabase.TransientAuthError) and auth_error_typed_enabled():
+            # GoTrue could not answer: that says nothing about this session. A 401 here signs healthy users out.
+            raise AuthProviderUnavailable(retry_after=error.retry_after)
+        if auth_error_typed_enabled():
+            raise SessionInvalid(error or "Invalid or expired session.")
         raise HTTPException(status_code=401, detail=error or "Invalid or expired session.")
     normalized = auth_supabase.normalize_auth_user(user, access_token=token)
     normalized["_access_token"] = token

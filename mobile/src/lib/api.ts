@@ -1,4 +1,4 @@
-import { friendlyStatusMessage } from './badDayCopy';
+import { BAD_RESPONSE_MESSAGE, friendlyStatusMessage, isRetryableSessionLookupError } from './badDayCopy';
 import { reportRequestOutcome } from './connectivity';
 import { normalizeProspectProfile, type ProspectProfileResponse } from './prospectProfile';
 import type { DraftSignalRow } from './draftSignals';
@@ -130,24 +130,30 @@ async function performRequest<T>(
   }
 
   let body: unknown = null;
+  let bodyUnreadable = false;
   try {
     body = await response.json();
   } catch {
     // Non-JSON error body (e.g. a gateway timeout page) — fall through below.
+    bodyUnreadable = response.status !== 204 && response.headers.get('Content-Length') !== '0';
   }
 
   if (!response.ok) {
+    const fields = body && typeof body === 'object' ? (body as { error?: unknown; detail?: unknown; reason?: unknown; code?: unknown }) : {};
     const friendly = friendlyStatusMessage(
       response.status,
-      body && typeof body === 'object' && 'error' in body ? String((body as { error: unknown }).error) : '',
+      typeof (fields.error ?? fields.detail) === 'string' ? String(fields.error ?? fields.detail) : '',
     );
     // 4xx keeps this client's generic "Request failed (N)." fallback, which Sim call sites detect to substitute their own sentence.
     const message = /^Request failed with status/.test(friendly) ? `Request failed (${response.status}).` : friendly;
-    const code =
-      body && typeof body === 'object' && typeof (body as { code?: unknown }).code === 'string'
-        ? (body as { code: string }).code
-        : undefined;
+    const codeField = fields.code ?? fields.reason;
+    const code = typeof codeField === 'string' ? codeField : undefined;
     throw new ApiError(response.status, message, code, parseRetryAfterSeconds(response.headers.get('Retry-After')));
+  }
+
+  // A 2xx that is not JSON is a proxy or error page (HTML), not data: a null body would crash the screen downstream.
+  if (bodyUnreadable) {
+    throw new ApiError(502, BAD_RESPONSE_MESSAGE, 'bad_response');
   }
 
   if (isFreeLeagueLockedBody(body)) {
@@ -163,6 +169,10 @@ async function authorizedRequest<T>(
 ): Promise<T> {
   const { data, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !data.session) {
+    // An offline refresh failure keeps the stored session (auth-js retries): that is a network problem, not a signed-out user.
+    if (!data.session && sessionError && isRetryableSessionLookupError(sessionError)) {
+      throw new Error('Network request failed');
+    }
     throw new ApiError(401, 'Not signed in.');
   }
   const accessToken = data.session.access_token;
