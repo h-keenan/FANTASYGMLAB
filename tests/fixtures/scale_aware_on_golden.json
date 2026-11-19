@@ -1,0 +1,1237 @@
+{
+ "10t-1qb|contender": [
+  {
+   "analyzer": 88,
+   "gain": 88,
+   "my_score": 4236,
+   "receive": [
+    "F10-21",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4324
+  },
+  {
+   "analyzer": 68,
+   "gain": 68,
+   "my_score": 5664,
+   "receive": [
+    "F04-17",
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-10"
+   ],
+   "their_score": 5732
+  },
+  {
+   "analyzer": 32,
+   "gain": 220,
+   "my_score": 6356,
+   "receive": [
+    "F04-16",
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-08"
+   ],
+   "their_score": 6576
+  },
+  {
+   "analyzer": 232,
+   "gain": 232,
+   "my_score": 6004,
+   "receive": [
+    "F04-17",
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-09"
+   ],
+   "their_score": 6236
+  },
+  {
+   "analyzer": -24,
+   "gain": -24,
+   "my_score": 3768,
+   "receive": [
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-18"
+   ],
+   "their_score": 3744
+  },
+  {
+   "analyzer": -76,
+   "gain": -28,
+   "my_score": 4988,
+   "receive": [
+    "F10-20",
+    "2026 Round 2"
+   ],
+   "send": [
+    "F01-12"
+   ],
+   "their_score": 4960
+  },
+  {
+   "analyzer": 92,
+   "gain": 92,
+   "my_score": 4868,
+   "receive": [
+    "F10-20",
+    "2026 Round 2"
+   ],
+   "send": [
+    "F01-13"
+   ],
+   "their_score": 4960
+  },
+  {
+   "analyzer": 232,
+   "gain": 280,
+   "my_score": 4988,
+   "receive": [
+    "F09-11"
+   ],
+   "send": [
+    "F01-12"
+   ],
+   "their_score": 5268
+  }
+ ],
+ "10t-1qb|rebuild": [
+  {
+   "analyzer": -144,
+   "gain": -224,
+   "my_score": 6944,
+   "receive": [
+    "F07-06"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6720
+  },
+  {
+   "analyzer": -264,
+   "gain": -360,
+   "my_score": 6944,
+   "receive": [
+    "F05-07"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6584
+  },
+  {
+   "analyzer": 92,
+   "gain": 92,
+   "my_score": 2788,
+   "receive": [
+    "F07-20"
+   ],
+   "send": [
+    "F01-19"
+   ],
+   "their_score": 2880
+  },
+  {
+   "analyzer": -174,
+   "gain": -384,
+   "my_score": 6944,
+   "receive": [
+    "2026 Round 1",
+    "2027 Round 3"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6560
+  },
+  {
+   "analyzer": 148,
+   "gain": 148,
+   "my_score": 3296,
+   "receive": [
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-18"
+   ],
+   "their_score": 3444
+  },
+  {
+   "analyzer": 632,
+   "gain": 388,
+   "my_score": 7204,
+   "receive": [
+    "F05-10",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-04"
+   ],
+   "their_score": 7592
+  },
+  {
+   "analyzer": 814,
+   "gain": 604,
+   "my_score": 6944,
+   "receive": [
+    "F06-10",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 7548
+  },
+  {
+   "analyzer": 853,
+   "gain": 632,
+   "my_score": 7204,
+   "receive": [
+    "F06-09",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-04"
+   ],
+   "their_score": 7836
+  }
+ ],
+ "10t-sf|contender": [
+  {
+   "analyzer": 140,
+   "gain": 140,
+   "my_score": 4236,
+   "receive": [
+    "F10-21",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4376
+  },
+  {
+   "analyzer": 144,
+   "gain": 144,
+   "my_score": 4000,
+   "receive": [
+    "F10-22",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-17"
+   ],
+   "their_score": 4144
+  },
+  {
+   "analyzer": -88,
+   "gain": -88,
+   "my_score": 4000,
+   "receive": [
+    "F10-23",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-17"
+   ],
+   "their_score": 3912
+  },
+  {
+   "analyzer": 20,
+   "gain": 20,
+   "my_score": 5664,
+   "receive": [
+    "F04-18",
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-10"
+   ],
+   "their_score": 5684
+  },
+  {
+   "analyzer": 304,
+   "gain": 304,
+   "my_score": 6004,
+   "receive": [
+    "F04-16",
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-09"
+   ],
+   "their_score": 6308
+  },
+  {
+   "analyzer": -333,
+   "gain": -312,
+   "my_score": 8644,
+   "receive": [
+    "F04-00"
+   ],
+   "send": [
+    "F01-08",
+    "2026 Round 1"
+   ],
+   "their_score": 8332
+  },
+  {
+   "analyzer": -56,
+   "gain": -108,
+   "my_score": 8292,
+   "receive": [
+    "F07-00"
+   ],
+   "send": [
+    "F01-09",
+    "2026 Round 1"
+   ],
+   "their_score": 8184
+  },
+  {
+   "analyzer": 137,
+   "gain": 320,
+   "my_score": 6356,
+   "receive": [
+    "F07-12",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-08"
+   ],
+   "their_score": 6676
+  }
+ ],
+ "10t-sf|rebuild": [
+  {
+   "analyzer": -144,
+   "gain": -224,
+   "my_score": 6944,
+   "receive": [
+    "F07-06"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6720
+  },
+  {
+   "analyzer": -264,
+   "gain": -360,
+   "my_score": 6944,
+   "receive": [
+    "F05-07"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6584
+  },
+  {
+   "analyzer": 92,
+   "gain": 92,
+   "my_score": 2788,
+   "receive": [
+    "F07-20"
+   ],
+   "send": [
+    "F01-19"
+   ],
+   "their_score": 2880
+  },
+  {
+   "analyzer": -22,
+   "gain": -44,
+   "my_score": 5348,
+   "receive": [
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-12"
+   ],
+   "their_score": 5304
+  },
+  {
+   "analyzer": 192,
+   "gain": 192,
+   "my_score": 5112,
+   "receive": [
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-13"
+   ],
+   "their_score": 5304
+  },
+  {
+   "analyzer": 176,
+   "gain": 176,
+   "my_score": 4112,
+   "receive": [
+    "F05-23",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4288
+  },
+  {
+   "analyzer": -52,
+   "gain": -52,
+   "my_score": 3868,
+   "receive": [
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-17"
+   ],
+   "their_score": 3816
+  },
+  {
+   "analyzer": 338,
+   "gain": 128,
+   "my_score": 6944,
+   "receive": [
+    "2026 Round 1",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 7072
+  }
+ ],
+ "12t-1qb|contender": [
+  {
+   "analyzer": 160,
+   "gain": 160,
+   "my_score": 4736,
+   "receive": [
+    "F10-20",
+    "2026 Round 2"
+   ],
+   "send": [
+    "F01-14"
+   ],
+   "their_score": 4896
+  },
+  {
+   "analyzer": -72,
+   "gain": -72,
+   "my_score": 4736,
+   "receive": [
+    "F10-21",
+    "2026 Round 2"
+   ],
+   "send": [
+    "F01-14"
+   ],
+   "their_score": 4664
+  },
+  {
+   "analyzer": 68,
+   "gain": 68,
+   "my_score": 4596,
+   "receive": [
+    "F10-21",
+    "2026 Round 2"
+   ],
+   "send": [
+    "F01-15"
+   ],
+   "their_score": 4664
+  },
+  {
+   "analyzer": -36,
+   "gain": 152,
+   "my_score": 6356,
+   "receive": [
+    "F04-16",
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-08"
+   ],
+   "their_score": 6508
+  },
+  {
+   "analyzer": 164,
+   "gain": 164,
+   "my_score": 6004,
+   "receive": [
+    "F04-17",
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-09"
+   ],
+   "their_score": 6168
+  },
+  {
+   "analyzer": 220,
+   "gain": 220,
+   "my_score": 5664,
+   "receive": [
+    "F04-18",
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-10"
+   ],
+   "their_score": 5884
+  },
+  {
+   "analyzer": -270,
+   "gain": 236,
+   "my_score": 6952,
+   "receive": [
+    "F12-02"
+   ],
+   "send": [
+    "F01-06"
+   ],
+   "their_score": 7188
+  },
+  {
+   "analyzer": 200,
+   "gain": 200,
+   "my_score": 4868,
+   "receive": [
+    "F11-11"
+   ],
+   "send": [
+    "F01-13"
+   ],
+   "their_score": 5068
+  }
+ ],
+ "12t-1qb|rebuild": [
+  {
+   "analyzer": -147,
+   "gain": -224,
+   "my_score": 6944,
+   "receive": [
+    "F07-06"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6720
+  },
+  {
+   "analyzer": -265,
+   "gain": -360,
+   "my_score": 6944,
+   "receive": [
+    "F05-07"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6584
+  },
+  {
+   "analyzer": 92,
+   "gain": 92,
+   "my_score": 2788,
+   "receive": [
+    "F07-20"
+   ],
+   "send": [
+    "F01-19"
+   ],
+   "their_score": 2880
+  },
+  {
+   "analyzer": 56,
+   "gain": 56,
+   "my_score": 3296,
+   "receive": [
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-18"
+   ],
+   "their_score": 3352
+  },
+  {
+   "analyzer": 84,
+   "gain": 84,
+   "my_score": 4112,
+   "receive": [
+    "2026 Round 2",
+    "2027 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4196
+  },
+  {
+   "analyzer": 622,
+   "gain": 380,
+   "my_score": 7204,
+   "receive": [
+    "F05-10",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-04"
+   ],
+   "their_score": 7584
+  },
+  {
+   "analyzer": 288,
+   "gain": 288,
+   "my_score": 4552,
+   "receive": [
+    "F08-20",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-15"
+   ],
+   "their_score": 4840
+  },
+  {
+   "analyzer": 791,
+   "gain": 584,
+   "my_score": 6944,
+   "receive": [
+    "F06-10",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 7528
+  }
+ ],
+ "12t-sf-tep|contender": [
+  {
+   "analyzer": -176,
+   "gain": -176,
+   "my_score": 4736,
+   "receive": [
+    "F10-20",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-14"
+   ],
+   "their_score": 4560
+  },
+  {
+   "analyzer": -36,
+   "gain": -36,
+   "my_score": 4596,
+   "receive": [
+    "F10-20",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-15"
+   ],
+   "their_score": 4560
+  },
+  {
+   "analyzer": 16,
+   "gain": 16,
+   "my_score": 4736,
+   "receive": [
+    "F10-22",
+    "2026 Round 2"
+   ],
+   "send": [
+    "F01-14"
+   ],
+   "their_score": 4752
+  },
+  {
+   "analyzer": -270,
+   "gain": 236,
+   "my_score": 6952,
+   "receive": [
+    "F12-02"
+   ],
+   "send": [
+    "F01-06"
+   ],
+   "their_score": 7188
+  },
+  {
+   "analyzer": -315,
+   "gain": -448,
+   "my_score": 8080,
+   "receive": [
+    "F04-03"
+   ],
+   "send": [
+    "F01-10",
+    "2026 Round 1"
+   ],
+   "their_score": 7632
+  },
+  {
+   "analyzer": -184,
+   "gain": -236,
+   "my_score": 8420,
+   "receive": [
+    "F07-00"
+   ],
+   "send": [
+    "F01-09",
+    "2026 Round 1"
+   ],
+   "their_score": 8184
+  },
+  {
+   "analyzer": 0,
+   "gain": 0,
+   "my_score": 2884,
+   "receive": [
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-21"
+   ],
+   "their_score": 2884
+  },
+  {
+   "analyzer": -96,
+   "gain": -96,
+   "my_score": 4000,
+   "receive": [
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-17"
+   ],
+   "their_score": 3904
+  }
+ ],
+ "12t-sf-tep|rebuild": [
+  {
+   "analyzer": -147,
+   "gain": -224,
+   "my_score": 6944,
+   "receive": [
+    "F07-06"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6720
+  },
+  {
+   "analyzer": -265,
+   "gain": -360,
+   "my_score": 6944,
+   "receive": [
+    "F05-07"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6584
+  },
+  {
+   "analyzer": 92,
+   "gain": 92,
+   "my_score": 2788,
+   "receive": [
+    "F07-20"
+   ],
+   "send": [
+    "F01-19"
+   ],
+   "their_score": 2880
+  },
+  {
+   "analyzer": -156,
+   "gain": -400,
+   "my_score": 7204,
+   "receive": [
+    "2026 Round 1",
+    "2027 Round 3"
+   ],
+   "send": [
+    "F01-04"
+   ],
+   "their_score": 6804
+  },
+  {
+   "analyzer": -152,
+   "gain": -152,
+   "my_score": 5112,
+   "receive": [
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-13"
+   ],
+   "their_score": 4960
+  },
+  {
+   "analyzer": 168,
+   "gain": 168,
+   "my_score": 4112,
+   "receive": [
+    "F05-23",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4280
+  },
+  {
+   "analyzer": -64,
+   "gain": -64,
+   "my_score": 3868,
+   "receive": [
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-17"
+   ],
+   "their_score": 3804
+  },
+  {
+   "analyzer": -200,
+   "gain": -444,
+   "my_score": 7204,
+   "receive": [
+    "2026 Round 1",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-04"
+   ],
+   "their_score": 6760
+  }
+ ],
+ "14t-1qb-tep|contender": [
+  {
+   "analyzer": -257,
+   "gain": 252,
+   "my_score": 6952,
+   "receive": [
+    "F13-16",
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-06"
+   ],
+   "their_score": 7204
+  },
+  {
+   "analyzer": -126,
+   "gain": 256,
+   "my_score": 6716,
+   "receive": [
+    "F13-17",
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-07"
+   ],
+   "their_score": 6972
+  },
+  {
+   "analyzer": -129,
+   "gain": 60,
+   "my_score": 6356,
+   "receive": [
+    "F13-19",
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-08"
+   ],
+   "their_score": 6416
+  },
+  {
+   "analyzer": -16,
+   "gain": -16,
+   "my_score": 4236,
+   "receive": [
+    "F10-21",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4220
+  },
+  {
+   "analyzer": -270,
+   "gain": 236,
+   "my_score": 6952,
+   "receive": [
+    "F12-02"
+   ],
+   "send": [
+    "F01-06"
+   ],
+   "their_score": 7188
+  },
+  {
+   "analyzer": 216,
+   "gain": 216,
+   "my_score": 4236,
+   "receive": [
+    "F10-20",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4452
+  },
+  {
+   "analyzer": -187,
+   "gain": -244,
+   "my_score": 7620,
+   "receive": [
+    "F14-02"
+   ],
+   "send": [
+    "F01-11",
+    "2026 Round 1"
+   ],
+   "their_score": 7376
+  },
+  {
+   "analyzer": 200,
+   "gain": 200,
+   "my_score": 4868,
+   "receive": [
+    "F11-11"
+   ],
+   "send": [
+    "F01-13"
+   ],
+   "their_score": 5068
+  }
+ ],
+ "14t-1qb-tep|rebuild": [
+  {
+   "analyzer": 269,
+   "gain": 172,
+   "my_score": 6460,
+   "receive": [
+    "F13-04"
+   ],
+   "send": [
+    "F01-07"
+   ],
+   "their_score": 6632
+  },
+  {
+   "analyzer": -147,
+   "gain": -224,
+   "my_score": 6944,
+   "receive": [
+    "F07-06"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6720
+  },
+  {
+   "analyzer": -52,
+   "gain": -52,
+   "my_score": 2836,
+   "receive": [
+    "F13-18"
+   ],
+   "send": [
+    "F01-20"
+   ],
+   "their_score": 2784
+  },
+  {
+   "analyzer": -235,
+   "gain": -332,
+   "my_score": 6460,
+   "receive": [
+    "F03-21",
+    "2026 Round 1"
+   ],
+   "send": [
+    "F01-07"
+   ],
+   "their_score": 6128
+  },
+  {
+   "analyzer": -132,
+   "gain": -132,
+   "my_score": 4872,
+   "receive": [
+    "2026 Round 3",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-10"
+   ],
+   "their_score": 4740
+  },
+  {
+   "analyzer": 491,
+   "gain": 248,
+   "my_score": 7204,
+   "receive": [
+    "F08-16",
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-04"
+   ],
+   "their_score": 7452
+  },
+  {
+   "analyzer": 259,
+   "gain": 16,
+   "my_score": 7204,
+   "receive": [
+    "F08-17",
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-04"
+   ],
+   "their_score": 7220
+  },
+  {
+   "analyzer": 128,
+   "gain": 128,
+   "my_score": 4112,
+   "receive": [
+    "2026 Round 2",
+    "2027 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4240
+  }
+ ],
+ "14t-sf|contender": [
+  {
+   "analyzer": -253,
+   "gain": 256,
+   "my_score": 6952,
+   "receive": [
+    "F13-18",
+    "2027 Round 1"
+   ],
+   "send": [
+    "F01-06"
+   ],
+   "their_score": 7208
+  },
+  {
+   "analyzer": -299,
+   "gain": -356,
+   "my_score": 7732,
+   "receive": [
+    "F14-02"
+   ],
+   "send": [
+    "F01-11",
+    "2026 Round 1"
+   ],
+   "their_score": 7376
+  },
+  {
+   "analyzer": 8,
+   "gain": 8,
+   "my_score": 4236,
+   "receive": [
+    "F10-21",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4244
+  },
+  {
+   "analyzer": 12,
+   "gain": 12,
+   "my_score": 4000,
+   "receive": [
+    "F10-22",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-17"
+   ],
+   "their_score": 4012
+  },
+  {
+   "analyzer": -24,
+   "gain": -24,
+   "my_score": 2884,
+   "receive": [
+    "F13-19"
+   ],
+   "send": [
+    "F01-21"
+   ],
+   "their_score": 2860
+  },
+  {
+   "analyzer": 51,
+   "gain": 240,
+   "my_score": 6356,
+   "receive": [
+    "F13-05"
+   ],
+   "send": [
+    "F01-08"
+   ],
+   "their_score": 6596
+  },
+  {
+   "analyzer": -270,
+   "gain": 236,
+   "my_score": 6952,
+   "receive": [
+    "F12-02"
+   ],
+   "send": [
+    "F01-06"
+   ],
+   "their_score": 7188
+  },
+  {
+   "analyzer": -332,
+   "gain": -356,
+   "my_score": 8404,
+   "receive": [
+    "F05-01"
+   ],
+   "send": [
+    "F01-09",
+    "2026 Round 1"
+   ],
+   "their_score": 8048
+  }
+ ],
+ "14t-sf|rebuild": [
+  {
+   "analyzer": 269,
+   "gain": 172,
+   "my_score": 6460,
+   "receive": [
+    "F13-04"
+   ],
+   "send": [
+    "F01-07"
+   ],
+   "their_score": 6632
+  },
+  {
+   "analyzer": -147,
+   "gain": -224,
+   "my_score": 6944,
+   "receive": [
+    "F07-06"
+   ],
+   "send": [
+    "F01-05"
+   ],
+   "their_score": 6720
+  },
+  {
+   "analyzer": -52,
+   "gain": -52,
+   "my_score": 2836,
+   "receive": [
+    "F13-18"
+   ],
+   "send": [
+    "F01-20"
+   ],
+   "their_score": 2784
+  },
+  {
+   "analyzer": -209,
+   "gain": -452,
+   "my_score": 7204,
+   "receive": [
+    "2026 Round 1",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-04"
+   ],
+   "their_score": 6752
+  },
+  {
+   "analyzer": 136,
+   "gain": 136,
+   "my_score": 4112,
+   "receive": [
+    "F04-23",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4248
+  },
+  {
+   "analyzer": 84,
+   "gain": 84,
+   "my_score": 4872,
+   "receive": [
+    "2026 Round 3",
+    "2027 Round 2"
+   ],
+   "send": [
+    "F01-10"
+   ],
+   "their_score": 4956
+  },
+  {
+   "analyzer": 120,
+   "gain": 120,
+   "my_score": 4112,
+   "receive": [
+    "F05-23",
+    "2026 Round 3"
+   ],
+   "send": [
+    "F01-16"
+   ],
+   "their_score": 4232
+  },
+  {
+   "analyzer": -241,
+   "gain": -484,
+   "my_score": 7204,
+   "receive": [
+    "2026 Round 1",
+    "2027 Round 3"
+   ],
+   "send": [
+    "F01-04"
+   ],
+   "their_score": 6720
+  }
+ ]
+}
