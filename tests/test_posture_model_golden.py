@@ -28,7 +28,18 @@ def _want():
 
 
 def _floor_off_snapshot():
-    env = {**os.environ, "DYNASTYGM_STARTER_WEIGHT_FLOOR_V1": "0"}
+    env = {**os.environ, "DYNASTYGM_STARTER_WEIGHT_FLOOR_V1": "0", "DYNASTYGM_POSTURE_COHERENCE_V1": "0"}
+    out = subprocess.run(
+        [sys.executable, "-m", "tests.posture_golden_support"], cwd=ROOT, env={**env, "PYTHONPATH": str(ROOT)},
+        capture_output=True, text=True, check=True,
+    ).stdout
+    line = next(x for x in out.splitlines() if x.startswith("GOLDEN_JSON="))
+    return json.loads(line[len("GOLDEN_JSON="):])
+
+
+def _legacy_snapshot():
+    """Pre-coherence goldens: the coherence flag defaults ON, so they are checked with it switched OFF (subprocess)."""
+    env = {**os.environ, "DYNASTYGM_POSTURE_COHERENCE_V1": "0", "POSTURE_GOLDEN_MODE": "legacy"}
     out = subprocess.run(
         [sys.executable, "-m", "tests.posture_golden_support"], cwd=ROOT, env={**env, "PYTHONPATH": str(ROOT)},
         capture_output=True, text=True, check=True,
@@ -44,11 +55,11 @@ def _compare(got, want, label):
 
 
 def test_posture_tables_and_age_curves_are_unchanged():
-    _compare(S.tables_snapshot(), _want()["tables_on"], "tables (floor on)")
+    _compare(_legacy_snapshot()["tables"], _want()["tables_on"], "tables (floor on, coherence off)")
 
 
 def test_trade_grade_verdicts_are_unchanged_for_every_posture_and_format():
-    _compare(S.grade_snapshot(), _want()["grade_on"], "grade (floor on)")
+    _compare(_legacy_snapshot()["grade"], _want()["grade_on"], "grade (floor on, coherence off)")
 
 
 def test_floor_off_tables_and_grades_are_unchanged():
@@ -58,11 +69,11 @@ def test_floor_off_tables_and_grades_are_unchanged():
 
 
 def test_hub_finder_and_gm_plan_are_unchanged():
-    _compare(S.engine_snapshot(), _want()["engine"], "hub/finder/gm plan")
+    _compare(_legacy_snapshot()["engine"], _want()["engine"], "hub/finder/gm plan (coherence off)")
 
 
 def test_three_team_finder_is_unchanged():
-    _compare(S.multi_team_snapshot(), _want()["multi"], "multi-team finder")
+    _compare(_legacy_snapshot()["multi"], _want()["multi"], "multi-team finder (coherence off)")
 
 
 COHERENCE_GOLDEN = Path(__file__).parent / "fixtures" / "posture_golden_coherence.json"
@@ -79,16 +90,19 @@ def _coherence_snapshot():
 
 
 def test_coherence_flag_on_matches_its_own_golden():
-    """DYNASTYGM_POSTURE_COHERENCE_V1=1 (default OFF): every table, grade, Hub/Finder/GM Plan and 3-team result."""
+    """DYNASTYGM_POSTURE_COHERENCE_V1=1 (default ON since 2026-11-19): every table, grade, Hub/Finder/GM Plan and 3-team result."""
 
     got, want = _coherence_snapshot(), json.loads(COHERENCE_GOLDEN.read_text())
     _compare(got, want, "coherence on")
 
 
-def test_coherence_flag_off_is_the_default(monkeypatch):
+def test_coherence_flag_on_is_the_default(monkeypatch):
     from modules import posture_model
 
-    assert posture_model.COHERENCE_ON is False or os.environ.get(posture_model.COHERENCE_ENV_KEY)
+    monkeypatch.delenv(posture_model.COHERENCE_ENV_KEY, raising=False)
+    assert posture_model.coherence_enabled() is True
+    monkeypatch.setenv(posture_model.COHERENCE_ENV_KEY, "0")
+    assert posture_model.coherence_enabled() is False
 
 
 if __name__ == "__main__" and os.environ.get("POSTURE_GOLDEN_CAPTURE_COHERENCE"):  # pragma: no cover - capture helper
