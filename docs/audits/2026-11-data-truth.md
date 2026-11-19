@@ -17,7 +17,7 @@ ingest code, the committed status file and the public freshness report instead.
 
 | # | Sev | Finding | Fix status |
 |---|---|---|---|
-| 1 | P0 | The FantasyCalc input to the committed `players.db` is the July 10 seed CSV, not live FantasyCalc. 364 of 364 name-matched `fantasycalc_value` rows equal the July CSV exactly; against live FantasyCalc (1QB dynasty, PPR, 12 teams) only 52 of 348 id-matched players are within 10% (median ratio 1.23). | Fix PR behind `DYNASTYGM_FRESH_PROVIDER_CACHE_V1` (default off, needs owner flip) |
+| 1 | P0 | The FantasyCalc input to the committed `players.db` is the July 10 seed CSV, not live FantasyCalc. 364 of 364 name-matched `fantasycalc_value` rows equal the July CSV exactly; against live FantasyCalc (1QB dynasty, PPR, 12 teams) only 52 of 348 id-matched players are within 10% (median ratio 1.23). | Fixed: `DYNASTYGM_FRESH_PROVIDER_CACHE_V1` (#2186, flipped to default ON after the live harness, section 10) |
 | 2 | P0 | The public freshness report (`/v1/public/data-freshness`, which the ops watchdog reads) measures file mtimes. In a git deploy every file's mtime is the checkout time, so five datasets (FantasyCalc values, depth charts, injury history, advanced stats, players directory) all report `as_of 1795073009`, "0.1h old", regardless of the data inside. Finding 1 was invisible to it. | Fix PR, same flag |
 | 3 | P1 | GitHub-hosted schedules run hours late, so "every 30 min" jobs are really every 6 to 9 hours (table below). Injury status, news and the players rebuild trail their advertised cadence by 12x to 36x. | Documented, needs an external trigger (owner) |
 | 4 | P1 | 18 data-bearing surfaces never say how old their numbers are (list below). Only Matchup live scores, the ADP credit, public rankings pages, the Sim banner and the prospect sheet do. | Fix PR: one shared `FreshnessLabel`, web and app |
@@ -128,14 +128,119 @@ Sim scope line, Sim real history, prospect sheet (raw string).
   helper pair `lib/dataFreshness.ts`): "Values as of 2h ago", "Injuries updated 9:40am", gentle muted "may be behind" wording
   when over threshold (never red). Wired into the highest-traffic surfaces first; the remainder is the follow-up list above.
 - `modules/fantasycalc.py`: sidecar `fantasycalc_values.meta.json` (fetched_at), team and value fixes, tests.
-  The TTL change is behind `DYNASTYGM_FRESH_PROVIDER_CACHE_V1` (default off; harness
-  `scripts/audits/fantasycalc_freshness_harness.py` shows before and after on a throwaway directory).
+  The TTL change is `DYNASTYGM_FRESH_PROVIDER_CACHE_V1`, shipped OFF in #2186 and flipped to default ON (kill switch `=0`)
+  after the live harness below. Harness: `scripts/audits/fantasycalc_freshness_harness.py`.
 - `modules/data_freshness.py`: uses the sidecar timestamp for FantasyCalc when the flag is on.
+
+## 10. Follow-up: live FantasyCalc drift (run 2026-11-19, public API only)
+
+Committed July seed CSV (463 rows) vs a live fetch (`values/current`, dynasty, 1QB, PPR, 12 teams) through the fixed
+`get_dynasty_values()` on a throwaway directory.
+
+Payload checks, all pass: 423 rows; positions WR 156, RB 108, QB 71, TE 64, PICK 24; value range 10 to 11181, no nulls,
+no non-positive values; no duplicate (name, position); `team` is now filled (29 blank, all picks and free agents);
+`sleeper_id` present on every row; as_of stamped at fetch time. 331 of the 463 seed names match a live row (the other 132
+are July-only names: drafted rookies whose name form changed, e.g. "Kenneth Walker" is now "Kenneth Walker III", and old pick rows).
+
+Drift on the 331 matched players: absolute change median 351, p90 1094, mean 496; relative median 35%, p90 95%.
+
+Top 20 movers (seed to live): Ashton Jeanty RB 7932 to 4392, Omarion Hampton RB 6302 to 2966, Matthew Golden WR 1922 to
+5015, De'Von Achane RB 6333 to 4058, Jeremiyah Love RB 7469 to 5263, Christian Watson WR 2263 to 4375, TreVeyon Henderson RB
+4191 to 2084, Parker Washington WR 2014 to 4109, Bhayshul Tuten RB 2466 to 4284, A.J. Brown WR 3685 to 1909, Chuba Hubbard RB
+2059 to 3682, Quinshon Judkins RB 4286 to 2703, Emeka Egbuka WR 4495 to 2941, Isaiah Likely TE 1800 to 3307, Jonah Coleman RB
+1965 to 3450, Saquon Barkley RB 4186 to 2728, Puka Nacua WR 8489 to 7050, Bucky Irving RB 3441 to 4842, Ladd McConkey WR 3758 to
+2376, Caleb Douglas WR 605 to 1950.
+
+Top 50 board: 32 of 50 names carry over (a few of the 18 "changes" are name-form changes). Biggest rank moves seed to live:
+Matthew Golden 118 to 17, Isaiah Likely 135 to 47, Parker Washington 109 to 30, Jonah Coleman 114 to 42, Christian Watson 90 to 24,
+Chuba Hubbard 103 to 39, Bhayshul Tuten 85 to 25, Brock Purdy 87 to 40, D'Andre Swift 89 to 44, Bucky Irving 52 to 18. Left
+the top 50: Omarion Hampton, Emeka Egbuka, Quinshon Judkins, Tyler Warren, TreVeyon Henderson, Saquon Barkley, Jayden Daniels,
+Lamar Jackson, Ladd McConkey, A.J. Brown, Rashee Rice, Marvin Harrison Jr, Cam Skattebo and three 2026 pick rows. Entered:
+Matthew Golden, Bucky Irving, Luther Burden III, Christian Watson, Bhayshul Tuten, Parker Washington, Tee Higgins, Zay Flowers,
+Javonte Williams, Chuba Hubbard, Brock Purdy, D'Andre Swift, Isaiah Likely, Trevor Lawrence, Jonah Coleman.
+
+Correction to finding 5: the July seed does NOT explain Puka Nacua at 61. FantasyCalc had him at rank 5 in July and has him at 7
+live; our `players.db` carries him at `fantasycalc_value` 8489 with `injury_status` IR, and Jeremiyah Love is also on IR. Those two
+low ranks are the model's injury discount, not stale input. Matthew Golden (FantasyCalc 1922 in July, 5015 live; our public
+rank 73 vs FantasyCalc 17) is the real stale-input case.
+
+No parse anomalies: no empty payload, no missing position, no wild range. Two observations: `PICK` rows are part of the payload
+and of the seed (consumed by the pick valuation, unchanged); and the live list is shorter than the seed (423 vs 463) because the
+seed carried long-tail names FantasyCalc no longer lists.
+
+### Who writes `players.db` and does the box serve it
+
+- Writer: `.github/workflows/players-db-refresh.yml` (cron `0 */6 * * *`, in practice every 7 to 8h) runs
+  `scripts/refresh_and_commit_players_db.py`, which rebuilds `data/players.db` and commits it, with the sibling caches
+  `sleeper_players.json`, `fantasycalc_values.csv` and `depth_chart_snapshots.json`, to `main` as "chore(data): scheduled
+  players.db refresh". `.github/workflows/injury-status-sync.yml` commits the injury-only patch as "chore(data): scheduled
+  injury-status sync".
+- Box: `fantasygmlab-autopull.timer` (server side, `docs/SELF_HOSTED_MIGRATION.md` 5.7) polls `origin/main` about every 2 minutes,
+  fast-forwards, rebuilds and recreates the stack. The image does `COPY . .` (the build context excludes the repo history), so each
+  deploy ships that committed `data/players.db`. At runtime `startup_cold_path.load_persisted_players` serves the persisted file and
+  only queues a background rebuild when the Sleeper cache is stale; the hot path recomputes injury and role stages "without provider
+  calls". So yes: the box serves the committed file, and the committed file carried July FantasyCalc values (finding 1).
+- Does the box refetch FantasyCalc at runtime? Possibly inside a queued in-container rebuild: Docker `COPY` keeps the source
+  file's mtime, and on the box an unchanged CSV keeps its original (old) mtime, so the legacy check would expire and refetch.
+  That result lives in the container and is discarded at the next autopull recreate (at least every data commit). This cannot be
+  confirmed without box access. The production evidence (Golden at 73 where live FantasyCalc says 17; production board
+  correlates 0.860 with live and 0.825 with July) says the stale file dominates what users see. Either way, with the flag on
+  the refresh job itself now commits live values.
+
+## 11. Follow-up: scheduling the 15 and 30 minute jobs (for coridian_ box cron and Zach)
+
+Problem (section 7): GitHub schedules run 6 to 9 hours late. Two jobs matter most: `news-ingest` (every 15 min) and
+`injury-status-sync` (every 30 min).
+
+Where each can run:
+- `news-ingest` runs `python scripts/ingest_news.py --require-durable` and needs only `SUPABASE_URL` and
+  `SUPABASE_SERVICE_ROLE_KEY`, which the box already has in `/opt/fantasygmlab/.env` (the compose `env_file`). It writes to
+  Supabase, not to the repo, so it can run inside the running API container.
+- `injury-status-sync` runs `python scripts/sync_injury_status.py`, which patches `data/players.db` and **commits and pushes to
+  `main`** (needs `GITHUB_PUSH_TOKEN`). The API container has no repo history, and patching the box's own deploy checkout would
+  dirty the tree autopull fast-forwards. So it must not run in the container or in `/opt/fantasygmlab`.
+
+Recommendation: box cron for `news-ingest` (Option A), and for `injury-status-sync` a cron `curl` that triggers the existing
+GitHub workflow with `workflow_dispatch` (Option B). That keeps one writer of `players.db` (the workflow), keeps the push token
+on GitHub, and still fixes the cadence, because a dispatched run starts within about a minute where a `schedule` trigger is
+throttled. Both are free.
+
+Option A, direct on the box (cron file, `deploy` user; `flock -n` stops overlapping runs; the container reads secrets from
+`.env` itself and nothing is echoed; output is appended to a log, never the environment):
+
+```
+# /etc/cron.d/fantasygmlab-jobs
+*/15 * * * * deploy flock -n /var/lock/fgl-news.lock sh -c 'docker compose -f /opt/fantasygmlab/docker-compose.yml exec -T mobile-api python scripts/ingest_news.py --require-durable' >> /var/log/fgl/news-ingest.log 2>&1
+```
+
+Injury sync on the box, only if you accept a second clone (never the deploy checkout): clone once to `/opt/fgl-cron/repo`,
+`python3 -m venv /opt/fgl-cron/venv && /opt/fgl-cron/venv/bin/pip install -r /opt/fgl-cron/repo/requirements.txt`, put
+`GITHUB_PUSH_TOKEN=...` and `GITHUB_REPO_SLUG=h-keenan/FANTASYGMLAB` in `/etc/fgl-cron.env` (mode 600, owner deploy), then:
+
+```
+*/30 * * * * deploy flock -n /var/lock/fgl-injury.lock sh -c 'set -a; . /etc/fgl-cron.env; set +a; cd /opt/fgl-cron/repo && git pull -q --ff-only origin main && /opt/fgl-cron/venv/bin/python scripts/sync_injury_status.py' >> /var/log/fgl/injury-sync.log 2>&1
+```
+
+Create the log directory once (`sudo install -d -o deploy -m 755 /var/log/fgl`) and add a logrotate stanza (weekly, rotate 4,
+compress). `set -a; . file; set +a` loads variables without printing them. Do not add `set -x`.
+
+Option B, cron triggers the GitHub workflow (the token stays in the box's secret store, nothing printed; a fine-grained PAT with
+only `actions: write` on this repo, stored as `GITHUB_DISPATCH_TOKEN` in `/etc/fgl-cron.env`):
+
+```
+*/15 * * * * deploy sh -c 'set -a; . /etc/fgl-cron.env; set +a; curl -fsS -o /dev/null -w "%{http_code} news\n" -X POST -H "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/h-keenan/FANTASYGMLAB/actions/workflows/news-ingest.yml/dispatches -d "{\"ref\":\"main\"}"' >> /var/log/fgl/dispatch.log 2>&1
+*/30 * * * * deploy sh -c 'set -a; . /etc/fgl-cron.env; set +a; curl -fsS -o /dev/null -w "%{http_code} injury\n" -X POST -H "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/h-keenan/FANTASYGMLAB/actions/workflows/injury-status-sync.yml/dispatches -d "{\"ref\":\"main\"}"' >> /var/log/fgl/dispatch.log 2>&1
+```
+
+Success is HTTP 204; the log holds only the status code and job name. Both workflows already have `workflow_dispatch:` and a
+`concurrency` group, so an overlapping dispatch queues instead of racing. Keep the GitHub `schedule:` triggers as the fallback if
+the box is down; duplicate runs are harmless (concurrency group, idempotent upserts, no-diff commits are skipped).
+
+Why not the alternatives: a third-party scheduler adds an external account holding a GitHub token; Supabase `pg_cron` could call
+the dispatch endpoint but needs the token stored in the database. Box cron is free, already trusted with the same secrets and the
+easiest to inspect. Owners: coridian_ (box) installs the lines; Zach confirms the token scope.
 
 ## Needs from the owner
 
-1. Flip `DYNASTYGM_FRESH_PROVIDER_CACHE_V1` ON after reading the harness output (the next 6h refresh then commits live
-   FantasyCalc values; `players.db` valuations will move toward the live board, which the valuation owners should expect).
-2. A reliable scheduler for the 15 and 30 minute jobs (an external `workflow_dispatch` caller, or the box); GitHub's
-   cron cannot keep these cadences.
-3. Decision on whether the prospect ingest should also be cron-driven daily in the fall (CFBD budget 597 of 1000).
+1. Install the box cron lines in section 11 (Option A for news, Option B for injury sync) and create the dispatch token.
+2. Decision on whether the prospect ingest should also be cron-driven daily in the fall (CFBD budget 597 of 1000).

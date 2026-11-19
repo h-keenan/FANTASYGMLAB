@@ -65,8 +65,8 @@ def test_parse_fills_team_from_maybe_team_and_never_uses_rank_as_value(seed, pro
     assert by_name.loc["Live One", "value"] == 8000
 
 
-def test_flag_off_keeps_legacy_mtime_ttl_and_serves_the_seed(seed, provider, monkeypatch):
-    monkeypatch.delenv(FLAG, raising=False)
+def test_kill_switch_keeps_legacy_mtime_ttl_and_serves_the_seed(seed, provider, monkeypatch):
+    monkeypatch.setenv(FLAG, "0")
     df = fantasycalc.get_dynasty_values()
     assert list(df["name"]) == ["Seed"]
     assert provider == []  # the checkout mtime says "fresh": the provider is never asked (the audited bug)
@@ -130,8 +130,15 @@ def test_freshness_report_unchanged_when_flag_off(tmp_path, monkeypatch):
     data = tmp_path / "data"
     data.mkdir()
     (data / "fantasycalc_values.csv").write_text("name,position,team,value\nA,WR,,1\n")
-    monkeypatch.delenv(FLAG, raising=False)
+    monkeypatch.setenv(FLAG, "0")
     rows = {r["name"]: r for r in data_freshness.dataset_rows(time.time(), str(data), True)}
     assert rows["values_fantasycalc"]["status"] == "ok"
     assert rows["values_fantasycalc"]["as_of_source"] == "file_mtime"  # clients will not print an "as of" for this
     assert os.path.exists(data / "fantasycalc_values.csv")
+
+
+def test_default_is_on_when_unset(monkeypatch):
+    monkeypatch.delenv(FLAG, raising=False)
+    assert fantasycalc.fresh_cache_enabled() is True
+    monkeypatch.setenv(FLAG, "0")
+    assert fantasycalc.fresh_cache_enabled() is False
