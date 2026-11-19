@@ -64,7 +64,7 @@ import pandas as pd
 
 from modules import multi_team_trade as mt
 from modules import multi_team_trade_engine as engine
-from modules import roster_value_model, trade_veto, trade_value_bands as bands
+from modules import roster_value_model, trade_analyzer_fit, trade_grade, trade_veto, trade_value_bands as bands
 
 logger = logging.getLogger("fantasygm.multi_team_trade_finder")
 
@@ -148,6 +148,7 @@ class _League:
                 for p in positions if p.get("tier") in NEED_TIERS
             }
             self.sendable[rid] = self._sendable(rid, positions)
+        self._start_cache: dict[tuple[str, str], bool] = {}
         self.pick_want: dict[str, float] = {}
         self.group: dict[str, str] = {}
         self.picks: dict[str, Asset] = {}
@@ -208,11 +209,45 @@ class _League:
         out.sort(key=lambda a: (-a.value, a.player_id))
         return out
 
+    def would_start(self, dst: str, asset: Asset) -> bool:
+        """Whether ``asset`` would start for ``dst`` (the Analyzer's own optimal-lineup read).
+
+        The Analyzer prices a received QB (and a TE outside TE-premium leagues) that cannot start for the roster
+        at the bench-chip rate (trade_grade.roster_redundancy_adjustment), so proposing one to a team that
+        cannot start him only builds a candidate that team's own verdict then rejects. Candidate generation
+        asks the same question first and searches the other fits instead. Always True when DYNASTYGM_FINDER_START_AWARE_V1 is off
+        or the position is outside its scope."""
+
+        if (
+            asset.kind != "player"
+            or not trade_grade.finder_start_aware_enabled()
+            or asset.position not in trade_grade.redundancy_positions(self.ctx.settings)
+        ):
+            return True
+        key = (dst, asset.player_id)
+        if key not in self._start_cache:
+            self._start_cache[key] = self._starts(dst, asset)
+        return self._start_cache[key]
+
+    def _starts(self, dst: str, asset: Asset) -> bool:
+        frame = self.ctx.valued
+        ids = {str(pid) for pid in (self.ctx.by_rid[dst].get("players") or []) if pid is not None} | {asset.player_id}
+        team_df = frame[frame["player_id"].astype(str).isin(ids)]
+        try:
+            snapshot = trade_analyzer_fit._starter_lineup_snapshot(team_df, self.ctx.score_field, dict(self.ctx.settings))
+        except Exception:
+            return True  # an unreadable roster never blocks a candidate; the real grade decides
+        return asset.player_id in trade_analyzer_fit._starter_ids(snapshot) if snapshot else True
+
     def edge(self, src: str, dst: str) -> list[Asset]:
-        """Up to ``EDGE_ASSETS`` of ``src``'s sendable players at a position ``dst`` needs."""
+        """Up to ``EDGE_ASSETS`` of ``src``'s sendable players at a position ``dst`` needs (and, for the
+        redundancy-scoped positions, who would actually start for ``dst``)."""
 
         want = self.need_pos.get(dst, {})
-        fits = [a for a in self.sendable.get(src, []) if a.kind == "player" and a.position in want]
+        fits = [
+            a for a in self.sendable.get(src, [])
+            if a.kind == "player" and a.position in want and self.would_start(dst, a)
+        ]
         fits.sort(key=lambda a: (-want[a.position], -a.value, a.player_id))
         picks = [a for a in self.sendable.get(src, []) if a.kind == "pick" and self.want(dst, a) > 0]
         return fits[:EDGE_ASSETS] + picks[:EDGE_PICKS]

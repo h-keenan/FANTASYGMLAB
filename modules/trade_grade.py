@@ -273,12 +273,30 @@ BENCH_CHIP_RETENTION = 0.50
 
 
 def roster_redundancy_enabled() -> bool:
-    """Default OFF (stopgap): the all-bench discount moved 45.8% of backtest verdicts, cut lineup
-    AUC 0.622 -> 0.611 and starved the Trade Finder of pick-for-player ideas. 1/true/yes/on enables it."""
+    """Scoped QB/TE redundancy discount. Default ON; 0/false/no/off disables it."""
 
     from modules.app_config import config_value
 
-    return config_value(REDUNDANCY_ENV_KEY).strip().casefold() in {"1", "true", "yes", "on"}
+    return config_value(REDUNDANCY_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
+
+
+START_AWARE_ENV_KEY = "DYNASTYGM_FINDER_START_AWARE_V1"
+
+
+def finder_start_aware_enabled() -> bool:
+    """Lineup-aware Finder candidates (skip a QB/TE the receiving team cannot start). Its own flag, independent of
+    the pricing discount above. Default ON; 0/false/no/off disables it."""
+
+    from modules.app_config import config_value
+
+    return config_value(START_AWARE_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
+
+
+def redundancy_positions(league_settings: Mapping[str, Any] | None) -> frozenset[str]:
+    """Positions the audit found mispriced when they cannot start: QB, and TE outside TE-premium leagues."""
+
+    tep = bool((league_settings or {}).get("te_premium"))
+    return frozenset({"QB"} if tep else {"QB", "TE"})
 
 
 def roster_redundancy_adjustment(
@@ -288,13 +306,16 @@ def roster_redundancy_adjustment(
     current_starter_ids: set[str],
     post_starter_ids: set[str],
     value_of,
+    positions: frozenset[str] | None = None,
 ) -> tuple[int, str]:
     """Price what a player adds to the lineup, not full market value, when he cannot start.
 
     A received player outside the post-trade optimal lineup, or a sent player
     outside the current one, keeps only BENCH_CHIP_RETENTION of his market value.
     Receiving surplus therefore reads lower and selling surplus reads higher.
-    Picks are untouched. Returns (points, explanation).
+    ``positions`` scopes the discount to the RECEIVE side of those positions only
+    (the audit's finding: a received QB the roster cannot start). Picks are
+    untouched. Returns (points, explanation).
     """
 
     haircut = 1.0 - BENCH_CHIP_RETENTION
@@ -302,9 +323,13 @@ def roster_redundancy_adjustment(
         a for a in receive_assets
         if a.get("asset_type") == "player" and str(a.get("player_id") or "") not in post_starter_ids
     ]
+    if positions is not None:
+        received_bench = [a for a in received_bench if str(a.get("position") or "").upper() in positions]
     sent_bench = [
         a for a in send_assets
-        if a.get("asset_type") == "player" and str(a.get("player_id") or "") not in current_starter_ids
+        if positions is None
+        and a.get("asset_type") == "player"
+        and str(a.get("player_id") or "") not in current_starter_ids
     ]
     recv = sum(max(0.0, float(value_of(a))) for a in received_bench)
     sent = sum(max(0.0, float(value_of(a))) for a in sent_bench)
