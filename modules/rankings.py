@@ -2730,7 +2730,30 @@ def injury_risk_score(status: str, injury_status: str = "") -> float:
     return injury_status_table.RISK_SCORE.get(injury_level(status, injury_status), 0.0)
 
 
-def non_injury_risk_multiplier(status: str, team: str, search_rank) -> float:
+# Owner decision 2026-11-19 (docs/audits/2026-11-injury-discount.md): an injury is discounted ONCE. Sleeper reports an IR'd
+# player's roster status as "Inactive", and that status is the injury itself, yet it also cost the 0.72 roster-presence
+# penalty on top of the injury severity/age curve (a double count in dynasty `risk_multiplier`, in the opportunity factor's
+# `non_injury_risk_multiplier`, and in redraft's `current_availability_multiplier`). The one source for an injured player's
+# availability discount is the injury table (`injury_status`: severity bucket, age curve, current-season factor); the status
+# penalty stays for non-injury statuses (retired, unknown, no team) and the no-team / unranked floors are untouched.
+INJURY_SINGLE_COUNT_ENV_KEY = "DYNASTYGM_INJURY_SINGLE_COUNT_V1"
+
+
+def injury_single_count_enabled() -> bool:
+    from modules.experimental_graduation import graduated_kill_switch_enabled
+
+    return graduated_kill_switch_enabled(INJURY_SINGLE_COUNT_ENV_KEY, default=True)
+
+
+def _status_for_roster_risk(status: str, injury_status: str = "") -> str:
+    """The status string the roster-presence penalty should see: blank when the status IS the injury already priced elsewhere."""
+
+    if (injury_single_count_enabled() or injury_horizon_enabled()) and injury_level(status, injury_status) != "healthy":
+        return ""
+    return status
+
+
+def non_injury_risk_multiplier(status: str, team: str, search_rank, injury_status: str = "") -> float:
     """Roster-presence/status/searchability risk only — no injury component.
 
     Same components as risk_multiplier() below, minus injury_multiplier().
@@ -2739,9 +2762,10 @@ def non_injury_risk_multiplier(status: str, team: str, search_rank) -> float:
     already bakes its own injury adjustment into those two factors — the
     "no team" / "bad status" / "unranked" risk captured here is still real
     for role/opportunity (an unsigned player genuinely has no NFL role),
-    it's only the injury double-count that needs excluding.
+    it's only the injury double-count that needs excluding. With ``injury_status`` given, a non-Active status that is itself
+    the injury (Sleeper "Inactive" for IR) no longer adds the roster-presence penalty (DYNASTYGM_INJURY_SINGLE_COUNT_V1).
     """
-    status = str(status or "").strip().lower()
+    status = str(_status_for_roster_risk(status, injury_status) or "").strip().lower()
     if not team or not str(team).strip():
         return 0.35
     base_risk = 1.0
@@ -2760,10 +2784,8 @@ def risk_multiplier(status: str, team: str, search_rank, injury_status: str = ""
     if not team or not str(team).strip():
         return 0.35
     injury_risk = injury_multiplier_for_age(status, injury_status, age)
-    base_status = status
-    if injury_horizon_enabled() and injury_level(status, injury_status) != "healthy":
-        base_status = ""  # the non-Active status (Sleeper "Inactive" for IR) IS the injury: count it once
-    base_risk = non_injury_risk_multiplier(base_status, team, search_rank)
+    # The non-Active status (Sleeper "Inactive" for IR) IS the injury: non_injury_risk_multiplier counts it once.
+    base_risk = non_injury_risk_multiplier(status, team, search_rank, injury_status)
     return min(base_risk, injury_risk)
 
 
@@ -2778,7 +2800,7 @@ def current_availability_multiplier(status: str, team: str, search_rank, injury_
         return 0.35
 
     base_risk = 1.0
-    if status and status not in PLAYABLE_OR_INJURED_STATUSES and status != "active":
+    if _status_for_roster_risk(status, injury_status) and status not in PLAYABLE_OR_INJURED_STATUSES and status != "active":
         base_risk = 0.72
     try:
         rank = int(float(search_rank))
@@ -4200,8 +4222,8 @@ def apply_injury_risk_fields(df: pd.DataFrame) -> pd.DataFrame:
         )
     ]
     work["non_injury_risk_multiplier"] = [
-        non_injury_risk_multiplier(status, team, rank)
-        for status, team, rank in zip(status_values, team_values, rank_values)
+        non_injury_risk_multiplier(status, team, rank, injury)
+        for status, team, rank, injury in zip(status_values, team_values, rank_values, injury_values)
     ]
     return work
 
