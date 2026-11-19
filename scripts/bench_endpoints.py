@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import cProfile
+import collections
 import hashlib
 import json
 import os
@@ -51,6 +52,7 @@ VOLATILE = {"playoff_probability", "generated_at", "as_of", "timestamp", "ts", "
 
 
 UPSTREAM_CALLS: dict[str, int] = {"sleeper": 0, "supabase_auth": 0, "supabase_rest": 0}
+UPSTREAM_PATHS: list[str] = []  # every upstream request path in order (repeat analysis: which calls are fetched more than once)
 
 
 def _count_upstream() -> None:
@@ -63,6 +65,7 @@ def _count_upstream() -> None:
         kind = "supabase_auth" if parts[:1] == ["auth"] else "supabase_rest" if parts[:1] == ["rest"] else "sleeper"
         if not self.path.startswith("/__"):
             UPSTREAM_CALLS[kind] += 1
+            UPSTREAM_PATHS.append(self.path.split("?")[0])
         return original(self)
 
     lt.Stub.do_GET = counted
@@ -147,7 +150,9 @@ async def run_single(client, reps, first_league=1):
         league_n = 4 * (100 + i)  # fresh league per endpoint => truly cold; n%4==0 => stub Pro user (no free-tier gates)
         _, m, p, b = endpoints(league_n)[i]
         calls_before = dict(UPSTREAM_CALLS)
+        paths_before = len(UPSTREAM_PATHS)
         cold = await call(client, name, m, p, b, league_n)
+        cold_paths = UPSTREAM_PATHS[paths_before:]
         cold_calls = {k: UPSTREAM_CALLS[k] - calls_before[k] for k in UPSTREAM_CALLS}
         warm = [await call(client, name, m, p, b, league_n) for _ in range(reps)]
         if BODIES_DIR is not None:
@@ -159,6 +164,8 @@ async def run_single(client, reps, first_league=1):
             "warm_cpu_ms": round(statistics.median(w["cpu_ms"] for w in warm), 1),
             "bytes": cold["bytes"], "hash": cold["hash"], "warm_hash": warm[-1]["hash"],
             "cold_upstream_calls": cold_calls,
+            "cold_upstream_paths": cold_paths,
+            "cold_upstream_repeats": {k: v for k, v in sorted(collections.Counter(cold_paths).items()) if v > 1},
         }
         print(f"  {name:20s} {cold['status']} cold {cold['ms']:8.0f}ms  warm p50 {out[name]['warm_p50_ms']:7.1f}ms cpu {out[name]['warm_cpu_ms']:7.1f}ms {cold['bytes']:>8}B", flush=True)
     return out
