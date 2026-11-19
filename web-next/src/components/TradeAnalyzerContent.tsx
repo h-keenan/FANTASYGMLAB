@@ -1072,10 +1072,13 @@ export function TradeAnalyzerContent({
         )
       ) : null}
 
-      <div className="flex flex-col gap-2">
-        {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
-        {analyzeError ? <ErrorState bare message={analyzeError} onRetry={() => void analyze()} /> : null}
-      </div>
+      {/* Only when there is something to show: an empty wrapper still takes a full page gap above and below it. */}
+      {limitWall || analyzeError ? (
+        <div className="flex flex-col gap-2">
+          {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
+          {analyzeError ? <ErrorState bare message={analyzeError} onRetry={() => void analyze()} /> : null}
+        </div>
+      ) : null}
 
       {planningNote ? (
         <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
