@@ -29,7 +29,7 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
-from modules.app_config import config_value
+from modules.experimental_graduation import graduated_kill_switch_enabled
 
 STARTING_DEMAND_ENV_KEY = "DYNASTYGM_ROLE_STARTING_DEMAND_V1"
 NO_MARKET_FLOOR_ENV_KEY = "DYNASTYGM_NO_MARKET_FLOOR_V1"
@@ -52,8 +52,7 @@ def flag_default_on(key: str) -> bool:
     """Default-ON flag: unset or any non-false value is on; only an explicit
     0/false/no/off turns it off (kill switch)."""
 
-    raw = config_value(key).strip().casefold()
-    return raw not in {"0", "false", "no", "off"}
+    return graduated_kill_switch_enabled(key, default=True)
 
 
 def starting_demand_enabled() -> bool:

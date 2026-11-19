@@ -31,10 +31,13 @@ def test_strategy_curve_has_no_large_step_between_adjacent_ages(strategy, positi
 def test_rebuild_rb_ramps_instead_of_cliff():
     out = apply_strategy_age_curve(_frame("RB", [26, 27, 28, 29, 30]), "rebuild", "dynasty_score")
     m = out["strategy_preference_multiplier"].tolist()
-    assert m[1] == pytest.approx(1.01)
+    # Age 27 is 1.005 now: the rebuild youth bonus is halved (audit P1-5, default ON), so the 26 -> 27 step is
+    # 1.01 -> 1.005 instead of 1.02 -> 1.01. The property under test is unchanged: a smooth ramp, no cliff.
+    assert m[1] == pytest.approx(1.005)
     assert m[2] == pytest.approx(0.91)
     assert m[3] == pytest.approx(0.82)
     assert m[4] == pytest.approx(0.82)
+    assert max(abs(a - b) for a, b in zip(m, m[1:])) <= 0.13  # the ramp spreads the 28+ decline over years, no birthday cliff
 
 
 def test_missing_age_is_neutral():

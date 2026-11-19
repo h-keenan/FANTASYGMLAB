@@ -507,11 +507,42 @@ def _pick_range_projection(
     }
 
 
+# Trade-advice pick audit (2026-11-18): the early-1st base (4,200, the realized slot-1..4 rookie
+# value) sat ~13% under the market's early 1st (FantasyCalc 2027 Early 1st 4,588; DynastyProcess
+# ECR-implied ~5,100), and early-1st trades were the worst-calibrated pick shape (AUC 0.516 on
+# lineup points). Raising the base to 4,900 lifts that AUC to 0.538 in 2023-2025 and 0.604 -> 0.622 in
+# the 2021-2022 holdout (all pick trades 0.625 -> 0.628 there). Applied here, the single place every
+# surface's pick value is built from (pick_value_components), so Grade, Finder, Analyzer, Hub and the
+# franchise draft-capital rank move together. Default ON; 0/false/no/off restores 4,200.
+#
+# TESTED AND REJECTED: calibrating rounds 2-3, the late 1st and the per-draft future discount to the
+# market too (FantasyCalc / DynastyProcess). Overall pick-trade AUC was flat in 2023-2025 and DOWN in
+# the 2021-2022 holdout (0.625 -> 0.619 lineup, 0.677 -> 0.669 over replacement): realized outcomes
+# beat the market's price there (the P0 bases are realized rookie values).
+# KNOWN GAP: out-year 1sts still run ~+20% over FantasyCalc's generic out-year price because FC prices
+# an unknown-slot pick ~12% under its own mid-slot 1st; the backtest has only next-draft picks, so it
+# cannot validate a generic-slot discount and none is applied.
+EARLY_FIRST_TOP_END_ENV_KEY = "DYNASTYGM_EARLY_FIRST_TOP_END_V1"
+EARLY_FIRST_TOP_END_BASE = 4900
+
+
+def early_first_top_end_enabled() -> bool:
+    from modules.app_config import config_value
+
+    return config_value(EARLY_FIRST_TOP_END_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
+
+
+def _pick_tier_base(round_num: int, bucket: str) -> float:
+    if round_num == 1 and bucket == "early" and early_first_top_end_enabled():
+        return float(EARLY_FIRST_TOP_END_BASE)
+    return float(_round_tier_base_value(round_num, bucket))
+
+
 def _weighted_pick_base_value(round_num: int, bucket_probabilities: Dict[str, float]) -> float:
     probabilities = _normalize_bucket_probabilities(bucket_probabilities)
     return float(
         sum(
-            _round_tier_base_value(round_num, bucket) * probability
+            _pick_tier_base(round_num, bucket) * probability
             for bucket, probability in probabilities.items()
         )
     )
@@ -6273,12 +6304,15 @@ def _build_trade_ideas_impl(
 
             full_send = make_package(*required_send)
             full_ok = shop_whole_selection(full_send, [])
-            if not full_ok and len(required_send) >= 2:
-                # The whole selection found nothing here. Search each "leave
-                # one out" package so the user can be shown a real alternative
-                # that is explicitly labelled as NOT including the asset. These
-                # probes are not counted in the funnel (the funnel describes
-                # the user's actual selection) and never become results.
+            if len(required_send) >= 2:
+                # Search each "leave one out" package so the user can be shown a real alternative
+                # that is explicitly labelled as NOT including the asset. This runs even when the
+                # whole selection produced a candidate here: that candidate can still be rejected
+                # by the user-side Analyzer gate later, and an alternative must exist then (a
+                # partner whose full package was gate-rejected used to contribute none). Probes
+                # are only ever SHOWN when nothing includes the whole selection. They are not
+                # counted in the funnel (the funnel describes the user's actual selection) and
+                # never become results.
                 live_trace, trace = trace, None
                 try:
                     for left_out in range(len(required_send)):

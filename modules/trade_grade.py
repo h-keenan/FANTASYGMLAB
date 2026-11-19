@@ -232,12 +232,11 @@ STARTER_STRENGTH_WEIGHTS: dict[str, float] = {
 
 # Trade-advice audit P1-5 (owner-approved 2026-11-18): realized two-season lineup
 # points are ~0.55-0.6 of a market point at EVERY posture, so rebuild/tank weights
-# of 0.05 / 0 under-price starting points. Default OFF (stopgap: trade_posture.PRESENT_ADJUST
-# was tuned for the old weights and a tank paying firsts for old vets stopped reading as a
-# decline; 1/true/yes/on enables; read at import because trade_lineup_model.POSTURE_WEIGHTS
-# derives from this table):
-# rebuild and tank are floored at 0.20 and their youth bonus is tempered
-# (trade_hub_engine). Retool stays at 0.15.
+# of 0.05 / 0 under-price starting points. Default ON (0/false/no/off disables; read at import
+# because trade_lineup_model.POSTURE_WEIGHTS derives from this table). trade_posture.PRESENT_ADJUST is
+# DERIVED from this table (it keeps the net lineup-point weight at rebuild 0.65 / tank 0.40), so the floor
+# does not change how a rebuilder or tank prices a lineup point in season; rebuild and tank are floored at
+# 0.20 and their youth bonus is tempered (trade_hub_engine). Retool stays at 0.15.
 STARTER_FLOOR_ENV_KEY = "DYNASTYGM_STARTER_WEIGHT_FLOOR_V1"
 STARTER_WEIGHT_FLOOR = 0.20
 STARTER_FLOOR_POSTURES = ("rebuild", "tank")
@@ -246,7 +245,7 @@ STARTER_FLOOR_POSTURES = ("rebuild", "tank")
 def _starter_floor_enabled() -> bool:
     from modules.app_config import config_value
 
-    return config_value(STARTER_FLOOR_ENV_KEY).strip().casefold() in {"1", "true", "yes", "on"}
+    return config_value(STARTER_FLOOR_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
 
 
 if _starter_floor_enabled():

@@ -239,7 +239,7 @@ def hydrate_session_from_durable(
         access_token,
         BASELINES_TABLE,
         user_id=user_id,
-        extra_query=f"league_id=eq.{league_key}&limit=1",
+        extra_query=f"league_id=eq.{account_store.pg_eq(league_key)}&limit=1",
         timing_label="decision_memory_baseline_read",
         timeout=8,
     )
@@ -378,7 +378,7 @@ def _prune_expired_events(
         access_token,
         EVENTS_TABLE,
         query=(
-            f"user_id=eq.{_safe_text(user_id)}&league_id=eq.{_safe_text(league_id)}"
+            f"user_id=eq.{_safe_text(user_id)}&league_id=eq.{account_store.pg_eq(league_id)}"
             f"&created_at=lt.{cutoff_iso}"
         ),
         timing_label="decision_memory_prune",
@@ -390,7 +390,7 @@ def _prune_expired_events(
         EVENTS_TABLE,
         user_id=user_id,
         extra_query=(
-            f"league_id=eq.{_safe_text(league_id)}"
+            f"league_id=eq.{account_store.pg_eq(league_id)}"
             f"&select=event_id,created_at&order=created_at.desc"
             f"&offset={MAX_EVENTS_PER_LEAGUE}"
         ),
@@ -470,7 +470,7 @@ def fetch_durable_events(
         EVENTS_TABLE,
         user_id=user_id,
         extra_query=(
-            f"league_id=eq.{league_key}"
+            f"league_id=eq.{account_store.pg_eq(league_key)}"
             f"&created_at=gte.{cutoff_iso}"
             f"&order=created_at.desc"
             f"&limit={max(1, min(int(limit), MAX_EVENTS_PER_LEAGUE))}"

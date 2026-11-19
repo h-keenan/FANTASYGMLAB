@@ -286,3 +286,60 @@ def test_analytics_alias_path_shares_the_analytics_budget(monkeypatch):
         assert client.post(path, json=body).status_code == 200
     assert client.post("/v1/e", json=body).status_code == 429
     assert client.post("/v1/analytics/event", json=body).status_code == 429
+
+
+def test_rotating_the_authorization_header_does_not_mint_a_fresh_budget(monkeypatch):
+    """The identity bucket is keyed on a hash of the Authorization header, so a caller sending a new bogus bearer token
+    per request used to get a new bucket every time. The per-IP ceiling (multiplier x the identity limit) closes that."""
+    client, mobile_api_service = _client(monkeypatch)
+    _force_rate_limiting(
+        monkeypatch,
+        mobile_api_service,
+        RATE_LIMIT_GENERAL_MAX=2,
+        RATE_LIMIT_GENERAL_WINDOW_SECONDS=60,
+        RATE_LIMIT_IP_CEILING_MULTIPLIER=3,
+    )
+
+    # Ceiling is 2 * 3 = 6 per window for this IP, regardless of how many distinct tokens are presented.
+    for i in range(6):
+        response = client.get("/health", headers={"Authorization": f"Bearer bogus-{i}"})
+        assert response.status_code == 200
+
+    limited = client.get("/health", headers={"Authorization": "Bearer bogus-new"})
+    assert limited.status_code == 429
+    assert "Retry-After" in limited.headers
+
+
+def test_distinct_ips_keep_independent_ip_ceilings(monkeypatch):
+    client, mobile_api_service = _client(monkeypatch)
+    _force_rate_limiting(
+        monkeypatch,
+        mobile_api_service,
+        RATE_LIMIT_GENERAL_MAX=1,
+        RATE_LIMIT_GENERAL_WINDOW_SECONDS=60,
+        RATE_LIMIT_IP_CEILING_MULTIPLIER=2,
+    )
+
+    for i in range(2):
+        assert client.get("/health", headers={"Authorization": f"Bearer t{i}", "X-Forwarded-For": "203.0.113.1"}).status_code == 200
+    assert client.get("/health", headers={"Authorization": "Bearer t9", "X-Forwarded-For": "203.0.113.1"}).status_code == 429
+    assert client.get("/health", headers={"Authorization": "Bearer t9", "X-Forwarded-For": "203.0.113.2"}).status_code == 200
+
+
+def test_fail_open_log_does_not_contain_the_client_ip(monkeypatch, caplog):
+    import logging
+
+    from modules import redis_cache
+
+    _client(monkeypatch)
+    from services import mobile_api_service
+
+    class _Boom:
+        def incr(self, *_a, **_k):
+            raise redis_cache.RedisError("down")
+
+    monkeypatch.setattr(redis_cache, "get_redis_client", lambda: _Boom())
+    with caplog.at_level(logging.WARNING):
+        allowed, _ = mobile_api_service._rate_limiter.hit("general|198.51.100.7:abcd", 5, 60)
+    assert allowed is True
+    assert "198.51.100.7" not in caplog.text

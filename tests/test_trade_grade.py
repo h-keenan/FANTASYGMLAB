@@ -265,7 +265,10 @@ def test_breaking_up_a_stud_for_depth_is_a_decline():
     # Posture is a parameter of the one model: contenders weight real
     # lineup points more than rebuilders do.
     assert contender_fit["lineup_model"]["weights"]["now"] == 1.5
-    assert rebuild_fit["lineup_model"]["weights"]["now"] == 1.05
+    # Rebuild's lineup weight is 1.20 (1.0 + the 0.20 starter-strength floor, audit P1-5, default ON); it was 1.05. The
+    # property under test (a contender weights real lineup points more than a rebuilder) still holds: 1.5 > 1.20.
+    assert rebuild_fit["lineup_model"]["weights"]["now"] == 1.20
+    assert contender_fit["lineup_model"]["weights"]["now"] > rebuild_fit["lineup_model"]["weights"]["now"]
     assert contender.trade_score == contender_fit["trade_score"]
 
 
@@ -422,21 +425,32 @@ _YOUTH = (
 )
 
 
-def test_starter_floor_defaults_off():
+def test_starter_floor_defaults_on_for_rebuild_and_tank_only():
     import json
 
     w = json.loads(_in_subprocess(_WEIGHTS, ""))
-    assert w["rebuild"] == 0.05 and w["tank"] == 0.0 and w["retool"] == 0.15
-
-
-def test_starter_floor_when_on_floors_rebuild_and_tank_only():
-    import json
-
-    w = json.loads(_in_subprocess(_WEIGHTS, "1"))
     assert w["rebuild"] == 0.20 and w["tank"] == 0.20
     assert w["retool"] == 0.15 and w["contender"] == 0.50 and w["fringe_contender"] == 0.35
 
 
-def test_youth_bonus_is_untouched_by_default_and_tempered_when_the_flag_is_on():
-    assert float(_in_subprocess(_YOUTH, "")) == 1.10
-    assert float(_in_subprocess(_YOUTH, "1")) == 1.05
+def test_starter_floor_can_be_switched_off():
+    import json
+
+    w = json.loads(_in_subprocess(_WEIGHTS, "0"))
+    assert w["rebuild"] == 0.05 and w["tank"] == 0.0 and w["retool"] == 0.15
+
+
+def test_youth_bonus_is_tempered_by_default_and_restored_when_off():
+    assert float(_in_subprocess(_YOUTH, "")) == 1.05
+    assert float(_in_subprocess(_YOUTH, "0")) == 1.10
+
+
+def test_present_adjust_keeps_the_net_lineup_weight_whatever_the_floor():
+    import json
+
+    code = (
+        "import json; from modules import trade_posture as p; from modules.trade_lineup_model import POSTURE_WEIGHTS as W; "
+        "print(json.dumps({k: round(W[k][0] + p.PRESENT_ADJUST[k], 4) for k in ('rebuild', 'tank')}))"
+    )
+    for flag in ("", "0"):
+        assert json.loads(_in_subprocess(code, flag)) == {"rebuild": 0.65, "tank": 0.40}

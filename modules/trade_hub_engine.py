@@ -74,7 +74,7 @@ DEFAULT_ANALYZER_STRATEGY = "retool"
 
 
 # Trade-advice audit P1-5: under the starter-floor flag (trade_grade.STARTER_FLOOR_ENV_KEY,
-# default OFF) the rebuild / tank youth bonus is halved, since trades handing the user the
+# default ON) the rebuild / tank youth bonus is halved, since trades handing the user the
 # younger side trailed the market (0.591 vs 0.618).
 YOUTH_BONUS_TEMPER = 0.5
 
