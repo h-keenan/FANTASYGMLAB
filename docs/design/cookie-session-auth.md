@@ -258,6 +258,8 @@ phase 1 (low risk: localStorage stays authoritative, so no logout risk) and deci
 performance gain does not need it. If the spike misses, NO-GO.
 
 Alternatives (do first or instead):
+- **Update 2026-11-19: the early-fetch step shipped for Today (`/dashboard/<league>`)**, see `web-next/src/lib/earlyFetch.ts`. Measured cold, fast3g, 4x CPU, 5 runs:
+  first API request ~3.6 s -> ~0.6 s, useful content 3.85 s -> 2.73 s (median). Cookie SSR must beat that new baseline.
 - **Early-fetch inline script**: a tiny script in `<head>` reads the same localStorage token and starts the first API call (kept on `window`) before the framework JS loads, plus
   `<link rel="preconnect" href="https://api.fantasygmlab.com">`. Estimated to move first-API start from ~2.5 s to ~0.7-0.9 s (it needs only the HTML); first render then still waits for hydration,
   so ~1.5-2.2 s. No cookies, no backend change, keeps the #2162 lazy auth work, 1-2 days, trivially reversible. Costs: a CSP nonce, same XSS exposure as today, and a refresh path for nearly

@@ -28,6 +28,7 @@ import type { DirectionCheckinAction, DirectionCheckinResponse } from "./directi
 import type { MultiTeamTradeResponse, MultiTransfer } from "./multiTeamTrade";
 import type { MultiTeamIdeasResponse } from "./multiTeamIdeas";
 import { isServerBusyError, parseRetryAfterSeconds, withServerBusyRetry } from "./busyRetry";
+import { earlyOrFetch, takeEarlyFetch } from "./earlyFetch";
 import { clearRequestCache, coalesceRead, isCacheablePath } from "./requestCache";
 
 /**
@@ -69,11 +70,12 @@ async function performRequest<T>(
   path: string,
   init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal; idempotent?: boolean } | undefined,
   accessToken: string,
+  userId?: string,
 ): Promise<T> {
   // Server load shedding (503 server_busy + Retry-After): idempotent reads
   // wait the hinted time and retry a couple of times before surfacing.
   try {
-    return await withServerBusyRetry(() => performRequestOnce<T>(path, init, accessToken), {
+    return await withServerBusyRetry(() => performRequestOnce<T>(path, init, accessToken, userId), {
       canRetry: (init?.method ?? "GET") === "GET" || init?.idempotent === true,
       signal: init?.signal,
     });
@@ -89,6 +91,7 @@ async function performRequestOnce<T>(
   path: string,
   init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal; idempotent?: boolean } | undefined,
   accessToken: string,
+  userId?: string,
 ): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -100,16 +103,22 @@ async function performRequestOnce<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${env.apiBaseUrl}${path}`, {
-      method: init?.method ?? "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        ...(init?.jsonBody !== undefined ? { "Content-Type": "application/json" } : {}),
-      },
-      // Privacy mode is display-only: masked labels never go back to the server.
-      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(unmaskOutgoing(init.jsonBody)) } : {}),
-      signal: controller.signal,
-    });
+    const url = `${env.apiBaseUrl}${path}`;
+    // The Today first-paint request may already be in flight (the inline early-fetch script, lib/earlyFetch.ts): reuse it
+    // when it is for this exact URL, user and league, otherwise (or if it failed) send our own. Plain GETs only.
+    const early = (init?.method ?? "GET") === "GET" && init?.jsonBody === undefined ? takeEarlyFetch(url, userId) : null;
+    response = await earlyOrFetch(early, controller.signal, () =>
+      fetch(url, {
+        method: init?.method ?? "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...(init?.jsonBody !== undefined ? { "Content-Type": "application/json" } : {}),
+        },
+        // Privacy mode is display-only: masked labels never go back to the server.
+        ...(init?.jsonBody !== undefined ? { body: JSON.stringify(unmaskOutgoing(init.jsonBody)) } : {}),
+        signal: controller.signal,
+      }),
+    );
   } catch (error) {
     reportApiFailure(0);
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -162,12 +171,12 @@ async function authorizedRequest<T>(
   if (method !== "GET") {
     // A write may change what any read returns: never serve a reused read after one.
     clearRequestCache();
-    return performRequest<T>(path, init, accessToken);
+    return performRequest<T>(path, init, accessToken, data.session?.user?.id);
   }
-  if (init?.signal) return performRequest<T>(path, init, accessToken);
+  if (init?.signal) return performRequest<T>(path, init, accessToken, data.session?.user?.id);
   // Same user + same privacy view + same path: one request, however many callers (see requestCache.ts).
   return coalesceRead<T>(`${accessToken}|${isPrivacyMode() ? "p" : "-"}|${path}`, isCacheablePath(path), () =>
-    performRequest<T>(path, init, accessToken),
+    performRequest<T>(path, init, accessToken, data.session?.user?.id),
   );
 }
 

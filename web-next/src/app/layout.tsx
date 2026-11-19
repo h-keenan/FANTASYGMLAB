@@ -21,6 +21,9 @@ import { BRAND_NAME } from "@/lib/brand";
 import { THEME_BOOT_SCRIPT } from "@/lib/displayPreferences";
 import { OG_IMAGE } from "@/lib/seo/site";
 import { preconnectOrigins } from "@/lib/preconnect";
+import { buildEarlyFetchScript } from "@/lib/earlyFetch";
+import { env } from "@/lib/env";
+import { storageKey } from "@/lib/supabaseKeys";
 
 // Share previews (Discord, X, iMessage): a static 1200x630 branded card
 // (public/og-image.png) with the large-image Twitter card; see OG_IMAGE.
@@ -63,6 +66,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <link key={origin} rel="preconnect" href={origin} crossOrigin="anonymous" />
         ))}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        {/* Starts Today's first-paint request before the bundle loads; lib/api.ts reuses it (see lib/earlyFetch.ts). No-op off
+            /dashboard/<league>, without a fresh stored session, or on an auth callback URL. Writes and logs nothing. */}
+        <script dangerouslySetInnerHTML={{ __html: buildEarlyFetchScript({ apiBase: env.apiBaseUrl, storageKey }) }} />
       </head>
       <body className="min-h-dvh flex flex-col">
         {/* coridian_, 2026-10-18: "Add that moving background from signup
