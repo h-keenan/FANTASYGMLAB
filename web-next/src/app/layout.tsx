@@ -18,10 +18,9 @@ import { AppHeader } from "@/components/AppHeader";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { DeferredTradeOutcomePrompt } from "@/components/DeferredTradeOutcomePrompt";
 import { BRAND_NAME } from "@/lib/brand";
-import { THEME_BOOT_SCRIPT } from "@/lib/displayPreferences";
 import { OG_IMAGE } from "@/lib/seo/site";
-import { preconnectOrigins } from "@/lib/preconnect";
-import { buildEarlyFetchScript } from "@/lib/earlyFetch";
+import { BootScripts } from "@/components/BootScripts";
+import { getNonce } from "@/lib/nonce";
 import { env } from "@/lib/env";
 import { storageKey } from "@/lib/supabaseKeys";
 
@@ -55,20 +54,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Per-request CSP nonce from src/proxy.ts; reading it also makes every route dynamic, which nonces require.
+  const nonce = await getNonce();
   return (
     // suppressHydrationWarning: the boot script below may set data-theme on
     // <html> (a forced Day/Night choice) before React hydrates.
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
-        {/* Open the API and auth connections while the bundle downloads (see lib/preconnect.ts). */}
-        {preconnectOrigins([process.env.NEXT_PUBLIC_API_BASE_URL, process.env.NEXT_PUBLIC_SUPABASE_URL]).map((origin) => (
-          <link key={origin} rel="preconnect" href={origin} crossOrigin="anonymous" />
-        ))}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-        {/* Starts Today's first-paint request before the bundle loads; lib/api.ts reuses it (see lib/earlyFetch.ts). No-op off
-            /dashboard/<league>, without a fresh stored session, or on an auth callback URL. Writes and logs nothing. */}
-        <script dangerouslySetInnerHTML={{ __html: buildEarlyFetchScript({ apiBase: env.apiBaseUrl, storageKey }) }} />
+        {/* Preconnects + THEME_BOOT_SCRIPT + early-fetch script (see components/BootScripts.tsx); the inline scripts carry the CSP nonce. */}
+        <BootScripts nonce={nonce} apiBase={env.apiBaseUrl} storageKey={storageKey} />
       </head>
       <body className="min-h-dvh flex flex-col">
         {/* coridian_, 2026-10-18: "Add that moving background from signup
