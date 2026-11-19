@@ -121,7 +121,10 @@ def test_value_band_scales_with_the_selection_instead_of_a_fixed_floor():
     low, high = trade_ideas.finder_value_band(5900)
     assert (low, high) == (-1500, 1200)
 
-    fixture = _fixture("contender")
+    # 32-man rosters (coordinator-approved fixture change): the 26-man fixture's cheapest player is 1,292, so it never held
+    # the ~200-1,000 assets this test's docstring is about; it only passed while a 2026 3rd was priced above the market
+    # (~1,480). A 32-man league has real 350-1,000 assets, and the assertions below are unchanged.
+    fixture = _fixture("contender", roster_size=32)
     ideas = _search(fixture, [_pick_id(fixture, 2026, 3)])
     player_returns = [i for i in ideas if i["receive_assets"][0]["asset_type"] == "player"]
     assert player_returns
