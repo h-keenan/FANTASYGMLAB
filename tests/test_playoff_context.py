@@ -103,3 +103,51 @@ def test_outlook_adds_lean_item_and_odds_aware_pick_slot():
     # Without odds the plan has no lean item and the pick lines are unchanged.
     plain = gm_plan_outlook.build_outlook(my_roster_id=1, profile={"teams": teams}, players_by_id={})
     assert "lean" not in [i["outlook_topic"] for i in plain]
+
+
+# --- early-season calibration (DYNASTYGM_LEAN_CALIBRATION_V1) -----------------------------------------------
+
+
+def test_calibration_weight_ramps_from_the_preseason_fit_to_unchanged_at_week_six():
+    w = playoff_context.calibration_weight
+    assert w(0) == 0.25 and w(6) == 1.0 and w(12) == 1.0
+    assert w(3) == 0.625
+    assert w(None) == 1.0 and w("x") == 1.0
+
+
+def test_golden_preseason_odds_are_shrunk_toward_even_and_week_six_is_untouched(monkeypatch):
+    monkeypatch.delenv(playoff_context.LEAN_CALIBRATION_ENV_KEY, raising=False)
+    cal = playoff_context.calibrated_odds
+    assert cal(76.0, 0) == 56.5  # replay: preseason buyers were told 76% and got 53%
+    assert cal(8.0, 0) == 39.5  # sellers were told 8% and got 29%
+    assert cal(76.0, 6) == 76.0 and cal(76.0, 12) == 76.0
+    assert cal(76.0, None) == 76.0
+    monkeypatch.setenv(playoff_context.LEAN_CALIBRATION_ENV_KEY, "0")
+    assert cal(76.0, 0) == 76.0
+
+
+def test_a_preseason_buyer_by_odds_alone_is_no_longer_a_buyer_but_midseason_is_unchanged(monkeypatch):
+    monkeypatch.delenv(playoff_context.LEAN_CALIBRATION_ENV_KEY, raising=False)
+    pre = playoff_context.lean({"playoff_probability": 76}, posture_key="retool", weeks_played=0)
+    assert pre["lean"] == "hold" and pre["playoff_odds"] == 56.5
+    assert any("shrunk toward even" in w for w in pre["why"])
+    mid = playoff_context.lean({"playoff_probability": 76}, posture_key="retool", weeks_played=6)
+    raw = playoff_context.lean({"playoff_probability": 76}, posture_key="retool")
+    assert mid["lean"] == raw["lean"] == "buyer" and not any("shrunk" in w for w in mid["why"])
+    # a contender whose odds also read as a push is still a buyer: odds and posture agree
+    assert playoff_context.lean({"playoff_probability": 80}, posture_key="contender", weeks_played=0)["lean"] == "buyer"
+
+
+def test_a_preseason_seller_by_odds_alone_is_a_hold_and_eliminated_still_sells(monkeypatch):
+    monkeypatch.delenv(playoff_context.LEAN_CALIBRATION_ENV_KEY, raising=False)
+    assert playoff_context.lean({"playoff_probability": 8}, posture_key="retool", weeks_played=0)["lean"] == "hold"
+    assert playoff_context.lean({"playoff_probability": 0, "eliminated": True}, posture_key="rebuild", weeks_played=0)["lean"] == "seller"
+
+
+def test_team_reads_derive_weeks_played_from_the_simulations_current_week(monkeypatch):
+    monkeypatch.delenv(playoff_context.LEAN_CALIBRATION_ENV_KEY, raising=False)
+    early = {**ODDS, "current_week": 1}
+    late = {**ODDS, "current_week": 9}
+    assert playoff_context.team_reads(early, None)["1"]["playoff_odds"] < 92
+    assert playoff_context.team_reads(late, None)["1"]["playoff_odds"] == 92
+    assert playoff_context.team_reads(ODDS, None)["1"]["playoff_odds"] == 92  # no week in the odds: raw
