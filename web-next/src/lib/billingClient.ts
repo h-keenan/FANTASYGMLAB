@@ -1,5 +1,7 @@
 import { ApiError } from "./api";
+import { BILLING_SLOW_MESSAGE, BILLING_STATUS_UNKNOWN_MESSAGE } from "./badDayCopy";
 import { env } from "./env";
+import { BILLING_READ_TIMEOUT_MS, BILLING_WRITE_TIMEOUT_MS, REQUEST_TIMEOUTS_ENABLED } from "./requestTimeouts";
 
 /**
  * Single client for the Stripe web-billing endpoints (plans, checkout,
@@ -34,7 +36,8 @@ const FASTAPI_PATHS: Record<Exclude<BillingFunction, "delete-account">, string> 
   "billing-portal-session": "/v1/billing/portal",
 };
 
-const REQUEST_TIMEOUT_MS = 30_000;
+/** Value used for everything when REQUEST_TIMEOUTS_ENABLED is off (the behaviour before the timeout work). */
+const LEGACY_REQUEST_TIMEOUT_MS = 30_000;
 
 export function billingEndpoint(name: BillingFunction, backend: BillingBackend = BILLING_BACKEND): string {
   // delete-account has no deprecated FastAPI route: always the Supabase function.
@@ -48,12 +51,17 @@ export async function billingRequest<T>(
   init?: { method?: "GET" | "POST"; jsonBody?: unknown; backend?: BillingBackend },
 ): Promise<T> {
   const backend = init?.backend ?? BILLING_BACKEND;
+  const method = init?.method ?? "GET";
+  // Only the plan list is a pure read. Checkout, portal and account deletion are writes: they keep the long limit and,
+  // on timeout, say the outcome is unknown (the server may have finished after we stopped waiting).
+  const isRead = method === "GET";
+  const timeoutMs = !REQUEST_TIMEOUTS_ENABLED ? LEGACY_REQUEST_TIMEOUT_MS : isRead ? BILLING_READ_TIMEOUT_MS : BILLING_WRITE_TIMEOUT_MS;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   try {
     response = await fetch(billingEndpoint(name, backend), {
-      method: init?.method ?? "GET",
+      method,
       headers: {
         Authorization: `Bearer ${accessToken}`,
         ...(backend === "supabase" ? { apikey: env.supabaseAnonKey } : {}),
@@ -64,7 +72,8 @@ export async function billingRequest<T>(
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new ApiError(0, "The request timed out. Check your connection and try again.");
+      if (!REQUEST_TIMEOUTS_ENABLED) throw new ApiError(0, "The request timed out. Check your connection and try again.");
+      throw new ApiError(0, isRead ? BILLING_SLOW_MESSAGE : BILLING_STATUS_UNKNOWN_MESSAGE, "client_timeout");
     }
     throw new ApiError(0, "Could not reach the server. Check your connection and try again.");
   } finally {

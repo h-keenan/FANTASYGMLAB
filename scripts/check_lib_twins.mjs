@@ -145,6 +145,7 @@ export const IDENTICAL = [
   "accountSections.ts",
   "simErrorCopy.ts",
   "badDayCopy.ts",
+  "requestTimeouts.ts",
   "sessionEnded.ts",
 ];
 

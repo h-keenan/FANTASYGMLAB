@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "./api";
+import { BILLING_SLOW_MESSAGE, BILLING_STATUS_UNKNOWN_MESSAGE } from "./badDayCopy";
 import { billingEndpoint, billingRequest } from "./billingClient";
 import { DEFAULT_TRIAL_DAYS, fetchPublicTrialDays, trialHeadline } from "./landingTrial";
 import { env } from "./env";
@@ -99,5 +100,39 @@ describe("landingTrial", () => {
     expect(await fetchPublicTrialDays()).toBeNull();
     fetchMock.mockRejectedValueOnce(new Error("down"));
     expect(await fetchPublicTrialDays()).toBeNull();
+  });
+});
+
+describe("billingRequest timeouts", () => {
+  const abortOnSignal = (_url: unknown, init: { signal: AbortSignal }) =>
+    new Promise((_res, rej) => init.signal.addEventListener("abort", () => rej(new DOMException("a", "AbortError"))));
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("a plans read times out at 15s with retry copy", async () => {
+    vi.stubGlobal("fetch", vi.fn(abortOnSignal));
+    const p = billingRequest("billing-plans", "tok", { backend: "supabase" });
+    const assertion = expect(p).rejects.toMatchObject({ message: BILLING_SLOW_MESSAGE, code: "client_timeout" });
+    await vi.advanceTimersByTimeAsync(15_000);
+    await assertion;
+  });
+
+  it("a checkout write is not cut at 15s and says the outcome is unknown at 30s", async () => {
+    vi.stubGlobal("fetch", vi.fn(abortOnSignal));
+    const p = billingRequest("create-checkout-session", "tok", { method: "POST", jsonBody: {}, backend: "supabase" });
+    let settled = false;
+    const assertion = expect(p).rejects.toMatchObject({ message: BILLING_STATUS_UNKNOWN_MESSAGE });
+    p.catch(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await assertion;
   });
 });

@@ -27,6 +27,13 @@ export const SERVER_ERROR_MESSAGE = "Our servers hit a snag. Try again in a mome
 export const SERVICE_BUSY_MESSAGE = "We are busy right now. Try again in a moment.";
 export const OFFLINE_ERROR_MESSAGE = "Could not reach the server. Check your connection and try again.";
 export const FORBIDDEN_MESSAGE = "Your account cannot open this. If your plan just changed, refresh the page or sign in again.";
+/** A data read (Supabase PostgREST) that got no answer in time: the read failed, nothing was changed. */
+export const SLOW_REQUEST_MESSAGE = "This is taking too long. Check your connection and try again.";
+/** A billing read (plan list) that got no answer in time. */
+export const BILLING_SLOW_MESSAGE = "Billing is taking too long to respond. Try again in a moment.";
+/** A billing write (checkout, portal, account deletion) that got no answer in time: it may or may not have gone through. */
+export const BILLING_STATUS_UNKNOWN_MESSAGE =
+  "We did not hear back in time, so we cannot say whether that went through. Refresh the page to check your plan before trying again.";
 export const BAD_RESPONSE_MESSAGE = "We got an unexpected reply from the server. Try again in a moment.";
 /** Codes the server attaches to auth failures: only `session_invalid` means the user must sign in again. */
 export const AUTH_UNAVAILABLE_CODE = "auth_unavailable";
