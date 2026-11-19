@@ -210,7 +210,7 @@ function GlanceCard({
   const compact = layout === 'grid';
   const { record, rank } = glanceRecordParts(league.record);
   const badge = glanceNewsBadge(league.news);
-  const badgeColor = badge.tone === 'risk' ? colors.danger : colors.textSecondary;
+  const badgeColor = badge.tone === 'risk' ? colors.warning : colors.textSecondary;
   const rows: Array<React.ComponentProps<typeof InsightRow> & { key: string }> = [];
   if (league.waiver) {
     rows.push({

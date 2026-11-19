@@ -28,6 +28,23 @@ describe("verdict colour guard", () => {
     // Trade History "-12 pts" in red and its red verdict stripe (2026-11-17).
     expect(run('{ key: "pts", tone: netPts > 0 ? "success" : netPts < 0 ? "danger" : undefined }')).toHaveLength(1);
     expect(run("const accent = verdict ? verdictToneColorVar(verdict) : outcomeToneColorVar(o);")).toHaveLength(1);
+    // Grade tone maps: risk / decline mapped to a red token (the old managerTendencies / sharedTrades maps) fail; amber passes.
+    expect(run('  if (tone === "risk") return "var(--color-danger)";')).toHaveLength(1);
+    const runAs = (file: string, text: string) =>
+      JSON.parse(
+        execFileSync(
+          "node",
+          ["-e", `import(${JSON.stringify(script)}).then((m) => console.log(JSON.stringify(m.scanText(${JSON.stringify(file)}, ${JSON.stringify(text)}))))`],
+          { encoding: "utf8" },
+        ),
+      ) as string[];
+    // In a grade-tone file even the "danger" slug is a red verdict (old mobile sharedTrades / managerTendencies maps).
+    expect(runAs("mobile/src/lib/sharedTrades.ts", "  if (grade === 'DECLINE') return 'danger';")).toHaveLength(1);
+    expect(runAs("mobile/src/lib/managerTendencies.ts", "  if (tone === 'risk') return 'danger';")).toHaveLength(1);
+    expect(runAs("mobile/src/lib/sharedTrades.ts", "  return toneToken(grade.toLowerCase());")).toHaveLength(0);
+    expect(run("const HEADLINE_COLOR = { decline: colors.danger };")).toHaveLength(1);
+    expect(run('  if (tone === "risk") return "var(--color-warning)";')).toHaveLength(0);
+    expect(run("const t = toneToken(tone);")).toHaveLength(0);
     // The trade picker header "You send" dot was red: tone "danger" mapped to the red token on a line that never said "You send".
     const scanTrade = (text: string) =>
       JSON.parse(

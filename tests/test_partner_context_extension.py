@@ -58,12 +58,7 @@ def test_surface_flag_hands_profile_or_nothing(monkeypatch, key):
     calls = []
     monkeypatch.setattr(team_profile, "league_team_profiles_cached", lambda **kw: calls.append(kw) or {"teams": {"1": {}}})
     kw = dict(league_id="L", lens="dynasty", players_db_path="x.db")
-    if pc.SURFACE_DEFAULT_ON.get(key, True):
-        assert pc.team_profiles_for_surface(key, **kw) == {"teams": {"1": {}}}
-    else:
-        assert pc.team_profiles_for_surface(key, **kw) is None
-        monkeypatch.setenv(key, "1")
-        assert pc.team_profiles_for_surface(key, **kw) == {"teams": {"1": {}}}
+    assert pc.team_profiles_for_surface(key, **kw) == {"teams": {"1": {}}}
     monkeypatch.setenv(key, "0")
     assert pc.team_profiles_for_surface(key, **kw) is None
     monkeypatch.setenv(key, "1")

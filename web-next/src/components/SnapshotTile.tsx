@@ -106,7 +106,7 @@ export function SnapshotTile({
           <span className="truncate">{label}</span>
         </span>
         <span className="flex max-w-full items-baseline justify-center gap-1 whitespace-nowrap tabular-nums leading-none">
-          <span style={{ font: "var(--type-primary-metric)", fontSize: "1rem", color: tone === "risk" ? "var(--color-danger)" : tone === "positive" ? "var(--color-success)" : "var(--color-text-primary)" }}>
+          <span style={{ font: "var(--type-primary-metric)", fontSize: "1rem", color: tone === "risk" ? "var(--color-warning)" : tone === "positive" ? "var(--color-success)" : "var(--color-text-primary)" }}>
             <Money>{value}</Money>
           </span>
           {note ? (

@@ -105,16 +105,6 @@ export const TYPE_KICKERS: Record<string, string> = {
   free_agent: "Free agent",
 };
 
-// modules/transaction_grades.py's _tone_for_letter() output ->
-// modules/league_history_styles.py's .dg-tx-grade--* color rules, verbatim.
-export function gradeToneColorVar(tone: string | undefined): string {
-  if (tone === "success") return "var(--color-success)";
-  if (tone === "positive" || tone === "accent") return "var(--color-information)";
-  if (tone === "warning" || tone === "risk") return "var(--color-warning)";
-  if (tone === "pending") return "var(--color-text-muted)";
-  return "var(--color-text-secondary)";
-}
-
 export function pickLabel(asset: { season?: string; round?: number | null; label?: string }): string {
   if (asset.season && asset.round) return `${asset.season} Round ${asset.round}`;
   return asset.label || "Draft pick";
