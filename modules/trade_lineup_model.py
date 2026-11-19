@@ -34,10 +34,11 @@ cached lookup; a failed lookup reads as "no bye", never a guess).
 from __future__ import annotations
 
 import math
+import threading
 from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import date
-from itertools import product
+from itertools import count, product
 from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
@@ -595,6 +596,53 @@ def solve_lineup(
     return sum(s[2] for s in starters), starters, open_slots
 
 
+# --- shared lineup solves -----------------------------------------------------
+#
+# ``run_weeks`` solves one lineup per (roster side, week, availability scenario).
+# The baseline ("before") side is the same roster for every candidate trade or
+# swap built on it, and the free-agent pool is the same for every candidate, so
+# the baseline lineup of a given week/scenario is the same solve over and over
+# (overflow swaps, trade ideas, drop candidates, both fill modes). The solve is
+# a pure function of its candidate list and the slots, so it is memoized on
+# exactly that input: a hit returns the very result a fresh solve would, and a
+# miss solves. Results are shared read-only (callers only iterate them).
+
+_SOLVE_CACHE: dict[tuple, tuple[float, list[tuple[str, str, float, str]], dict[str, int]]] = {}
+_SOLVE_CACHE_MAX = 6000
+_POOL_IDS: dict[tuple, int] = {}
+_POOL_IDS_MAX = 512
+_SOLVE_LOCK = threading.Lock()
+_POOL_COUNTER = count(1)
+
+
+def _pool_id(pool_points: Sequence[tuple[str, str, float]]) -> int:
+    """Small id for one free-agent pool's candidate tuples (equal content, equal id; ids never repeat)."""
+
+    key = tuple(pool_points)
+    pid = _POOL_IDS.get(key)
+    if pid is None:
+        with _SOLVE_LOCK:
+            pid = _POOL_IDS.get(key)
+            if pid is None:
+                if len(_POOL_IDS) >= _POOL_IDS_MAX:
+                    _POOL_IDS.clear()  # old ids are never reissued, so their solves just age out
+                pid = _POOL_IDS[key] = next(_POOL_COUNTER)
+    return pid
+
+
+def _solve_shared(side_points: Sequence[tuple[str, str, float]], pool_key: int, pool_points, slots_key: tuple, slots):
+    key = (pool_key, slots_key, tuple(side_points))
+    hit = _SOLVE_CACHE.get(key)
+    if hit is not None:
+        return hit
+    result = solve_lineup(list(side_points) + list(pool_points), slots)
+    with _SOLVE_LOCK:
+        if len(_SOLVE_CACHE) >= _SOLVE_CACHE_MAX:
+            _SOLVE_CACHE.clear()
+        _SOLVE_CACHE[key] = result
+    return result
+
+
 # --- weekly engine -----------------------------------------------------------
 
 
@@ -664,10 +712,25 @@ def run_weeks(
     pos_delta_weeks: dict[str, list[float]] = {}
 
     def cands(players, week):
-        rows = []
-        for pid, pos, pts, p, is_fa in _candidates(players, week, current_week, 1.0):
-            rows.append((pid, pos, pts, 1.0 if ignore_availability else p, is_fa))
-        return rows
+        # (id, pos, points, p_available, is_fa); same values as ``_candidates`` with the
+        # availability optionally forced to 1, built in one pass.
+        if ignore_availability:
+            return [(p.player_id, p.position, p.ppg * 1.0, 1.0, p.free_agent) for p in players if p.ppg is not None]
+        return [
+            (p.player_id, p.position, p.ppg * 1.0, p.availability(week, current_week), p.free_agent)
+            for p in players
+            if p.ppg is not None
+        ]
+
+    # Free-agent / replacement candidates: the same every week and scenario.
+    ce = [
+        (p.player_id, p.position, p.ppg * 1.0 * fa_rel[p.player_id], 1.0, True)
+        for p in extra
+        if p.ppg is not None
+    ]
+    ce_static = [(pid, pos, pts) for pid, pos, pts, _av, _fa in ce]
+    ce_static_key = _pool_id(ce_static)
+    slots_key = tuple(sorted((str(k), repr(v)) for k, v in ctx.slots.items()))
 
     for week in weeks:
         # A playoff week only counts if the team is alive for it; a week past the
@@ -677,17 +740,15 @@ def run_weeks(
             continue
         cb = cands(before, week)
         ca = cands(after, week)
-        ce = []
-        for p in extra:
-            if p.ppg is None:
-                continue
-            ce.append((p.player_id, p.position, p.ppg * 1.0 * fa_rel[p.player_id], 1.0, True))
         # Uncertain = fractional availability among rostered players.
         uncertain: dict[str, float] = {}
+        best_pts: dict[str, float] = {}
         for pid, pos, pts, av, _ in cb + ca:
             if 0.0 < av < 1.0:
                 uncertain[pid] = av
-        ranked = sorted(uncertain, key=lambda i: -max([c[2] for c in cb + ca if c[0] == i] or [0.0]))
+            if pid not in best_pts or pts > best_pts[pid]:
+                best_pts[pid] = pts
+        ranked = sorted(uncertain, key=lambda i: -best_pts.get(i, 0.0))
         enumerated = ranked[: params.max_enumerated]
         folded = {pid: uncertain[pid] for pid in ranked[params.max_enumerated:]}
 
@@ -706,7 +767,13 @@ def run_weeks(
 
         # The free-agent pool does not depend on who is present, so its points
         # are built once per week, not once per availability scenario.
-        ce_points = points_for(ce, {})
+        # (The pool is always fully available, so unless a rostered id is folded
+        # the same list serves every week: built once per call.)
+        if folded and any(pid in folded for pid, *_ in ce):
+            ce_points = points_for(ce, {})
+            pool_key = _pool_id(ce_points)
+        else:
+            ce_points, pool_key = ce_static, ce_static_key
         wb = wa = 0.0
         e_delta = e_delta2 = 0.0
         bypos_b: dict[str, float] = {}
@@ -723,8 +790,8 @@ def run_weeks(
                 prob *= uncertain[pid] if here else 1.0 - uncertain[pid]
             if prob <= 0.0:
                 continue
-            tb, sb, ob = solve_lineup(points_for(cb, present) + ce_points, ctx.slots)
-            ta, sa, oa = solve_lineup(points_for(ca, present) + ce_points, ctx.slots)
+            tb, sb, ob = _solve_shared(points_for(cb, present), pool_key, ce_points, slots_key, ctx.slots)
+            ta, sa, oa = _solve_shared(points_for(ca, present), pool_key, ce_points, slots_key, ctx.slots)
             wb += prob * tb
             wa += prob * ta
             d = ta - tb
