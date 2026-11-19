@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { SimWatchPlayback } from "@/components/SimWatch";
+import { SimWatchPlayback, SimWatchReportCard } from "@/components/SimWatch";
 
 vi.mock("@/components/SimGameParts", () => ({
   SimToneBadge: ({ label }: { label: string }) => <span>{label}</span>,
@@ -18,7 +18,8 @@ const advance = vi.fn(async (_id: string, week: number) => {
     game: { id: "g", status: "in_season", week: week + 1, settings: { watch_v: 1, regular_weeks: 14 }, you: { team_id: "me", wins, losses: i + 1 - wins, ties: 0, rank: 3 } },
   };
 });
-vi.mock("@/lib/api", () => ({ api: { advanceSimGame: (id: string, week: number) => advance(id, week) } }));
+const getReport = vi.fn();
+vi.mock("@/lib/api", () => ({ api: { advanceSimGame: (id: string, week: number) => advance(id, week), getSimWatchReport: (id: string) => getReport(id) } }));
 
 describe("Draft & Watch playback", () => {
   it("shows a record that matches the results list after N weeks", async () => {
@@ -34,5 +35,23 @@ describe("Draft & Watch playback", () => {
     expect(wins).toBe(5);
     const won = WINS.filter(Boolean).length;
     expect(screen.getByTestId("watch-record").textContent).toBe(`${won}-${WINS.length - won}`);
+  });
+});
+
+describe("Draft & Watch report card read failures", () => {
+  const ctx = (preview: unknown) => ({ gameId: "g", preview, game: { id: "g", status: "complete", week: 15, settings: { watch_v: 1 }, you: { team_id: "me" } }, call: (fn: () => Promise<unknown>) => fn(), setGame: () => {} });
+
+  it("a report that cannot be parsed shows the error and the Pro upsell for a Free game, never a blank", async () => {
+    getReport.mockResolvedValue({ ok: true, is_premium: false, report: { nonsense: true } });
+    render(<SimWatchReportCard ctx={ctx({ paywalled: true, weeks_left: 0, paywall_week: 0 }) as never} onStartGame={() => {}} onHub={() => {}} />);
+    expect(await screen.findByTestId("watch-report-error")).toHaveTextContent("report card could not load");
+    expect(screen.getByRole("link", { name: /Run it back · Pro/ })).toBeInTheDocument();
+  });
+
+  it("a failed read falls back to the game's preview for the plan: a null preview (Pro) gets the real actions", async () => {
+    getReport.mockRejectedValue(new Error("offline"));
+    render(<SimWatchReportCard ctx={ctx(null) as never} onStartGame={() => {}} onHub={() => {}} />);
+    expect(await screen.findByTestId("watch-report-error")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run it back" })).toBeInTheDocument();
   });
 });

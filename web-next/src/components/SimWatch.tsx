@@ -208,7 +208,9 @@ function WhatIf({ item }: { item: SimWatchWhatIf }) {
 /** The end of Draft & Watch: the report card story opens by itself; the page behind it keeps the same facts and the next-run actions. */
 export function SimWatchReportCard({ ctx, onStartGame, onHub }: { ctx: SimCtx; onStartGame: (body: SimGameCreateBody) => void; onHub: () => void }) {
   const [report, setReport] = useState<SimWatchReport | null>(null);
-  const [isPro, setIsPro] = useState(false);
+  // Plan: the report's own `is_premium`, else the game's free-season preview (null preview = Pro). A failed read never hides the next-run actions.
+  const [planFromReport, setPlanFromReport] = useState<boolean | null>(null);
+  const isPro = planFromReport ?? ctx.preview == null;
   const [failed, setFailed] = useState(false);
   const [story, setStory] = useState(true);
   useEffect(() => {
@@ -217,11 +219,10 @@ export function SimWatchReportCard({ ctx, onStartGame, onHub }: { ctx: SimCtx; o
       .getSimWatchReport(ctx.gameId)
       .then((body) => {
         if (cancelled) return;
+        if (typeof body.is_premium === "boolean") setPlanFromReport(body.is_premium);
         const parsed = normalizeWatchReport(body.report);
-        if (parsed) {
-          setReport(parsed);
-          setIsPro(body.is_premium === true);
-        } else setFailed(true);
+        if (parsed) setReport(parsed);
+        else setFailed(true);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -236,10 +237,6 @@ export function SimWatchReportCard({ ctx, onStartGame, onHub }: { ctx: SimCtx; o
     [report, ctx.game.you?.name],
   );
 
-  if (failed) return <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Your season is saved, but the report card could not load. Try again in a moment.</p>;
-  if (!report) return <div className="flex flex-col gap-3" aria-busy="true"><SkeletonCard lines={4} /><SkeletonCard lines={6} /></div>;
-
-  const move = simWatchGradeMove(report.draft.then?.grade, report.draft.now.grade);
   const rerun = (same: boolean) => onStartGame(simWatchRerunBody(ctx.game.settings, same) as SimGameCreateBody);
   const actions = (
     <>
@@ -258,6 +255,21 @@ export function SimWatchReportCard({ ctx, onStartGame, onHub }: { ctx: SimCtx; o
       )}
     </>
   );
+  if (failed) {
+    // The report could not be read or parsed: say so, and keep the next-run actions (the Pro upsell for Free) instead of a blank.
+    return (
+      <div className="flex flex-col gap-3" data-testid="watch-report-error">
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Your season is saved, but the report card could not load. Try again in a moment.</p>
+        <div className="flex flex-col gap-2">
+          {actions}
+          <Button variant="ghost" onClick={onHub}>All games</Button>
+        </div>
+      </div>
+    );
+  }
+  if (!report) return <div className="flex flex-col gap-3" aria-busy="true"><SkeletonCard lines={4} /><SkeletonCard lines={6} /></div>;
+
+  const move = simWatchGradeMove(report.draft.then?.grade, report.draft.now.grade);
   return (
     <div className="flex flex-col gap-3" data-testid="watch-report">
       <AccentCard accent="var(--color-accent)" as="section" glow>

@@ -7,7 +7,6 @@ import AppText from './AppText';
 import Button from './Button';
 import CompactModule from './CompactModule';
 import { api, type TrackRecordResponse } from '../lib/api';
-import { planOf, type Plan } from '../lib/plan';
 import {
   basicSummary,
   calibrationNote,
@@ -26,7 +25,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
  * server withholds them too). Every number carries its sample size; below the minimum it says "too early".
  * Web twin: web-next/src/components/TrackRecordModule.tsx; wording: lib/trackRecordView.ts.
  */
-export function TrackRecordView({ record, plan, onUpgrade }: { record: TrackRecordResponse; plan: Plan; onUpgrade?: () => void }) {
+export function TrackRecordView({ record, onUpgrade }: { record: TrackRecordResponse; onUpgrade?: () => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { basic, advanced } = record;
@@ -41,7 +40,8 @@ export function TrackRecordView({ record, plan, onUpgrade }: { record: TrackReco
           : undefined // a net loss is muted, never red
         : undefined,
   }));
-  const showLock = !advanced && plan === 'free';
+  // The response says whether the advanced block was withheld (`is_pro`), so the lock never depends on a second /me call.
+  const showLock = !advanced && !record.is_pro;
   const levels: TrackLevel[] = ['high', 'medium', 'low'];
 
   return (
@@ -79,22 +79,35 @@ export function TrackRecordView({ record, plan, onUpgrade }: { record: TrackReco
 
 export default function TrackRecordModule() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [state, setState] = useState<{ record: TrackRecordResponse; plan: Plan } | null>(null);
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [record, setRecord] = useState<TrackRecordResponse | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.getTrackRecord(), api.getMe().catch(() => null)])
-      .then(([record, me]) => {
-        if (!cancelled) setState({ record, plan: planOf(me?.user) });
+    api
+      .getTrackRecord()
+      .then((body) => {
+        if (!cancelled) setRecord(body);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Fail soft: no record (offline, table unreachable) simply hides the module.
-  return state ? <TrackRecordView record={state.record} plan={state.plan} onUpgrade={() => navigation.navigate('Paywall')} /> : null;
+  // The module stays visible when the read fails: a short error line, never a blank where it used to be.
+  if (failed) {
+    return (
+      <CompactModule id="track-record" title="Your track record" parts={[{ key: 'err', text: 'Could not load right now', strong: true }]} testID="track-record-error">
+        <AppText style={styles.secondary}>Your track record could not load. Try again in a moment.</AppText>
+      </CompactModule>
+    );
+  }
+  return record ? <TrackRecordView record={record} onUpgrade={() => navigation.navigate('Paywall')} /> : null;
 }
 
 function createStyles(colors: ThemeColors) {

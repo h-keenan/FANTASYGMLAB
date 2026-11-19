@@ -116,6 +116,7 @@ import {
   type SimTradeSeed,
   type SimToResponse,
   simSeasonText,
+  simGatePreview,
 } from '../lib/simGame';
 import { simToProgressLabel, simToRemaining } from '../lib/simTo';
 import { simScrollKey, simShouldScrollTop } from '../lib/simScroll';
@@ -178,7 +179,7 @@ export default function GmGameScreen({ navigation }: Props) {
   const onGate = useCallback(
     (gate: SimGameGate) => {
       dispatch({ type: 'gate', gate });
-      if (gate.kind === 'premium' && gate.preview) setPreview(gate.preview);
+      if (gate.kind === 'premium') setPreview(simGatePreview(gate));
       if (gate.kind === 'blocked') notify(gate.message, 'warning');
       if (gate.kind === 'unavailable' && gate.cause === 'busy') notify('The simulator is busy right now. Try again in a few seconds.', 'warning');
     },

@@ -1538,6 +1538,15 @@ export function simGameStage(game: Pick<SimGame, "status">): SimGameStage {
   }
 }
 
+/** The preview a premium_required answer stands for. `preview` null means Pro, so a premium gate that arrives without one
+ * (or a missing read) must never leave the screen holding null: that treated a Free account as Pro until the next read. */
+export const SIM_PAYWALLED_PREVIEW: SimGamePreview = { free_season: true, weeks_left: 0, paywall_week: 0, paywalled: true };
+
+/** The preview to hold after a premium gate: the server's own, else the paywalled one. */
+export function simGatePreview(gate: { preview?: SimGamePreview | null }): SimGamePreview {
+  return gate.preview ?? SIM_PAYWALLED_PREVIEW;
+}
+
 /** True once the free season is used up (every write answers premium_required). */
 export function simGamePaywalled(preview: SimGamePreview | null | undefined): boolean {
   return Boolean(preview?.paywalled);
