@@ -4422,26 +4422,11 @@ def get_league_draft_picks(
             )
         )
     )
-    # Crowdsourced college scouting signal (modules/college_scouting.py),
-    # cached ~10min since it's identical for every caller — see
-    # get_cached_crowd_class_strength_by_year's own docstring for why this
-    # isn't refetched per request. Gated by class_strength_signal_enabled()
-    # (default off — see that function's docstring); {} is always the safe
-    # "no crowd signal" value, which _rookie_class_strength_multiplier
-    # already treats as pure editorial class strength, unchanged.
-    crowd_class_strength = (
-        college_scouting.get_cached_crowd_class_strength_by_year(
-            auth_supabase.get_supabase_config(), str(user.get("_access_token") or "")
-        )
-        if college_scouting.class_strength_signal_enabled()
-        else {}
-    )
     picks = trade_ideas.list_draft_pick_assets(
         league_id,
         df_summary,
         league_settings=settings,
         draft_status=draft_status,
-        crowd_class_strength_by_year=crowd_class_strength,
     )
     projected = [
         {
@@ -4946,11 +4931,7 @@ def _live_draft_context(
             except (TypeError, ValueError):
                 year = None
             if year is not None:
-                crowd = (
-                    college_scouting.get_cached_crowd_class_strength_by_year(config, token)
-                    if college_scouting.class_strength_signal_enabled()
-                    else {}
-                )
+                crowd = {}
                 try:
                     prospects, _err = college_scouting.get_cached_all_prospects(config, token)
                 except Exception:
@@ -6955,18 +6936,10 @@ def _compute_trade_analyzer(
             league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
         )
         if not pick_summary.empty:
-            crowd_class_strength = (
-                college_scouting.get_cached_crowd_class_strength_by_year(
-                    auth_supabase.get_supabase_config(), str(user.get("_access_token") or "")
-                )
-                if college_scouting.class_strength_signal_enabled()
-                else {}
-            )
             all_picks = trade_ideas.list_draft_pick_assets(
                 league_id,
                 pick_summary,
                 league_settings=settings,
-                crowd_class_strength_by_year=crowd_class_strength,
             )
             picks_by_id = {
                 f"{pick.get('season')}:{pick.get('round')}:{pick.get('original_roster_id')}": pick
@@ -7390,11 +7363,6 @@ def _compute_multi_team_trade(
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
     my_rid = str(my_roster.get("roster_id"))
-    crowd = {}
-    if any(t.type.strip().lower() == "pick" for t in body.transfers) and college_scouting.class_strength_signal_enabled():
-        crowd = college_scouting.get_cached_crowd_class_strength_by_year(
-            auth_supabase.get_supabase_config(), str(user.get("_access_token") or "")
-        )
     status = model_status.ok()
     result = multi_team_trade_engine.analyze_multi_team_trade(
         league_id=league_id,
@@ -7402,7 +7370,6 @@ def _compute_multi_team_trade(
         lens=body.lens,
         players_db_path=PLAYERS_DB_PATH,
         perspective_roster_id=body.perspective_roster_id or my_rid,
-        crowd_class_strength_by_year=crowd,
         include_veto=pro,
         status=status,
         **_multi_team_engine_hooks(
@@ -7532,16 +7499,11 @@ def _compute_multi_team_ideas(
     )
     # Picks are pieces too, priced by the same crowd-aware pick table the Analyzer
     # regrades them with (so an idea's pick means the same thing when opened there).
-    crowd = {}
-    if college_scouting.class_strength_signal_enabled():
-        crowd = college_scouting.get_cached_crowd_class_strength_by_year(
-            auth_supabase.get_supabase_config(), str(user.get("_access_token") or "")
-        )
     hooks = _multi_team_engine_hooks(league_id, league, user, my_roster, lens=lens, strategy="", pro=pro)
     ctx = multi_team_trade_engine.build_context(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH,
         perspective_roster_id=str(my_roster.get("roster_id")), status=model_status.ok(),
-        load_picks=True, crowd_class_strength_by_year=crowd, **hooks,
+        load_picks=True, **hooks,
     )
     if isinstance(ctx, dict):
         # Pick data not ready: a players-only search is still a correct answer.

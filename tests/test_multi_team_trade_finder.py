@@ -326,7 +326,6 @@ def test_endpoint_search_loads_picks_and_falls_back_to_players_when_the_pick_tab
     monkeypatch.setattr(sleeper, "get_league", lambda lid: {"league_id": lid})
     monkeypatch.setattr(svc, "_fetch_gm_target_player_ids", lambda *a, **k: ([], []))
     monkeypatch.setattr(svc, "_multi_team_engine_hooks", lambda *a, **k: {})
-    monkeypatch.setattr(svc.college_scouting, "class_strength_signal_enabled", lambda: False)
     monkeypatch.setattr(svc.auth_supabase, "get_supabase_config", lambda: None)
     out = svc._compute_multi_team_ideas("abc", "Dynasty", {"id": "u"}, {"roster_id": 1}, True)
     assert built == [True, False] and out["reason"] == "no_fit"
