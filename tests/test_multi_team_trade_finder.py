@@ -18,6 +18,15 @@ from tests.test_mobile_api_service import _client
 
 NEEDS = {"1": ("WR",), "2": ("RB",), "3": ("QB",)}  # 1 gets WR from 3, 2 gets RB from 1, 3 gets QB from 2
 BALANCED = ("F01-17", "F02-14", "F03-10")  # one RB / QB / WR priced equally so a fair cycle exists
+# Team 3 declares "needs QB", so its own QBs must really be weak: below the 4000 QB it is sent, otherwise the
+# need is fictional (an elite QB1 plus QB2 starts nobody it is handed) and the start-aware Finder rightly skips it.
+WEAK_QBS_3 = {"F03-00": 3500.0, "F03-01": 3300.0, "F03-14": 3100.0, "F03-15": 2900.0}
+
+
+def _weaken_team_3_qbs(pl):
+    for pid, value in WEAK_QBS_3.items():
+        for col in ("dynasty_score", "value_score"):
+            pl.loc[pl["player_id"].astype(str) == pid, col] = value
 
 
 def fake_needs(ctx, need_by_rid):
@@ -38,6 +47,7 @@ def ctx(league):
     for pid in BALANCED:
         for col in ("dynasty_score", "value_score"):
             pl.loc[pl["player_id"].astype(str) == pid, col] = 4000.0
+    _weaken_team_3_qbs(pl)
     built = engine.build_context(league_id="fixture-league", lens="Dynasty", players_db_path=":memory:")
     assert not isinstance(built, dict), built
     fake_needs(built, NEEDS)
@@ -193,6 +203,7 @@ def pick_ctx(league):
     for pid in BALANCED:
         for col in ("dynasty_score", "value_score"):
             pl.loc[pl["player_id"].astype(str) == pid, col] = 4000.0
+    _weaken_team_3_qbs(pl)
     built = engine.build_context(league_id="fixture-league", lens="Dynasty", players_db_path=":memory:", load_picks=True)
     assert not isinstance(built, dict), built
     fake_needs(built, NEEDS)
@@ -411,3 +422,43 @@ def test_deadline_passed_and_unlinked_roster_short_circuit(monkeypatch):
     assert data["ideas"] == [] and data["reason"] == svc.league_calendar.TRADE_DEADLINE_PASSED_REASON and not calls
     monkeypatch.setattr(svc, "_resolve_my_roster", lambda user, lid: (None, "sleeper_not_linked"))
     assert _get(client, "pro").json()["reason"] == "sleeper_not_linked"
+
+
+# --- start-aware candidates (roster redundancy) ------------------------------
+
+
+def test_finder_never_sends_a_non_starting_qb_to_a_team_with_an_elite_qb1_and_a_qb2(league, monkeypatch):
+    """The old fixture world: Team 3 'needs QB' on paper but holds an elite QB1 plus a QB2, so any QB it is sent
+    sits on the bench. The Analyzer prices that QB at the bench-chip rate, so the Finder must not propose it."""
+
+    monkeypatch.setenv("DYNASTYGM_FINDER_START_AWARE_V1", "1")
+    pl = league["players"]
+    for pid in BALANCED:
+        for col in ("dynasty_score", "value_score"):
+            pl.loc[pl["player_id"].astype(str) == pid, col] = 4000.0
+    built = engine.build_context(league_id="fixture-league", lens="Dynasty", players_db_path=":memory:")
+    assert not isinstance(built, dict), built
+    fake_needs(built, NEEDS)
+    qb_ids = set(pl.loc[pl["position"] == "QB", "player_id"].astype(str))
+    view = finder._League(built, "1", set())
+    sent_qbs = [a for a in view.sendable["2"] if a.kind == "player" and a.player_id in qb_ids]
+    assert sent_qbs and not any(view.would_start("3", a) for a in sent_qbs)  # nobody beats QB1/QB2 on Team 3
+    assert not [a for a in view.edge("2", "3") if a.player_id in qb_ids]
+    for idea in _find(built)["ideas"]:
+        for team in idea["teams"]:
+            if team["roster_id"] == "3":
+                assert not [a for a in team["receives"] if a.get("player_id") in qb_ids]
+
+
+def test_start_aware_filter_has_its_own_kill_switch(monkeypatch):
+    from modules import trade_grade
+
+    monkeypatch.delenv("DYNASTYGM_FINDER_START_AWARE_V1", raising=False)
+    assert trade_grade.finder_start_aware_enabled()
+    for off in ("0", "false", "off", "no"):
+        monkeypatch.setenv("DYNASTYGM_FINDER_START_AWARE_V1", off)
+        assert not trade_grade.finder_start_aware_enabled()
+    # independent of the pricing discount flag
+    monkeypatch.setenv("DYNASTYGM_FINDER_START_AWARE_V1", "1")
+    monkeypatch.setenv("DYNASTYGM_ROSTER_REDUNDANCY_V1", "0")
+    assert trade_grade.finder_start_aware_enabled() and not trade_grade.roster_redundancy_enabled()

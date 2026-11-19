@@ -215,12 +215,12 @@ class _League:
         The Analyzer prices a received QB (and a TE outside TE-premium leagues) that cannot start for the roster
         at the bench-chip rate (trade_grade.roster_redundancy_adjustment), so proposing one to a team that
         cannot start him only builds a candidate that team's own verdict then rejects. Candidate generation
-        asks the same question first and searches the other fits instead. Always True when the discount is off
+        asks the same question first and searches the other fits instead. Always True when DYNASTYGM_FINDER_START_AWARE_V1 is off
         or the position is outside its scope."""
 
         if (
             asset.kind != "player"
-            or not trade_grade.roster_redundancy_enabled()
+            or not trade_grade.finder_start_aware_enabled()
             or asset.position not in trade_grade.redundancy_positions(self.ctx.settings)
         ):
             return True

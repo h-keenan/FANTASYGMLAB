@@ -280,6 +280,18 @@ def roster_redundancy_enabled() -> bool:
     return config_value(REDUNDANCY_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
 
 
+START_AWARE_ENV_KEY = "DYNASTYGM_FINDER_START_AWARE_V1"
+
+
+def finder_start_aware_enabled() -> bool:
+    """Lineup-aware Finder candidates (skip a QB/TE the receiving team cannot start). Its own flag, independent of
+    the pricing discount above. Default ON; 0/false/no/off disables it."""
+
+    from modules.app_config import config_value
+
+    return config_value(START_AWARE_ENV_KEY).strip().casefold() not in {"0", "false", "no", "off"}
+
+
 def redundancy_positions(league_settings: Mapping[str, Any] | None) -> frozenset[str]:
     """Positions the audit found mispriced when they cannot start: QB, and TE outside TE-premium leagues."""
 
