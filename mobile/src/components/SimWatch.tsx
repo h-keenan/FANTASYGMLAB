@@ -84,6 +84,7 @@ export function SimWatchPlayback({ ctx }: { ctx: SimCtx }) {
   const [lines, setLines] = useState<SimWatchLine[]>([]);
   const [moves, setMoves] = useState<{ title: string; sub: string }[]>([]);
   const [running, setRunning] = useState(false);
+  const [latestYou, setLatestYou] = useState<SimCtx['game']['you'] | null>(null);
   const [speed, setSpeed] = useState('1');
   const speedRef = useRef('1');
   const paused = useRef(false);
@@ -110,6 +111,7 @@ export function SimWatchPlayback({ ctx }: { ctx: SimCtx }) {
         if (made.length) setMoves((prev) => [...prev, ...made].slice(-6));
       }
       game = res.game;
+      if (mounted.current && res.game.you) setLatestYou(res.game.you);
       ctx.setGame(res.game);
       if (res.game.status === 'complete' || res.game.status === 'offseason') break;
       const pause = SPEEDS.find((sp) => sp.value === speedRef.current)?.pause ?? 650;
@@ -118,7 +120,8 @@ export function SimWatchPlayback({ ctx }: { ctx: SimCtx }) {
     if (mounted.current) setRunning(false);
   }
 
-  const you = ctx.game.you;
+  // The record comes from the same answer as each results row (the game the advance call returned), not from a re-render that may lag it.
+  const you = latestYou ?? ctx.game.you;
   const total = ctx.game.settings.regular_weeks || 14;
   const started = lines.length > 0;
   const record = you ? `${you.wins}-${you.losses}${you.ties ? `-${you.ties}` : ''}` : '0-0';
