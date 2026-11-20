@@ -209,6 +209,7 @@ from modules import (
     live_activity,
     live_big_plays,
     live_policy,
+    live_scoreboard,
     live_stat_lines,
     live_draft,
     live_draft_trade_evaluator,
@@ -16382,6 +16383,9 @@ def _player_game_state(team: Any, projection_context: "_ProjectionContext | None
         "game_is_home": None,
         "game_team_score": None,
         "game_opponent_score": None,
+        "game_clock_label": None,
+        "game_remaining": None,
+        "game_situation": None,
     }
     if projection_context is None or projection_context.games is None or not team:
         return state
@@ -16408,7 +16412,34 @@ def _player_game_state(team: Any, projection_context: "_ProjectionContext | None
             state["game_status"] = nfl_schedule.game_phase(matchup)
         except Exception:
             state["game_status"] = None
+    _apply_real_game_clock(state, team, projection_context.week, projection_context.season)
     return state
+
+
+def _apply_real_game_clock(state: dict[str, Any], team: Any, week: int, season: int | None = None) -> None:
+    """Overlay the real quarter/clock, live score and final status from the
+    ESPN scoreboard (modules.live_scoreboard). Fails open: with no scoreboard
+    (flag off, outage, other week) the nflverse + wall-clock fields stand."""
+
+    state.setdefault("game_clock_label", None)
+    state.setdefault("game_remaining", None)
+    state.setdefault("game_situation", None)
+    info = live_scoreboard.team_info(live_scoreboard.current_board(), team, week, season)
+    if not info:
+        return
+    if info["state"] == "in":
+        state.update(game_started=True, game_final=False, game_status="in_progress")
+        state["game_remaining"] = info["fraction_remaining"]
+        state["game_situation"] = info["situation"]
+    elif info["state"] == "post":
+        state.update(game_started=True, game_final=True, game_status="final", game_remaining=0.0)
+    else:
+        return
+    state["game_clock_label"] = info["label"]
+    state["game_opponent"] = info["opponent"] or state.get("game_opponent")
+    state["game_is_home"] = info["is_home"]
+    state["game_team_score"] = info["team_score"]
+    state["game_opponent_score"] = info["opponent_score"]
 
 
 def _project_real_starter_row(
@@ -17529,7 +17560,12 @@ def _build_matchup(
     # Latest big plays (TD, long gain, turnover, 2-pt) derived from stat-line
     # deltas between polls; shared per matchup via Redis. Live games only.
     big_plays: list[dict[str, Any]] = []
-    if projection_context is not None and not is_external and live_policy.is_live():
+    _any_game_live = any(
+        _st.get("game_status") == "in_progress"
+        for _side_payload in (my_side, opponent_side)
+        for _st in (_side_payload.get("real_starters") or [])
+    )
+    if projection_context is not None and not is_external and (live_policy.is_live() or _any_game_live):
         big_plays = live_big_plays.present(
             live_big_plays.ingest(
                 league_id,

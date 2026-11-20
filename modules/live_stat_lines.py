@@ -31,12 +31,25 @@ LIVE_STAT_KEYS: tuple[str, ...] = (
 )
 
 
+def _scoreboard_live(week: int) -> bool:
+    """The scoreboard sees a game in progress this week even when the schedule
+    file the live window reads is missing or stale."""
+
+    from modules import live_scoreboard
+
+    board = live_scoreboard.current_board()
+    if not board or (board.get("week") is not None and int(board["week"]) != week):
+        return False
+    return any(t.get("state") == "in" for t in (board.get("teams") or {}).values())
+
+
 def week_payload(season: int, week: int) -> dict[str, Any] | None:
     """League-wide stats for the live week, cached for the live TTL; None when
     the week is not live or the fetch failed."""
 
     try:
-        if live_policy.live_nfl_week() != int(week):
+        live_week = live_policy.live_nfl_week()
+        if live_week != int(week) and not (live_week is None and _scoreboard_live(int(week))):
             return None
         url = f"{sleeper.SLEEPER_BASE}/stats/nfl/regular/{int(season)}/{int(week)}"
         ttl = float(live_policy.current_live_ttl())
