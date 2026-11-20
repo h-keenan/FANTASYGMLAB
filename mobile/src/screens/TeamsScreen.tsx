@@ -25,6 +25,7 @@ import FilterDropdownButton from '../components/FilterDropdownButton';
 import { ViewTabs } from '../components/PageControlRow';
 import TeamAvatar from '../components/TeamAvatar';
 import PlayoffOddsPanel from './PlayoffOddsPanel';
+import LeagueMatchupsSection from '../components/LeagueMatchupsSection';
 import LeagueStandingsModule from '../components/LeagueStandingsModule';
 import { ReSettle } from '../components/Motion';
 import NextSteps from '../components/NextSteps';
@@ -545,6 +546,7 @@ function RankingsPanel({
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
             {myRanking ? <YourStandingCard me={myRanking} total={teamRankingsQuery.data?.teams.length ?? 0} colors={colors} styles={styles} /> : null}
+            <LeagueMatchupsSection leagueId={leagueId} leagueName={leagueName} onOpenMyMatchup={() => navigation.navigate('Matchup', { leagueId, leagueName })} />
             {teamRankingsQuery.data ? (
               <LeagueStandingsModule
                 data={teamRankingsQuery.data}

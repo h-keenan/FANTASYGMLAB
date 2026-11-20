@@ -36,6 +36,8 @@ export const queryKeys = {
   teamProfile: (leagueId: string, rosterId: string | number) =>
     [...userScopeKey(), 'league', leagueId, 'team-profile', String(rosterId)] as const,
   guillotine: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'guillotine'] as const,
+  leagueMatchups: (leagueId: string, week: number | null) =>
+    [...userScopeKey(), 'league', leagueId, 'matchups', week ?? 'current'] as const,
   matchup: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'matchup'] as const,
   // Dashboard's "new recap ready" module — also shared by Alerts,
   // LeagueDetail, RecapScreen's own default (current-recap) load, and

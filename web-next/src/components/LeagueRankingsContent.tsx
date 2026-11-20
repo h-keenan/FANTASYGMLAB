@@ -30,6 +30,7 @@ import {
 } from "@/lib/leagueRankingsPresentation";
 import { STANDINGS_EMPTY, STANDINGS_KICKER, STANDINGS_NOTE, sortByStanding, standingsSummaryParts, standingsTitle } from "@/lib/leagueStandings";
 import { SectionHeading } from "@/components/SectionHeading";
+import { LeagueMatchupsSection } from "@/components/LeagueMatchupsSection";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -547,6 +548,7 @@ export function LeagueRankingsContent({
       ) : (
         <>
           <YourStandingCard teams={data.teams} myRosterId={myRosterId} />
+          <LeagueMatchupsSection leagueId={leagueId} leagueName={leagueName} />
           <StandingsSection data={data} myRosterId={myRosterId} onOpenManager={openManager} />
           <PlayoffOddsSection leagueId={leagueId} leagueName={leagueName} myRosterId={myRosterId} myTeam={data.teams.find((team) => team.roster_id === myRosterId)} />
           <RankBoardSection board="power" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />

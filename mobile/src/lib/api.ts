@@ -1,3 +1,4 @@
+import type { LeagueMatchupPairView } from './leagueMatchups';
 import { BAD_RESPONSE_MESSAGE, friendlyStatusMessage, isRetryableSessionLookupError } from './badDayCopy';
 import { reportRequestOutcome } from './connectivity';
 import { normalizeProspectProfile, type ProspectProfileResponse } from './prospectProfile';
@@ -1181,6 +1182,22 @@ export interface MatchupRealComparison {
   edge: 'you' | 'opponent' | 'even';
   basis: 'sleeper_actual_lineup';
   basis_label: string;
+}
+
+export interface LeagueMatchupsResponse {
+  /** ISO time of last-known provider data served after a failed refresh; absent on live data. */
+  sleeper_data_as_of?: string;
+  ok: boolean;
+  week: number | null;
+  current_week: number | null;
+  max_week: number;
+  matchups: LeagueMatchupPairView[];
+  /** no_current_week / no_matchup_data / no_player_data / unsupported_platform; empty when ready. */
+  reason?: string;
+  as_of?: string;
+  as_of_age_seconds?: number;
+  live?: boolean;
+  poll_after_seconds?: number | null;
 }
 
 export interface MatchupResponse {
@@ -4432,6 +4449,11 @@ export const api = {
     ),
   getLiveActivity: (leagueId: string) =>
     authorizedFetch<LiveActivitySnapshot>(`/v1/leagues/${encodeURIComponent(leagueId)}/live-activity`),
+  getLeagueMatchups: (leagueId: string, week?: number | null) =>
+    authorizedFetch<LeagueMatchupsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/matchups${week ? `?week=${week}` : ''}`,
+    ),
+
   getLeagueMatchup: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

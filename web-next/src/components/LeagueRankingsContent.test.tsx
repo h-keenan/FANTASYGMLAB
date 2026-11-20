@@ -17,6 +17,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       getLeaguePlayoffOdds: vi.fn(),
+      getLeagueMatchups: vi.fn().mockResolvedValue({ ok: true, week: null, current_week: null, max_week: 18, matchups: [], reason: "no_current_week" }),
     },
   };
 });

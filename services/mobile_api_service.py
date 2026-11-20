@@ -202,6 +202,7 @@ from modules import (
     league_rankings,
     league_warmup,
     league_recaps,
+    league_matchups,
     league_standings,
     league_storylines,
     league_value_settings,
@@ -17324,6 +17325,24 @@ def _matchup_freshness(league_id: str, week: int, is_external: bool) -> dict[str
     }
 
 
+def _annotate_live_starters(side: dict[str, Any], live_stats: Any = None) -> None:
+    """Per real starter: live stat line (when his game has started and a league-wide
+    stats payload is given), projected final and share of his game played. Pure
+    arithmetic on data already fetched; shared by /matchup and the league-wide
+    /matchups list so both compute these identically."""
+
+    for starter in side.get("real_starters") or []:
+        if live_stats is not None and starter.get("game_started") is True:
+            starter["stats"] = live_stat_lines.compact_line(live_stats, starter.get("player_id"))
+        starter["projected_final"] = matchup_win_probability.projected_final(starter)
+        # Share of his own game already played (0-1, wall-clock estimate):
+        # drives the player card's progress bar. None before kickoff / bye.
+        remaining = matchup_win_probability.game_fraction_remaining(starter)
+        starter["game_progress"] = (
+            round(1.0 - remaining, 3) if starter.get("game_started") is True and remaining is not None else None
+        )
+
+
 def _build_matchup(
     league_id: str,
     lens: str,
@@ -17545,18 +17564,7 @@ def _build_matchup(
         else None
     )
     for _side_payload in (my_side, opponent_side):
-        for _starter in _side_payload.get("real_starters") or []:
-            if _live_stats is not None and _starter.get("game_started") is True:
-                _starter["stats"] = live_stat_lines.compact_line(_live_stats, _starter.get("player_id"))
-            _starter["projected_final"] = matchup_win_probability.projected_final(_starter)
-            # Share of his own game already played (0-1, wall-clock estimate):
-            # drives the player card's progress bar. None before kickoff / bye.
-            _remaining = matchup_win_probability.game_fraction_remaining(_starter)
-            _starter["game_progress"] = (
-                round(1.0 - _remaining, 3)
-                if _starter.get("game_started") is True and _remaining is not None
-                else None
-            )
+        _annotate_live_starters(_side_payload, _live_stats)
     # Latest big plays (TD, long gain, turnover, 2-pt) derived from stat-line
     # deltas between polls; shared per matchup via Redis. Live games only.
     big_plays: list[dict[str, Any]] = []
@@ -17640,6 +17648,153 @@ def _build_matchup(
         response["platform"] = external_leagues.league_platform(league_id)
         response["unmapped_players"] = unmapped_players
     return response
+
+
+@app.get("/v1/leagues/{league_id}/matchups")
+@_with_sleeper_as_of
+def get_league_matchups(
+    response: Response,
+    week: int | None = None,
+    league_id: str = Depends(resolve_league_path_id),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Every head-to-head pair of one week in a real Sleeper league, for the League
+    page's Matchups section. Reuses GET /matchup's per-matchup computation (real
+    lineup and live points, per-starter projected final, blended win probability);
+    it does one Sleeper matchups read for the league-week (shared cache, live TTL)
+    and adds each side's record, streak and standing from the shared standings
+    and streak caches. Not-ready states return 200 with a `reason`."""
+
+    response.headers["Cache-Control"] = "private, no-store"
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    if external_leagues.is_external_league_key(league_id):
+        return {"ok": True, "week": week, "matchups": [], "reason": "unsupported_platform"}
+    if week is not None and not 1 <= week <= league_matchups.MAX_WEEK:
+        raise HTTPException(status_code=422, detail=f"week must be 1-{league_matchups.MAX_WEEK}")
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise _league_missing_error(league_id)
+    league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+    try:
+        current_week = int((league_settings or {}).get("leg") or 0)
+    except (TypeError, ValueError):
+        current_week = 0
+    current_week = min(current_week, league_matchups.MAX_WEEK)
+    selected = week or current_week
+    base = {"ok": True, "current_week": current_week or None, "max_week": league_matchups.MAX_WEEK, "matchups": []}
+    if selected <= 0:
+        return {**base, "week": None, "reason": "no_current_week"}
+
+    matchups = sleeper.get_matchups(league_id, selected)
+    if not matchups:
+        return {**base, "week": selected, "reason": "no_matchup_data", **_matchup_freshness(league_id, selected, False)}
+
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if valued.empty:
+        return {**base, "week": selected, "reason": "no_player_data"}
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    try:
+        profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+        my_roster, _reason = _resolve_my_roster(user, league_id, profile=profile)
+    except HTTPException:
+        raise
+    except Exception:
+        my_roster = None
+    my_roster_id = str((my_roster or {}).get("roster_id") or "")
+
+    rosters = sleeper.get_rosters(league_id)
+    profiles = sleeper.get_league_roster_profiles(league_id) or {}
+    standings_frame = league_standings.build_league_standings_bundle(
+        rosters=rosters, roster_profiles=profiles, league=league
+    ).get("frame")
+    standing_by_roster: dict[str, dict[str, Any]] = {}
+    if isinstance(standings_frame, pd.DataFrame) and not standings_frame.empty:
+        for _, row in standings_frame.iterrows():
+            standing_by_roster[str(row.get("roster_id"))] = row.to_dict()
+    try:
+        streaks = team_streaks.league_current_streaks_cached(league_id)
+    except Exception:
+        streaks = {}
+
+    projection_context = _build_projection_context(selected, league.get("scoring_settings"))
+    idp_result = _league_idp_result(league_id, league) if settings.get("idp_slots") else None
+    roster_positions = league.get("roster_positions") if isinstance(league.get("roster_positions"), list) else []
+    live_stats = (
+        live_stat_lines.week_payload(projection_context.season, projection_context.week)
+        if projection_context is not None
+        else None
+    )
+
+    by_matchup: dict[Any, list[dict[str, Any]]] = {}
+    for entry in matchups:
+        if entry.get("matchup_id") is not None:
+            by_matchup.setdefault(entry.get("matchup_id"), []).append(entry)
+
+    pairs: list[dict[str, Any]] = []
+    for matchup_id, entries in by_matchup.items():
+        if len(entries) != 2:
+            continue
+        real_sides = []
+        for entry in entries:
+            real = _real_current_lineup(
+                entry,
+                valued,
+                score_field,
+                projection_context=projection_context,
+                settings=settings,
+                roster_positions=roster_positions,
+                idp_result=idp_result,
+            )
+            _annotate_live_starters(real, live_stats)
+            real_sides.append(real)
+        win = matchup_win_probability.compute_live_win_probability(
+            real_sides[0].get("real_starters") or [], real_sides[1].get("real_starters") or []
+        )
+        available = win.get("available") is True
+        probability = win.get("probability") if available else None
+        totals = (win.get("my_projected_total"), win.get("opponent_projected_total")) if available else (None, None)
+        sides = [
+            league_matchups.side_payload(
+                str(entry.get("roster_id")),
+                standing_by_roster.get(str(entry.get("roster_id"))),
+                streaks,
+                real_points=real.get("real_points"),
+                entry_points=entry.get("points"),
+                has_live_data=bool(real.get("has_live_data")),
+                projected_total=totals[index],
+                win_probability=(None if probability is None else (probability if index == 0 else 1.0 - probability)),
+                is_mine=bool(my_roster_id) and str(entry.get("roster_id")) == my_roster_id,
+            )
+            for index, (entry, real) in enumerate(zip(entries, real_sides))
+        ]
+        pairs.append(
+            {
+                "matchup_id": matchup_id,
+                "game_state": _matchup_game_state(real_sides[0], real_sides[1]),
+                "sides": sides,
+            }
+        )
+    # The caller's own pair first, then Sleeper's matchup order.
+    pairs.sort(key=lambda pair: 0 if any(side["is_mine"] for side in pair["sides"]) else 1)
+    return {
+        **base,
+        "week": selected,
+        "reason": "" if pairs else "no_matchup_data",
+        "matchups": pairs,
+        **_matchup_freshness(league_id, selected, False),
+    }
 
 
 class MatchupWhatIfLineupSlot(BaseModel):
