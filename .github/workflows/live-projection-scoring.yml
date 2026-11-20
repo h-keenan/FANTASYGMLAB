@@ -1,0 +1,36 @@
+name: Live Projection Scoring
+
+# Weekly: scores the live projection forward log (public.live_projection_snapshots,
+# docs/supabase_live_projection_snapshots.sql) against final results and upserts
+# public.live_projection_reports; the report is also written to the job summary.
+# Tuesday 09:00 UTC, after Monday Night Football has finished.
+# Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY secrets.
+
+on:
+  schedule:
+    - cron: "0 9 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-projection-scoring
+  cancel-in-progress: false
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Score live projections
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/run_live_projection_scoring.py
