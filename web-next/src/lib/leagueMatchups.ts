@@ -32,6 +32,8 @@ export interface LeagueMatchupPairView {
 
 export const LEAGUE_MATCHUPS_TITLE = "Matchups";
 export const LEAGUE_MATCHUPS_MAX_WEEK = 18;
+/** Shown instead of bare dashes when a pair has no modeled projection or win chance (lineups not set, no projection data). */
+export const PROJECTIONS_UNAVAILABLE = "Projections unavailable";
 
 /** "Wk 1" .. "Wk N" for the week select: 1..max, left to right. */
 export function leagueMatchupWeeks(maxWeek: number): number[] {

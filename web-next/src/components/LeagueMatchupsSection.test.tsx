@@ -49,6 +49,14 @@ describe("LeagueMatchupsSection", () => {
     expect(screen.getByRole("link", { name: "Open my matchup" }).getAttribute("href")).toContain("/matchup/L1");
   });
 
+  it("says projections are unavailable instead of showing bare dashes", async () => {
+    const quiet = (id: string) => side({ roster_id: id, points: null, projected_total: null, win_probability: null, is_mine: false });
+    vi.mocked(api.getLeagueMatchups).mockResolvedValue(response({ matchups: [{ matchup_id: 9, game_state: "pregame", sides: [quiet("5"), quiet("6")] }] }));
+    await act(async () => { render(<LeagueMatchupsSection leagueId="L1" leagueName="Test" />); });
+    expect(screen.getByTestId("league-matchup-unavailable").textContent).toBe("Upcoming · Projections unavailable");
+    expect(screen.queryByText("0%")).toBeNull();
+  });
+
   it("asks for another week from the select", async () => {
     vi.mocked(api.getLeagueMatchups).mockResolvedValue(response());
     await act(async () => { render(<LeagueMatchupsSection leagueId="L1" leagueName="Test" />); });

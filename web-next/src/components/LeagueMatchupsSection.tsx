@@ -20,6 +20,7 @@ import {
   leagueMatchupWeeks,
   matchupStateLabel,
   pairAriaLabel,
+  PROJECTIONS_UNAVAILABLE,
   pairTones,
   sideSubline,
   winPercent,
@@ -118,11 +119,17 @@ function MatchupCard({ pair, leagueId, leagueName }: { pair: LeagueMatchupPairVi
             </div>
           ))}
         </div>
-        <div className="flex justify-between text-xs font-bold tabular-nums">
-          <span style={{ color: TONE_COLOR[toneA] }}>{modeled ? `${winPercent(a.win_probability)}%` : "—"}</span>
-          <span style={{ color: "var(--color-text-muted)" }}>{matchupStateLabel(pair.game_state)}</span>
-          <span style={{ color: TONE_COLOR[toneB] }}>{modeled ? `${winPercent(b.win_probability)}%` : "—"}</span>
-        </div>
+        {modeled ? (
+          <div className="flex justify-between text-xs font-bold tabular-nums">
+            <span style={{ color: TONE_COLOR[toneA] }}>{`${winPercent(a.win_probability)}%`}</span>
+            <span style={{ color: "var(--color-text-muted)" }}>{matchupStateLabel(pair.game_state)}</span>
+            <span style={{ color: TONE_COLOR[toneB] }}>{`${winPercent(b.win_probability)}%`}</span>
+          </div>
+        ) : (
+          <p className="m-0 text-center text-xs font-bold" style={{ color: "var(--color-text-muted)" }} data-testid="league-matchup-unavailable">
+            {`${matchupStateLabel(pair.game_state)} · ${PROJECTIONS_UNAVAILABLE}`}
+          </p>
+        )}
       </div>
       <button
         type="button"

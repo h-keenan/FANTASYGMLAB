@@ -23,6 +23,7 @@ import {
   leagueMatchupWeeks,
   matchupStateLabel,
   pairAriaLabel,
+  PROJECTIONS_UNAVAILABLE,
   pairTones,
   sideSubline,
   winPercent,
@@ -112,11 +113,17 @@ function MatchupCard({ pair, leagueId, leagueName, colors, styles, onOpenMyMatch
           </View>
         ))}
       </View>
-      <View style={styles.pctRow}>
-        <AppText style={[styles.pct, { color: toneColor(colors, toneA) }]}>{modeled ? `${winPercent(a.win_probability)}%` : '—'}</AppText>
-        <AppText style={[styles.pct, { color: colors.textTertiary }]}>{matchupStateLabel(pair.game_state)}</AppText>
-        <AppText style={[styles.pct, { color: toneColor(colors, toneB) }]}>{modeled ? `${winPercent(b.win_probability)}%` : '—'}</AppText>
-      </View>
+      {modeled ? (
+        <View style={styles.pctRow}>
+          <AppText style={[styles.pct, { color: toneColor(colors, toneA) }]}>{`${winPercent(a.win_probability)}%`}</AppText>
+          <AppText style={[styles.pct, { color: colors.textTertiary }]}>{matchupStateLabel(pair.game_state)}</AppText>
+          <AppText style={[styles.pct, { color: toneColor(colors, toneB) }]}>{`${winPercent(b.win_probability)}%`}</AppText>
+        </View>
+      ) : (
+        <AppText style={[styles.pct, { color: colors.textTertiary, textAlign: 'center' }]} testID="league-matchup-unavailable">
+          {`${matchupStateLabel(pair.game_state)} · ${PROJECTIONS_UNAVAILABLE}`}
+        </AppText>
+      )}
       <PressableScale accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel="Matchup details" onPress={() => setOpen((v) => !v)} style={styles.details}>
         <AppText style={styles.detailsLabel}>Details</AppText>
         <AppText style={styles.detailsAction}>{open ? 'Hide' : 'Show'}</AppText>
