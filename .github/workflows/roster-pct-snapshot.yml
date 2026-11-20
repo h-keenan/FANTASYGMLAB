@@ -1,0 +1,35 @@
+name: Roster Pct Snapshot
+
+# Daily roster % (ESPN) + Sleeper trending adds -> Supabase roster_pct_snapshots
+# (docs/supabase_roster_pct_snapshots.sql; modules/roster_pct_history.py).
+# 07:20 UTC, after players-db-refresh (06:00) and player-rating-snapshot (07:00).
+# Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY secrets.
+
+on:
+  schedule:
+    - cron: "20 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roster-pct-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run roster pct snapshot
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/run_roster_pct_snapshot.py
