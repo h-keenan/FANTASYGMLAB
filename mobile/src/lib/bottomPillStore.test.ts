@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
 
-import { getPillState, resetPillStore, setPillBarPresent, setPillContext, subscribePill } from './bottomPillStore.ts';
+import { getPillState, getServerPillState, resetPillStore, setPillBarPresent, setPillContext, subscribePill } from './bottomPillStore.ts';
 import { normalizePillContext, pillMode, PILL_MAX_TABS } from './bottomNav.ts';
+
+test('snapshots are referentially stable when nothing changed', () => {
+  resetPillStore();
+  assert.equal(getPillState(), getPillState());
+  assert.equal(getServerPillState(), getServerPillState());
+});
 
 const ctx = (over = {}) => ({ id: 'team', label: 'Team', tabs: [{ key: 'a', label: 'A' }], activeKey: 'a', onSelect: () => {}, ...over });
 beforeEach(resetPillStore);
