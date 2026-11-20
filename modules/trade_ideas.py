@@ -3621,6 +3621,7 @@ def _viable_target_assets(
     *,
     strategy: str,
     league_settings: Mapping[str, Any] | None,
+    target_cap: int = 8,
 ) -> List[Dict[str, Any]]:
     """Availability + depth-role check on automatic acquisition targets (DYNASTYGM_TARGET_VIABILITY_V1, modules.target_viability).
 
@@ -3644,13 +3645,17 @@ def _viable_target_assets(
         )
         if verdict.verdict == "avoid":
             continue
+        if verdict.note:
+            asset["availability_note"] = verdict.note
         if verdict.is_stash:
             asset["availability_framing"] = "injured_stash"
-            asset["availability_note"] = verdict.note
             stash.append(asset)
         else:
             kept.append(asset)
-    return kept + stash[:1]
+    # The stash sits at the end of the window the generator actually reads (target_cap), behind every healthy fit that
+    # fills it, so a rebuilder can see one without it ever leading.
+    at = min(len(kept), max(target_cap - 1, 0))
+    return kept[:at] + stash[:1] + kept[at:]
 
 
 def _acquire_candidate_allowed(
@@ -5665,7 +5670,7 @@ def _build_trade_ideas_impl(
                     market_context.get("summary", ""),
                     waiver_guardrail.get("summary", ""),
                     str(market_context.get("roster_note") or ""),
-                    *[str(a.get("availability_note") or "") for a in receive_assets if a.get("availability_framing")],
+                    *[str(a.get("availability_note") or "") for a in receive_assets if a.get("availability_note")],
                 ]
                 if part
             ).strip()
@@ -5755,6 +5760,7 @@ def _build_trade_ideas_impl(
                     partner_team_df,
                     strategy=str(my_shape.get("strategy") or my_mode),
                     league_settings=league_settings,
+                    target_cap=target_cap,
                 )
             partner_target_players = [
                 asset
