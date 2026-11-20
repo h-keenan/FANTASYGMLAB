@@ -7,6 +7,7 @@ import { StackActions } from '@react-navigation/routers';
 import { api, type RankedPlayer } from './api';
 import { navigationRef } from '../navigation/navigationRef';
 import { resolvePushTapTarget } from './pushRouting';
+import { PUSH_TOKEN_HANDOFF_ENABLED } from './pushHandoffCore';
 import type { PushPermissionState } from './pushPermissionPrompt';
 
 /**
@@ -115,13 +116,23 @@ export async function syncPushToken(opts: { requestPermission?: boolean } = {}):
   }
 }
 
-/** Unregister this device's token — called on sign-out so a shared/reused
- * device doesn't keep delivering pushes meant for the previous account. */
+/** The in-memory token belonged to the previous user; the next session re-registers it. */
+export function forgetPushTokenForUserChange(): void {
+  lastRegisteredToken = null;
+}
+
+/** Unregister this device's token - called on sign-out BEFORE the session is dropped (the call needs it), so a
+ * shared/reused device never keeps delivering pushes meant for the previous account. Best effort: the caller
+ * bounds it with a timeout. When this process has not registered yet (cold start, sync still pending) the
+ * token is read from the OS instead, never prompting. */
 export async function unregisterCurrentPushToken(): Promise<void> {
-  const token = lastRegisteredToken;
-  if (!token) return;
+  let token = lastRegisteredToken;
   lastRegisteredToken = null;
   try {
+    if (!token && PUSH_TOKEN_HANDOFF_ENABLED && (await Notifications.getPermissionsAsync()).granted) {
+      token = await getExpoPushToken();
+    }
+    if (!token) return;
     await api.unregisterPushToken(token);
   } catch (err) {
     console.warn('[push] unregisterCurrentPushToken failed', err);

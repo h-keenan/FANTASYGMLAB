@@ -172,7 +172,7 @@ def fetch_push_recipients(config: PushTriggerConfig) -> dict[str, list[str]]:
         response = requests.get(
             f"{config.url}/rest/v1/{PUSH_TOKENS_TABLE}",
             headers=_headers(config),
-            params={"select": "user_id,expo_push_token"},
+            params={"select": "user_id,expo_push_token,updated_at"},
             timeout=15,
         )
     except Exception:
@@ -183,16 +183,8 @@ def fetch_push_recipients(config: PushTriggerConfig) -> dict[str, list[str]]:
         rows = response.json()
     except Exception:
         return {}
-    recipients: dict[str, list[str]] = {}
-    for row in rows if isinstance(rows, list) else []:
-        if not isinstance(row, Mapping):
-            continue
-        user_id = _safe_text(row.get("user_id"))
-        token = _safe_text(row.get("expo_push_token"))
-        if not user_id or not token:
-            continue
-        recipients.setdefault(user_id, []).append(token)
-    return recipients
+    # One owner per token: a token seen under two accounts goes to the newest only.
+    return push_tokens.owned_recipients(rows if isinstance(rows, list) else [])
 
 
 def fetch_sleeper_usernames(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, str]:
