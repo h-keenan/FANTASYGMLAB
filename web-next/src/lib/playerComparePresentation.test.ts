@@ -50,6 +50,7 @@ import {
   suggestedOpponents,
 } from "./playerComparePresentation";
 import type { RankedPlayer, ScheduleWeek } from "./api";
+import { applySessionUser, resetUserStorageForTests } from "./userStorage";
 
 function rp(id: string, position: string, score: number, over: Partial<RankedPlayer> = {}): RankedPlayer {
   return { player_id: id, name: id, position, team: "KC", age: 25, status: null, injury_status: null, tier: null, score, overall_rank: 1, position_rank: 1, rank_unavailable_reason: null, opportunity_label: null, ...over };
@@ -91,6 +92,8 @@ describe("compare page v2 helpers", () => {
   });
   it("remembers recent opponents newest first, deduped and capped, and survives blocked storage", () => {
     window.localStorage.clear();
+    resetUserStorageForTests();
+    applySessionUser("user-1");
     for (const id of ["1", "2", "3", "4", "5", "6", "7", "2"]) rememberOpponent("L", id);
     expect(readRecentOpponents("L")).toEqual(["2", "7", "6", "5", "4", "3"]);
     const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {

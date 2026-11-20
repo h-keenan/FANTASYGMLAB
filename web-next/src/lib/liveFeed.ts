@@ -9,6 +9,8 @@
  * docs/live-plays-research.md.
  */
 
+import { registerAccountCacheReset } from "./accountCaches.ts";
+
 export type FeedSide = "mine" | "opponent";
 export type StatLine = Record<string, number>;
 
@@ -302,6 +304,8 @@ export const liveFeedStore = {
     listeners.forEach((listener) => listener());
   },
 };
+
+registerAccountCacheReset(() => liveFeedStore.reset());
 
 export function feedKey(leagueId: string, week: number | null | undefined): string {
   return `${leagueId}:${week ?? "?"}`;

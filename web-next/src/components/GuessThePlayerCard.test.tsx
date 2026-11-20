@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GuessThePlayerCard } from "./GuessThePlayerCard";
 import { api, type GuessThePlayerAnswerResponse, type GuessThePlayerResponse } from "@/lib/api";
+import { applySessionUser, resetUserStorageForTests } from "@/lib/userStorage";
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -61,6 +62,8 @@ beforeEach(() => {
   // The dismiss-persistence fix writes a real key to window.localStorage,
   // which otherwise survives across tests in this same file/worker.
   window.localStorage.clear();
+  resetUserStorageForTests();
+  applySessionUser("user-1");
 });
 
 describe("GuessThePlayerCard", () => {

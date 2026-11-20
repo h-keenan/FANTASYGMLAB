@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { api, type TradeAsset, type TradeOddsEffectResponse } from "@/lib/api";
 import { tradeOddsView, type WhatIfTone } from "@/lib/gamesPresentation";
+import { registerAccountCacheReset } from "@/lib/accountCaches";
 
 /**
  * "Effect on your odds" row for a trade (Analyzer verdict, Trade Hub and Trade
@@ -17,6 +18,7 @@ import { tradeOddsView, type WhatIfTone } from "@/lib/gamesPresentation";
  */
 
 const cache = new Map<string, Promise<TradeOddsEffectResponse>>();
+registerAccountCacheReset(() => cache.clear());
 
 function fetchOnce(leagueId: string, send: string[], receive: string[], hasPicks: boolean, lens: string) {
   const key = JSON.stringify([leagueId, lens, [...send].sort(), [...receive].sort(), hasPicks]);

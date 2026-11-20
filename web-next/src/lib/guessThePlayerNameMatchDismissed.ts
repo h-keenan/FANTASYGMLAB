@@ -1,3 +1,4 @@
+import { userGet, userSet } from "./userStorage";
 const KEY = "fd:guess-the-player-name-match-dismissed-pick-id";
 
 /**
@@ -17,7 +18,7 @@ const KEY = "fd:guess-the-player-name-match-dismissed-pick-id";
  */
 export function getDismissedGuessThePlayerNameMatchPickId(): string | null {
   try {
-    return window.localStorage.getItem(KEY);
+    return userGet(KEY);
   } catch {
     return null;
   }
@@ -26,7 +27,7 @@ export function getDismissedGuessThePlayerNameMatchPickId(): string | null {
 export function setDismissedGuessThePlayerNameMatchPickId(pickId: string): void {
   if (!pickId) return;
   try {
-    window.localStorage.setItem(KEY, pickId);
+    userSet(KEY, pickId);
   } catch {
     // Best-effort — worst case the card shows again next page view.
   }

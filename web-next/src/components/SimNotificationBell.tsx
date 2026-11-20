@@ -10,6 +10,7 @@ import { SimGlyph } from "@/components/SimGlyph";
 import { Sheet } from "@/components/ui/Sheet";
 import { api } from "@/lib/api";
 import { setShellBadges } from "@/lib/shellBadgeStore";
+import { userGet, userSet } from "@/lib/userStorage";
 import type { SimGlyphName } from "@/lib/simGame";
 import {
   simNotifBadge,
@@ -29,7 +30,7 @@ import {
 function readCursor(gameId: string): number {
   if (typeof window === "undefined") return 0;
   try {
-    return simNotifParseCursor(window.localStorage.getItem(simNotifCursorKey(gameId)));
+    return simNotifParseCursor(userGet(simNotifCursorKey(gameId)));
   } catch {
     return 0;
   }
@@ -37,7 +38,7 @@ function readCursor(gameId: string): number {
 
 function writeCursor(gameId: string, value: number) {
   try {
-    window.localStorage.setItem(simNotifCursorKey(gameId), String(value));
+    userSet(simNotifCursorKey(gameId), String(value));
   } catch {
     /* private window: the cursor lives only in memory this session */
   }

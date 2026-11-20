@@ -1,3 +1,4 @@
+import { registerAccountCacheReset } from "./accountCaches";
 import { api, type ManagerTendenciesSummaryResponse, type ManagerTendencySummaryRow } from "./api";
 
 /** Signal order + short titles for the manager profile (mirrors
@@ -25,6 +26,7 @@ export function headlineChips(headline: string | null | undefined, max = 3): str
 
 const TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, { at: number; promise: Promise<ManagerTendenciesSummaryResponse> }>();
+registerAccountCacheReset(() => cache.clear());
 
 /** One request per league, shared by every card on the page. */
 export function loadLeagueTendencies(leagueId: string): Promise<ManagerTendenciesSummaryResponse> {

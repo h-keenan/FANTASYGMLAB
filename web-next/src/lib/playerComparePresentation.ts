@@ -1,4 +1,5 @@
 import type { QuickViewModel, RankedPlayer, ScheduleWeek, WeeklyStatPoint } from "./api";
+import { userGet, userSet } from "./userStorage";
 import { formatRank, formatScore } from "./leagueRankingsPresentation";
 
 /**
@@ -352,7 +353,7 @@ const RECENT_MAX = 6;
 /** Recently chosen opponents for a league (ids, newest first). Storage can be blocked; never throws. */
 export function readRecentOpponents(leagueId: string): string[] {
   try {
-    const raw = window.localStorage.getItem(`${RECENT_KEY}:${leagueId}`);
+    const raw = userGet(`${RECENT_KEY}:${leagueId}`);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string").slice(0, RECENT_MAX) : [];
   } catch {
@@ -363,7 +364,7 @@ export function readRecentOpponents(leagueId: string): string[] {
 export function rememberOpponent(leagueId: string, playerId: string): string[] {
   const next = [playerId, ...readRecentOpponents(leagueId).filter((id) => id !== playerId)].slice(0, RECENT_MAX);
   try {
-    window.localStorage.setItem(`${RECENT_KEY}:${leagueId}`, JSON.stringify(next));
+    userSet(`${RECENT_KEY}:${leagueId}`, JSON.stringify(next));
   } catch {
     // Private mode or blocked storage: recents just do not persist.
   }

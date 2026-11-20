@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userStorage } from './userStorage';
 
 const KEY = 'fgl:guess-the-player-dismissed-pick-id';
 
@@ -19,7 +19,7 @@ const KEY = 'fgl:guess-the-player-dismissed-pick-id';
  */
 export async function getDismissedGuessThePlayerPickId(): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem(KEY);
+    return await userStorage.get(KEY);
   } catch {
     return null;
   }
@@ -28,7 +28,7 @@ export async function getDismissedGuessThePlayerPickId(): Promise<string | null>
 export async function setDismissedGuessThePlayerPickId(pickId: string): Promise<void> {
   if (!pickId) return;
   try {
-    await AsyncStorage.setItem(KEY, pickId);
+    await userStorage.set(KEY, pickId);
   } catch {
     // Best-effort — worst case the popup shows again next launch.
   }

@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userStorage } from './userStorage';
 
 import { simRookieNoticeKey } from './simGame';
 
@@ -9,7 +9,7 @@ import { simRookieNoticeKey } from './simGame';
  */
 export async function isSimRookieNoticeSeen(gameId: string): Promise<boolean> {
   try {
-    return (await AsyncStorage.getItem(simRookieNoticeKey(gameId))) === '1';
+    return (await userStorage.get(simRookieNoticeKey(gameId))) === '1';
   } catch {
     return false;
   }
@@ -17,7 +17,7 @@ export async function isSimRookieNoticeSeen(gameId: string): Promise<boolean> {
 
 export async function setSimRookieNoticeSeen(gameId: string): Promise<void> {
   try {
-    await AsyncStorage.setItem(simRookieNoticeKey(gameId), '1');
+    await userStorage.set(simRookieNoticeKey(gameId), '1');
   } catch {
     // Best-effort.
   }

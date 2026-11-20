@@ -27,6 +27,7 @@ import {
   type AuthResult,
 } from '../lib/guestConversion';
 import { clearAuthenticatedQueryCache } from '../lib/queryClient';
+import { purgeAccountStorage, userStorage } from '../lib/userStorage';
 import { isForcedSignOut } from '../lib/sessionEnded';
 import { identifyRevenueCatUser, signOutRevenueCatUser } from '../lib/revenuecat';
 import { syncLastLeagueFromServer } from '../lib/lastLeague';
@@ -136,10 +137,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const handleAuthenticatedUserId = async (nextUserId: string | null) => {
       if (didAuthenticatedUserChange(lastHandledUserIdRef.current, nextUserId)) {
         await clearAuthenticatedQueryCache();
+        // Same trigger, same guarantee for the user-scoped local state (lib/accountScope.ts).
+        await purgeAccountStorage();
       }
       lastHandledUserIdRef.current = nextUserId;
       setCurrentAuthScopeUserId(nextUserId);
       await writeStoredAuthScopeUserId(AsyncStorage, nextUserId);
+      // Scopes local state to this user; the first sign-in after the upgrade adopts the old plain keys.
+      await userStorage.applyUser(nextUserId);
     };
 
     void (async () => {
@@ -280,6 +285,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // regardless of how sign-out got here. clearAuthenticatedQueryCache
           // itself never throws (see its own doc comment).
           await clearAuthenticatedQueryCache();
+          await purgeAccountStorage();
+          await userStorage.applyUser(null);
           lastHandledUserIdRef.current = null;
           setCurrentAuthScopeUserId(null);
           await writeStoredAuthScopeUserId(AsyncStorage, null);
@@ -315,6 +322,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await signOutRevenueCatUser();
         } finally {
           await clearAuthenticatedQueryCache();
+          await purgeAccountStorage();
+          await userStorage.applyUser(null);
           lastHandledUserIdRef.current = null;
           setCurrentAuthScopeUserId(null);
           await writeStoredAuthScopeUserId(AsyncStorage, null);

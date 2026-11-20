@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerCompareContent } from "./PlayerCompareContent";
 import type { QuickViewModel, QuickViewResponse, RankedPlayer, WeeklyStatsResponse } from "@/lib/api";
 import { api } from "@/lib/api";
+import { applySessionUser, resetUserStorageForTests } from "@/lib/userStorage";
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -77,6 +78,8 @@ describe("PlayerCompareContent", () => {
     vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue(weeklyStatsResult([]));
     vi.mocked(api.getPlayerSchedule).mockResolvedValue({ ok: true, team: "SF", weeks: [] });
     window.localStorage.clear();
+    resetUserStorageForTests();
+    applySessionUser("user-1");
   });
 
   it("shows two big slots with Player A filled and a Choose a player slot, plus one-tap suggestions", () => {
@@ -98,7 +101,7 @@ describe("PlayerCompareContent", () => {
 
     expect(await screen.findByTestId("compare-grid")).toBeInTheDocument();
     await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalledWith("p2"));
-    expect(JSON.parse(window.localStorage.getItem("fgl:compare-recent:L1") ?? "[]")).toEqual(["p2"]);
+    expect(JSON.parse(window.localStorage.getItem("u:user-1:fgl:compare-recent:L1") ?? "[]")).toEqual(["p2"]);
   });
 
   it("opens the shared picker pre-filtered to the same position and chooses with one tap", async () => {

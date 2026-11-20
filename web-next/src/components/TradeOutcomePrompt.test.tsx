@@ -5,6 +5,7 @@ import { TradeOutcomePrompt } from "./TradeOutcomePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { api, type PendingTradeOutcome } from "@/lib/api";
 import { onTradeOutcomeAnswered } from "@/lib/tradeOutcomeEvents";
+import { applySessionUser, resetUserStorageForTests } from "@/lib/userStorage";
 
 vi.mock("@/context/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -64,6 +65,8 @@ function outcome(id: string, partner: string): PendingTradeOutcome {
 beforeEach(() => {
   mockPathname = "/dashboard/league-1";
   window.sessionStorage.clear();
+  resetUserStorageForTests();
+  applySessionUser("user-1");
   vi.mocked(api.getPendingTradeOutcomes).mockReset();
   vi.mocked(api.answerTradeOutcome).mockReset();
   vi.mocked(api.answerTradeOutcome).mockResolvedValue({ ok: true, reason: "" });

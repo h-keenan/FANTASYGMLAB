@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   SIM_GENERATED_CLASS_LABEL,
@@ -10,8 +10,14 @@ import {
   simSetupDynastyNote,
 } from "./simGame";
 import { isSimRookieNoticeSeen, setSimRookieNoticeSeen } from "./simRookieNotice";
+import { applySessionUser, resetUserStorageForTests } from "./userStorage";
 
 describe("generated rookie class disclosure", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    resetUserStorageForTests();
+    applySessionUser("user-1");
+  });
   afterEach(() => window.localStorage.clear());
 
   it("has the owner-approved notice and chip label", () => {
