@@ -31,7 +31,7 @@ from typing import Any, Mapping
 import pandas as pd
 
 from modules import league_calendar, nfl_schedule
-from modules.rankings import is_ruled_out
+from modules.injury_status import is_ruled_out
 from modules.team_eval import lineup_open_slots, suggest_optimal_lineup
 
 LABEL = "Bye Week Cover"

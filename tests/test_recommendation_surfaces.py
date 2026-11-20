@@ -119,3 +119,27 @@ def test_player_hub_labels_a_stash_for_a_rebuilding_team(monkeypatch):
     kept = trade_ideas._viable_target_assets(_assets()[:1], FRAME, strategy="rebuild", league_settings=SETTINGS)
     assert kept and kept[0]["availability_framing"] == "injured_stash"
     assert kept[0]["availability_note"].startswith("Injured stash, buy-low only")
+
+
+@pytest.mark.parametrize("name", sorted(n for n, e in reg.SURFACES.items() if e["kind"] == reg.AVAILABILITY))
+def test_availability_surfaces_import_the_one_injury_table(name):
+    entry = reg.SURFACES[name]
+    module = importlib.import_module(entry["module"])
+    source = inspect.getsource(module)
+    assert re.search(r"from modules(\.injury_status)? import [^\n]*injury_status|from modules\.injury_status import|import modules\.injury_status", source) or "injury_status as" in source or "injury_table" in source, (
+        f"{name}: {entry['module']} must take availability from {reg.SHARED_AVAILABILITY_MODULE}, not a local copy"
+    )
+    assert "from modules.rankings import is_ruled_out" not in source and "from modules.rankings import injury_level" not in source
+
+
+def test_counteroffer_pickups_skip_a_buried_player_only_with_the_flag(monkeypatch):
+    from modules import trade_offer_analyzer as toa
+
+    pool = [
+        {"asset_type": "player", "position": "RB", "owner_roster_id": 2, "status": "Active", "injury_status": "", "score": 3000, "player_id": "deep", "depth_chart_order": 7},
+        {"asset_type": "player", "position": "RB", "owner_roster_id": 2, "status": "Active", "injury_status": "", "score": 3200, "player_id": "ok", "depth_chart_order": 1},
+    ]
+    monkeypatch.delenv(target_viability.ENV_KEY, raising=False)
+    assert {a["player_id"] for a in toa._startable_candidates(pool, "RB")} == {"deep", "ok"}
+    monkeypatch.setenv(target_viability.ENV_KEY, "1")
+    assert [a["player_id"] for a in toa._startable_candidates(pool, "RB")] == ["ok"]
