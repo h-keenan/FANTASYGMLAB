@@ -133,7 +133,12 @@ def parse_scoreboard(payload: Any) -> dict[str, Any] | None:
                 }
         except Exception:  # noqa: BLE001 - one bad event never drops the board
             logger.debug("scoreboard event skipped", exc_info=True)
-    return {"week": int(week) if isinstance(week, (int, float)) else None, "teams": teams}
+    year = (payload.get("season") or {}).get("year")
+    return {
+        "week": int(week) if isinstance(week, (int, float)) else None,
+        "season": int(year) if isinstance(year, (int, float)) else None,
+        "teams": teams,
+    }
 
 
 def _fetch() -> Any:
@@ -176,10 +181,12 @@ def _current_board_uncached() -> dict[str, Any] | None:
         return None
 
 
-def team_info(board: dict[str, Any] | None, team: Any, week: int | None) -> dict[str, Any] | None:
-    """This team's game on the board, only when the board is for ``week``."""
+def team_info(board: dict[str, Any] | None, team: Any, week: int | None, season: int | None = None) -> dict[str, Any] | None:
+    """This team's game on the board, only when the board is for ``week`` (and ``season`` when both are known)."""
 
     if not board or not team:
+        return None
+    if board.get("season") is not None and season is not None and int(board["season"]) != int(season):
         return None
     if board.get("week") is not None and week is not None and int(board["week"]) != int(week):
         return None

@@ -16412,11 +16412,11 @@ def _player_game_state(team: Any, projection_context: "_ProjectionContext | None
             state["game_status"] = nfl_schedule.game_phase(matchup)
         except Exception:
             state["game_status"] = None
-    _apply_real_game_clock(state, team, projection_context.week)
+    _apply_real_game_clock(state, team, projection_context.week, projection_context.season)
     return state
 
 
-def _apply_real_game_clock(state: dict[str, Any], team: Any, week: int) -> None:
+def _apply_real_game_clock(state: dict[str, Any], team: Any, week: int, season: int | None = None) -> None:
     """Overlay the real quarter/clock, live score and final status from the
     ESPN scoreboard (modules.live_scoreboard). Fails open: with no scoreboard
     (flag off, outage, other week) the nflverse + wall-clock fields stand."""
@@ -16424,7 +16424,7 @@ def _apply_real_game_clock(state: dict[str, Any], team: Any, week: int) -> None:
     state.setdefault("game_clock_label", None)
     state.setdefault("game_remaining", None)
     state.setdefault("game_situation", None)
-    info = live_scoreboard.team_info(live_scoreboard.current_board(), team, week)
+    info = live_scoreboard.team_info(live_scoreboard.current_board(), team, week, season)
     if not info:
         return
     if info["state"] == "in":

@@ -69,6 +69,9 @@ def test_team_info_requires_matching_week_and_normalizes_codes():
     board = _board(_event("in", "STATUS_IN_PROGRESS", 1, 100, "1:40", home=("WSH", "28", 0), away=("LAR", "14", 0)))
     assert sb.team_info(board, "WAS", 11)["opponent"] == "LAR"
     assert sb.team_info(board, "WAS", 12) is None
+    board["season"] = 2026
+    assert sb.team_info(board, "WAS", 11, 2026) is not None
+    assert sb.team_info(board, "WAS", 11, 2025) is None
     assert sb.team_info(None, "WAS", 11) is None
 
 
@@ -79,7 +82,7 @@ def test_flag_off_returns_no_board(monkeypatch):
 
 def test_bad_payload_fails_open():
     assert sb.parse_scoreboard(None) is None
-    assert sb.parse_scoreboard({"events": [{"bogus": 1}]}) == {"week": None, "teams": {}}
+    assert sb.parse_scoreboard({"events": [{"bogus": 1}]}) == {"week": None, "season": None, "teams": {}}
 
 
 def _starter(actual, *, remaining=None, started=True, final=False, mean=15.0, now_kick=KICKOFF, **extra):
