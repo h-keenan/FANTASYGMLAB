@@ -149,6 +149,7 @@ export const IDENTICAL = [
   "latestRequest.ts",
   "accountScope.ts",
   "accountCaches.ts",
+  "shareToggleFlow.ts",
   "useLatestGate.ts",
   "sessionEnded.ts",
 ];

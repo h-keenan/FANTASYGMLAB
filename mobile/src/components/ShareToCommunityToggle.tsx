@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { createSingleFlight } from '../lib/latestRequest';
+import { createShareToggleFlow, type ShareToggleFlow } from '../lib/shareToggleFlow';
 import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import Button from './Button';
 import { api } from '../lib/api';
-import { toUserErrorMessage } from '../lib/errorMessages';
 import { buildShareBody, isShareableGrade, SHARE_NAME_MAX, type ShareableVerdict, type SharedTradeAssetInput } from '../lib/sharedTrades';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -34,7 +33,7 @@ export default function ShareToCommunityToggle({
   const [busy, setBusy] = useState(false);
   const [sharedId, setSharedId] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [shareFlight] = useState(() => createSingleFlight());
+  // Serializes share and off so that switching off during an in-flight share always wins.
 
   useEffect(() => {
     let cancelled = false;
@@ -49,20 +48,30 @@ export default function ShareToCommunityToggle({
     };
   }, []);
 
+  const [flow] = useState<ShareToggleFlow>(() =>
+    createShareToggleFlow({ unshare: async (id) => (await api.deleteSharedCommunityTrade(id))?.ok !== false }),
+  );
+
   if (!available || !isShareableGrade(verdict.ui_verdict)) return null;
 
-  const share = async () => {
-    await shareFlight.run(shareOnce);
+  const sendShare = async () => {
+    const result = await api.shareCommunityTrade(buildShareBody(verdict, send, receive, name));
+    return result.ok && result.trade ? result.trade.id : null;
   };
-  const shareOnce = async () => {
+
+  const share = async () => {
     setBusy(true);
     setError('');
     try {
-      const result = await api.shareCommunityTrade(buildShareBody(verdict, send, receive, name));
-      if (result.ok && result.trade) setSharedId(result.trade.id);
-      else setError("Sharing isn't available right now.");
-    } catch (err) {
-      setError(toUserErrorMessage(err, 'Could not share this trade.'));
+      const outcome = await flow.requestShare(sendShare);
+      if (outcome === 'shared') setSharedId(flow.sharedId);
+      else if (outcome === 'unavailable') setError("Sharing isn't available right now.");
+      else if (outcome === 'error') setError('Could not share this trade.');
+      else if (outcome === 'stuck-public') {
+        setOn(true);
+        setSharedId(flow.sharedId);
+        setError('Could not stop sharing this trade. Try again.');
+      }
     } finally {
       setBusy(false);
     }
@@ -73,29 +82,24 @@ export default function ShareToCommunityToggle({
       setOn(true);
       return;
     }
-    const id = sharedId;
     setOn(false);
     setSharedId(null);
     setError('');
-    if (!id) return;
     // A failed delete must not leave the switch saying "off" while the trade is still public.
-    api
-      .deleteSharedCommunityTrade(id)
-      .then((result) => {
-        if (result?.ok === false) throw new Error('not ok');
-      })
-      .catch(() => {
+    void flow.requestOff().then((outcome) => {
+      if (outcome === 'still-public') {
         setOn(true);
-        setSharedId(id);
+        setSharedId(flow.sharedId);
         setError('Could not stop sharing this trade. Try again.');
-      });
+      }
+    });
   };
 
   return (
     <View style={styles.box}>
       <View style={styles.row}>
         <AppText style={styles.label}>Share to community</AppText>
-        <Toggle value={on} onValueChange={onToggle} disabled={busy} label="Share to community" />
+        <Toggle value={on} onValueChange={onToggle} label="Share to community" />
       </View>
       {on && !sharedId ? (
         <View style={styles.form}>

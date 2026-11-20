@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import { api, type TradeAsset, type TradeVerdict } from "@/lib/api";
 import { Toggle } from "@/components/Toggle";
 import { Input } from "@/components/Input";
+import { createShareToggleFlow, type ShareToggleFlow } from "@/lib/shareToggleFlow";
 
 function slimAssets(assets: TradeAsset[]): TradeAsset[] {
   return assets.map((asset) => ({
@@ -37,6 +38,7 @@ export function ShareToCommunityToggle({
   const [busy, setBusy] = useState(false);
   const [sharedId, setSharedId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // Serializes share and off so that switching off during an in-flight share always wins.
 
   useEffect(() => {
     let cancelled = false;
@@ -51,42 +53,51 @@ export function ShareToCommunityToggle({
     };
   }, []);
 
+  const [flow] = useState<ShareToggleFlow>(() =>
+    createShareToggleFlow({ unshare: async (id) => (await api.deleteSharedCommunityTrade(id))?.ok !== false }),
+  );
+
   if (!available) return null;
+
+  const sendShare = async () => {
+    const result = await api.shareCommunityTrade({
+      send: slimAssets(sendAssets),
+      receive: slimAssets(receiveAssets),
+      grade: verdict.ui_verdict,
+      band: verdict.band,
+      why: (verdict.rationale || "").slice(0, 280),
+      display_name: name.trim(),
+    });
+    return result.ok && result.trade ? result.trade.id : null;
+  };
 
   const share = async () => {
     setBusy(true);
     setError("");
     try {
-      const result = await api.shareCommunityTrade({
-        send: slimAssets(sendAssets),
-        receive: slimAssets(receiveAssets),
-        grade: verdict.ui_verdict,
-        band: verdict.band,
-        why: (verdict.rationale || "").slice(0, 280),
-        display_name: name.trim(),
-      });
-      if (result.ok && result.trade) setSharedId(result.trade.id);
-      else setError("Sharing isn't available right now.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not share this trade.");
+      const outcome = await flow.requestShare(sendShare);
+      if (outcome === "shared") setSharedId(flow.sharedId);
+      else if (outcome === "unavailable") setError("Sharing isn't available right now.");
+      else if (outcome === "error") setError("Could not share this trade.");
+      else if (outcome === "stuck-public") {
+        setOn(true);
+        setSharedId(flow.sharedId);
+        setError("Could not stop sharing this trade. Try again.");
+      }
     } finally {
       setBusy(false);
     }
   };
 
   const turnOff = async () => {
-    const id = sharedId;
     setOn(false);
     setSharedId(null);
     setError("");
-    if (!id) return;
+    const outcome = await flow.requestOff();
     // A failed delete must not leave the switch saying "off" while the trade is still public.
-    try {
-      const result = await api.deleteSharedCommunityTrade(id);
-      if (result?.ok === false) throw new Error("not ok");
-    } catch {
+    if (outcome === "still-public") {
       setOn(true);
-      setSharedId(id);
+      setSharedId(flow.sharedId);
       setError("Could not stop sharing this trade. Try again.");
     }
   };
@@ -101,7 +112,6 @@ export function ShareToCommunityToggle({
         <Toggle
           label="Share to community"
           checked={on}
-          disabled={busy}
           onChange={(next) => (next ? setOn(true) : void turnOff())}
         />
       </div>
