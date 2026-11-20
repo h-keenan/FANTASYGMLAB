@@ -126,15 +126,15 @@ function AppContent() {
                       storage before the first authorized request goes out. */}
                   <ShowcaseModeProvider>
                     <OnboardingProvider>
-                      <CollegeInterestProvider>
-                        <AuthProvider>
+                      <AuthProvider>
+                        <CollegeInterestProvider>
                           <LiveActivitySync />
                           <NoticeProvider>
                             <RootNavigator />
                             <OfflineBanner />
                           </NoticeProvider>
-                        </AuthProvider>
-                      </CollegeInterestProvider>
+                        </CollegeInterestProvider>
+                      </AuthProvider>
                     </OnboardingProvider>
                   </ShowcaseModeProvider>
                 </ValuationLensProvider>

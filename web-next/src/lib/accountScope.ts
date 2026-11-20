@@ -59,7 +59,26 @@ export const LEGACY_SCOPED_BASES: readonly string[] = [
   "fgl:trial-lapsed-shown-expiration",
   "fgl:guess-the-player-dismissed-pick-id",
   "fgl:guess-the-player-name-match-dismissed-pick-id",
+  // app: personal preference (do you follow college football), scoped per user by product decision
+  "fgl:college-football-prompt-answered",
+  "fgl:college-football-interest",
 ];
+
+/**
+ * User-scoped bases the purge leaves in place: personal preferences the same person should not be asked for
+ * again after signing out and back in. They stay under `u:<userId>:<base>`, so another account never reads them.
+ */
+export const USER_SCOPED_KEEP_BASES: readonly string[] = [
+  "fgl:college-football-prompt-answered",
+  "fgl:college-football-interest",
+];
+
+function isKeptUserScopedKey(key: string): boolean {
+  if (!isUserScopedKey(key)) return false;
+  const rest = key.slice(USER_SCOPE_PREFIX.length);
+  const cut = rest.indexOf(":");
+  return cut > 0 && USER_SCOPED_KEEP_BASES.includes(rest.slice(cut + 1));
+}
 
 /**
  * Keys that stay unscoped because something reads them without a user (an inline script, or a hand-off written
@@ -102,10 +121,8 @@ export const DEVICE_LEVEL_KEYS: ReadonlyArray<{ key: string; why: string }> = [
   { key: "fgl:age-gate-passed", why: "The person at this device passed the age gate; legal gate, not an account fact." },
   { key: "fd-help-seen:orb-menu", why: "Hint about the orb control itself; same device, same control." },
   { key: "fgl:push-prompt-dismissed-at", why: "The OS permission prompt belongs to the device, not the account." },
-  { key: "fgl:onboarding-complete", why: "Per-install first-run gate (the intro tutorial), documented as device state in OnboardingContext. Follow-up: scope if product wants each account to see it." },
+  { key: "fgl:onboarding-complete", why: "Per-install first-run gate (the intro tutorial), device-level by product decision (2026-11): the intro is about this install, so a second account on the phone does not repeat it." },
   { key: "fgl:trial-offer-pending", why: "Arms the first-value offer after this install's first onboarding; the offer itself re-checks the account's plan on the server." },
-  { key: "fgl:college-football-prompt-answered", why: "Per-install prompt state, documented as device state in CollegeInterestContext." },
-  { key: "fgl:college-football-interest", why: "Per-install answer to the same prompt." },
   { key: "fgl:experience-level", why: "Device display choice (beginner or advanced copy)." },
   { key: "fgl:showcase-mode", why: "Screenshot/demo display mode of this device." },
   { key: "fd_privacy_mode", why: "Privacy masking is a viewing choice of this device and must stay on across accounts." },
@@ -122,7 +139,7 @@ export const DEVICE_LEVEL_KEYS: ReadonlyArray<{ key: string; why: string }> = [
 
 /** True when `key` is something the account purge must remove. */
 export function isAccountPurgeKey(key: string): boolean {
-  if (isUserScopedKey(key)) return true;
+  if (isUserScopedKey(key)) return !isKeptUserScopedKey(key);
   for (const k of PURGE_UNSCOPED_KEYS) {
     if (key === k || (k.endsWith(":") && key.startsWith(k))) return true;
   }
