@@ -1,0 +1,91 @@
+name: Target Viability Replay
+
+# Manual only. Runs the #2164 whole-system historical replay (docs/audits/historical-replay/code/ideas_run.py, Trade Hub idea
+# generator on point-in-time synthetic leagues) twice, DYNASTYGM_TARGET_VIABILITY_V1 OFF and ON, and uploads each run's results
+# as an artifact so the two can be compared (docs/audits/2026-11-target-viability.md, "Replay").
+#
+# Needs the replay input data (nflverse weekly stats parquet in nv/ and DynastyProcess snapshots in dp/, public data, a few GB).
+# It is not in the repo and is not downloaded here: point `data_url` at a tar.gz of a directory holding nv/ and dp/ (for example a
+# private release asset). No secrets are used; the data URL is the only input that reaches the network.
+#
+# Never triggered by a push or a schedule. Pass a small slice for a quick check (one season, two dates, dynasty_sf).
+
+on:
+  workflow_dispatch:
+    inputs:
+      data_url:
+        description: "https URL of a .tar.gz containing nv/ and dp/ (replay input data)"
+        required: true
+        type: string
+      seasons:
+        description: "Comma-separated seasons"
+        required: false
+        default: "2024"
+        type: string
+      dates:
+        description: "Comma-separated MM-DD replay dates"
+        required: false
+        default: "10-20,12-01"
+        type: string
+      formats:
+        description: "Comma-separated league formats"
+        required: false
+        default: "dynasty_sf"
+        type: string
+      sizes:
+        description: "Comma-separated league sizes"
+        required: false
+        default: "12"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    name: replay (flag ${{ matrix.flag }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        flag: ["0", "1"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt pyarrow
+      - name: Fetch replay input data
+        env:
+          DATA_URL: ${{ inputs.data_url }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/replay_data"
+          curl -fsSL "$DATA_URL" | tar -xz -C "$RUNNER_TEMP/replay_data"
+          test -d "$RUNNER_TEMP/replay_data/nv" && test -d "$RUNNER_TEMP/replay_data/dp"
+      - name: Run Trade Hub replay
+        env:
+          REPLAY_REPO: ${{ github.workspace }}
+          DYNASTYGM_TARGET_VIABILITY_V1: ${{ matrix.flag }}
+          SEASONS: ${{ inputs.seasons }}
+          DATES: ${{ inputs.dates }}
+          FORMATS: ${{ inputs.formats }}
+          SIZES: ${{ inputs.sizes }}
+        run: |
+          export REPLAY_DATA="$RUNNER_TEMP/replay_data"
+          mkdir -p "$RUNNER_TEMP/out"
+          export PYTHONPATH="$GITHUB_WORKSPACE:$GITHUB_WORKSPACE/docs/audits/historical-replay/code"
+          python docs/audits/historical-replay/code/ideas_run.py --out "$RUNNER_TEMP/out" --variant base \
+            --seasons "$SEASONS" --dates "$DATES" --formats "$FORMATS" --sizes "$SIZES"
+      - name: Summarise
+        run: |
+          export REPLAY_OUT="$RUNNER_TEMP/out"
+          export PYTHONPATH="$GITHUB_WORKSPACE:$GITHUB_WORKSPACE/docs/audits/historical-replay/code"
+          python docs/audits/historical-replay/code/analyze_ideas.py > "$RUNNER_TEMP/out/summary.txt" || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: target-viability-replay-flag-${{ matrix.flag }}
+          path: ${{ runner.temp }}/out
+          retention-days: 30

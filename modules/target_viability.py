@@ -27,8 +27,13 @@ from modules.team_eval import normalize_team_strategy
 ENV_KEY = "DYNASTYGM_TARGET_VIABILITY_V1"
 # Starters per position on an NFL depth chart (a real team's usual offense), not a fantasy lineup.
 NFL_DEPTH_STARTERS = {"QB": 1, "RB": 2, "WR": 3, "TE": 1}
+# Last chart place that still counts as usable depth (a backup who plays when a starter is out): QB2, RB4, WR5, TE3. Anything
+# deeper (QB3+, RB5+, WR6+, TE4+) is buried. Sleeper lists WRs by sub-slot (LWR / RWR / SWR), each with its own order, so a
+# sub-slot has one starter and a usable depth of three.
+NFL_USABLE_DEPTH = {"QB": 2, "RB": 4, "WR": 5, "TE": 3}
+WR_SUB_SLOTS = frozenset({"LWR", "RWR", "SWR"})
 HORIZON_GAMES = 17.0
-TARGET_MIN_VIABILITY = 0.4
+TARGET_MIN_VIABILITY = 0.6
 STASH_MIN_VIABILITY = 0.2
 # A posture whose missed-week weight is at or below this can hold a player for later (retool and below).
 STASH_MAX_POSTURE_WEIGHT = 0.45
@@ -72,8 +77,10 @@ def role_factor(row: Mapping[str, Any]) -> tuple[float, str]:
     order = _num(row.get("depth_chart_order"))
     if not slots or order is None or order <= 0:
         return 1.0, ""
-    beyond = order - slots
-    factor = 1.0 if beyond <= 1 else 0.8 if beyond <= 2 else 0.55 if beyond <= 3 else 0.3
+    usable = NFL_USABLE_DEPTH[pos]
+    if pos == "WR" and _text(row.get("depth_chart_position")).upper() in WR_SUB_SLOTS:
+        slots, usable = 1, 3
+    factor = 1.0 if order <= slots + 1 else 0.8 if order <= usable else 0.3
     snap = _num(row.get("snap_share"))
     if snap is not None:
         snap = snap / 100.0 if snap > 1.5 else snap
@@ -142,7 +149,9 @@ def assess(
     viability = availability * role
     reasons = tuple(text for text in (injury_text, role_text) if text)
     if viability >= TARGET_MIN_VIABILITY:
-        return Viability("target", viability, availability, role, reasons)
+        # Still labelled when he carries a short absence or a thin role: the Analyzer prices it, the card says it.
+        note = f"Availability: {'; '.join(reasons)}." if reasons else ""
+        return Viability("target", viability, availability, role, reasons, note)
     young_cap = age_profile.RETOOL_TARGET_MAX_AGE if strategy == "retool" else age_profile.REBUILD_TARGET_MAX_AGE
     stash_ok = (
         weight <= STASH_MAX_POSTURE_WEIGHT
@@ -153,7 +162,8 @@ def assess(
     )
     why = "; ".join(reasons) or "limited availability or role"
     if stash_ok:
-        note = f"Injured stash, buy-low only: {why}; cheap now, value if he returns and the role opens."
+        kind = "Injured stash" if injury_text else "Depth stash"
+        note = f"{kind}, buy-low only: {why}; cheap now, value if {'he returns and ' if injury_text else ''}the role opens."
         return Viability("stash", viability, availability, role, reasons, note)
     who = "a contending team" if weight > STASH_MAX_POSTURE_WEIGHT else "this price and age"
     return Viability("avoid", viability, availability, role, reasons, f"Not a target for {who}: {why}.")

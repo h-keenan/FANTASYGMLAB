@@ -28,19 +28,38 @@ Decision Fit that named market value as the driver and role as the softest input
   "Injured stash, buy-low only: <injury, timing, depth>; cheap now, value if he returns and the role opens.", and stash ideas always sort behind
   healthy ideas.
 
+## Follow-up findings (why 15 IR/Out-and-deep contender targets remained, and why stash read 0)
+
+* Remaining contender targets were (a) short-term Out designations, which are allowed, and (b) players whose snap share (>= 55%) shows a
+  real role the chart understates; but also (c) a real defect: Sleeper numbers WRs inside each sub-slot (LWR / RWR / SWR), so a raw
+  order of 6 on one sub-slot is not "sixth WR". The role factor now reads WR sub-slots per slot, and the buried cut is explicit:
+  usable depth QB2 / RB4 / WR5 / TE3, anything deeper is buried (QB3+, RB5+, WR6+, TE4+). The target threshold also moved to 0.6, so an
+  IR player with no return date is never a contender or fringe-contender target (availability alone is 0.45 / 0.53).
+* The stash counter was not a counting bug: the stash was appended after the first `target_cap` candidates, where the generator never
+  looks. It now sits at the end of that window, behind every healthy fit that fills it. Stash is plentiful on real data (pool scan, rebuild: 37 IR+deep
+  players are stash-eligible), and a depth-only stash (healthy but buried, young, cheap) is labelled "Depth stash", not "Injured stash".
+
 ## Measurement (real player pool from a read-only copy of players.db, 3 synthetic leagues of 10/12/14 teams, 5 postures x 5 teams each, week 11)
 
-Not a full replay: the #2164 harness needs several GB of nflverse and DynastyProcess history that is not on this machine, and the machine
-is out of memory and disk headroom for it. So there is no out-of-sample outcome number for this change, and the flag ships OFF.
-"IR" below includes any Out/IR/PUP status, so it over-counts short absences.
+"IR" = IR/PUP/NFI/reserve only (strict). "Deep" = raw depth order at or past QB3 / RB5 / WR6 / TE4. Flag OFF -> ON:
 
-| posture | ideas off -> on | targets off -> on | IR/Out targets | deep-chart targets | IR/Out and deep |
-|---|---|---|---|---|---|
-| contender | 235 -> 215 | 226 -> 206 | 79 -> 33 | 54 -> 15 | 50 -> 15 |
-| fringe contender | 234 -> 223 | 223 -> 212 | 79 -> 46 | 52 -> 18 | 50 -> 18 |
-| retool | 239 -> 237 | 225 -> 222 | 74 -> 52 | 60 -> 26 | 58 -> 26 |
-| rebuild | 245 -> 240 | 179 -> 176 | 45 -> 35 | 41 -> 26 | 41 -> 26 |
-| tank | 244 -> 239 | 179 -> 175 | 44 -> 36 | 39 -> 26 | 39 -> 26 |
+| posture | ideas | targets | IR targets | deep targets | IR and deep | stash targets |
+|---|---|---|---|---|---|---|
+| contender | 235 -> 209 (-11.1%) | 226 -> 200 | 47 -> 0 | 51 -> 0 | 36 -> 0 | 0 |
+| fringe contender | 234 -> 214 (-8.5%) | 223 -> 203 | 46 -> 0 | 49 -> 0 | 34 -> 0 | 0 |
+| retool | 239 -> 233 | 225 -> 217 | 42 -> 2 | 57 -> 19 | 39 -> 2 | 2 |
+| rebuild | 245 -> 239 | 179 -> 170 | 27 -> 2 | 38 -> 12 | 24 -> 0 | 2 |
+| tank | 244 -> 238 | 179 -> 170 | 26 -> 2 | 36 -> 11 | 23 -> 0 | 2 |
 
-Target and idea counts hold (contender -8.5% ideas, others -2% or less). The remaining deep or out targets are mostly players whose snap share
-shows a real role the chart understates, or one-week Out designations.
+Per-league idea counts (OFF -> ON, 5 teams each): contender 76 -> 74, 81 -> 78, 78 -> 57 (the 14-team league); no posture loses all of its ideas in any
+league. Contender volume falls 11.1%, 1.1 points over the 10% gate, almost all in the 14-team league; the lost ideas are the ones built on IR or buried
+targets. Remaining deep targets for non-contenders are snap-share-corroborated roles or stash-labelled players.
+
+## Replay
+
+No local replay: it needs several GB of nflverse and DynastyProcess history and this machine is short of disk and memory. Run it on a box or in Actions:
+
+* GitHub Actions: `.github/workflows/target-viability-replay.yml` (workflow_dispatch only; give it a `data_url` for a tar.gz holding `nv/` and `dp/`). It
+  runs `ideas_run.py` with the flag OFF and ON and uploads both result sets.
+* Box: `REPLAY_REPO=<repo> REPLAY_DATA=<dir with nv/ and dp/> REPLAY_OUT=<dir>/off DYNASTYGM_TARGET_VIABILITY_V1=0 python docs/audits/historical-replay/code/ideas_run.py --out <dir>/off --variant base --seasons 2024 --dates 10-20,12-01 --formats dynasty_sf --sizes 12`, then the same with `=1` and `--out <dir>/on`, then `analyze_ideas.py` on each.
+* Limit: the replay's depth order is usage-derived and its injuries come from nflverse reports (no IR rows), so it exercises the role term far more than the IR term.
