@@ -55,7 +55,8 @@ export function usePointPulses(slots: SlotComparison[]): Map<string, number> {
 
 function leadTone(value: number): string {
   if (Math.abs(value) < 0.05) return "var(--color-text-muted)";
-  return value > 0 ? "var(--color-success)" : "var(--color-danger)";
+  // Trailing is muted, never red (owner rule: no red values); only leading is green.
+  return value > 0 ? "var(--color-success)" : "var(--color-text-muted)";
 }
 
 export function ComparisonHeader({
@@ -253,8 +254,10 @@ function CompactSide({
   emphasis,
   pulseKey,
   onEdit,
+  expanded = false,
 }: {
   cell: SlotComparison["mine"];
+  expanded?: boolean;
   mirror: boolean;
   emphasis: "win" | "lose" | "even";
   pulseKey: number;
@@ -281,7 +284,7 @@ function CompactSide({
     <>
       <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} name={card.name} position={card.position} team={card.team} />
       <span className={`flex flex-col min-w-0 flex-1 gap-0.5${mirror ? " items-end" : ""}`}>
-        <PlayerName name={card.name} className="text-[12px] font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
+        <PlayerName short name={card.name} className="text-[12px] font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
         <span className={`flex items-center gap-1 text-[0.6875rem] font-bold leading-tight${mirror ? " flex-row-reverse text-right" : ""}`} style={{ color: "var(--color-text-secondary)" }} data-testid="compact-game-line">
           {primary ? (
             <span className="inline-flex items-center" data-testid={`compact-status-${primary.kind}`} title={primary.label}>
@@ -292,7 +295,7 @@ function CompactSide({
           {flag ? <span className="font-extrabold uppercase" style={{ color: DOT_COLOR[flag.tone] }}>{flag.kind === "doubtful" ? "D" : "Q"}</span> : null}
           {gameLine ? <span>{gameLine}</span> : null}
         </span>
-        {live && card.statLine ? (
+        {live && expanded && card.statLine ? (
           <span className={`text-[0.6875rem] leading-tight${mirror ? " text-right" : ""}`} style={{ color: "var(--color-text-muted)" }} data-testid="compact-stat-line">
             {card.statLine}
           </span>
@@ -372,7 +375,7 @@ export function CompactSlotRow({
   return (
     <li className="flex flex-col slot-row" data-decides={slot.decides ? "true" : undefined} data-testid="slot-row" data-slot={slot.label} data-compact="true">
       <div className="grid grid-cols-[minmax(0,1fr)_3.2rem_minmax(0,1fr)] items-center gap-1">
-        <CompactSide cell={slot.mine} mirror={false} emphasis={emphasis("mine")} pulseKey={pulse(slot.mine)} onEdit={onEditMine} />
+        <CompactSide cell={slot.mine} mirror={false} emphasis={emphasis("mine")} pulseKey={pulse(slot.mine)} onEdit={onEditMine} expanded={open} />
         <button
           type="button"
           onClick={onToggle}
@@ -392,7 +395,7 @@ export function CompactSlotRow({
             </svg>
           </span>
         </button>
-        <CompactSide cell={slot.opponent} mirror emphasis={emphasis("opponent")} pulseKey={pulse(slot.opponent)} />
+        <CompactSide cell={slot.opponent} mirror emphasis={emphasis("opponent")} pulseKey={pulse(slot.opponent)} expanded={open} />
       </div>
       <Collapse open={open}>
         <div className="flex flex-col gap-1.5 pt-1.5 pb-1" data-testid="slot-expanded">

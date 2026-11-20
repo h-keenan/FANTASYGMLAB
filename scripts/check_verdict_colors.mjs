@@ -86,6 +86,11 @@ const WORKLOAD_KEY_RED = new RegExp(`\\b(cooling|fragile|blocked|falling|declini
 const USAGE_FILE = /(usage|Usage|playerQuickViewPresentation)/;
 const USAGE_TONE_RETURN_RED = /return\s+["']danger["']/;
 
+// Matchup lineup lead / margin / "NOW" pills (2026-11-19): a trailing margin was a green-or-red ternary (value > 0 ? success : danger).
+// A trailing side is muted, never red.
+const LEAD_FILE = /Matchup(Lineup|Module|Content)/;
+const LEAD_SIGN_RED = />\s*0\s*\?[^:]*:\s*["'`]?(var\(--color-danger\)|colors\.danger\b)/;
+
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
     if (name === "node_modules" || name.startsWith(".")) continue;
@@ -112,6 +117,10 @@ export function scanText(rel, text) {
       (USAGE_FILE.test(rel) && USAGE_TONE_RETURN_RED.test(line))
     ) {
       problems.push(`${rel}:${i + 1}: a usage / flag / pulse / workload negative is red (${line.trim().slice(0, 80)}); a decline is a caution: use toneToken / toneColorVar (amber), never red`);
+      return;
+    }
+    if (LEAD_FILE.test(rel) && LEAD_SIGN_RED.test(line)) {
+      problems.push(`${rel}:${i + 1}: a lead / margin value turns red when negative (${line.trim().slice(0, 80)}); trailing is muted, only leading may be green`);
       return;
     }
     if (LADDER.test(line)) {
