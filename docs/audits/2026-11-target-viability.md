@@ -57,9 +57,22 @@ targets. Remaining deep targets for non-contenders are snap-share-corroborated r
 
 ## Replay
 
-No local replay: it needs several GB of nflverse and DynastyProcess history and this machine is short of disk and memory. Run it on a box or in Actions:
+The replay inputs are small (public nflverse + DynastyProcess, about 9 MB as a tar.gz). A one-season, one-date, one-format slice ran locally in about 25 s and 480 MB. Run it on a box or in Actions:
 
 * GitHub Actions: `.github/workflows/target-viability-replay.yml` (workflow_dispatch only; give it a `data_url` for a tar.gz holding `nv/` and `dp/`). It
   runs `ideas_run.py` with the flag OFF and ON and uploads both result sets.
 * Box: `REPLAY_REPO=<repo> REPLAY_DATA=<dir with nv/ and dp/> REPLAY_OUT=<dir>/off DYNASTYGM_TARGET_VIABILITY_V1=0 python docs/audits/historical-replay/code/ideas_run.py --out <dir>/off --variant base --seasons 2024 --dates 10-20,12-01 --formats dynasty_sf --sizes 12`, then the same with `=1` and `--out <dir>/on`, then `analyze_ideas.py` on each.
 * Limit: the replay's depth order is usage-derived and its injuries come from nflverse reports (no IR rows), so it exercises the role term far more than the IR term.
+
+### Replay input data asset
+
+* Asset: `replay-data-2026-11.tar.gz` (8,905,411 bytes), sha256 `0d665ea348e9c57f955b3ba0d1f87cae13082b39341931811e567000f50542ec`. Contents: `nv/` (nflverse `spw_2020..2026.parquet`, `inj_2020..2026.csv`, `players.csv`, `games.csv`) and `dp/` (DynastyProcess `<season>-<mm-dd>_values-players.csv` and `_values-picks.csv` for Apr 15, May 20, Aug 20, Oct 20, Dec 1 of 2021-2025, the commit nearest each date). Public data only.
+* Create the release (the user runs this):
+
+```
+gh release create replay-data-2026-11 --prerelease --title "Replay data 2026-11" --notes "Public nflverse + DynastyProcess inputs for the #2164 historical replay" <path-to-tarball>
+gh workflow run target-viability-replay.yml -f data_url=https://github.com/<owner>/<repo>/releases/download/replay-data-2026-11/replay-data-2026-11.tar.gz -f seasons=2021,2022,2023,2024,2025 -f dates=04-15,05-20,08-20,10-20,12-01 -f formats=dynasty_sf -f sizes=12
+```
+
+* Workflow inputs: `data_url`, `seasons`, `dates`, `formats`, `sizes`. There is no train/test split input. Train 2021-23 / test 2024-25 is done by running the workflow twice, `-f seasons=2021,2022,2023` and `-f seasons=2024,2025`, and comparing the OFF/ON artifacts per run. The tarball holds all seasons (the harness always loads nflverse 2020-2026 for lookbacks). A private repo needs a `data_url` the runner can fetch without auth; a private release asset will not download via plain curl.
+* Limitation: depth order is usage-derived and the nflverse injury source has no IR rows, so the replay exercises the role term more than the IR term.
