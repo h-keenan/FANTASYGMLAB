@@ -238,14 +238,20 @@ def build_injury_record(
             loaded[season] = index
     history = build_history(pid, gsis, loaded, current_season=current_season, through_week=through_week)
     latest = None
+    season_rows: list[Mapping[str, Any]] = []
     if current_season in loaded:
-        rows = loaded[current_season].player_rows(pid, gsis)
-        latest = rows[-1] if rows else None
+        season_rows = loaded[current_season].player_rows(pid, gsis)
+        latest = season_rows[-1] if season_rows else None
+    current = build_current(directory, latest)
+    # The official reports drop players on IR / PUP, so a player who is out with no row for this season has no countable
+    # games here. Say it is untracked rather than letting "0 missed" stand (the client reads this flag).
+    season_tracked = not (current and current["unavailable"] and not season_rows)
     return {
         "ok": True,
         "player_id": pid,
         "current_season": current_season,
-        "current": build_current(directory, latest),
+        "current_season_tracked": season_tracked,
+        "current": current,
         **history,
         "source": SOURCE_TEXT,
         "method": METHOD_NOTE,

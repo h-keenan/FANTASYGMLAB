@@ -78,7 +78,7 @@ def build_depth_chart(
 ) -> dict[str, Any]:
     pid = str(player_id)
     me = directory.get(pid)
-    base: dict[str, Any] = {"ok": True, "player_id": pid, "team": None, "slot": None, "slot_label": None, "self_order": None, "entries": [], "total": 0, "reason": ""}
+    base: dict[str, Any] = {"ok": True, "player_id": pid, "team": None, "slot": None, "slot_label": None, "self_order": None, "self_rank": None, "entries": [], "total": 0, "reason": ""}
     if not isinstance(me, Mapping):
         return {**base, "reason": "not_found"}
     team = _text(me.get("team")).upper()
@@ -105,6 +105,9 @@ def build_depth_chart(
         members.append((order, name, str(other_id), raw))
     members.sort(key=lambda m: (m[0], m[1], m[2]))
 
+    # Sleeper's order has gaps (1,2,3,4,6,7), so "RB6" can sit behind only four players. ``rank`` is his place among the
+    # players actually listed (1 = first), the number "N ahead" and the list agree with; ``order`` stays the raw listing.
+    rank_by_id = {m[2]: index + 1 for index, m in enumerate(members)}
     entries = []
     for order, name, other_id, raw in members[:MAX_ENTRIES]:
         prior = previous.get(other_id)
@@ -114,6 +117,7 @@ def build_depth_chart(
             "position": _text(raw.get("position")).upper() or None,
             "team": team,
             "order": order,
+            "rank": rank_by_id[other_id],
             "status": _text(raw.get("status")) or None,
             "injury_status": _text(raw.get("injury_status")) or None,
             "is_self": other_id == pid,
@@ -128,7 +132,7 @@ def build_depth_chart(
             prior = previous.get(pid)
             entries.append({
                 "player_id": pid, "name": name, "position": _text(raw.get("position")).upper() or None, "team": team,
-                "order": order, "status": _text(raw.get("status")) or None, "injury_status": _text(raw.get("injury_status")) or None,
+                "order": order, "rank": rank_by_id[pid], "status": _text(raw.get("status")) or None, "injury_status": _text(raw.get("injury_status")) or None,
                 "is_self": True, "change": (prior - order) if prior is not None else None,
             })
-    return {**base, "team": team, "slot": slot, "slot_label": SLOT_LABELS.get(slot, slot), "self_order": self_order, "entries": entries, "total": len(members)}
+    return {**base, "team": team, "slot": slot, "slot_label": SLOT_LABELS.get(slot, slot), "self_order": self_order, "self_rank": rank_by_id.get(pid), "entries": entries, "total": len(members)}
