@@ -7,7 +7,7 @@ is the one availability + role check for acquisition targets. Nothing is modelle
 * availability: ``trade_grade.estimate_injury_absence`` (the same absence estimate the Trade Analyzer prices), the season
   window (``trade_grade.season_window``), the posture's own weight on missed weeks (``trade_grade.injury_posture_weight``),
   and the fitted return curves (``injury_return_curves``) for what is lost over the next 17 games.
-* role: depth-chart place against the team's own starter slots (``sim.team_roles.STARTER_SLOTS``), softened by a snap-share
+* role: depth-chart place against the team's own starter slots (``NFL_DEPTH_STARTERS``), softened by a snap-share
   read when the row carries one.
 * posture: the same weight blends "this season" and "later": a contender lives on this season; a rebuilder discounts it.
 
@@ -21,10 +21,11 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from modules import age_profile, injury_return_curves, trade_grade
-from modules.sim.team_roles import STARTER_SLOTS
+from modules.coerce import float_nan_to_none
 from modules.team_eval import normalize_team_strategy
 
 ENV_KEY = "DYNASTYGM_TARGET_VIABILITY_V1"
+# Starters per position on an NFL depth chart (a real team's usual offense), not a fantasy lineup.NFL_DEPTH_STARTERS = {"QB": 1, "RB": 2, "WR": 3, "TE": 1}
 HORIZON_GAMES = 17.0
 TARGET_MIN_VIABILITY = 0.4
 STASH_MIN_VIABILITY = 0.2
@@ -55,12 +56,7 @@ class Viability:
         return self.verdict == "stash"
 
 
-def _num(value: Any) -> float | None:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return None
-    return out if out == out else None
+_num = float_nan_to_none
 
 
 def _text(value: Any) -> str:
@@ -71,7 +67,7 @@ def role_factor(row: Mapping[str, Any]) -> tuple[float, str]:
     """1.0 = starter-level role; lower the deeper he sits behind his team's starters. No chart data = no evidence = 1.0."""
 
     pos = _text(row.get("position")).upper()
-    slots = STARTER_SLOTS.get(pos)
+    slots = NFL_DEPTH_STARTERS.get(pos)
     order = _num(row.get("depth_chart_order"))
     if not slots or order is None or order <= 0:
         return 1.0, ""
