@@ -27,6 +27,8 @@ PENALISE = "penalise"
 NA_DROP = "n/a: drop surface"
 NA_NOT_ACQUIRE = "n/a: not an acquire/start surface"
 
+SHARED_AVAILABILITY_MODULE = "modules.injury_status"  # the one injury table every availability surface must import
+
 SURFACES: dict[str, dict[str, Any]] = {
     "trade_board": dict(kind=ACQUISITION, module="modules.trade_ideas", function="_build_trade_ideas_impl", token="_viable_target_assets", depth_rule=PENALISE),
     "trade_hub": dict(kind=DERIVED, of="trade_board", depth_rule=PENALISE),

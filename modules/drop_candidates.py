@@ -33,7 +33,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 import pandas as pd
 
-from modules import age_profile, model_status, posture_model, roster_value_model as rvm
+from modules import age_profile, injury_status, model_status, posture_model, roster_value_model as rvm
 from modules.frame_records import frame_records
 
 MODEL_VERSION = "drop-candidates-v1"
@@ -331,7 +331,7 @@ def _ir_move_possible(rvc: rvm.RosterValueContext, player_id: str) -> bool:
     if rvc.limits.open_ir_slots <= 0:
         return False
     row = rvc.row(player_id) or {}
-    return rvm.ir_eligible(row.get("status"), row.get("injury_status"), rvc.league) and rvm.is_ruled_out(
+    return rvm.ir_eligible(row.get("status"), row.get("injury_status"), rvc.league) and injury_status.is_ruled_out(
         row.get("status"), row.get("injury_status")
     )
 
@@ -564,7 +564,7 @@ def plan_trade_overflow(
     ir_room = limits.open_ir_slots + sum(1 for pid in limits.ir_ids if pid in send)
     ir_placed = []
     for row in incoming_rows:
-        if len(ir_placed) < ir_room and rvm.ir_eligible(row.get("status"), row.get("injury_status"), league) and rvm.is_ruled_out(
+        if len(ir_placed) < ir_room and rvm.ir_eligible(row.get("status"), row.get("injury_status"), league) and injury_status.is_ruled_out(
             row.get("status"), row.get("injury_status")
         ):
             ir_placed.append(str(row["player_id"]))

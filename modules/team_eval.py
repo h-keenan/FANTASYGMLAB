@@ -134,14 +134,14 @@ def _lineup_slots(lineup_settings: Optional[Dict[str, Any]] = None) -> Dict[str,
 def _ruled_out_flags(df: pd.DataFrame) -> List[bool]:
     """Per-row "confirmed unavailable this week" flags for a roster frame.
 
-    Uses modules.rankings.is_ruled_out (and therefore injury_level) so the
+    Uses modules.injury_status.is_ruled_out (the one injury table) so the
     lineup builder shares the codebase's single injury vocabulary instead of
     re-deriving severity from raw status strings. A frame without the status
     columns — several callers build score-only frames — reads as all
     available, i.e. exactly the pre-existing behaviour.
     """
 
-    from modules.rankings import is_ruled_out  # local: avoids an import cycle at module load
+    from modules.injury_status import is_ruled_out
 
     n = len(df)
     statuses = df["status"].tolist() if "status" in df.columns else [None] * n

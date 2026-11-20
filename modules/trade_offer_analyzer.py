@@ -660,7 +660,8 @@ def _startable_candidates(
     """Verified partner players at `position` who could actually start (not
     ruled out, not on a listed injury), best value first."""
 
-    from modules.rankings import injury_level, is_ruled_out
+    from modules import target_viability
+    from modules.injury_status import category as injury_level, is_ruled_out
 
     out = []
     for asset in assets or ():
@@ -672,6 +673,9 @@ def _startable_candidates(
             continue
         status, injury = str(asset.get("status") or ""), str(asset.get("injury_status") or "")
         if is_ruled_out(status, injury) or injury_level(status, injury) != "healthy":
+            continue
+        if target_viability.enabled() and target_viability.role_factor(asset)[0] < 1.0:
+            # A lineup fix must be someone who actually plays: a buried depth-chart player (shared role check) is not.
             continue
         if int(asset.get("score") or asset.get("value_score") or 0) <= 0:
             continue

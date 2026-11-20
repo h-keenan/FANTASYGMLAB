@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Mapping, Sequence
 
 from modules.frame_records import frame_records
-from modules.rankings import injury_level
+from modules.injury_status import category as injury_level
 from modules.semantic_glyphs import glyph_html
 
 
