@@ -81,6 +81,7 @@ export const IDENTICAL = [
   "liveFeed.ts",
   "liveScores.ts",
   "matchupPlanner.ts",
+  "matchupLive.ts",
   "matchupModules.ts",
   "money.ts",
   "playersModules.ts",

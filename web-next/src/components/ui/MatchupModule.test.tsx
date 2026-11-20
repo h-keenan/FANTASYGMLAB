@@ -30,31 +30,45 @@ describe("MatchupModule", () => {
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ name: "Ja'Marr Chase" }));
     expect(document.body.innerHTML).not.toMatch(/--color-action|--color-premium/);
   });
-  it("latest big play: newest line, tap expands the last 3, opponent plays stay neutral, hidden when empty", () => {
+  it("live sections: one module, compact rows that expand on tap; plays carry the clock; opponent plays stay neutral", () => {
     const now = Date.now();
-    const plays = [
-      { id: "a", at: now - 120_000, player_id: "11", name: "Ja'Marr Chase", position: "WR", team: "CIN", side: "mine" as const, points: 9.8, description: "38-yd TD catch", approx: false },
-      { id: "b", at: now - 600_000, player_id: "22", name: "James Cook", position: "RB", team: "BUF", side: "opponent" as const, points: 4.2, description: "TD run and 45 yds", approx: true },
-      { id: "c", at: now - 900_000, player_id: "33", name: "Some Guy", position: "QB", team: "KC", side: "mine" as const, points: -2, description: "interception", approx: false },
-      { id: "d", at: now - 990_000, player_id: "44", name: "Fourth Guy", position: "WR", team: "KC", side: "mine" as const, points: 3, description: "25-yd catch", approx: false },
-    ];
-    const { rerender } = render(<MatchupHeroCard model={model} bigPlays={plays} />);
-    expect(screen.getAllByTestId("matchup-big-play-item")).toHaveLength(1);
-    const item = screen.getByTestId("matchup-big-play-item");
-    expect(item).toHaveTextContent("Chase · 38-yd TD catch");
-    expect(item).toHaveTextContent("2m ago");
-    expect(item).toHaveTextContent("for You");
-    expect(screen.getByTestId("matchup-big-play-points")).toHaveTextContent("+9.8");
-    expect(screen.getByTestId("matchup-big-play-points").style.color).toBe("var(--color-success)");
-    fireEvent.click(screen.getByTestId("matchup-big-play-toggle"));
+    const sections = {
+      live: true,
+      games: [{ key: "HOU-IND", score: "IND 3 - 14 HOU", clock: "Q2 5:54", situation: "2nd & 7 at HOU 25", live: true }],
+      plays: [
+        { id: "a", at: now - 120_000, playerId: "11", name: "Ja'Marr Chase", side: "mine" as const, points: 9.8, detail: "38-yd TD catch", approx: false, clock: "Q2 6:32", soFar: false },
+        { id: "b", at: now - 600_000, playerId: "22", name: "James Cook", side: "opponent" as const, points: 4.2, detail: "TD run and 45 yds", approx: true, clock: null, soFar: false },
+        { id: "c", at: now, playerId: "33", name: "Some Guy", side: "mine" as const, points: 6, detail: "1 TD so far", approx: true, clock: "Q2 6:32", soFar: true },
+      ],
+      ageSeconds: 12,
+      projectedLine: "Proj final 118.4 - 109.2",
+      projected: { mine: "118.4", opponent: "109.2" },
+    };
+    const { rerender } = render(<MatchupHeroCard model={model} liveSections={sections} />);
+    // one module: no separate big-play card or live feed card
+    expect(screen.queryByTestId("live-feed")).toBeNull();
+    expect(screen.getByTestId("matchup-section-games-toggle")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("matchup-game")).toHaveTextContent("Q2 5:54");
+    expect(screen.getByTestId("matchup-game")).toHaveTextContent("2nd & 7 at HOU 25");
+    expect(screen.getByTestId("matchup-section-projected-toggle")).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByTestId("matchup-section-projected-toggle"));
+    expect(screen.getByTestId("matchup-section-projected-toggle")).toHaveAttribute("aria-expanded", "true");
     const items = screen.getAllByTestId("matchup-big-play-item");
     expect(items).toHaveLength(3);
+    expect(items[0]).toHaveTextContent("Chase · 38-yd TD catch");
+    expect(items[0]).toHaveTextContent("Q2 6:32");
+    expect(items[0]).toHaveTextContent("2m ago");
+    expect(items[0]).toHaveTextContent("for You");
     expect(items[1]).toHaveTextContent("approx.");
     expect(items[1]).toHaveTextContent("for Mike");
-    expect(screen.getAllByTestId("matchup-big-play-points")[1].style.color).toBe("var(--color-text-secondary)");
-    expect(screen.getAllByTestId("matchup-big-play-points")[2].style.color).toBe("var(--color-text-secondary)");
-    rerender(<MatchupHeroCard model={model} bigPlays={[]} />);
-    expect(screen.queryByTestId("matchup-big-play")).toBeNull();
+    expect(items[2]).toHaveTextContent("so far");
+    const points = screen.getAllByTestId("matchup-big-play-points");
+    expect(points[0].style.color).toBe("var(--color-success)");
+    expect(points[1].style.color).toBe("var(--color-text-secondary)");
+    rerender(<MatchupHeroCard model={model} liveSections={{ ...sections, plays: [] }} />);
+    expect(screen.getByTestId("matchup-plays-quiet")).toHaveTextContent("All quiet · last checked 12s ago");
+    rerender(<MatchupHeroCard model={model} />);
+    expect(screen.queryByTestId("matchup-live-sections")).toBeNull();
   });
   it("ticker: one line that links to the matchup page", () => {
     render(<MatchupTicker model={model} week={7} href="/matchup/L" />);

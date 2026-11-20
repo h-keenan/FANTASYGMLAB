@@ -15,7 +15,7 @@ import type { MatchupSide, MatchupWinProbability } from '../lib/api';
 import { changedPlayerIds, slotTotals, sortSlots, type SlotComparison, type SlotSortMode } from '../lib/lineupSlots';
 import { freshnessLabel } from '../lib/liveScores';
 import { formatSigned, type LineupPlayer } from '../lib/matchupPresentation';
-import { headlinePoints, playerCardAriaLabel, playerStatusChips, trendVsProjection, type ChipTone } from '../lib/playerCard';
+import { headlinePoints, playerCardAriaLabel, playerGameStatusLine, playerStatusChips, trendVsProjection, type ChipTone } from '../lib/playerCard';
 import { probabilityColor } from '../lib/verdictToneTheme';
 import { marginNowLabel } from '../lib/matchupModules';
 import { percentWord } from '../lib/verdictTone';
@@ -47,7 +47,8 @@ export function usePointPulses(slots: SlotComparison[]): Map<string, number> {
 
 function leadColor(colors: ThemeColors, value: number): string {
   if (Math.abs(value) < 0.05) return colors.textTertiary;
-  return value > 0 ? colors.successBright : colors.danger;
+  // Trailing is muted, never red (owner rule: no red values); only leading is green.
+  return value > 0 ? colors.successBright : colors.textTertiary;
 }
 
 export function ComparisonHeader({
@@ -146,8 +147,10 @@ function CompactSide({
   emphasis,
   pulseKey,
   onPress,
+  expanded = false,
 }: {
   cell: SlotComparison['mine'];
+  expanded?: boolean;
   mirror: boolean;
   emphasis: 'win' | 'lose' | 'even';
   pulseKey: number;
@@ -166,12 +169,14 @@ function CompactSide({
   const card = cell.card;
   const head = headlinePoints(card);
   const trend = trendVsProjection(card);
+  const gameLine = playerGameStatusLine(card);
+  const live = card.gameStatus === 'in_progress';
   const chips = playerStatusChips(card);
   const primary = chips[0];
   const flag = chips.find((chip) => chip.kind === 'questionable' || chip.kind === 'doubtful');
   const align = mirror ? 'flex-end' : 'flex-start';
-  // verdict-color-ok: live-scoring projected-final move, not a usage state
-  const trendColor = trend ? (trend.dir === 'up' ? colors.successBright : trend.dir === 'down' ? colors.danger : colors.textTertiary) : colors.textSecondary;
+  // verdict-color-ok: live-scoring projected-final move, not a usage state; below projection stays muted, never red
+  const trendColor = trend && trend.dir === 'up' ? colors.successBright : colors.textTertiary;
   return (
     <PressableScale
       style={[
@@ -179,6 +184,7 @@ function CompactSide({
         styles.side,
         mirror && { flexDirection: 'row-reverse' },
         emphasis === 'win' && { backgroundColor: colors.accentMuted },
+        live && { backgroundColor: colors.accentMuted, borderWidth: 1, borderColor: colors.accent },
       ]}
       onPress={onPress}
       disabled={!onPress}
@@ -188,7 +194,7 @@ function CompactSide({
       {pulseKey > 0 ? <PulseRing pulseKey={pulseKey} /> : null}
       <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} name={card.name} position={card.position} team={card.team} />
       <View style={[styles.flex, { alignItems: align, gap: 1 }]}>
-        <PlayerName name={card.name} style={[styles.sideName, mirror && { textAlign: 'right' }]} />
+        <PlayerName short name={card.name} style={[styles.sideName, mirror && { textAlign: 'right' }]} />
         <View style={[styles.statusRow, mirror && { flexDirection: 'row-reverse' }]}>
           {primary ? (
             <AppText
@@ -199,9 +205,15 @@ function CompactSide({
             </AppText>
           ) : null}
           {flag ? <AppText style={[styles.statusText, { color: dotColor(colors, flag.tone) }]}>{flag.kind === 'doubtful' ? 'D' : 'Q'}</AppText> : null}
+          {gameLine ? <AppText style={[styles.statusText, { fontSize: 12, color: colors.textSecondary }]} testID="compact-game-line">{gameLine}</AppText> : null}
         </View>
-        <View style={[styles.statusRow, mirror && { flexDirection: 'row-reverse' }, { gap: 6 }]}>
-          {head.value != null ? (
+        {live && expanded && card.statLine ? (
+          <AppText style={[styles.statusText, { fontSize: 12, color: colors.textTertiary, textAlign: mirror ? 'right' : 'left' }]} testID="compact-stat-line">
+            {card.statLine}
+          </AppText>
+        ) : null}
+        <View style={{ alignItems: align }}>
+          {head.value != null && head.kind === 'pts' ? (
             <TickNumber
               value={head.value}
               variant="roll"
@@ -211,12 +223,12 @@ function CompactSide({
             <AppText style={[styles.sidePoints, { color: colors.textTertiary }]}>{card.bye || card.out ? '0.0' : '—'}</AppText>
           )}
           {card.projectedFinal != null ? (
-            <AppText style={[styles.statusText, { color: trendColor }]}>
+            <AppText style={[styles.statusText, { color: trendColor }]} testID="compact-proj-final">
               {trend ? (trend.dir === 'up' ? '▲' : trend.dir === 'down' ? '▼' : '–') : ''}
-              {card.projectedFinal.toFixed(1)}
+              {card.projectedFinal.toFixed(1)} proj
             </AppText>
           ) : head.kind === 'proj' ? (
-            <AppText style={[styles.statusText, { color: colors.textTertiary }]}>PROJ</AppText>
+            <AppText style={[styles.statusText, { color: colors.textTertiary }]} testID="compact-pregame-proj">{head.value?.toFixed(1)} proj</AppText>
           ) : null}
         </View>
       </View>
@@ -273,6 +285,7 @@ export function SlotRow({
           mirror={false}
           emphasis={emphasis('mine')}
           pulseKey={pulse(slot.mine)}
+          expanded={open}
           onPress={onEditMine ?? (slot.mine.kind === 'player' ? () => onPressPlayer((slot.mine as { source: LineupPlayer }).source) : undefined)}
         />
         <PressableScale
@@ -296,6 +309,7 @@ export function SlotRow({
           mirror
           emphasis={emphasis('opponent')}
           pulseKey={pulse(slot.opponent)}
+          expanded={open}
           onPress={slot.opponent.kind === 'player' ? () => onPressPlayer((slot.opponent as { source: LineupPlayer }).source) : undefined}
         />
       </View>

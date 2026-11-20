@@ -6,6 +6,8 @@ import {
   playerCardAriaLabel,
   playerCardFromStarter,
   playerGameLine,
+  playerGameStatusLine,
+  liveStatLine,
   playerStatusChips,
   trendVsProjection,
   type PlayerCardSource,
@@ -97,5 +99,31 @@ describe("playerCard model", () => {
 
   it("has an accessible summary", () => {
     expect(playerCardAriaLabel(playerCardFromStarter(live))).toContain("projected final 17.4");
+  });
+});
+
+describe("real game clock on the card", () => {
+  const qb: PlayerCardSource = { ...live, position: "QB", game_opponent: "IND", game_is_home: true, game_team_score: 14, game_opponent_score: 3, game_clock_label: "Q2 5:54", game_situation: "2nd & 7 at HOU 25", stats: { pass_att: 14, pass_cmp: 11, pass_yd: 118, pass_td: 2, pass_int: 2, rush_att: 1, rush_yd: 4 } };
+  it("inline status uses the real clock and own score first; wall-clock estimate only as fallback", () => {
+    expect(playerGameStatusLine(playerCardFromStarter(qb))).toBe("Q2 5:54 \u00b7 14-3 vs IND");
+    expect(playerGameStatusLine(playerCardFromStarter({ ...qb, game_clock_label: null }))).toMatch(/^~Q\d/);
+    expect(playerGameLine(playerCardFromStarter(qb))).toContain("Q2 5:54");
+  });
+  it("halftime, final, not started, bye", () => {
+    expect(playerGameStatusLine(playerCardFromStarter({ ...qb, game_clock_label: "Half" }))).toMatch(/^Half/);
+    expect(playerGameStatusLine(playerCardFromStarter({ ...qb, game_status: "final", game_clock_label: "Final" }))).toBe("Final 14-3 W");
+    expect(playerGameStatusLine(playerCardFromStarter({ ...base, game_status: "scheduled", game_started: false, game_opponent: "MIN", game_kickoff_at: "2026-11-22T19:20:00-05:00" }), "America/New_York")).toBe("Sun 7:20 PM vs MIN");
+    expect(playerGameStatusLine(playerCardFromStarter({ ...base, projection: { status: "bye_week", point_estimate: null } }))).toBe("Bye");
+  });
+  it("live stat line by position, only while his game is live or final", () => {
+    expect(playerCardFromStarter(qb).statLine).toBe("11/14 CMP, 118 YD, 2 TD, 2 INT, 1 CAR, 4 YD");
+    expect(playerCardFromStarter({ ...qb, game_status: "scheduled", game_started: false }).statLine).toBeNull();
+    expect(liveStatLine({ rush_att: 6, rush_yd: 14, rec: 1, rec_tgt: 2, rec_yd: -1 }, "RB")).toBe("6 CAR, 14 YD, 1/2 REC, -1 YD");
+    expect(liveStatLine({ rec: 2, rec_tgt: 3, rec_yd: 48, rec_td: 1 }, "WR")).toBe("2/3 REC, 48 YD, 1 TD");
+    expect(liveStatLine({}, "WR")).toBeNull();
+  });
+  it("below projection is flat/down data only (UI keeps it muted); exited keeps projected final = actual from the server", () => {
+    const m = playerCardFromStarter({ ...qb, projected_final: 8, projection: { status: "ok", point_estimate: 19, opponent: "IND" } });
+    expect(trendVsProjection(m)?.dir).toBe("down");
   });
 });

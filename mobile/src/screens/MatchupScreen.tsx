@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import ManagerProfileModal from '../components/ManagerProfileModal';
 import PressableScale from '../components/PressableScale';
@@ -27,14 +27,14 @@ import GuillotineCard from '../components/GuillotineCard';
 import GridBackground from '../components/GridBackground';
 import { ComparisonHeader, SlotList } from '../components/MatchupLineup';
 import { PlayerCard } from '../components/PlayerCardKit';
-import LiveFeedPanel from '../components/LiveFeedPanel';
 import { feedKey, liveFeedStore } from '../lib/liveFeed';
 import { playerCardFromStarter } from '../lib/playerCard';
 import PositionBadge from '../components/PositionBadge';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import DashboardStatRow from '../components/DashboardStatRow';
 import CompactModule from '../components/CompactModule';
-import { MatchupHeroCard } from '../components/MatchupModule';
+import { MatchupHeroCard, type MatchupLiveSections } from '../components/MatchupModule';
+import { liveGamesFromStarters, mergeLivePlays } from '../lib/matchupLive';
 import type { MatchupSwingPlayer } from '../lib/matchupModules';
 import { bandColor } from '../lib/verdictToneTheme';
 import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, swingInputsFromMatchup, teamsValuesParts } from '../lib/matchupModules';
@@ -347,6 +347,8 @@ export default function MatchupScreen({ route, navigation }: Props) {
 
         <MatchupHero
           matchup={shown}
+          leagueId={leagueId}
+          ageSeconds={matchup.as_of_age_seconds != null ? dataAgeSeconds(matchup.as_of_age_seconds, matchupQuery.dataUpdatedAt, nowMs) : null}
           mine={mine}
           opponent={opponent}
           onOpenPlayer={(p) => {
@@ -365,7 +367,6 @@ export default function MatchupScreen({ route, navigation }: Props) {
               .join(', ')}.`}
           </AppText>
         ) : null}
-        <LiveFeedPanel feedKey={feedKey(leagueId, matchup.week)} live={matchup.game_state === 'live'} />
         <Insights matchup={shown} />
         <View onLayout={(e) => { lineupY.current = e.nativeEvent.layout.y; }}>
         <LineupComparison
@@ -465,13 +466,19 @@ function scoreboardFacts(matchup: MatchupResponse) {
  * and the swing player on each side (widest projection range still to play) with their avatars. "Open lineup" scrolls to
  * the lineup comparison.
  */
+const EMPTY_FEED: ReturnType<typeof liveFeedStore.events> = [];
+
 function MatchupHero({
   matchup,
   mine,
   opponent,
   onOpenPlayer,
   onOpenLineup,
+  leagueId,
+  ageSeconds,
 }: {
+  leagueId?: string | null;
+  ageSeconds?: number | null;
   matchup: MatchupResponse;
   mine: MatchupSide;
   opponent: MatchupSide;
@@ -498,9 +505,25 @@ function MatchupHero({
     swing: matchupSwingPlayers(swingInputs, opponent.team_name),
     omitWeek: true,
   });
+  const feedEvents = useSyncExternalStore(
+    liveFeedStore.subscribe,
+    () => (leagueId ? liveFeedStore.events(feedKey(leagueId, matchup.week)) : EMPTY_FEED),
+    () => EMPTY_FEED,
+  );
+  const live = matchup.game_state === 'live';
+  const liveSections: MatchupLiveSections | undefined = hasKickedOff(matchup)
+    ? {
+        live,
+        games: liveGamesFromStarters([...(mine.real_starters ?? []), ...(opponent.real_starters ?? [])]),
+        plays: live || matchup.big_plays?.length ? mergeLivePlays(matchup.big_plays, feedEvents) : [],
+        ageSeconds: ageSeconds ?? null,
+        projectedLine: model.detail,
+        projected: myProjected != null && opponentProjected != null ? { mine: myProjected.toFixed(1), opponent: opponentProjected.toFixed(1) } : null,
+      }
+    : undefined;
   return (
     <>
-      <MatchupHeroCard model={model} bigPlays={matchup.live ? matchup.big_plays : undefined} onOpenPlayer={onOpenPlayer} action={<Button label="Open lineup" onPress={onOpenLineup} />} testID="matchup-hero" />
+      <MatchupHeroCard model={model} liveSections={liveSections} onOpenPlayer={onOpenPlayer} action={<Button label="Open lineup" onPress={onOpenLineup} />} testID="matchup-hero" />
       {myPct == null ? <AppText style={styles.oddsUnavailable}>{winProbabilityUnavailableMessage(matchup)}</AppText> : winProbabilityNote(matchup) ? <AppText style={styles.oddsUnavailable}>{winProbabilityNote(matchup)}</AppText> : null}
     </>
   );

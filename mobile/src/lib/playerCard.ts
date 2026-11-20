@@ -48,6 +48,12 @@ export interface PlayerCardSource {
   game_opponent_score?: number | null;
   game_progress?: number | null;
   projected_final?: number | null;
+  /** Real game clock from the scoreboard: "Q2 5:54", "Half", "OT 9:12", "Final". Absent: wall-clock estimate. */
+  game_clock_label?: string | null;
+  /** Down and distance while his team's game is live ("2nd & 7 at HOU 25"). */
+  game_situation?: string | null;
+  /** Live stat line (Sleeper keys), present while his game is live or final. */
+  stats?: Record<string, number> | null;
   projection?: { status: string; point_estimate: number | null; opponent?: string | null } | null;
 }
 
@@ -67,6 +73,11 @@ export interface PlayerCardModel {
   projection: number | null;
   /** Live projected final (in-progress games only). */
   projectedFinal: number | null;
+  /** Real clock label ("Q2 5:54") or null when only the wall-clock estimate exists. */
+  clockLabel: string | null;
+  situation: string | null;
+  /** Compact live stat line ("11/14 CMP, 118 YD, 2 TD") or null. */
+  statLine: string | null;
   /** Best end-of-game number: final points, live projected final, or the projection. */
   expectedFinal: number | null;
   /** Share (0-1) of his game played; 1 final, 0 not started. */
@@ -140,6 +151,9 @@ export function playerCardFromStarter(source: PlayerCardSource): PlayerCardModel
     points,
     projection,
     projectedFinal,
+    clockLabel: status === "in_progress" || status === "final" ? (source.game_clock_label ?? null) : null,
+    situation: status === "in_progress" ? (source.game_situation ?? null) : null,
+    statLine: status === "in_progress" || status === "final" ? liveStatLine(source.stats, source.position) : null,
     expectedFinal,
     progress,
     opponent: source.game_opponent ?? projectionRow?.opponent ?? null,
@@ -199,6 +213,37 @@ export function kickoffLabel(kickoffAt: string | null | undefined, timeZone?: st
   }
 }
 
+const n = (stats: Record<string, number>, key: string): number => {
+  const value = stats[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+};
+
+/** Compact live stat line from a Sleeper stat line, by position: "11/14 CMP, 118 YD, 2 TD, 1 INT". Null when nothing worth showing. */
+export function liveStatLine(stats: Record<string, number> | null | undefined, position?: string | null): string | null {
+  if (!stats) return null;
+  const parts: string[] = [];
+  const pos = (position ?? "").toUpperCase();
+  const passed = n(stats, "pass_att") > 0;
+  if (passed && (pos === "QB" || pos === "")) {
+    parts.push(`${n(stats, "pass_cmp")}/${n(stats, "pass_att")} CMP`, `${n(stats, "pass_yd")} YD`);
+    if (n(stats, "pass_td")) parts.push(`${n(stats, "pass_td")} TD`);
+    if (n(stats, "pass_int")) parts.push(`${n(stats, "pass_int")} INT`);
+    if (n(stats, "rush_att")) parts.push(`${n(stats, "rush_att")} CAR, ${n(stats, "rush_yd")} YD`);
+    return parts.join(", ");
+  }
+  if (n(stats, "rush_att")) {
+    parts.push(`${n(stats, "rush_att")} CAR, ${n(stats, "rush_yd")} YD`);
+    if (n(stats, "rush_td")) parts.push(`${n(stats, "rush_td")} TD`);
+  }
+  if (n(stats, "rec_tgt") || n(stats, "rec")) {
+    parts.push(`${n(stats, "rec")}/${n(stats, "rec_tgt") || n(stats, "rec")} REC, ${n(stats, "rec_yd")} YD`);
+    if (n(stats, "rec_td")) parts.push(`${n(stats, "rec_td")} TD`);
+  }
+  if (n(stats, "fgm") || n(stats, "fga")) parts.push(`${n(stats, "fgm")}/${n(stats, "fga")} FG`);
+  if (n(stats, "fum_lost")) parts.push(`${n(stats, "fum_lost")} FUM`);
+  return parts.length ? parts.join(", ") : null;
+}
+
 /** Rough quarter from wall-clock progress. There is no live game clock in our data, so this is always an estimate ("~Q3"). */
 export function estimatedQuarter(progress: number): string {
   if (progress >= 0.99) return "~Q4";
@@ -211,7 +256,7 @@ export function playerGameLine(model: PlayerCardModel, timeZone?: string): strin
   if (model.bye) return "Bye week";
   const versus = model.opponent ? `${model.isHome === false ? "@" : "vs"} ${model.opponent}` : null;
   let tail: string | null = null;
-  if (model.gameStatus === "in_progress") tail = estimatedQuarter(model.progress);
+  if (model.gameStatus === "in_progress") tail = model.clockLabel ?? estimatedQuarter(model.progress);
   else if (model.gameStatus === "final") {
     if (model.teamScore != null && model.opponentScore != null) {
       const result = model.teamScore > model.opponentScore ? "W" : model.teamScore < model.opponentScore ? "L" : "T";
@@ -219,6 +264,26 @@ export function playerGameLine(model: PlayerCardModel, timeZone?: string): strin
     } else tail = "Final";
   } else if (model.gameStatus === "scheduled") tail = kickoffLabel(model.kickoffAt, timeZone);
   return [versus, tail].filter(Boolean).join(" · ") || (model.team ?? "");
+}
+
+/**
+ * Inline game status for a matchup row: "Q2 5:54 · 14-3 vs IND" while live (real clock, own score first), "Final 24-17 W",
+ * the kickoff time ("Sun 7:20 PM vs MIN") before it starts, "Bye". Null when nothing is known.
+ */
+export function playerGameStatusLine(model: PlayerCardModel, timeZone?: string): string | null {
+  if (model.bye) return "Bye";
+  const versus = model.opponent ? `${model.isHome === false ? "@" : "vs"} ${model.opponent}` : null;
+  if (model.gameStatus === "in_progress") {
+    const clock = model.clockLabel ?? estimatedQuarter(model.progress);
+    const score = model.teamScore != null && model.opponentScore != null ? `${Math.round(model.teamScore)}-${Math.round(model.opponentScore)}` : null;
+    return [clock, [score, versus].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
+  }
+  if (model.gameStatus === "final") return playerGameLine(model, timeZone).replace(/^(vs|@) [A-Z]+ · /, "");
+  if (model.gameStatus === "scheduled") {
+    const kickoff = kickoffLabel(model.kickoffAt, timeZone);
+    return [kickoff, versus].filter(Boolean).join(" ") || null;
+  }
+  return null;
 }
 
 /** One-decimal points text ("12.4") or an em dash. */

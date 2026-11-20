@@ -11,8 +11,9 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { matchupTickerParts, type MatchupCardModel, type MatchupSwingPlayer } from "@/lib/matchupModules";
 import { compactSummaryText } from "@/lib/compactModule";
 import { playerSurname } from "@/lib/playerNameDisplay";
-import type { MatchupBigPlay } from "@/lib/api";
 import { feedAgeLabel, feedPointsLabel } from "@/lib/liveFeed";
+import { quietLabel, type LiveGame, type LivePlay } from "@/lib/matchupLive";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * THE matchup module (docs/ui-patterns.md, "Matchup hero and ticker"). One model (`matchupCardModel`), two forms:
@@ -71,63 +72,128 @@ export function SwingPlayers({ swing, onOpenPlayer }: { swing: MatchupSwingPlaye
   );
 }
 
+/** What the live sections read; built by the page (see MatchupContent / MatchupScreen). */
+export interface MatchupLiveSections {
+  /** A real game is in progress right now. */
+  live: boolean;
+  games: LiveGame[];
+  plays: LivePlay[];
+  /** Age in seconds of the data on screen (drives "last checked Xs ago"). */
+  ageSeconds: number | null;
+  /** "Proj final 118.4 - 109.2 · 3 players left" (the model detail). */
+  projectedLine: string | null;
+  /** Projected totals per side, for the Projected finals section. */
+  projected: { mine: string; opponent: string } | null;
+}
+
+function SectionRow({ id, title, summary, children, defaultOpen = false }: { id: string; title: string; summary: string; children: ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="flex flex-col" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }} data-testid={`matchup-section-${id}`}>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 text-left"
+        style={{ color: "inherit", minHeight: "var(--touch-target-min)" }}
+        aria-expanded={open}
+        aria-controls={`matchup-section-body-${id}`}
+        onClick={() => setOpen((v) => !v)}
+        data-testid={`matchup-section-${id}-toggle`}
+      >
+        <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          {title}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-right text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>
+          {summary}
+        </span>
+        <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }} aria-hidden="true">
+          {open ? "Hide" : "Show"}
+        </span>
+      </button>
+      <Collapse open={open}>
+        <div id={`matchup-section-body-${id}`} className="flex flex-col gap-2 pb-2">
+          {children}
+        </div>
+      </Collapse>
+    </div>
+  );
+}
+
 /**
- * "Latest big play" line for the live Matchup hero: avatar, description, points swing and age of the newest big play
- * (inferred from live stat-line changes, so times are when we noticed). Green only when it is for you; the opponent's is
- * neutral, never red. Tap expands the last 3. Renders nothing without events. Mobile twin: mobile/src/components/MatchupModule.tsx.
+ * Compact, tap-to-expand sections inside the top Matchup module (score header stays above): Win odds, Projected finals,
+ * Games (real clock) and Plays (server big plays + client-derived feed, one list). Replaces the separate big-play line
+ * and Live feed card. Green only when a play is for you; the opponent's is neutral, never red. Mobile twin:
+ * mobile/src/components/MatchupModule.tsx.
  */
-export function LatestBigPlay({ plays, mineName, opponentName }: { plays: MatchupBigPlay[]; mineName: string; opponentName: string }) {
-  const [open, setOpen] = useState(false);
+export function MatchupLiveSectionsView({ model, sections, mineName, opponentName }: { model: MatchupCardModel; sections: MatchupLiveSections; mineName: string; opponentName: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(timer);
   }, []);
-  if (plays.length === 0) return null;
-  const shown = open ? plays.slice(0, 3) : plays.slice(0, 1);
+  const { plays, games } = sections;
+  const realPlays = plays.filter((p) => !p.soFar);
+  const playsSummary = plays.length === 0 ? quietLabel(sections.ageSeconds) : realPlays.length > 0 ? `${playerSurname(realPlays[0].name) || realPlays[0].name} · ${realPlays[0].detail}` : `${plays.length} so far`;
   return (
-    <div className="flex flex-col gap-1 pt-1" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }} data-testid="matchup-big-play">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-2 pt-2 text-left"
-        style={{ color: "inherit", minHeight: "var(--touch-target-min)" }}
-        aria-expanded={open}
-        aria-label={`Latest big play. ${open ? "Collapse" : "Show last 3"}`}
-        onClick={() => setOpen((v) => !v)}
-        disabled={plays.length < 2}
-        data-testid="matchup-big-play-toggle"
-      >
-        <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-          Latest big play
-        </span>
-        {plays.length > 1 ? (
-          <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }} aria-hidden="true">
-            {open ? "Hide" : "More"}
-          </span>
-        ) : null}
-      </button>
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {shown.map((play) => {
-          const mine = play.side === "mine";
-          return (
-            <li key={play.id} className="flex min-w-0 items-center gap-2" data-testid="matchup-big-play-item">
-              <PlayerAvatar playerId={play.player_id ?? ""} size={32} name={play.name} />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="break-words text-sm font-bold">
-                  {playerSurname(play.name) || play.name} · {play.description}
+    <div className="flex flex-col" data-testid="matchup-live-sections">
+      {model.win ? (
+        <SectionRow id="odds" title="Win odds" summary={model.win.label}>
+          <p className="m-0 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            {sections.live ? "Updates as the games play: points so far plus what each player has left, on the real game clock." : "Based on this week's projections."}
+          </p>
+        </SectionRow>
+      ) : null}
+      {sections.projected ? (
+        <SectionRow id="projected" title="Projected finals" summary={`${sections.projected.mine} - ${sections.projected.opponent}`}>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <span className="flex flex-col"><span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{mineName}</span><span className="font-extrabold tabular-nums">{sections.projected.mine}</span></span>
+            <span className="flex flex-col items-end"><span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{opponentName}</span><span className="font-extrabold tabular-nums">{sections.projected.opponent}</span></span>
+          </div>
+          {sections.projectedLine ? <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>{sections.projectedLine}</p> : null}
+        </SectionRow>
+      ) : null}
+      {games.length > 0 ? (
+        <SectionRow id="games" title="Games" summary={games.find((g) => g.live)?.clock ? `${games.find((g) => g.live)?.clock} · ${games.filter((g) => g.live).length} live` : `${games.length} played`} defaultOpen={games.some((g) => g.live)}>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {games.map((g) => (
+              <li key={g.key} className="flex flex-col text-xs" data-testid="matchup-game">
+                <span className="flex items-center justify-between gap-2 font-bold">
+                  <span className="tabular-nums">{g.score}</span>
+                  <span style={{ color: g.live ? "var(--color-success)" : "var(--color-text-muted)" }}>{g.live ? "● " : ""}{g.clock}</span>
                 </span>
-                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {feedAgeLabel(play.at, now)}
-                  {play.approx ? " · approx." : ""} · for {mine ? mineName : opponentName}
-                </span>
-              </span>
-              <span className="shrink-0 text-sm font-extrabold tabular-nums" style={{ color: mine && play.points >= 0 ? "var(--color-success)" : "var(--color-text-secondary)" }} data-testid="matchup-big-play-points">
-                {feedPointsLabel(play.points)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+                {g.situation ? <span style={{ color: "var(--color-text-muted)" }}>{g.situation}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </SectionRow>
+      ) : null}
+      {sections.live || plays.length > 0 ? (
+        <SectionRow id="plays" title="Plays" summary={playsSummary} defaultOpen={realPlays.length > 0}>
+          {plays.length === 0 ? (
+            <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="matchup-plays-quiet">{quietLabel(sections.ageSeconds)}</p>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-2 p-0" role="log" aria-live="polite">
+              {plays.map((play) => {
+                const mine = play.side === "mine";
+                return (
+                  <li key={play.id} className="flex min-w-0 items-center gap-2" data-testid="matchup-big-play-item">
+                    <PlayerAvatar playerId={play.playerId ?? ""} size={32} name={play.name} />
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="break-words text-sm font-bold">{playerSurname(play.name) || play.name} · {play.detail}</span>
+                      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                        {[play.clock, play.soFar ? "so far" : feedAgeLabel(play.at, now), play.approx && !play.soFar ? "approx." : null, `for ${mine ? mineName : opponentName}`].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-sm font-extrabold tabular-nums" style={{ color: mine && play.points >= 0 ? "var(--color-success)" : "var(--color-text-secondary)" }} data-testid="matchup-big-play-points">
+                      {feedPointsLabel(play.points)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="m-0 text-[11px]" style={{ color: "var(--color-text-muted)" }}>Built from score changes between refreshes, so times are when we noticed.</p>
+        </SectionRow>
+      ) : null}
     </div>
   );
 }
@@ -136,7 +202,7 @@ export function MatchupHeroCard({
   model,
   onOpenPlayer,
   action,
-  bigPlays,
+  liveSections,
   testId = "matchup-hero",
   bare = false,
   children,
@@ -146,8 +212,8 @@ export function MatchupHeroCard({
   onOpenPlayer?: (player: MatchupSwingPlayer) => void;
   /** The one primary action ("Open lineup"). */
   action?: ReactNode;
-  /** Live big plays (Matchup page only); the line is hidden when empty. */
-  bigPlays?: MatchupBigPlay[];
+  /** Live sections (Matchup page only): Win odds, Projected finals, Games, Plays; absent elsewhere. */
+  liveSections?: MatchupLiveSections;
   testId?: string;
   /** Render the body without its own card, for placing inside a CompactModule (no card inside a card). */
   bare?: boolean;
@@ -207,7 +273,7 @@ export function MatchupHeroCard({
         {[model.basis === "projected" ? "Projected points" : null, model.detail].filter(Boolean).join(" · ")}
       </p>
       <SwingPlayers swing={model.swing} onOpenPlayer={onOpenPlayer} />
-      {bigPlays && bigPlays.length > 0 ? <LatestBigPlay plays={bigPlays} mineName={model.mine.name} opponentName={model.opponent.name} /> : null}
+      {liveSections ? <MatchupLiveSectionsView model={model} sections={liveSections} mineName={model.mine.name} opponentName={model.opponent.name} /> : null}
       {action}
       {children}
     </>,

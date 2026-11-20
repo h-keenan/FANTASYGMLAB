@@ -994,6 +994,10 @@ export interface MatchupStarter extends LineupPlayer {
   game_opponent_score?: number | null;
   /** Share (0-1) of his own game already played, a wall-clock estimate; null before kickoff. */
   game_progress?: number | null;
+  /** Real game clock from the scoreboard: "Q2 5:54", "Half", "OT 9:12", "Final". */
+  game_clock_label?: string | null;
+  /** Down and distance while live ("2nd & 7 at HOU 25"). */
+  game_situation?: string | null;
 }
 
 /** modules.nfl_schedule.game_phase for one player's own NFL game. */
@@ -1054,6 +1058,10 @@ export interface MatchupRealStarter {
   game_opponent_score?: number | null;
   /** Share (0-1) of his own game already played, a wall-clock estimate; null before kickoff. */
   game_progress?: number | null;
+  /** Real game clock from the scoreboard: "Q2 5:54", "Half", "OT 9:12", "Final". */
+  game_clock_label?: string | null;
+  /** Down and distance while live ("2nd & 7 at HOU 25"). */
+  game_situation?: string | null;
   /** Live stat line (non-zero tracked stats) while his game is live; the Live feed diffs these between polls. */
   stats?: Record<string, number> | null;
   /** The league lineup slot he fills, named like the suggested lineup's slots. */
@@ -1227,6 +1235,10 @@ export interface MatchupBigPlay {
   description: string;
   /** Several things landed between polls (a combined drive). */
   approx: boolean;
+  /** Real game clock when the play was noticed ("Q2 6:32"). */
+  clock?: string | null;
+  /** Read from the current stat line ("2 TD so far"), not a play noticed between polls. */
+  so_far?: boolean;
 }
 
 /** One slot of a proposed lineup sent to POST .../matchup/what-if. */
