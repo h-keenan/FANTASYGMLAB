@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userStorage } from './userStorage';
 
 const KEY_PREFIX = 'fgl:dashboard-seen-recs:';
 
@@ -20,7 +20,7 @@ const KEY_PREFIX = 'fgl:dashboard-seen-recs:';
 
 async function getSeenIds(leagueId: string): Promise<Set<string>> {
   try {
-    const raw = await AsyncStorage.getItem(KEY_PREFIX + leagueId);
+    const raw = await userStorage.get(KEY_PREFIX + leagueId);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? new Set(parsed.filter((id) => typeof id === 'string')) : new Set();
@@ -31,7 +31,7 @@ async function getSeenIds(leagueId: string): Promise<Set<string>> {
 
 async function setSeenIds(leagueId: string, ids: string[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY_PREFIX + leagueId, JSON.stringify(ids.slice(0, 100)));
+    await userStorage.set(KEY_PREFIX + leagueId, JSON.stringify(ids.slice(0, 100)));
   } catch {
     // Best-effort only — a storage failure just means every item looks "new" next time.
   }

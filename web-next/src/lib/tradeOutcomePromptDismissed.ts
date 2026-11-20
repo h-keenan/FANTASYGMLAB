@@ -1,3 +1,4 @@
+import { userGet, userSet } from "./userStorage";
 const KEY = "fd:trade-outcome-prompt-dismissed";
 
 /**
@@ -18,7 +19,7 @@ const KEY = "fd:trade-outcome-prompt-dismissed";
  */
 export function isTradeOutcomePromptDismissed(): boolean {
   try {
-    return window.sessionStorage.getItem(KEY) === "1";
+    return userGet(KEY, "session") === "1";
   } catch {
     return false;
   }
@@ -26,7 +27,7 @@ export function isTradeOutcomePromptDismissed(): boolean {
 
 export function setTradeOutcomePromptDismissed(): void {
   try {
-    window.sessionStorage.setItem(KEY, "1");
+    userSet(KEY, "1", "session");
   } catch {
     // Best-effort; the component's own state still hides it for this page.
   }

@@ -22,6 +22,7 @@ import { clearPortfolioSnapshots } from "@/lib/portfolioSnapshot";
 import { storeCurrentPathForReturnAfterSignIn } from "@/lib/protectedRouteReturn";
 import { clearSessionEnded, isForcedSignOut, markSessionEnded, readSessionEnded } from "@/lib/sessionEnded";
 import { supabase } from "@/lib/supabase";
+import { applySessionUser } from "@/lib/userStorage";
 
 /** Current in-app location (path + query + hash) to come back to after auth. */
 function currentLocationPath(): string {
@@ -171,6 +172,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void (async () => {
       const { data } = await supabase.auth.getSession();
       if (!isMounted) return;
+      // Storage learns the user before any child reads per-user state.
+      applySessionUser(data.session?.user?.id ?? null);
       sessionRef.current = data.session;
       // A forced sign-out followed by a reload: the note must still be there when the sign-in form shows.
       if (!data.session && readSessionEnded(safeSessionStorage())) setSessionEnded(true);
@@ -180,6 +183,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!isMounted) return;
+      // Purge a departing user's local state first, so the return path stored below (for the same user) survives it.
+      applySessionUser(nextSession?.user?.id ?? null);
       if (isForcedSignOut({ event, hadSession: Boolean(sessionRef.current), userInitiated: userSignOutRef.current })) {
         // Pages are about to bounce a null session to "/": remember why, and where the user was, before they do.
         markSessionEnded(safeSessionStorage());
@@ -303,6 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRecoveryPending(false);
         // The cached Portfolio is one person's leagues: gone with the session.
         clearPortfolioSnapshots(safeLocalStorage());
+        applySessionUser(null);
         await supabase.auth.signOut();
       },
       deleteAccount: async () => {
@@ -319,6 +325,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: e instanceof Error ? e.message : "Could not delete the account." };
         }
         userSignOutRef.current = true;
+        applySessionUser(null);
         await supabase.auth.signOut();
         return { error: null };
       },

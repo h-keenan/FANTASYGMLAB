@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userStorage } from '../lib/userStorage';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -124,7 +124,7 @@ export function SimRealismBanner({ ctx }: { ctx: SimCtx }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    AsyncStorage.getItem(key)
+    userStorage.get(key)
       .then((v) => {
         if (!cancelled) setDismissed(v === '1');
       })
@@ -154,7 +154,7 @@ export function SimRealismBanner({ ctx }: { ctx: SimCtx }) {
             label={SIM_REALISM_BANNER_DISMISS}
             onPress={() => {
               setDismissed(true);
-              AsyncStorage.setItem(key, '1').catch(() => undefined);
+              userStorage.set(key, '1').catch(() => undefined);
             }}
           />
         </View>

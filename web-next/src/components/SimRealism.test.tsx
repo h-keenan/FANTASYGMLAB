@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SimRealismBanner, SimRealismModule, SimRealismSheet } from "./SimRealism";
 import type { SimCtx } from "@/components/SimGameParts";
 import type { SimGame, SimRealismInfo } from "@/lib/simGame";
+import { applySessionUser, resetUserStorageForTests } from "@/lib/userStorage";
 
 const upgrade = vi.fn();
 vi.mock("@/lib/api", () => ({ api: { realismUpgradeSimGame: (...a: unknown[]) => upgrade(...a) } }));
@@ -41,6 +42,8 @@ function makeCtx(info: SimRealismInfo | null) {
 beforeEach(() => {
   upgrade.mockReset();
   window.localStorage.clear();
+  resetUserStorageForTests();
+  applySessionUser("user-1");
 });
 
 describe("SimRealism UI", () => {

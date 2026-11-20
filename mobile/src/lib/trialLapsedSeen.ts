@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userStorage } from './userStorage';
 
 const KEY = 'fgl:trial-lapsed-shown-expiration';
 
@@ -10,7 +10,7 @@ const KEY = 'fgl:trial-lapsed-shown-expiration';
  */
 export async function getShownTrialLapseExpiration(): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem(KEY);
+    return await userStorage.get(KEY);
   } catch {
     return null;
   }
@@ -18,7 +18,7 @@ export async function getShownTrialLapseExpiration(): Promise<string | null> {
 
 export async function setShownTrialLapseExpiration(expiration: string): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY, expiration);
+    await userStorage.set(KEY, expiration);
   } catch {
     // Best-effort — worst case it shows again next launch.
   }

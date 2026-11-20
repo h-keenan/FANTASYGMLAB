@@ -1,4 +1,5 @@
 import { simRookieNoticeKey } from "@/lib/simGame";
+import { userGet, userSet } from "@/lib/userStorage";
 
 /**
  * Per-game "the generated rookie class popup was already dismissed" flag.
@@ -8,7 +9,7 @@ import { simRookieNoticeKey } from "@/lib/simGame";
  */
 export function isSimRookieNoticeSeen(gameId: string): boolean {
   try {
-    return window.localStorage.getItem(simRookieNoticeKey(gameId)) === "1";
+    return userGet(simRookieNoticeKey(gameId)) === "1";
   } catch {
     return false;
   }
@@ -16,7 +17,7 @@ export function isSimRookieNoticeSeen(gameId: string): boolean {
 
 export function setSimRookieNoticeSeen(gameId: string): void {
   try {
-    window.localStorage.setItem(simRookieNoticeKey(gameId), "1");
+    userSet(simRookieNoticeKey(gameId), "1");
   } catch {
     // Best-effort.
   }

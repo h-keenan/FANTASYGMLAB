@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userStorage } from '../lib/userStorage';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -40,7 +40,7 @@ export function useSimNotifications(ctx: SimCtx) {
 
   useEffect(() => {
     let active = true;
-    AsyncStorage.getItem(simNotifCursorKey(gameId))
+    userStorage.get(simNotifCursorKey(gameId))
       .then((raw) => {
         if (active) setCursor(simNotifParseCursor(raw));
       })
@@ -55,7 +55,7 @@ export function useSimNotifications(ctx: SimCtx) {
     (async () => {
       let since = 0;
       try {
-        since = simNotifParseCursor(await AsyncStorage.getItem(simNotifCursorKey(gameId)));
+        since = simNotifParseCursor(await userStorage.get(simNotifCursorKey(gameId)));
       } catch {
         since = 0;
       }
@@ -77,7 +77,7 @@ export function useSimNotifications(ctx: SimCtx) {
   const markAllRead = useCallback(() => {
     const next = simNotifMarkAllRead(cursor, latest);
     setCursor(next);
-    AsyncStorage.setItem(simNotifCursorKey(gameId), String(next)).catch(() => {});
+    userStorage.set(simNotifCursorKey(gameId), String(next)).catch(() => {});
   }, [cursor, latest, gameId]);
   return { items, unread, cursor, markAllRead };
 }

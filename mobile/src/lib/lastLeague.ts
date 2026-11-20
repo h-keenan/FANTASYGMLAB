@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userStorage } from './userStorage';
 
 import { api } from './api';
 import { isShowcaseModeEnabled } from './showcaseMode';
@@ -17,7 +17,7 @@ export interface LastLeague {
  */
 export async function getLastLeague(): Promise<LastLeague | null> {
   try {
-    const raw = await AsyncStorage.getItem(KEY);
+    const raw = await userStorage.get(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.leagueId === 'string' && typeof parsed.leagueName === 'string') {
@@ -31,7 +31,7 @@ export async function getLastLeague(): Promise<LastLeague | null> {
 
 export async function setLastLeague(league: LastLeague): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(league));
+    await userStorage.set(KEY, JSON.stringify(league));
   } catch {
     // Best-effort — not worth surfacing to the user.
   }
@@ -54,7 +54,7 @@ export async function setLastLeague(league: LastLeague): Promise<void> {
  */
 export async function syncLastLeagueFromServer(league: LastLeague): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(league));
+    await userStorage.set(KEY, JSON.stringify(league));
   } catch {
     // Best-effort — not worth surfacing to the user.
   }

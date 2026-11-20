@@ -147,6 +147,8 @@ export const IDENTICAL = [
   "badDayCopy.ts",
   "requestTimeouts.ts",
   "latestRequest.ts",
+  "accountScope.ts",
+  "accountCaches.ts",
   "shareToggleFlow.ts",
   "useLatestGate.ts",
   "sessionEnded.ts",
@@ -194,6 +196,7 @@ export const MIRRORED = [
 export const DIVERGED = [
   // Platform glue that is meant to differ (storage, SDKs, env, gestures).
   "analytics.ts",
+  "userStorage.ts", // platform binding of accountScope.ts (web: sync localStorage + sessionStorage; app: AsyncStorage)
   "useOverlay.ts", // platform hook over the shared overlayStack (web: useId + runtime; mobile: Modal registration)
   "api.ts", // types are hand-duplicated; see docs/web-mobile-lib-twins.md
   "env.ts",

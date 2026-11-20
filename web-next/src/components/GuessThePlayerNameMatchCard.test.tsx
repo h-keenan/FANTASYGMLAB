@@ -7,6 +7,7 @@ import {
   type GuessThePlayerNameMatchAnswerResponse,
   type GuessThePlayerNameMatchResponse,
 } from "@/lib/api";
+import { applySessionUser, resetUserStorageForTests } from "@/lib/userStorage";
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -63,6 +64,8 @@ beforeEach(() => {
   // The dismiss-persistence fix writes a real key to window.localStorage,
   // which otherwise survives across tests in this same file/worker.
   window.localStorage.clear();
+  resetUserStorageForTests();
+  applySessionUser("user-1");
 });
 
 describe("GuessThePlayerNameMatchCard", () => {
@@ -202,8 +205,8 @@ describe("GuessThePlayerNameMatchCard", () => {
     await screen.findByText("Who Is Who?");
     fireEvent.click(screen.getByLabelText("Dismiss Name Match"));
 
-    expect(window.localStorage.getItem("fd:guess-the-player-name-match-dismissed-pick-id")).toBe("pair-1");
-    expect(window.localStorage.getItem("fd:guess-the-player-dismissed-pick-id")).toBeNull();
+    expect(window.localStorage.getItem("u:user-1:fd:guess-the-player-name-match-dismissed-pick-id")).toBe("pair-1");
+    expect(window.localStorage.getItem("u:user-1:fd:guess-the-player-dismissed-pick-id")).toBeNull();
   });
 
   // Regression: this link used to omit `?name=`, so following it into the

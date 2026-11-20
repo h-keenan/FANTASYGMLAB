@@ -28,11 +28,12 @@ import {
   simRealismToast,
   simRealismWhen,
 } from "@/lib/simRealism";
+import { userGet, userSet } from "@/lib/userStorage";
 import { Presence } from "@/components/ui/Presence";
 
 function readDismissed(key: string): boolean {
   try {
-    return window.localStorage.getItem(key) === "1";
+    return userGet(key) === "1";
   } catch {
     return false;
   }
@@ -40,7 +41,7 @@ function readDismissed(key: string): boolean {
 
 function writeDismissed(key: string) {
   try {
-    window.localStorage.setItem(key, "1");
+    userSet(key, "1");
   } catch {
     // Storage can be blocked: the banner just shows again next visit.
   }

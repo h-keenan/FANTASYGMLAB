@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userStorage } from './userStorage';
 
 const KEY_PREFIX = 'fgl:trade-hub-seen:';
 
@@ -14,7 +14,7 @@ const KEY_PREFIX = 'fgl:trade-hub-seen:';
  */
 export async function getSeenTradeIdeaCount(leagueId: string): Promise<number> {
   try {
-    const raw = await AsyncStorage.getItem(KEY_PREFIX + leagueId);
+    const raw = await userStorage.get(KEY_PREFIX + leagueId);
     const parsed = raw ? Number(raw) : 0;
     return Number.isFinite(parsed) ? parsed : 0;
   } catch {
@@ -24,7 +24,7 @@ export async function getSeenTradeIdeaCount(leagueId: string): Promise<number> {
 
 export async function setSeenTradeIdeaCount(leagueId: string, count: number): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY_PREFIX + leagueId, String(count));
+    await userStorage.set(KEY_PREFIX + leagueId, String(count));
   } catch {
     // Best-effort — worst case the glyph shows again next time.
   }

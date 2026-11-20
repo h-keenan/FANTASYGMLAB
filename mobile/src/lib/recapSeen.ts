@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userStorage } from './userStorage';
 
 const KEY_PREFIX = 'fgl:recap-opened:';
 
@@ -20,7 +20,7 @@ const KEY_PREFIX = 'fgl:recap-opened:';
  */
 export async function getLastOpenedRecapId(leagueId: string): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem(KEY_PREFIX + leagueId);
+    return await userStorage.get(KEY_PREFIX + leagueId);
   } catch {
     return null;
   }
@@ -29,7 +29,7 @@ export async function getLastOpenedRecapId(leagueId: string): Promise<string | n
 export async function markRecapOpened(leagueId: string, recapId: string): Promise<void> {
   if (!recapId) return;
   try {
-    await AsyncStorage.setItem(KEY_PREFIX + leagueId, recapId);
+    await userStorage.set(KEY_PREFIX + leagueId, recapId);
   } catch {
     // Best-effort — worst case the Dashboard module shows again next time.
   }
