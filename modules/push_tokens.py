@@ -13,7 +13,7 @@ from typing import Any, Iterable, Mapping
 
 import requests
 
-from modules import account_store, auth_supabase
+from modules import account_store, app_config, auth_supabase, experimental_graduation
 
 
 TOKENS_TABLE = "push_tokens"
@@ -22,6 +22,15 @@ EXPO_PUSH_API_URL = "https://exp.host/--/api/v2/push/send"
 EXPO_PUSH_CHUNK_SIZE = 100
 EXPO_RECEIPTS_API_URL = "https://exp.host/--/api/v2/push/getReceipts"
 EXPO_RECEIPTS_CHUNK_SIZE = 300
+# Kill switch (owner Zach, infra). ON: registering a token re-owns it to the
+# caller server-side (service-role upsert; the user-JWT path cannot, RLS hides
+# another account's row) and senders drop a token whose owner is ambiguous.
+# OFF restores the previous user-JWT-only behaviour exactly.
+HANDOFF_FLAG = "DYNASTYGM_PUSH_TOKEN_HANDOFF_V1"
+
+
+def handoff_enabled() -> bool:
+    return experimental_graduation.graduated_kill_switch_enabled(HANDOFF_FLAG, default=True)
 
 
 def _safe_text(value: object, default: str = "") -> str:
@@ -67,8 +76,12 @@ def register_token(
     timezone: str = "",
 ) -> tuple[bool, str]:
     """Upsert a device token for the caller. Primary key is the token itself,
-    so re-registering the same device under a different account reassigns
-    the row instead of erroring or duplicating.
+    so one token has exactly one owner. Under the user's JWT, RLS hides a
+    row owned by another account, so the conflict update is rejected and the
+    old owner would keep the device. With the handoff flag on, the upsert runs
+    with the service role instead (``user_id`` is the verified caller): one
+    atomic statement that moves the token to the caller. Falls back to the
+    JWT path when the service key is not configured or the flag is off.
     """
 
     token = _safe_text(expo_push_token)
@@ -84,6 +97,10 @@ def register_token(
         "platform": normalize_platform(platform),
         "device_name": _safe_text(device_name)[:120],
     }
+    if handoff_enabled():
+        ok, error, attempted = _service_reown(config, payload, normalize_timezone(timezone))
+        if attempted:
+            return ok, error
     tz_name = normalize_timezone(timezone)
     if tz_name:
         # `timezone` needs docs/supabase_push_safety.sql. Until that is
@@ -99,6 +116,67 @@ def register_token(
     )
 
 
+def _service_reown(config: Mapping[str, Any], payload: dict[str, Any], tz_name: str) -> tuple[bool, str, bool]:
+    """Service-role upsert on the token primary key. Returns (ok, error, attempted)."""
+
+    key = app_config.config_value("SUPABASE_SERVICE_ROLE_KEY")
+    if not key or not auth_supabase.is_configured(dict(config)):
+        return False, "", False
+    from datetime import datetime, timezone as _tz
+
+    body = {**payload, "updated_at": datetime.now(_tz.utc).isoformat()}
+    attempts = ([{"timezone": tz_name}] if tz_name else []) + [{}]
+    for extra in attempts:
+        try:
+            response = requests.post(
+                auth_supabase.rest_api_url(dict(config), TOKENS_TABLE, "on_conflict=expo_push_token"),
+                headers={
+                    "apikey": key,
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "resolution=merge-duplicates,return=minimal",
+                },
+                json={**body, **extra},
+                timeout=15,
+            )
+        except Exception:
+            return False, "Could not reach Supabase table storage.", True
+        if response.status_code < 400:
+            return True, "", True
+        # `timezone` column may be unapplied: the next attempt omits it.
+    return False, "push token upsert failed", True
+
+
+def owned_recipients(rows: Iterable[Mapping[str, Any]]) -> dict[str, list[str]]:
+    """user_id -> tokens, each token under exactly one user.
+
+    The primary key already guarantees one owner per token; if a legacy or
+    hand-edited table ever shows the same token under two users, only the most
+    recently updated owner keeps it, so a handed-off device never receives the
+    previous account's notifications. With the flag off, rows pass through.
+    """
+
+    clean = [r for r in rows if isinstance(r, Mapping)]
+    newest: dict[str, tuple[str, str]] = {}
+    if handoff_enabled():
+        for row in clean:
+            token = _safe_text(row.get("expo_push_token"))
+            stamp = _safe_text(row.get("updated_at"))
+            if token and (token not in newest or stamp >= newest[token][0]):
+                newest[token] = (stamp, _safe_text(row.get("user_id")))
+    out: dict[str, list[str]] = {}
+    for row in clean:
+        uid = _safe_text(row.get("user_id"))
+        token = _safe_text(row.get("expo_push_token"))
+        if not uid or not token:
+            continue
+        if newest and newest[token][1] != uid:
+            continue
+        if token not in out.setdefault(uid, []):
+            out[uid].append(token)
+    return out
+
+
 def unregister_token(
     config: Mapping[str, Any],
     access_token: str,
@@ -106,7 +184,9 @@ def unregister_token(
     user_id: str,
     expo_push_token: str,
 ) -> tuple[bool, str]:
-    """Delete one of the caller's own tokens (e.g. called on sign-out)."""
+    """Delete one of the caller's own tokens (e.g. called on sign-out). The
+    ``user_id`` filter plus the table's delete RLS policy mean a caller can
+    never remove another account's token (a foreign token deletes 0 rows)."""
 
     token = _safe_text(expo_push_token)
     uid = _safe_text(user_id)

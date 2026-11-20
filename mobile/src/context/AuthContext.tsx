@@ -31,7 +31,8 @@ import { purgeAccountStorage, userStorage } from '../lib/userStorage';
 import { isForcedSignOut } from '../lib/sessionEnded';
 import { identifyRevenueCatUser, signOutRevenueCatUser } from '../lib/revenuecat';
 import { syncLastLeagueFromServer } from '../lib/lastLeague';
-import { syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotifications';
+import { forgetPushTokenForUserChange, syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotifications';
+import { unregisterThenDropSession } from '../lib/pushHandoffCore';
 import { supabase } from '../lib/supabase';
 import { useDensity } from './DensityContext';
 import { useExperienceLevel } from './ExperienceLevelContext';
@@ -139,6 +140,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await clearAuthenticatedQueryCache();
         // Same trigger, same guarantee for the user-scoped local state (lib/accountScope.ts).
         await purgeAccountStorage();
+        // Same trigger for the push token: the in-memory token belonged to the previous user. The session
+        // effects below re-register it for the new user, and the backend moves it (one owner per token).
+        forgetPushTokenForUserChange();
       }
       lastHandledUserIdRef.current = nextUserId;
       setCurrentAuthScopeUserId(nextUserId);
@@ -272,7 +276,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Push-token unregistering needs the still-active session/access
         // token to call the backend, so it must run before anything below
         // invalidates it.
-        await unregisterCurrentPushToken();
+        await unregisterThenDropSession({
+          unregisterPush: unregisterCurrentPushToken,
+          dropSession: async () => {
         try {
           await supabase.auth.signOut();
           await signOutRevenueCatUser();
@@ -291,6 +297,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setCurrentAuthScopeUserId(null);
           await writeStoredAuthScopeUserId(AsyncStorage, null);
         }
+          },
+        });
       },
       deleteAccount: async () => {
         // The `delete-account` edge function (supabase/functions/delete-account)
@@ -316,7 +324,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // first (needs the still-live session), then best-effort
         // sign-out/cache-teardown that always completes via `finally`.
         userSignOutRef.current = true;
-        await unregisterCurrentPushToken();
+        await unregisterThenDropSession({
+          unregisterPush: unregisterCurrentPushToken,
+          dropSession: async () => {
         try {
           await supabase.auth.signOut();
           await signOutRevenueCatUser();
@@ -328,6 +338,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setCurrentAuthScopeUserId(null);
           await writeStoredAuthScopeUserId(AsyncStorage, null);
         }
+          },
+        });
         return { error: null };
       },
     }),
