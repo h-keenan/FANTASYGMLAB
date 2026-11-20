@@ -119,7 +119,7 @@ export function MatchupLiveSectionsView({ model, sections, mineName, opponentNam
   const { plays, games } = sections;
   const realPlays = plays.filter((p) => !p.soFar);
   const liveGame = games.find((g) => g.live);
-  const playsSummary = plays.length === 0 ? quietLabel(sections.ageSeconds) : realPlays.length > 0 ? `${realPlays[0].name.split(' ').slice(-1)[0]} · ${realPlays[0].detail}` : `${plays.length} so far`;
+  const playsSummary = plays.length === 0 ? quietLabel(sections.ageSeconds) : realPlays.length > 0 ? `${playerSurname(realPlays[0].name) || realPlays[0].name} · ${realPlays[0].detail}` : `${plays.length} so far`;
   return (
     <View testID="matchup-live-sections">
       {model.win ? (

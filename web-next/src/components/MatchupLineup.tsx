@@ -293,7 +293,7 @@ function CompactSide({
           {gameLine ? <span>{gameLine}</span> : null}
         </span>
         {live && card.statLine ? (
-          <span className={`text-[0.625rem] leading-tight${mirror ? " text-right" : ""}`} style={{ color: "var(--color-text-muted)" }} data-testid="compact-stat-line">
+          <span className={`text-[0.6875rem] leading-tight${mirror ? " text-right" : ""}`} style={{ color: "var(--color-text-muted)" }} data-testid="compact-stat-line">
             {card.statLine}
           </span>
         ) : null}
