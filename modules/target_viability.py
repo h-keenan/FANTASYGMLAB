@@ -25,7 +25,8 @@ from modules.coerce import float_nan_to_none
 from modules.team_eval import normalize_team_strategy
 
 ENV_KEY = "DYNASTYGM_TARGET_VIABILITY_V1"
-# Starters per position on an NFL depth chart (a real team's usual offense), not a fantasy lineup.NFL_DEPTH_STARTERS = {"QB": 1, "RB": 2, "WR": 3, "TE": 1}
+# Starters per position on an NFL depth chart (a real team's usual offense), not a fantasy lineup.
+NFL_DEPTH_STARTERS = {"QB": 1, "RB": 2, "WR": 3, "TE": 1}
 HORIZON_GAMES = 17.0
 TARGET_MIN_VIABILITY = 0.4
 STASH_MIN_VIABILITY = 0.2
