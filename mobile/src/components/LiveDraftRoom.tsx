@@ -1,3 +1,4 @@
+import TeamNameLink from './TeamNameLink';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -447,6 +448,7 @@ function DraftBoard({
                 key={row.roster_id}
                 row={row}
                 last={index === state.team_rankings.length - 1}
+                leagueId={leagueId}
                 styles={styles}
                 colors={colors}
               />
@@ -674,11 +676,13 @@ function RankingsBoard({
 function TeamRankingRow({
   row,
   last,
+  leagueId,
   styles,
   colors,
 }: {
   row: LiveDraftTeamRow;
   last: boolean;
+  leagueId: string;
   styles: Styles;
   colors: ThemeColors;
 }) {
@@ -688,9 +692,7 @@ function TeamRankingRow({
       <AppText style={styles.rank}>#{row.team_rank}</AppText>
       <View style={styles.flex}>
         <View style={styles.nameLine}>
-          <AppText style={styles.rowName} numberOfLines={1}>
-            {row.team_name}
-          </AppText>
+          <TeamNameLink leagueId={leagueId} rosterId={row.roster_id} name={row.team_name} textStyle={styles.rowName} numberOfLines={1} />
           {row.is_mine ? <ToneBadge label="You" color={colors.accent} size="xs" /> : null}
         </View>
         <AppText style={styles.muted} numberOfLines={2}>

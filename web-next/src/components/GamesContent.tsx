@@ -201,6 +201,8 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
             <RankingRow
               key={team.roster_id}
               rankLabel={formatRank(index + 1)}
+              leagueId={leagueId}
+              rosterId={team.roster_id}
               teamName={team.team_name}
               avatarUrl={team.avatar_url}
               ownerName={team.record_label}
@@ -547,6 +549,8 @@ function PickemPanel({ leagueId }: { leagueId: string }) {
               <RankingRow
                 key={row.roster_id}
                 rankLabel={formatRank(row.rank)}
+                leagueId={leagueId}
+                rosterId={row.roster_id}
                 teamName={row.team_name}
                 avatarUrl={row.avatar_url}
                 ownerName={row.owner_name}
@@ -598,6 +602,7 @@ function MatchupPick({
                 opacity: phase !== "open" && !picked && !won ? 0.8 : 1,
               }}
             >
+              {/* team-tap-exempt: a pick'em choice, tapping selects the winner (picker rule), not a profile link */}
               <TeamAvatar avatarUrl={team.avatar_url} name={team.team_name} size={28} />
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-sm font-bold">{team.team_name}</span>

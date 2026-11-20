@@ -133,12 +133,18 @@ describe("leaguePulseHighlights", () => {
 });
 
 describe("LeaguePulseCard", () => {
-  it("is one tappable card (link to News > My League) with a visible chevron, not a lone arrow", async () => {
+  it("the header links to News > My League with a chevron; each team name is its own team-sheet button, never nested in that link", async () => {
     vi.mocked(api.getTeamRankings).mockResolvedValue({ ok: true, reason: "", teams: [team({ roster_id: "1", current_streak: 3, transaction_activity_count: 5 })] } as never);
     render(<LeaguePulseCard leagueId="abc" leagueName="My League" />);
     const link = await screen.findByRole("link", { name: /League Activity/ });
     expect(link).toHaveAttribute("href", "/news?tab=league&league=abc&name=My+League");
-    expect(link).toContainElement(screen.getByTestId("league-pulse-card"));
+    expect(screen.getByTestId("league-pulse-card")).toContainElement(link);
+    const teamButtons = screen.getAllByTestId("team-name-link");
+    expect(teamButtons.length).toBeGreaterThan(0);
+    for (const button of teamButtons) {
+      expect(link).not.toContainElement(button);
+      expect(button.tagName).toBe("BUTTON");
+    }
   });
 
   it("renders nothing while loading and nothing on fetch failure", async () => {

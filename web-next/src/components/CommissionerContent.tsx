@@ -1,5 +1,6 @@
 "use client";
 
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { PageTitle } from "@/components/PageTitle";
 import { useEffect, useState } from "react";
 
@@ -124,7 +125,7 @@ function Bullets({ title, items, icon, color }: { title: string; items: string[]
 
 const INNOCENT_COLOR = "var(--color-information)";
 
-export function IntegrityTeamCard({ team }: { team: IntegrityTeam }) {
+export function IntegrityTeamCard({ team, leagueId }: { team: IntegrityTeam; leagueId?: string }) {
   const [open, setOpen] = useState(team.band === "strong");
   const expandable = team.band === "strong" || team.band === "worth_a_look";
   return (
@@ -140,9 +141,7 @@ export function IntegrityTeamCard({ team }: { team: IntegrityTeam }) {
           />
         ) : null}
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-base font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
-            {team.team_name}
-          </span>
+          <TeamNameLink leagueId={leagueId} rosterId={team.roster_id} name={team.team_name} className="text-base font-extrabold" />
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {team.owner_name}
             {team.weeks.evaluated ? ` · ${team.weeks.flagged} of ${team.weeks.evaluated} weeks flagged` : ""}
@@ -197,12 +196,10 @@ function CollusionCard({ pair }: { pair: IntegrityCollusionPair }) {
   );
 }
 
-function InactiveCard({ manager }: { manager: IntegrityInactiveManager }) {
+function InactiveCard({ manager, leagueId }: { manager: IntegrityInactiveManager; leagueId?: string }) {
   return (
     <AccentCard accent="var(--color-warning)" as="article">
-      <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-        {manager.team_name}
-      </span>
+      <TeamNameLink leagueId={leagueId} rosterId={manager.roster_id} name={manager.team_name} className="text-base font-extrabold" />
       <Bullets title="Evidence" items={manager.evidence} icon="clock" color="var(--color-warning)" />
       <Bullets title="Could be innocent" items={manager.innocent_explanations} icon="info" color={INNOCENT_COLOR} />
     </AccentCard>
@@ -267,7 +264,9 @@ export function CommissionerView({
   data,
   draftOrder,
   onDraftOrder,
+  leagueId,
 }: {
+  leagueId?: string;
   data: CommissionerIntegrityResponse;
   draftOrder: DraftOrderRule;
   onDraftOrder: (value: DraftOrderRule) => void;
@@ -300,7 +299,7 @@ export function CommissionerView({
         <section className="flex flex-col gap-3">
           <SectionHeading>Worth a look</SectionHeading>
           {flagged.map((team) => (
-            <IntegrityTeamCard key={team.roster_id} team={team} />
+            <IntegrityTeamCard key={team.roster_id} team={team} leagueId={leagueId} />
           ))}
         </section>
       ) : null}
@@ -320,7 +319,7 @@ export function CommissionerView({
         <section className="flex flex-col gap-3">
           <SectionHeading>Possibly inactive</SectionHeading>
           {data.inactive.map((m) => (
-            <InactiveCard key={m.roster_id} manager={m} />
+            <InactiveCard key={m.roster_id} manager={m} leagueId={leagueId} />
           ))}
         </section>
       ) : null}
@@ -342,7 +341,7 @@ export function CommissionerView({
               {showRest ? "Hide teams" : `Show ${rest.length} team${rest.length === 1 ? "" : "s"}`}
             </button>
           </div>
-          {showRest ? rest.map((team) => <IntegrityTeamCard key={team.roster_id} team={team} />) : null}
+          {showRest ? rest.map((team) => <IntegrityTeamCard key={team.roster_id} team={team} leagueId={leagueId} />) : null}
         </section>
       ) : null}
 
@@ -444,7 +443,7 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
         </>
       ) : (
         <ModuleErrorBoundary name="commissioner_integrity">
-          <CommissionerView data={data} draftOrder={draftOrder ?? "unknown"} onDraftOrder={setDraftOrder} />
+          <CommissionerView leagueId={leagueId} data={data} draftOrder={draftOrder ?? "unknown"} onDraftOrder={setDraftOrder} />
         </ModuleErrorBoundary>
       )}
       {ready && data && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}

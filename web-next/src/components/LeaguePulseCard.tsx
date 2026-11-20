@@ -4,7 +4,7 @@ import { InsightLink } from "@/components/ui/InsightLink";
 import { useEffect, useState } from "react";
 
 import { api, type LeagueTeamRankingsResponse, type TeamRanking } from "@/lib/api";
-import { TeamAvatar } from "@/components/TeamAvatar";
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { toneColorVar } from "@/lib/verdictToneCss";
 
 /**
@@ -126,15 +126,16 @@ export function LeaguePulseCard({
   if (!highlights || highlights.length === 0) return null;
 
   return (
-    <InsightLink insight="league_activity" league={{ id: leagueId, name: leagueName }} spoken={["League Activity", ...highlights.map((h) => `${h.label} ${h.team.team_name || "Team"} ${h.metric}`)]} noChevron testId="league-pulse-link">
     <article className="glass-surface flex flex-col gap-3 p-4" data-testid="league-pulse-card">
-      <div className="flex items-center justify-between gap-2">
-        <h3 style={{ font: "var(--font-card-title)" }}>League Activity</h3>
-      </div>
+      {/* The header is the link to League Activity; each team name below is its own team-sheet target (never nested in a link). */}
+      <InsightLink insight="league_activity" league={{ id: leagueId, name: leagueName }} spoken={["League Activity", ...highlights.map((h) => `${h.label} ${h.team.team_name || "Team"} ${h.metric}`)]} noChevron testId="league-pulse-link">
+        <div className="flex items-center justify-between gap-2">
+          <h3 style={{ font: "var(--font-card-title)" }}>League Activity</h3>
+        </div>
+      </InsightLink>
       <div className="flex flex-col gap-2.5">
         {highlights.map((highlight) => (
           <div key={highlight.key} className="flex items-center gap-3">
-            <TeamAvatar avatarUrl={highlight.team.avatar_url} name={highlight.team.team_name} size={28} />
             <div className="flex-1 flex flex-col min-w-0">
               <span
                 className="uppercase"
@@ -142,9 +143,16 @@ export function LeaguePulseCard({
               >
                 {highlight.label}
               </span>
-              <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-                {highlight.team.team_name || "Team"}
-              </span>
+              <TeamNameLink
+                leagueId={leagueId}
+                leagueName={leagueName}
+                rosterId={highlight.team.roster_id}
+                name={highlight.team.team_name || "Team"}
+                avatarUrl={highlight.team.avatar_url}
+                showAvatar
+                avatarSize={28}
+                className="text-sm font-bold"
+              />
             </div>
             <span className="text-sm font-extrabold shrink-0" style={{ color: toneColor(highlight.tone) }}>
               {highlight.metric}
@@ -153,6 +161,5 @@ export function LeaguePulseCard({
         ))}
       </div>
     </article>
-    </InsightLink>
   );
 }

@@ -34,6 +34,7 @@ import InfoMark from '../components/InfoMark';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import MeterRow from '../components/ConfidenceMeter';
+import TeamNameLink from '../components/TeamNameLink';
 import TeamAvatar from '../components/TeamAvatar';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import MultiTeamTradePanel from '../components/MultiTeamTradePanel';
@@ -620,6 +621,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
                 style={[styles.teamPill, selectedTeamId === team.rosterId && styles.pillActive]}
                 onPress={() => setSelectedTeamId(team.rosterId)}
               >
+                {/* team-tap-exempt: a partner picker pill, tapping selects the trade partner (picker rule); the selected team's sheet opens from the link below */}
                 <TeamAvatar avatarId={team.avatarId} name={team.ownerName} size={16} />
                 <AppText style={[styles.pillText, selectedTeamId === team.rosterId && styles.pillTextActive]} numberOfLines={1}>
                   {team.ownerName}
@@ -627,6 +629,18 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
               </PressableScale>
             ))}
           </ScrollView>
+          {selectedTeamId !== ALL_TEAMS_ID && otherTeams.some((t) => t.rosterId === selectedTeamId) ? (
+            <TeamNameLink
+              leagueId={leagueId}
+              leagueName={leagueName}
+              rosterId={selectedTeamId}
+              name={otherTeams.find((t) => t.rosterId === selectedTeamId)?.teamName}
+              avatarId={otherTeams.find((t) => t.rosterId === selectedTeamId)?.avatarId}
+              showAvatar
+              avatarSize={24}
+              textStyle={styles.partnerLabel}
+            />
+          ) : null}
         </View>
       ) : null}
 

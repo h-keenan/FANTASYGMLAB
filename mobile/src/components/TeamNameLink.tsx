@@ -21,6 +21,11 @@ export default function TeamNameLink({
   avatarId,
   showAvatar = false,
   avatarSize = 24,
+  avatarStyle,
+  vertical = false,
+  alignEnd = false,
+  fill = false,
+  ownerName,
   current = false,
   textStyle,
   style,
@@ -34,6 +39,15 @@ export default function TeamNameLink({
   avatarId?: string | null;
   showAvatar?: boolean;
   avatarSize?: number;
+  avatarStyle?: StyleProp<ViewStyle>;
+  /** Stack the avatar above the name and centre both (a scoreboard side). */
+  vertical?: boolean;
+  /** Sit at the trailing edge of the parent (a right-aligned column). */
+  alignEnd?: boolean;
+  /** Take the remaining width of a row (flex 1). */
+  fill?: boolean;
+  /** Manager handle shown in the sheet header. */
+  ownerName?: string | null;
   current?: boolean;
   textStyle?: StyleProp<TextStyle>;
   style?: StyleProp<ViewStyle>;
@@ -44,19 +58,19 @@ export default function TeamNameLink({
   const [sheetOpen, setSheetOpen] = useState(false);
   const shown = teamDisplayName(name);
   const content = (
-    <View style={[styles.row, style]}>
-      {showAvatar ? <TeamAvatar avatarId={avatarId} name={name} size={avatarSize} /> : null}
+    <View style={[styles.row, vertical && styles.vertical, style]}>
+      {showAvatar ? <TeamAvatar avatarId={avatarId} name={name} size={avatarSize} style={avatarStyle} /> : null}
       <View style={styles.text}>{children ?? <AppText style={textStyle} numberOfLines={numberOfLines}>{shown}</AppText>}</View>
     </View>
   );
-  if (!teamLinkInteractive({ leagueId, rosterId, name }, current) || !leagueId || rosterId == null) return content;
+  if (!teamLinkInteractive({ leagueId, rosterId, name }, current) || !leagueId || rosterId == null) return fill ? <View style={styles.targetFill}>{content}</View> : content;
   return (
     <>
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={teamOpenLabel(name)}
         onPress={() => setSheetOpen(true)}
-        style={styles.target}
+        style={[styles.target, alignEnd && styles.targetEnd, fill && styles.targetFill]}
       >
         {content}
       </PressableScale>
@@ -68,6 +82,7 @@ export default function TeamNameLink({
           leagueName={leagueName}
           rosterId={rosterId}
           teamName={shown}
+          ownerName={ownerName}
           avatarId={avatarId}
         />
       ) : null}
@@ -78,5 +93,8 @@ export default function TeamNameLink({
 const styles = StyleSheet.create({
   target: { minHeight: TEAM_TAP_MIN, justifyContent: 'center', alignSelf: 'flex-start', maxWidth: '100%' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  targetFill: { flex: 1, alignSelf: 'stretch' },
+  targetEnd: { alignSelf: 'flex-end' },
+  vertical: { flexDirection: 'column', alignSelf: 'center', gap: 2 },
   text: { flexShrink: 1 },
 });

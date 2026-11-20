@@ -1,5 +1,6 @@
 "use client";
 
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { useMemo, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -108,7 +109,7 @@ function AssetChips({ label, items, fromTeam }: { label: string; items: string[]
   );
 }
 
-function VetoSideCard({ side, hurt, otherName }: { side: VetoSide; hurt: boolean; otherName: string }) {
+function VetoSideCard({ side, hurt, otherName, leagueId }: { side: VetoSide; hurt: boolean; otherName: string; leagueId?: string }) {
   const posture = vetoSideDirection(side);
   const standing = vetoStandingLine(side);
   const worst = vetoWorstPositionLine(side);
@@ -116,9 +117,7 @@ function VetoSideCard({ side, hurt, otherName }: { side: VetoSide; hurt: boolean
     <AccentCard accent={hurt ? "var(--color-warning)" : "var(--color-border)"} as="article">
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col min-w-0">
-          <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-            {side.team_name}
-          </span>
+          <TeamNameLink leagueId={leagueId} rosterId={side.roster_id} name={side.team_name} className="text-base font-extrabold" />
           {standing ? (
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               {standing}
@@ -169,7 +168,7 @@ function OutrageMeter({ outrage, color }: { outrage: number; color: string }) {
   );
 }
 
-export function VetoResult({ result }: { result: VetoCheckResponse }) {
+export function VetoResult({ result, leagueId }: { result: VetoCheckResponse; leagueId?: string }) {
   if (!vetoHasResult(result)) return null;
   const band = result.band as VetoBand;
   const color = bandColor(band);
@@ -201,6 +200,7 @@ export function VetoResult({ result }: { result: VetoCheckResponse }) {
             side={side}
             hurt={String(side.roster_id) === String(result.hurt_roster_id)}
             otherName={all[1 - i]?.team_name ?? ""}
+            leagueId={leagueId}
           />
         ))}
       </div>
@@ -500,7 +500,7 @@ function VetoBuilder({ leagueId, lens, pool }: { leagueId: string; lens: string;
             bare
           />
         ) : result.status === "ok" && vetoHasResult(result) ? (
-          <VetoResult result={result} />
+          <VetoResult result={result} leagueId={leagueId} />
         ) : result.status === "error" || result.status === "unavailable" ? (
           <ErrorState message={vetoStatusMessage(result)} onRetry={check} />
         ) : (

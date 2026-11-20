@@ -22,6 +22,8 @@ export function TeamNameLink({
   avatarUrl,
   showAvatar = false,
   avatarSize = 24,
+  ringColor,
+  ownerName,
   current = false,
   className = "",
   children,
@@ -34,6 +36,10 @@ export function TeamNameLink({
   /** Draw the team avatar inside the same tap target, before the name. */
   showAvatar?: boolean;
   avatarSize?: number;
+  /** Avatar ring colour (e.g. accent for your own team). */
+  ringColor?: string;
+  /** Manager handle shown in the sheet header. */
+  ownerName?: string | null;
   /** The screen is already this team's own page: render plain. */
   current?: boolean;
   className?: string;
@@ -44,7 +50,7 @@ export function TeamNameLink({
   const shown = teamDisplayName(name);
   const content = (
     <>
-      {showAvatar ? <TeamAvatar avatarUrl={avatarUrl} name={name} size={avatarSize} /> : null}
+      {showAvatar ? <TeamAvatar avatarUrl={avatarUrl} name={name} size={avatarSize} ringColor={ringColor} /> : null}
       <span className="min-w-0 break-words">{children ?? shown}</span>
     </>
   );
@@ -70,6 +76,7 @@ export function TeamNameLink({
           leagueName={leagueName}
           rosterId={rosterId}
           teamName={shown}
+          ownerName={ownerName}
           avatarUrl={avatarUrl}
           onClose={() => setSheetOpen(false)}
         />

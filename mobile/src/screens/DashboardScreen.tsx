@@ -626,7 +626,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           <View style={styles.activityRow}>
             {/* League Activity is free on web and in the app. */}
             <View style={styles.activityCell}>
-              <LeaguePulseCard teams={teamRankings} onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} />
+              <LeaguePulseCard teams={teamRankings} leagueId={leagueId} leagueName={leagueName} onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} />
             </View>
           </View>
         ) : null}

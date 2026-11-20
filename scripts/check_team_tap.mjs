@@ -5,9 +5,9 @@
 // name as bare text, or a bare <TeamAvatar>, without going through it:
 //
 //   - A file that renders a team name as JSX text ({x.team_name}, {teamName}, {idea.partner_team_name}) or a raw
-//     <TeamAvatar> and does not use <TeamNameLink> must be listed in RAW_ALLOWLIST with a reason (a ratchet: new files cannot
+//     <TeamAvatar> (and has no `team-tap-exempt: reason` mark on that spot) must be listed in RAW_ALLOWLIST with a reason (a ratchet: new files cannot
 //     join the debt, and adopting the component should remove the entry).
-//   - A stale entry fails: a listed file that now uses <TeamNameLink> or no longer draws a raw team name must be removed.
+//   - A stale entry fails: a listed file with no unmarked bare team name left must be removed.
 //   - The component files must keep routing through the shared sheet (ManagerProfileSheet / ManagerProfileModal).
 //
 // Usage: node scripts/check_team_tap.mjs   (exit 1 on any violation)
@@ -24,50 +24,33 @@ const COMPONENT_FILES = {
 // Files that ARE the sheet / avatar / share-image primitives, or design-system demos.
 const SKIP = /\/(TeamNameLink|TeamAvatar|ManagerProfileSheet|ManagerProfileModal)\.tsx$|\/shareCard\/|ShareCard\.tsx$|\/design\//;
 
-const MATCHUP = "the Matchup page is being reworked in PR #2230; adopt <TeamNameLink> in a follow-up after it merges";
 const OWN = "shows the user's own team / league card (a switcher or setup list, not a league-mate), so there is no other team sheet to open; audited in the 2026-11 team tap sweep";
 const ROW = "the whole row is already one tap target that opens the team sheet (a name inside it must not nest a second button)";
-const PENDING = "not yet moved to TeamNameLink (ratchet: adopt <TeamNameLink> here and delete this entry)";
 // path (relative to repo root) -> reason. Only shrinks.
 export const RAW_ALLOWLIST = {
   "mobile/src/components/EspnLeagueImport.tsx": OWN,
-  "mobile/src/components/LeaguePulseCard.tsx": PENDING,
   "mobile/src/components/LeagueRecapPanel.tsx": ROW,
   "mobile/src/components/LeaguesGlanceSection.tsx": OWN,
   "mobile/src/components/LeagueStandingsModule.tsx": ROW,
   "mobile/src/components/LeagueStandingStrips.tsx": ROW,
-  "mobile/src/components/LiveDraftRoom.tsx": PENDING,
-  "mobile/src/components/MatchupLineup.tsx": MATCHUP,
-  "mobile/src/components/MultiTeamTradePanel.tsx": PENDING,
   "mobile/src/components/PortfolioStanding.tsx": OWN,
-  "mobile/src/components/VetoCalculator.tsx": OWN,
-  "mobile/src/components/WeeklyMatchupCard.tsx": MATCHUP,
-  "mobile/src/screens/CommissionerScreen.tsx": OWN,
-  "mobile/src/screens/DashboardScreen.tsx": OWN,
-  "mobile/src/screens/DraftCenterScreen.tsx": PENDING,
-  "mobile/src/screens/GamesScreen.tsx": PENDING,
+  "mobile/src/components/WeeklyMatchupCard.tsx": ROW,
+  "mobile/src/screens/DashboardScreen.tsx": ROW,
   "mobile/src/screens/HomeScreen.tsx": OWN,
-  "mobile/src/screens/MatchupScreen.tsx": MATCHUP,
-  "mobile/src/screens/PlayoffOddsPanel.tsx": PENDING,
   "mobile/src/screens/TeamsScreen.tsx": ROW,
-  "mobile/src/screens/TradeAnalyzerScreen.tsx": PENDING,
-  "web-next/src/components/CommissionerContent.tsx": OWN,
-  "web-next/src/components/DraftCenterContent.tsx": PENDING,
   "web-next/src/components/EspnImportForm.tsx": OWN,
-  "web-next/src/components/GamesContent.tsx": PENDING,
-  "web-next/src/components/GmPlanSteps.tsx": OWN,
-  "web-next/src/components/LeaguePulseCard.tsx": PENDING,
+  "web-next/src/components/GmPlanSteps.tsx": ROW,
   "web-next/src/components/LeagueRankingsContent.tsx": ROW,
-  "web-next/src/components/MatchupContent.tsx": MATCHUP,
-  "web-next/src/components/MatchupLineup.tsx": MATCHUP,
   "web-next/src/components/PortfolioContent.tsx": OWN,
   "web-next/src/components/RecapWeekView.tsx": ROW,
   "web-next/src/components/SleeperImportForm.tsx": OWN,
-  "web-next/src/components/VetoCalculator.tsx": OWN,
 };
 
-const TEXT_NAME = /[>}]\s*\{\s*[\w.?!]*\b(?:team_name|teamName|partner_team_name)\b\s*(?:\|\|[^}]*|\?\?[^}]*)?\}\s*</;
-const RAW_AVATAR = /<TeamAvatar(?=[\s/>])/;
+const TEXT_NAME = /[>}]\s*\{\s*[\w.?!]*\b(?:team_name|teamName|partner_team_name)\b\s*(?:\|\|[^}]*|\?\?[^}]*)?\}\s*</g;
+const RAW_AVATAR = /<TeamAvatar(?=[\s/>])/g;
+// A single bare team name that must stay plain (a picker that selects, a row that is itself the tap target) is marked on the
+// same line or up to 3 lines above with `team-tap-exempt: <reason of 12+ characters>`; such a mark exempts only that spot.
+const EXEMPT = /team-tap-exempt:\s*\S[^\n]{10,}/;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -79,9 +62,55 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** What a source file does with team identity: raw = draws a bare name/avatar, linked = uses <TeamNameLink>. */
-export function scanSource(src) {
-  return { raw: TEXT_NAME.test(src) || RAW_AVATAR.test(src), linked: /<TeamNameLink(?=[\s/>])/.test(src) };
+/** Index just past the `>` that ends the JSX opening tag starting at `start` (handles {} nesting and quotes). */
+function tagEnd(src, start) {
+  let depth = 0;
+  let quote = null;
+  for (let i = start; i < src.length; i++) {
+    const c = src[i];
+    if (quote) {
+      if (c === quote && src[i - 1] !== "\\") quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") { quote = c; continue; }
+    if (c === "{") depth++;
+    else if (c === "}") depth--;
+    else if (c === ">" && depth === 0 && src[i - 1] !== "=") return i + 1;
+  }
+  return src.length;
+}
+
+/** Blank out the children of every <TeamNameLink ...>...</TeamNameLink>: names drawn inside the shared target are the link itself. */
+function withoutLinkChildren(src) {
+  let out = src;
+  const re = /<TeamNameLink(?=[\s/>])/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const end = tagEnd(src, m.index);
+    if (src[end - 2] === "/") continue;
+    const close = src.indexOf("</TeamNameLink>", end);
+    if (close < 0) continue;
+    out = out.slice(0, end) + src.slice(end, close).replace(/[^\n]/g, " ") + out.slice(close);
+    re.lastIndex = close;
+  }
+  return out;
+}
+
+/** Bare team names / avatars in a source file that carry no exemption mark; `linked` = the file also uses <TeamNameLink>. */
+export function scanSource(source) {
+  const src = withoutLinkChildren(source);
+  const lines = src.split("\n");
+  let raw = 0;
+  for (const re of [TEXT_NAME, RAW_AVATAR]) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(src))) {
+      const line = src.slice(0, m.index).split("\n").length - 1;
+      const context = lines.slice(Math.max(0, line - 3), line + 1).join("\n");
+      if (!EXEMPT.test(context)) raw++;
+    }
+  }
+  return { raw: raw > 0, linked: /<TeamNameLink(?=[\s/>])/.test(source) };
 }
 
 export function run(root = ROOT, allow = RAW_ALLOWLIST) {
@@ -104,8 +133,8 @@ export function run(root = ROOT, allow = RAW_ALLOWLIST) {
       if (SKIP.test(rel)) continue;
       const { raw, linked } = scanSource(readFileSync(file, "utf8"));
       seen.add(rel);
-      if (raw && !linked && !allow[rel]) errors.push(`${rel}: draws a bare team name / <TeamAvatar>; use <TeamNameLink> or add it to RAW_ALLOWLIST in scripts/check_team_tap.mjs with a reason`);
-      if (allow[rel] && (!raw || linked)) errors.push(`${rel}: listed in RAW_ALLOWLIST but ${linked ? "now uses <TeamNameLink>" : "no longer draws a bare team name"}; remove it`);
+      if (raw && !allow[rel]) errors.push(`${rel}: draws a bare team name / <TeamAvatar>; use <TeamNameLink> or add it to RAW_ALLOWLIST in scripts/check_team_tap.mjs with a reason`);
+      if (allow[rel] && !raw) errors.push(`${rel}: listed in RAW_ALLOWLIST but no longer draws an unmarked bare team name${linked ? " (it uses <TeamNameLink>)" : ""}; remove it`);
     }
   }
   for (const rel of Object.keys(allow)) {
