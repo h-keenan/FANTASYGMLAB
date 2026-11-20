@@ -41,7 +41,7 @@ export default function TeamNameLink({
   /** Replaces the default name text (the tap target stays the same). */
   children?: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const shown = teamDisplayName(name);
   const content = (
     <View style={[styles.row, style]}>
@@ -55,15 +55,15 @@ export default function TeamNameLink({
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={teamOpenLabel(name)}
-        onPress={() => setOpen(true)}
+        onPress={() => setSheetOpen(true)}
         style={styles.target}
       >
         {content}
       </PressableScale>
-      {open ? (
+      {sheetOpen ? (
         <ManagerProfileModal
           visible
-          onClose={() => setOpen(false)}
+          onClose={() => setSheetOpen(false)}
           leagueId={leagueId}
           leagueName={leagueName}
           rosterId={rosterId}

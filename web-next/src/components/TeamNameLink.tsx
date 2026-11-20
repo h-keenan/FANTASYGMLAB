@@ -40,7 +40,7 @@ export function TeamNameLink({
   /** Replaces the default name text (the tap target stays the same). */
   children?: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const shown = teamDisplayName(name);
   const content = (
     <>
@@ -58,20 +58,20 @@ export function TeamNameLink({
         data-testid="team-name-link"
         aria-label={teamOpenLabel(name)}
         aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
+        onClick={() => setSheetOpen(true)}
         className={`inline-flex items-center gap-2 min-w-0 text-left underline decoration-dotted underline-offset-2 ${className}`}
         style={{ minHeight: TEAM_TAP_MIN, color: "inherit", font: "inherit" }}
       >
         {content}
       </button>
-      {open ? (
+      {sheetOpen ? (
         <ManagerProfileSheet
           leagueId={leagueId}
           leagueName={leagueName}
           rosterId={rosterId}
           teamName={shown}
           avatarUrl={avatarUrl}
-          onClose={() => setOpen(false)}
+          onClose={() => setSheetOpen(false)}
         />
       ) : null}
     </>
