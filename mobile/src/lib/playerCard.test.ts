@@ -7,6 +7,8 @@ import {
   headlinePoints,
   playerCardFromStarter,
   playerGameLine,
+  playerGameStatusLine,
+  liveStatLine,
   playerStatusChips,
   trendVsProjection,
   type PlayerCardSource,
@@ -71,4 +73,21 @@ test('trend vs projection', () => {
   assert.equal(trendVsProjection(playerCardFromStarter({ ...live, projected_final: 9 }))?.dir, 'down');
   assert.equal(trendVsProjection(playerCardFromStarter({ ...base, game_status: 'scheduled' })), null);
   assert.equal(estimatedQuarter(0.3), '~Q2');
+});
+
+const qb: PlayerCardSource = { ...live, position: 'QB', game_opponent: 'IND', game_is_home: true, game_team_score: 14, game_opponent_score: 3, game_clock_label: 'Q2 5:54', stats: { pass_att: 14, pass_cmp: 11, pass_yd: 118, pass_td: 2, pass_int: 2, rush_att: 1, rush_yd: 4 } };
+
+test('inline status uses the real clock and own score first; wall-clock only as fallback', () => {
+  assert.equal(playerGameStatusLine(playerCardFromStarter(qb)), 'Q2 5:54 \u00b7 14-3 vs IND');
+  assert.match(playerGameStatusLine(playerCardFromStarter({ ...qb, game_clock_label: null })) ?? '', /^~Q\d/);
+  assert.match(playerGameStatusLine(playerCardFromStarter({ ...qb, game_clock_label: 'Half' })) ?? '', /^Half/);
+  assert.equal(playerGameStatusLine(playerCardFromStarter({ ...qb, game_status: 'final', game_clock_label: 'Final' })), 'Final 14-3 W');
+  assert.equal(playerGameStatusLine(playerCardFromStarter({ ...base, projection: { status: 'bye_week', point_estimate: null } })), 'Bye');
+});
+
+test('live stat line by position, only while live or final', () => {
+  assert.equal(playerCardFromStarter(qb).statLine, '11/14 CMP, 118 YD, 2 TD, 2 INT, 1 CAR, 4 YD');
+  assert.equal(playerCardFromStarter({ ...qb, game_status: 'scheduled', game_started: false }).statLine, null);
+  assert.equal(liveStatLine({ rush_att: 6, rush_yd: 14, rec: 1, rec_tgt: 2, rec_yd: -1 }, 'RB'), '6 CAR, 14 YD, 1/2 REC, -1 YD');
+  assert.equal(liveStatLine({}, 'WR'), null);
 });

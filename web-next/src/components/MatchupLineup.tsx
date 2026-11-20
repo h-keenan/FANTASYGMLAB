@@ -11,6 +11,7 @@ import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { useIsPhone } from "@/components/useIsPhone";
 import {
   headlinePoints,
+  playerGameStatusLine,
   playerStatusChips,
   trendVsProjection,
   type ChipTone,
@@ -270,6 +271,8 @@ function CompactSide({
   const card: PlayerCardModel = cell.card;
   const head = headlinePoints(card);
   const trend = trendVsProjection(card);
+  const gameLine = playerGameStatusLine(card);
+  const live = card.gameStatus === "in_progress";
   const chips = playerStatusChips(card);
   const primary = chips[0];
   const flag = chips.find((chip) => chip.kind === "questionable" || chip.kind === "doubtful");
@@ -279,39 +282,48 @@ function CompactSide({
       <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} name={card.name} position={card.position} team={card.team} />
       <span className={`flex flex-col min-w-0 flex-1 gap-0.5${mirror ? " items-end" : ""}`}>
         <PlayerName name={card.name} className="text-[12px] font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
-        <span className={`flex items-center gap-1 text-[0.6875rem] font-extrabold uppercase leading-none${mirror ? " flex-row-reverse" : ""}`} style={{ letterSpacing: "var(--letter-spacing-badge)" }}>
+        <span className={`flex items-center gap-1 text-[0.6875rem] font-bold leading-tight${mirror ? " flex-row-reverse text-right" : ""}`} style={{ color: "var(--color-text-secondary)" }} data-testid="compact-game-line">
           {primary ? (
             <span className="inline-flex items-center" data-testid={`compact-status-${primary.kind}`} title={primary.label}>
               <StatusGlyph kind={primary.kind as GlyphKind} tone={primary.tone} />
               <span className="sr-only">{primary.label}</span>
             </span>
           ) : null}
-          {flag ? <span style={{ color: DOT_COLOR[flag.tone] }}>{flag.kind === "doubtful" ? "D" : "Q"}</span> : null}
+          {flag ? <span className="font-extrabold uppercase" style={{ color: DOT_COLOR[flag.tone] }}>{flag.kind === "doubtful" ? "D" : "Q"}</span> : null}
+          {gameLine ? <span>{gameLine}</span> : null}
         </span>
-        <span className={`flex items-baseline gap-1.5${mirror ? " flex-row-reverse" : ""}`}>
-          {head.value != null ? (
+        {live && card.statLine ? (
+          <span className={`text-[0.625rem] leading-tight${mirror ? " text-right" : ""}`} style={{ color: "var(--color-text-muted)" }} data-testid="compact-stat-line">
+            {card.statLine}
+          </span>
+        ) : null}
+        <span className={`flex flex-col${mirror ? " items-end" : ""}`}>
+          {head.value != null && head.kind === "pts" ? (
             <TickNumber
               value={head.value}
-              className="text-[16px] font-extrabold leading-none"
-              style={{ color: emphasis === "lose" ? "var(--color-text-muted)" : head.kind === "pts" ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
+              className="text-[18px] font-extrabold leading-none"
+              style={{ color: emphasis === "lose" ? "var(--color-text-muted)" : "var(--color-text-primary)" }}
             />
           ) : (
-            <span className="text-[16px] font-extrabold leading-none" style={{ color: "var(--color-text-muted)" }}>
+            <span className="text-[18px] font-extrabold leading-none" style={{ color: "var(--color-text-muted)" }}>
               {card.bye || card.out ? "0.0" : "—"}
             </span>
           )}
           {card.projectedFinal != null ? (
             <span
               className="text-[0.6875rem] font-bold tabular-nums"
-              /* verdict-color-ok: live-scoring projected-final move, not a usage state */
-              style={{ color: trend ? (trend.dir === "up" ? "var(--color-success)" : trend.dir === "down" ? "var(--color-danger)" : "var(--color-text-muted)") : "var(--color-text-secondary)" }}
+              /* verdict-color-ok: live-scoring projected-final move, not a usage state; below projection stays muted, never red */
+              style={{ color: trend && trend.dir === "up" ? "var(--color-success)" : "var(--color-text-muted)" }}
               title="Projected final"
+              data-testid="compact-proj-final"
             >
               {trend ? (trend.dir === "up" ? "▲" : trend.dir === "down" ? "▼" : "–") : ""}
-              {card.projectedFinal.toFixed(1)}
+              {card.projectedFinal.toFixed(1)} proj
             </span>
           ) : head.kind === "proj" ? (
-            <span className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>proj</span>
+            <span className="text-[0.6875rem] font-bold tabular-nums" style={{ color: "var(--color-text-muted)" }} data-testid="compact-pregame-proj">
+              {head.value?.toFixed(1)} proj
+            </span>
           ) : null}
         </span>
       </span>
@@ -319,7 +331,11 @@ function CompactSide({
   );
   const cls = `flex items-center gap-1.5 min-w-0 w-full${dir}`;
   return (
-    <div className="relative min-w-0 rounded-lg px-0.5 py-1" style={emphasis === "win" ? { background: "color-mix(in srgb, var(--color-accent) 9%, transparent)" } : undefined}>
+    <div
+      className="relative min-w-0 rounded-lg px-0.5 py-1"
+      style={live ? { background: "color-mix(in srgb, var(--color-accent) 12%, transparent)", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 28%, transparent)" } : emphasis === "win" ? { background: "color-mix(in srgb, var(--color-accent) 9%, transparent)" } : undefined}
+      data-live={live ? "true" : undefined}
+    >
       {pulseKey > 0 ? <span key={pulseKey} className="player-card-pulse" aria-hidden="true" /> : null}
       {onEdit ? (
         <button type="button" onClick={onEdit} aria-label={`Swap ${card.name}`} className={`${cls} text-left`}>

@@ -46,6 +46,15 @@ interface Spec {
   stats?: Record<string, number>;
 }
 
+/** Real-clock label for a share of regulation played (0-1): "Q2 5:54", "Half". Mirrors modules.live_scoreboard.clock_label. */
+export function clockFromProgress(progress: number): string {
+  const elapsed = Math.round(Math.min(0.999, Math.max(0, progress)) * 3600);
+  if (elapsed === 1800) return "Half";
+  const quarter = Math.min(4, Math.floor(elapsed / 900) + 1);
+  const left = 900 - (elapsed - (quarter - 1) * 900);
+  return `Q${quarter} ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+}
+
 function toStarter(spec: Spec): MatchupRealStarter {
   const started = spec.game === "live" || spec.game === "final";
   return {
@@ -71,8 +80,10 @@ function toStarter(spec: Spec): MatchupRealStarter {
     game_progress: spec.game === "live" ? (spec.progress ?? 0.5) : spec.game === "final" ? 1 : null,
     game_opponent: spec.opponent ?? spec.projection.opponent,
     game_is_home: spec.home ?? null,
-    game_team_score: spec.game === "final" ? (spec.teamScore ?? 24) : null,
-    game_opponent_score: spec.game === "final" ? (spec.oppScore ?? 17) : null,
+    game_team_score: spec.game === "final" ? (spec.teamScore ?? 24) : spec.game === "live" ? (spec.teamScore ?? 17) : null,
+    game_opponent_score: spec.game === "final" ? (spec.oppScore ?? 17) : spec.game === "live" ? (spec.oppScore ?? 10) : null,
+    game_clock_label: spec.game === "live" ? clockFromProgress(spec.progress ?? 0.5) : spec.game === "final" ? "Final" : null,
+    game_situation: spec.game === "live" ? `2nd & 7 at ${spec.opponent ?? "OPP"} 25` : null,
     slot: spec.slot,
     stats: spec.stats ?? null,
   };
@@ -174,6 +185,10 @@ export function midGameMatchup(tick = 0, asOfAgeSeconds = 12): MatchupResponse {
     as_of_age_seconds: asOfAgeSeconds,
     live: true,
     poll_after_seconds: 30,
+    big_plays: [
+      { id: "p1", at: Date.now() - 95_000, player_id: "4866", name: "Saquon Barkley", position: "RB", team: "PHI", side: "mine", points: 9.2, description: "28-yd TD run", approx: false, clock: "Q2 6:32" },
+      { id: "p2", at: Date.now() - 410_000, player_id: "9221", name: "Chase Brown", position: "RB", team: "CIN", side: "opponent", points: 3.6, description: "36-yd run", approx: false, clock: "Q2 11:05" },
+    ],
   };
 }
 

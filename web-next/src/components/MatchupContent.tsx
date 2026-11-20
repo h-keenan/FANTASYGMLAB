@@ -8,7 +8,7 @@ import { TickNumber } from "@/components/TickNumber";
 import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from "@/lib/startSitRange";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type {
   MatchupPositionEdge,
@@ -25,14 +25,14 @@ import { PillRow } from "@/components/PillRow";
 import { NextSteps } from "@/components/NextSteps";
 import { PlannerBar, SwapSheet, useLineupPlanner } from "@/components/MatchupPlanner";
 import { ComparisonHeader, SlotList } from "@/components/MatchupLineup";
-import { LiveFeedPanel } from "@/components/LiveFeedPanel";
-import { feedKey } from "@/lib/liveFeed";
+import { feedKey, liveFeedStore } from "@/lib/liveFeed";
+import { liveGamesFromStarters, mergeLivePlays } from "@/lib/matchupLive";
 import { PlayerCard } from "@/components/PlayerCardKit";
 import { playerCardFromStarter } from "@/lib/playerCard";
 import { PositionBadge } from "@/components/PositionBadge";
 import { StatStrip } from "@/components/StatStrip";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { MatchupHeroCard } from "@/components/ui/MatchupModule";
+import { MatchupHeroCard, type MatchupLiveSections } from "@/components/ui/MatchupModule";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { bandColorVar } from "@/lib/verdictToneCss";
 import { deltaBand } from "@/lib/verdictTone";
@@ -198,7 +198,9 @@ function scoreboardFacts(matchup: MatchupResponse) {
  * Hero (V1): week + live state, win chance, both scores, the win bar, projection / players left, and the swing player on
  * each side (widest projection range still to play) with their avatars. "Open lineup" jumps to the lineup comparison.
  */
-function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
+const EMPTY_FEED: ReturnType<typeof liveFeedStore.events> = [];
+
+function MatchupHero({ matchup, leagueId, ageSeconds }: { matchup: MatchupResponse; leagueId?: string | null; ageSeconds?: number | null }) {
   const mine = matchup.my_team!;
   const opponent = matchup.opponent!;
   const { openPlayer } = usePlayerQuickView();
@@ -220,11 +222,28 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
     swing: matchupSwingPlayers(swingInputs, opponent.team_name),
     omitWeek: true,
   });
+  const feedEvents = useSyncExternalStore(
+    liveFeedStore.subscribe,
+    () => (leagueId ? liveFeedStore.events(feedKey(leagueId, matchup.week)) : EMPTY_FEED),
+    () => EMPTY_FEED,
+  );
+  const live = matchup.game_state === "live";
+  const kicked = hasKickedOff(matchup);
+  const liveSections: MatchupLiveSections | undefined = kicked
+    ? {
+        live,
+        games: liveGamesFromStarters([...(mine.real_starters ?? []), ...(opponent.real_starters ?? [])]),
+        plays: live || matchup.big_plays?.length ? mergeLivePlays(matchup.big_plays, feedEvents) : [],
+        ageSeconds: ageSeconds ?? null,
+        projectedLine: model.detail,
+        projected: myProjected != null && opponentProjected != null ? { mine: myProjected.toFixed(1), opponent: opponentProjected.toFixed(1) } : null,
+      }
+    : undefined;
   return (
     <>
       <MatchupHeroCard
         model={model}
-        bigPlays={matchup.live ? matchup.big_plays : undefined}
+        liveSections={liveSections}
         onOpenPlayer={(p) => p.playerId && openPlayer({ player_id: p.playerId, name: p.name, position: p.position, team: p.team, tier: p.tier })}
         action={
           <Button
@@ -826,14 +845,13 @@ export function MatchupContent({
       {leagueId ? <PageTabBar family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} /> : null}
       <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} ageSeconds={ageSeconds} onRefresh={onRefresh} refreshing={refreshing} />
       {matchup.sleeper_data_as_of ? <FreshnessLabel datasets={[]} report={null} leagueAsOf={matchup.sleeper_data_as_of} className="block text-xs" /> : null}
-      <MatchupHero matchup={shown} />
+      <MatchupHero matchup={shown} leagueId={leagueId} ageSeconds={ageSeconds} />
       {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="unmapped-starters">
           Not matched to a FantasyDesk player, so left out of the lineups and win odds:{" "}
           {matchup.unmapped_players.map((p) => `${p.name} (${p.fantasy_team})`).join(", ")}.
         </p>
       ) : null}
-      {leagueId ? <LiveFeedPanel feedKey={feedKey(leagueId, matchup.week)} live={matchup.game_state === "live"} /> : null}
       <div className="matchup-grid" data-testid="matchup-grid">
       <div className="matchup-col-main lg:col-start-1">
         <MatchupInsights matchup={shown} />

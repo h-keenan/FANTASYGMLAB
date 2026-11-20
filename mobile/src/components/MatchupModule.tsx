@@ -6,13 +6,14 @@ import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import { PlayerTap } from './PlayerOpenContext';
+import { Collapse } from './Presence';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { compactSummaryText } from '../lib/compactModule';
 import { matchupTickerParts, type MatchupCardModel, type MatchupSwingPlayer } from '../lib/matchupModules';
 import { playerSurname } from '../lib/playerNameDisplay';
-import type { MatchupBigPlay } from '../lib/api';
 import { feedAgeLabel, feedPointsLabel } from '../lib/liveFeed';
+import { quietLabel, type LiveGame, type LivePlay } from '../lib/matchupLive';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
@@ -69,50 +70,112 @@ export function SwingPlayers({ swing, onOpenPlayer }: { swing: MatchupSwingPlaye
   );
 }
 
-/**
- * "Latest big play" line for the live Matchup hero (mirrors web LatestBigPlay): avatar, description, points swing, age.
- * Green only when it is for you; the opponent's is neutral, never red. Tap expands the last 3. Nothing without events.
- */
-export function LatestBigPlay({ plays, mineName, opponentName }: { plays: MatchupBigPlay[]; mineName: string; opponentName: string }) {
+/** What the live sections read; built by the screen (mirrors web MatchupLiveSections). */
+export interface MatchupLiveSections {
+  live: boolean;
+  games: LiveGame[];
+  plays: LivePlay[];
+  ageSeconds: number | null;
+  projectedLine: string | null;
+  projected: { mine: string; opponent: string } | null;
+}
+
+function SectionRow({ id, title, summary, children, defaultOpen = false }: { id: string; title: string; summary: string; children: ReactNode; defaultOpen?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <View style={styles.swing} testID={`matchup-section-${id}`}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${title}. ${summary}. ${open ? 'Collapse' : 'Expand'}`}
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((v) => !v)}
+        style={styles.bigHeader}
+        testID={`matchup-section-${id}-toggle`}
+      >
+        <AppText style={[styles.swingTitle, { paddingTop: 0 }]}>{title}</AppText>
+        <AppText style={[styles.swingLabel, { flex: 1, textAlign: 'right', color: colors.textSecondary }]} numberOfLines={1}>{summary}</AppText>
+        <AppText style={[styles.swingLabel, { color: colors.accent }]}>{open ? 'Hide' : 'Show'}</AppText>
+      </Pressable>
+      <Collapse open={open} style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>{children}</Collapse>
+    </View>
+  );
+}
+
+/**
+ * Compact, tap-to-expand sections inside the top Matchup module (mirrors web MatchupLiveSectionsView): Win odds,
+ * Projected finals, Games (real clock) and Plays (server big plays + client-derived feed, one list). Replaces the
+ * separate big-play line and Live feed card. Green only for you; the opponent's plays are neutral, never red.
+ */
+export function MatchupLiveSectionsView({ model, sections, mineName, opponentName }: { model: MatchupCardModel; sections: MatchupLiveSections; mineName: string; opponentName: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(timer);
   }, []);
-  if (plays.length === 0) return null;
-  const shown = open ? plays.slice(0, 3) : plays.slice(0, 1);
+  const { plays, games } = sections;
+  const realPlays = plays.filter((p) => !p.soFar);
+  const liveGame = games.find((g) => g.live);
+  const playsSummary = plays.length === 0 ? quietLabel(sections.ageSeconds) : realPlays.length > 0 ? `${realPlays[0].name.split(' ').slice(-1)[0]} · ${realPlays[0].detail}` : `${plays.length} so far`;
   return (
-    <View style={styles.swing} testID="matchup-big-play">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Latest big play. ${open ? 'Collapse' : 'Show last 3'}`}
-        accessibilityState={{ expanded: open }}
-        disabled={plays.length < 2}
-        onPress={() => setOpen((v) => !v)}
-        style={styles.bigHeader}
-        testID="matchup-big-play-toggle"
-      >
-        <AppText style={styles.swingTitle}>Latest big play</AppText>
-        {plays.length > 1 ? <AppText style={[styles.swingLabel, { color: colors.accent }]}>{open ? 'Hide' : 'More'}</AppText> : null}
-      </Pressable>
-      {shown.map((play) => {
-        const mine = play.side === 'mine';
-        return (
-          <View key={play.id} style={styles.bigRow} testID="matchup-big-play-item">
-            <PlayerAvatar playerId={play.player_id ?? ''} size={32} name={play.name} />
-            <View style={styles.swingText}>
-              <AppText style={styles.swingNameText}>{`${playerSurname(play.name) || play.name} · ${play.description}`}</AppText>
-              <AppText style={styles.detail}>{`${feedAgeLabel(play.at, now)}${play.approx ? ' · approx.' : ''} · for ${mine ? mineName : opponentName}`}</AppText>
-            </View>
-            <AppText style={[styles.bigPoints, { color: mine && play.points >= 0 ? colors.success : colors.textSecondary }]} testID="matchup-big-play-points">
-              {feedPointsLabel(play.points)}
-            </AppText>
+    <View testID="matchup-live-sections">
+      {model.win ? (
+        <SectionRow id="odds" title="Win odds" summary={model.win.label}>
+          <AppText style={styles.detail}>
+            {sections.live ? 'Updates as the games play: points so far plus what each player has left, on the real game clock.' : "Based on this week's projections."}
+          </AppText>
+        </SectionRow>
+      ) : null}
+      {sections.projected ? (
+        <SectionRow id="projected" title="Projected finals" summary={`${sections.projected.mine} - ${sections.projected.opponent}`}>
+          <View style={styles.scores}>
+            <View style={styles.side}><AppText style={styles.detail}>{mineName}</AppText><AppText style={styles.swingNameText}>{sections.projected.mine}</AppText></View>
+            <View style={[styles.side, styles.sideEnd]}><AppText style={styles.detail}>{opponentName}</AppText><AppText style={styles.swingNameText}>{sections.projected.opponent}</AppText></View>
           </View>
-        );
-      })}
+          {sections.projectedLine ? <AppText style={styles.detail}>{sections.projectedLine}</AppText> : null}
+        </SectionRow>
+      ) : null}
+      {games.length > 0 ? (
+        <SectionRow id="games" title="Games" summary={liveGame?.clock ? `${liveGame.clock} · ${games.filter((g) => g.live).length} live` : `${games.length} played`} defaultOpen={Boolean(liveGame)}>
+          {games.map((g) => (
+            <View key={g.key} testID="matchup-game">
+              <View style={styles.bigRow}>
+                <AppText style={[styles.swingNameText, { flex: 1 }]}>{g.score}</AppText>
+                <AppText style={[styles.swingLabel, { color: g.live ? colors.success : colors.textTertiary }]}>{`${g.live ? '● ' : ''}${g.clock ?? ''}`}</AppText>
+              </View>
+              {g.situation ? <AppText style={styles.detail}>{g.situation}</AppText> : null}
+            </View>
+          ))}
+        </SectionRow>
+      ) : null}
+      {sections.live || plays.length > 0 ? (
+        <SectionRow id="plays" title="Plays" summary={playsSummary} defaultOpen={realPlays.length > 0}>
+          {plays.length === 0 ? (
+            <AppText style={styles.detail} testID="matchup-plays-quiet">{quietLabel(sections.ageSeconds)}</AppText>
+          ) : (
+            plays.map((play) => {
+              const mine = play.side === 'mine';
+              const meta = [play.clock, play.soFar ? 'so far' : feedAgeLabel(play.at, now), play.approx && !play.soFar ? 'approx.' : null, `for ${mine ? mineName : opponentName}`].filter(Boolean).join(' · ');
+              return (
+                <View key={play.id} style={styles.bigRow} testID="matchup-big-play-item">
+                  <PlayerAvatar playerId={play.playerId ?? ''} size={32} name={play.name} />
+                  <View style={styles.swingText}>
+                    <AppText style={styles.swingNameText}>{`${playerSurname(play.name) || play.name} · ${play.detail}`}</AppText>
+                    <AppText style={styles.detail}>{meta}</AppText>
+                  </View>
+                  <AppText style={[styles.bigPoints, { color: mine && play.points >= 0 ? colors.success : colors.textSecondary }]} testID="matchup-big-play-points">
+                    {feedPointsLabel(play.points)}
+                  </AppText>
+                </View>
+              );
+            })
+          )}
+          <AppText style={styles.detail}>Built from score changes between refreshes, so times are when we noticed.</AppText>
+        </SectionRow>
+      ) : null}
     </View>
   );
 }
@@ -121,7 +184,7 @@ export function MatchupHeroCard({
   model,
   onOpenPlayer,
   action,
-  bigPlays,
+  liveSections,
   testID = 'matchup-hero',
   bare = false,
   children,
@@ -131,8 +194,8 @@ export function MatchupHeroCard({
   onOpenPlayer?: (player: MatchupSwingPlayer) => void;
   /** The one primary action ("Open lineup"). */
   action?: ReactNode;
-  /** Live big plays (Matchup screen only); the line is hidden when empty. */
-  bigPlays?: MatchupBigPlay[];
+  /** Live sections (Matchup screen only): Win odds, Projected finals, Games, Plays; absent elsewhere. */
+  liveSections?: MatchupLiveSections;
   testID?: string;
   /** Render the body without its own card, for placing inside a CompactModule (no card inside a card). */
   bare?: boolean;
@@ -171,7 +234,7 @@ export function MatchupHeroCard({
           </AppText>
         ) : null}
         <SwingPlayers swing={model.swing} onOpenPlayer={onOpenPlayer} />
-        {bigPlays && bigPlays.length > 0 ? <LatestBigPlay plays={bigPlays} mineName={model.mine.name} opponentName={model.opponent.name} /> : null}
+        {liveSections ? <MatchupLiveSectionsView model={model} sections={liveSections} mineName={model.mine.name} opponentName={model.opponent.name} /> : null}
         {action}
         {children}
       </View>

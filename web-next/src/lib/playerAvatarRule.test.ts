@@ -13,7 +13,6 @@ import { describe, expect, it } from "vitest";
  * and in docs/ui-patterns.md). An entry that now has an avatar, or whose file is gone, fails the test so it is removed.
  */
 const WEB_ALLOW: Record<string, string> = {
-  "components/LiveFeedPanel.tsx": "TEXT: names inside a news headline",
   "components/SimToControl.tsx": "TEXT: injury names inside a sentence",
   "components/SimRecapStory.tsx": "TEXT: top-scorer name inside a fact line",
   "components/SimGameTeam.tsx": "TEXT: a native <option> and a sheet title sentence",
@@ -21,7 +20,6 @@ const WEB_ALLOW: Record<string, string> = {
   "components/SimGameHomeCards.tsx": "TEXT: inline tappable names (SimPlayerNameTap) inside a sentence",
 };
 const APP_ALLOW: Record<string, string> = {
-  "components/LiveFeedPanel.tsx": "TEXT: names inside a news headline",
   "components/RoundupPanel.tsx": "TEXT: names inside roundup sentences",
   "components/SimToControl.tsx": "TEXT: injury names inside a sentence",
 };
