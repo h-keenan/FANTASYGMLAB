@@ -209,6 +209,7 @@ from modules import (
     live_activity,
     live_big_plays,
     live_policy,
+    live_projection_log,
     live_scoreboard,
     live_stat_lines,
     live_draft,
@@ -17634,6 +17635,12 @@ def _build_matchup(
         # A starter we could not match to a FantasyDesk player has no projection, so
         # any odds would silently leave a real scorer out. Say so instead.
         win_probability = {"available": False, "reason": "unmapped_starters"}
+    if not is_external and projection_context is not None:
+        # Forward calibration log (fail-soft, background thread, deduped per 5 real game-minutes; no-op unless configured).
+        live_projection_log.maybe_log(
+            league_id, projection_context.season, current_week, my_roster_id, opponent_roster_id,
+            my_side.get("real_starters") or [], opponent_side.get("real_starters") or [], win_probability,
+        )
     if state is not None:
         state.update(my_side=my_side, opponent_side=opponent_side, my_bench=my_bench, league=league)
 
