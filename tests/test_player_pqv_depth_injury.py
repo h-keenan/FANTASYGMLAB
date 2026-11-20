@@ -127,3 +127,31 @@ def test_depth_chart_keeps_deep_player_visible_past_the_cap():
     chart = player_depth_chart.build_depth_chart("15", directory)
     assert len(chart["entries"]) == player_depth_chart.MAX_ENTRIES + 1
     assert chart["entries"][-1]["is_self"] and chart["total"] == 15
+
+
+def test_depth_chart_rank_is_place_among_listed_when_order_skips_numbers():
+    # Sleeper lists 1,2,3,4,6,7 (no 5): the sixth listed order is the fifth player, with four ahead.
+    directory = {
+        str(i): {"full_name": f"P{i}", "team": "ARI", "position": "RB", "depth_chart_position": "RB", "depth_chart_order": order, "status": "Active"}
+        for i, order in zip(range(1, 7), (1, 2, 3, 4, 6, 7))
+    }
+    chart = player_depth_chart.build_depth_chart("5", directory)
+    assert chart["self_order"] == 6 and chart["self_rank"] == 5
+    assert [e["rank"] for e in chart["entries"]] == [1, 2, 3, 4, 5, 6]
+    assert [e["order"] for e in chart["entries"]] == [1, 2, 3, 4, 6, 7]
+    assert chart["total"] == 6 and sum(1 for e in chart["entries"] if e["rank"] < chart["self_rank"]) == 4
+
+
+def test_injury_record_flags_untracked_season_for_ir_player_without_report_rows(tmp_path: Path):
+    path = reports.report_path(tmp_path, 2026)
+    path.parent.mkdir(parents=True)
+    path.write_bytes(reports.serialize([_row(2026, 4, "KC", "999", "")]))
+    ir = {"status": "Inactive", "injury_status": "IR", "injury_body_part": "Knee"}
+    record = player_injury_record.build_injury_record("7", ir, root=tmp_path, current_season=2026, through_week=10)
+    assert record["current"]["unavailable"] and record["current_season_tracked"] is False
+    # An IR player who does have report rows this season, or a healthy one, is tracked.
+    path.write_bytes(reports.serialize([_row(2026, 4, "KC", "7", "Out", "Knee")]))
+    record = player_injury_record.build_injury_record("7", ir, root=tmp_path, current_season=2026, through_week=10)
+    assert record["current_season_tracked"] is True and record["seasons"][0]["games_missed"] == 1
+    healthy = player_injury_record.build_injury_record("8", {}, root=tmp_path, current_season=2026, through_week=10)
+    assert healthy["current_season_tracked"] is True

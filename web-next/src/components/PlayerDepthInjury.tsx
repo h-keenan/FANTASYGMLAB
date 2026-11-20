@@ -5,6 +5,7 @@ import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import {
   depthChange,
   depthChartParts,
+  depthPlace,
   depthRoleLabel,
   depthRowKind,
   injuryCoverageNote,
@@ -32,9 +33,9 @@ export function DepthChartSection({ chart, idPrefix = "pqv" }: { chart: DepthCha
       </p>
       <ol className="m-0 flex list-none flex-col gap-1 p-0" aria-label="Depth chart order">
         {chart.entries.map((entry) => {
-          const kind = depthRowKind(entry, chart.self_order);
+          const kind = depthRowKind(entry, chart.self_rank ?? chart.self_order);
           const moved = depthChange(entry.change);
-          const detail = [depthRoleLabel(chart.slot, entry.order), kind === "ahead" ? "Ahead" : kind === "behind" ? "Behind" : "This player", entry.injury_status]
+          const detail = [depthRoleLabel(chart.slot, depthPlace(entry)), kind === "ahead" ? "Ahead" : kind === "behind" ? "Behind" : "This player", entry.injury_status]
             .filter(Boolean)
             .join(" · ");
           return (

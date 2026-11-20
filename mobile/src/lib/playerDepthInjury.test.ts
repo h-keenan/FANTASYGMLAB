@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { depthChange, depthChartParts, depthRowKind, injuryHistoryRows, injurySummaryParts, weeksLabel, type DepthChartData, type InjuryRecordData } from './playerDepthInjury.ts';
+import { depthChange, depthChartParts, depthPlace, depthRowKind, injuryHistoryRows, injurySummaryParts, weeksLabel, type DepthChartData, type InjuryRecordData } from './playerDepthInjury.ts';
 import { compactSummaryText } from './compactModule.ts';
 
 const chart: DepthChartData = {
@@ -44,4 +44,20 @@ test('history lists stints newest first with week ranges and an honest unspecifi
     [[2026, 'Injury (not specified)', 'Wk 9', '1 game'], [2026, 'Ankle', 'Wk 1', '1 game'], [2023, 'Foot', 'Wk 4–6', '3 games']],
   );
   assert.equal(weeksLabel({ start_week: null, end_week: null, games_missed: 1, injury: null }), '');
+});
+
+test('uses the rank among listed players when the team order skips numbers', () => {
+  const gappy: DepthChartData = {
+    ok: true, team: 'ARI', slot: 'RB', slot_label: 'Running backs', self_order: 6, self_rank: 5, total: 6,
+    entries: [1, 2, 3, 4, 6, 7].map((order, i) => ({ player_id: String(i), name: `P${i}`, order, rank: i + 1, is_self: order === 6 })),
+  };
+  assert.equal(compactSummaryText(depthChartParts(gappy)), 'RB5 · ARI · 4 ahead');
+  assert.deepEqual(gappy.entries.map((e) => depthRowKind(e, 5)), ['ahead', 'ahead', 'ahead', 'ahead', 'self', 'behind']);
+  assert.equal(depthPlace({ order: 3 }), 3);
+});
+
+test('no false 0 missed for an injured player the reports do not cover', () => {
+  const ir = { ...record, seasons: [{ season: 2025, games_missed: 3, stints: [] }], career_games_missed: 4, current_season_tracked: false, current: { ...record.current!, unavailable: true, line: 'Knee · Injured Reserve' } };
+  assert.equal(compactSummaryText(injurySummaryParts(ir)), 'Knee · Injured Reserve · 2026 games not counted · 4 career');
+  assert.equal(compactSummaryText(injurySummaryParts({ ...ir, career_games_missed: 0, seasons: [] })), 'Knee · Injured Reserve · 2026 games not counted');
 });
