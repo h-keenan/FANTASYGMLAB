@@ -54,7 +54,7 @@ from modules.player_state_authority import (
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
 from modules import age_profile, model_status, partner_context, playoff_context, runtime_trace, usage_roles_targets
-from modules import drop_candidates, trade_cautions, trade_grade, trade_posture
+from modules import drop_candidates, target_viability, trade_cautions, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 from modules import value_scale
 from modules.coerce import float_or_default_any
@@ -3608,6 +3608,51 @@ def _target_trade_fit(
     return score
 
 
+def _is_injured_stash_idea(idea: Mapping[str, Any]) -> bool:
+    return any(
+        isinstance(asset, Mapping) and asset.get("availability_framing") == "injured_stash"
+        for asset in idea.get("receive_assets") or ()
+    )
+
+
+def _viable_target_assets(
+    assets: List[Dict[str, Any]],
+    team_df: pd.DataFrame,
+    *,
+    strategy: str,
+    league_settings: Mapping[str, Any] | None,
+) -> List[Dict[str, Any]]:
+    """Availability + depth-role check on automatic acquisition targets (DYNASTYGM_TARGET_VIABILITY_V1, modules.target_viability).
+
+    Players the team should not be steered toward are dropped; a cheap, young, injured or buried player a non-contender
+    may hold for later stays but is tagged ``injured_stash`` (with the reason) and sorted behind every healthy fit, at
+    most one per partner."""
+
+    if not assets or team_df is None or team_df.empty or "player_id" not in team_df.columns:
+        return assets
+    window = trade_grade.season_window(league_settings)
+    rows = {str(row.get("player_id")): row for _, row in team_df.iterrows()}
+    kept: List[Dict[str, Any]] = []
+    stash: List[Dict[str, Any]] = []
+    for asset in assets:
+        row = rows.get(str(asset.get("player_id")))
+        if row is None:
+            kept.append(asset)
+            continue
+        verdict = target_viability.assess(
+            row, strategy=strategy, window=window, value=float(asset.get("score") or 0), cheap_value=float(_vs(3500)),
+        )
+        if verdict.verdict == "avoid":
+            continue
+        if verdict.is_stash:
+            asset["availability_framing"] = "injured_stash"
+            asset["availability_note"] = verdict.note
+            stash.append(asset)
+        else:
+            kept.append(asset)
+    return kept + stash[:1]
+
+
 def _acquire_candidate_allowed(
     position: str,
     my_shape: Dict[str, Any],
@@ -5620,6 +5665,7 @@ def _build_trade_ideas_impl(
                     market_context.get("summary", ""),
                     waiver_guardrail.get("summary", ""),
                     str(market_context.get("roster_note") or ""),
+                    *[str(a.get("availability_note") or "") for a in receive_assets if a.get("availability_framing")],
                 ]
                 if part
             ).strip()
@@ -5703,6 +5749,13 @@ def _build_trade_ideas_impl(
                 ),
                 reverse=True,
             )
+            if target_viability.enabled():
+                partner_player_assets = _viable_target_assets(
+                    partner_player_assets,
+                    partner_team_df,
+                    strategy=str(my_shape.get("strategy") or my_mode),
+                    league_settings=league_settings,
+                )
             partner_target_players = [
                 asset
                 for asset in partner_player_assets
@@ -6353,6 +6406,9 @@ def _build_trade_ideas_impl(
 
     with profile.stage("final_sorting"):
         ideas.sort(key=_trade_surface_sort_key, reverse=True)
+        if target_viability.enabled():
+            # An injured stash is a buy-low note, never a headline: every healthy fit ranks ahead of it.
+            ideas.sort(key=lambda idea: 1 if _is_injured_stash_idea(idea) else 0)
 
     # Every surfaced idea must grade at least FAIR in the Trade Analyzer for
     # the user's side. Graded lazily in surface order, so only the ideas the
