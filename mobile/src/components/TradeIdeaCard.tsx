@@ -9,8 +9,7 @@ import TradeCompactCard, { type TradeCardAsset } from './TradeCompactCard';
 import InfoMark from './InfoMark';
 import MeterRow from './ConfidenceMeter';
 import ManagerTendenciesChips from './ManagerTendenciesChips';
-import TeamAvatar from './TeamAvatar';
-import ManagerProfileModal from './ManagerProfileModal';
+import TeamNameLink from './TeamNameLink';
 import Button from './Button';
 import ToneBadge from './ToneBadge';
 import IdeaPosture from './IdeaPosture';
@@ -271,7 +270,6 @@ export default function TradeIdeaCard({
   const copy = useExperienceCopy();
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
   const [shareOpen, setShareOpen] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
   // Recorded alongside the share so the quiet Trade Outcomes result sweep
   // can re-value these same players under the same lens later.
   const { lens } = useValuationLens(leagueId);
@@ -379,38 +377,20 @@ export default function TradeIdeaCard({
           visual reference wins here — the pill stays small/quiet per
           section 12's intent, just relocated to match the images. */}
       <View style={styles.partnerRow}>
-        {idea.partner_roster_id ? (
-          <ManagerProfileModal
-            visible={sheetOpen}
-            onClose={() => setSheetOpen(false)}
+        <View style={styles.partnerTextGroup}>
+          <TeamNameLink
             leagueId={leagueId}
             leagueName={leagueName}
             rosterId={idea.partner_roster_id}
-            teamName={idea.partner_team_name}
+            name={idea.partner_team_name}
             avatarId={idea.partner_team_avatar_url}
-          />
-        ) : null}
-        {idea.partner_team_avatar_url ? (
-          <TeamAvatar avatarId={idea.partner_team_avatar_url} name={idea.partner_team_name} size={36} />
-        ) : (
-          <View style={styles.partnerAvatar}>
-            <AppText style={styles.partnerInitial}>{idea.partner_team_name.charAt(0).toUpperCase()}</AppText>
-          </View>
-        )}
-        <View style={styles.partnerTextGroup}>
-          <View style={styles.partnerNameRow}>
-            {idea.partner_roster_id ? (
-              <Pressable onPress={() => setSheetOpen(true)} accessibilityRole="button" accessibilityLabel={`Open ${idea.partner_team_name} team sheet`} hitSlop={6}>
-                <AppText style={[styles.partnerName, { textDecorationLine: 'underline' }]} numberOfLines={2}>
-                  {idea.partner_team_name}
-                </AppText>
-              </Pressable>
-            ) : (
-              <AppText style={styles.partnerName} numberOfLines={2}>
+            showAvatar
+            avatarSize={36}
+          >
+            <View>
+              <AppText style={[styles.partnerName, idea.partner_roster_id ? { textDecorationLine: 'underline' } : null]} numberOfLines={2}>
                 {idea.partner_team_name}
               </AppText>
-            )}
-          </View>
           {idea.partner_team_archetype_label ? (
             <AppText style={styles.partnerArchetype} numberOfLines={1}>
               {idea.partner_team_archetype_label}
@@ -434,6 +414,8 @@ export default function TradeIdeaCard({
               </AppText>
             </View>
           ) : null}
+            </View>
+          </TeamNameLink>
           <ManagerTendenciesChips leagueId={leagueId} teamName={idea.partner_team_name} />
         </View>
         <PressableScale
