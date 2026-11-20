@@ -64,7 +64,8 @@ In-memory (web): `requestCache` (key already includes the access token; now also
 | `fd:start-here:v1:<user>` | progress flag | user in key | no | K |
 | `fgl:alert-reads-pending:v1` | unsent mark-read queue | user inside | no | K |
 | `fgl:theme-mode`, `fgl:ui-density`, `fgl:experience-level`, `fgl:showcase-mode`, `fgl:effects-prefs:v1`, `fgl:orb-horizontal-fraction`, `fgl:player-list-view-mode:*`, `fgl:sim-to-prefs`, `fd.sim.celebrations`, `fgl:sim-open:*`, `fd-help-seen:orb-menu` | appearance and layout | no | no | D |
-| `fgl:onboarding-complete`, `fgl:trial-offer-pending`, `fgl:college-football-prompt-answered`, `fgl:college-football-interest` | per-install first-run gates, documented as device state in their providers | no | no | D (follow-up) |
+| `fgl:onboarding-complete`, `fgl:trial-offer-pending` | per-install first-run gates; device-level by product decision (the intro is about this install) | no | no | D |
+| `fgl:college-football-prompt-answered`, `fgl:college-football-interest` | personal preference | scoped `u:<user>:` (app), existing keys adopted on first sign-in | scoped, kept across sign-out (`USER_SCOPED_KEEP_BASES`) | S |
 | `fgl:age-gate-passed`, `fgl:push-prompt-dismissed-at` | gate and OS prompt, per device | no | no | D |
 | `dynastygm_analytics_anon_id`, `dynastygm_analytics_queue_v1` | anonymous ids, events | no | no | D |
 | `fgl:pending-referral-code` | referral code captured before sign-in, cleared when consumed | no | no | D |
@@ -85,7 +86,7 @@ They are written before any account exists, or describe the device or the person
 
 ## Not fixed (documented)
 
-- App `OnboardingContext` and `CollegeInterestContext` read once at mount as per-install state; scoping them needs reload-on-user-change and a product call (should a second account on the phone see the intro?). Left device-level.
+- App `OnboardingContext` stays device-level by product decision. `CollegeInterestContext` is now per user (done): reloads on user change, migrates the old keys, and its answer survives sign-out.
 - Web `fgl:college-football-interest-web` is device-level for the same reason.
 - Pending alert reads (`fgl:alert-reads-pending:v1`) carry A's alert keys on disk until A signs in again; they are inside a user:league scope and hold no names.
 - Server-side: nothing deleted or changed.

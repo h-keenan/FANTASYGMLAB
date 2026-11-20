@@ -1,8 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-const ANSWERED_KEY = 'fgl:college-football-prompt-answered';
-const FOLLOWS_KEY = 'fgl:college-football-interest';
+import { loadCollegeInterest, saveCollegeInterest } from '../lib/collegeInterestStore';
+import { userStorage } from '../lib/userStorage';
+import { useAuth } from './AuthContext';
 
 export type CollegeInterestStatus = 'loading' | 'unanswered' | 'yes' | 'no';
 
@@ -30,10 +30,12 @@ const CollegeInterestContext = createContext<CollegeInterestContextValue | undef
 /**
  * One-time, non-intrusive "Do you follow college football?" ask (coridian_:
  * "don't make it overbearing" — a single dismissible prompt, never a
- * blocking modal, never repeated once dismissed or answered). Shaped like
- * OnboardingContext: a local-only AsyncStorage flag, not synced
- * cross-device — whether *this install* has been asked is per-device
- * first-run state, not an account preference.
+ * blocking modal, never repeated once dismissed or answered). Personal
+ * preference data, so it is scoped per user (lib/collegeInterestStore.ts,
+ * account isolation audit): a second account on the phone is asked on its
+ * own, and the first account's answer survives sign-out. Mounted inside
+ * AuthProvider so it reloads when the signed-in user changes (AuthContext
+ * applies the user to storage before it publishes the session).
  *
  * Persistence: two independent flags rather than one enum string, so a
  * dismiss-without-answering and an explicit "no" answer are both
@@ -42,36 +44,34 @@ const CollegeInterestContext = createContext<CollegeInterestContextValue | undef
  */
 export function CollegeInterestProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<CollegeInterestStatus>('loading');
+  const { session } = useAuth();
+  const userId = session?.user?.id ?? null;
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([AsyncStorage.getItem(ANSWERED_KEY), AsyncStorage.getItem(FOLLOWS_KEY)])
-      .then(([answered, follows]) => {
-        if (cancelled) return;
-        if (answered !== '1') {
-          setStatus('unanswered');
-          return;
-        }
-        setStatus(follows === 'yes' ? 'yes' : 'no');
+    setStatus('loading');
+    if (!userId) return undefined;
+    loadCollegeInterest(userStorage)
+      .then((answer) => {
+        if (!cancelled) setStatus(answer);
       })
       .catch(() => {
-        // Fail open — never trap the prompt in a broken "loading" state.
+        // Fail open - never trap the prompt in a broken "loading" state.
         if (!cancelled) setStatus('unanswered');
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [userId]);
 
   const respond = (follows: boolean) => {
     setStatus(follows ? 'yes' : 'no');
-    AsyncStorage.setItem(ANSWERED_KEY, '1').catch(() => {});
-    AsyncStorage.setItem(FOLLOWS_KEY, follows ? 'yes' : 'no').catch(() => {});
+    saveCollegeInterest(userStorage, follows).catch(() => {});
   };
 
   const dismiss = () => {
     setStatus('no');
-    AsyncStorage.setItem(ANSWERED_KEY, '1').catch(() => {});
+    saveCollegeInterest(userStorage, null).catch(() => {});
   };
 
   const value = useMemo<CollegeInterestContextValue>(
