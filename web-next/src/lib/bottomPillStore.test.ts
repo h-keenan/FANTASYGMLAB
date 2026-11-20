@@ -1,8 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getPillState, PILL_CLEAR_DELAY_MS, resetPillStore, setPillBarPresent, setPillContext, subscribePill } from "./bottomPillStore";
+import { getPillState, getServerPillState, PILL_CLEAR_DELAY_MS, resetPillStore, setPillBarPresent, setPillContext, subscribePill } from "./bottomPillStore";
 
 const ctx = (over = {}) => ({ id: "team", label: "Team", tabs: [{ key: "a", label: "A" }], activeKey: "a", onSelect: () => {}, ...over });
+
+describe("bottomPillStore snapshots", () => {
+  it("getSnapshot and getServerSnapshot return the same reference when nothing changed", () => {
+    resetPillStore();
+    expect(getPillState()).toBe(getPillState());
+    expect(getServerPillState()).toBe(getServerPillState());
+  });
+});
 
 describe("bottomPillStore", () => {
   beforeEach(() => {

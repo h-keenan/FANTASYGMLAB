@@ -69,7 +69,9 @@ export const subscribePill = (l: () => void) => {
   return () => void listeners.delete(l);
 };
 export const getPillState = () => state;
-export const getServerPillState = (): PillState => ({ ctx: null, barPresent: false });
+const SERVER_PILL_STATE: PillState = { ctx: null, barPresent: false };
+/** Stable reference: useSyncExternalStore requires getServerSnapshot to return the same value on every call. */
+export const getServerPillState = (): PillState => SERVER_PILL_STATE;
 /** Test helper. */
 export function resetPillStore() {
   owner = null;

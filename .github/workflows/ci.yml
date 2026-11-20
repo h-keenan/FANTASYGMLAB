@@ -104,6 +104,8 @@ jobs:
         run: node scripts/check_motion_usage.mjs
       - name: One navigation sheet (More and Search share the registry and component)
         run: node scripts/check_nav_sheet.mjs
+      - name: useSyncExternalStore snapshots are cached, never freshly allocated
+        run: node scripts/check_sync_store_snapshots.mjs
 
   mobile-app:
     needs: [classify]
