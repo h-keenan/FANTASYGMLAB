@@ -76,3 +76,21 @@ gh workflow run target-viability-replay.yml -f data_url=https://github.com/<owne
 
 * Workflow inputs: `data_url`, `seasons`, `dates`, `formats`, `sizes`. There is no train/test split input. Train 2021-23 / test 2024-25 is done by running the workflow twice, `-f seasons=2021,2022,2023` and `-f seasons=2024,2025`, and comparing the OFF/ON artifacts per run. The tarball holds all seasons (the harness always loads nflverse 2020-2026 for lookbacks). A private repo needs a `data_url` the runner can fetch without auth; a private release asset will not download via plain curl.
 * Limitation: depth order is usage-derived and the nflverse injury source has no IR rows, so the replay exercises the role term more than the IR term.
+
+### Replay results (run locally 2026-11-20, flag OFF vs ON)
+
+Harness `ideas_run.py`, 12-team leagues, seasons 2021-2025, dates 04-15/05-20/08-20/10-20/12-01, formats dynasty_sf and dynasty_1qb, run sequentially (about 35 min per flag, under 0.5 GB RAM, 24 MB output). Train 2021-23 / test 2024-25 is the split `analyze_ideas.py` uses. Differences are ON minus OFF, paired by league-date-team, bootstrap 95% CI (1000 resamples). ROS / horizon points are the realised lineup points of the user side (`u_ros`, `u_ros + u_y1`); partner is `p_h`.
+
+| | train SF | train 1QB | test SF | test 1QB | test both |
+|---|---|---|---|---|---|
+| ideas OFF / ON | 1427 / 1424 | 1412 / 1410 | 939 / 938 | 960 / 960 | 1899 / 1898 |
+| ROS pts diff | +0.02 [-0.93, 0.96] | -0.09 [-1.26, 0.99] | +0.49 [-0.58, 1.73] | **-1.72 [-3.03, -0.71]** | -0.62 [-1.43, 0.17] |
+| horizon pts diff | -1.33 [-3.41, 0.66] | -1.07 [-3.16, 0.88] | +0.76 [-1.95, 3.35] | **-3.70 [-7.46, -0.70]** | -1.47 [-3.65, 0.60] |
+| partner pts diff | +1.71 [-0.13, 3.82] | +0.93 [-0.83, 2.86] | +0.12 [-3.04, 3.29] | **+3.59 [1.31, 6.47]** | +1.85 [-0.03, 4.03] |
+| win % OFF -> ON | 48.4 -> 48.0 | 50.2 -> 50.0 | 46.4 -> 46.0 | 49.7 -> 48.9 | 48.0 -> 47.4 |
+| win-win % OFF -> ON | 8.3 -> 8.1 | 13.7 -> 14.0 | 15.0 -> 15.4 | 16.7 -> 16.5 | 15.8 -> 15.9 |
+
+* ON barely changes the idea set: 4738 OFF vs 4732 ON ideas overall; per-posture counts are identical except retool (-3 train, -1 test) and tank (-2 train). Mean ideas per team 7.91 vs 7.91 on test.
+* Playoff-odds and title-odds deltas (`u_dpo`, `u_dti`) are within +-0.2 pp, CIs straddle zero except test 1QB dpo (-0.2 pp, tiny).
+* Is ON negative on the test years? The point estimate is slightly negative on both formats combined (ROS -0.6, horizon -1.5 pts per idea, CIs include zero), and in test dynasty_1qb it is significantly negative for the user side (ROS -1.7, horizon -3.7) with the partner gaining +3.6. Test dynasty_sf is slightly positive and not significant, train is flat. This is not a clear win for the flag, and the 1QB test signal is the one to look at before turning it on. Only a handful of ideas change per slice, so it is a small sample of swapped ideas, and no multiple-comparison correction was applied across the 6 columns.
+* Limitation: the replay's depth order is usage-derived and the nflverse injury reports have no IR rows, so it tests the role term far more than the IR term; the IR-driven part of the viability check is effectively unexercised.
