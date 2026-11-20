@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { depthChange, depthChartParts, depthRowKind, injuryHistoryRows, injurySummaryParts, weeksLabel, type DepthChartData, type InjuryRecordData } from "./playerDepthInjury";
+import { depthChange, depthChartParts, depthPlace, depthRowKind, injuryHistoryRows, injurySummaryParts, weeksLabel, type DepthChartData, type InjuryRecordData } from "./playerDepthInjury";
 import { compactSummaryText } from "./compactModule";
 
 const chart: DepthChartData = {
@@ -44,5 +44,19 @@ describe("playerDepthInjury", () => {
       [2023, "Foot", "Wk 4–6", "3 games"],
     ]);
     expect(weeksLabel({ start_week: null, end_week: null, games_missed: 1, injury: null })).toBe("");
+  });
+  it("uses the rank among listed players when the team's order skips numbers", () => {
+    const gappy: DepthChartData = {
+      ok: true, team: "ARI", slot: "RB", slot_label: "Running backs", self_order: 6, self_rank: 5, total: 6,
+      entries: [1, 2, 3, 4, 6, 7].map((order, i) => ({ player_id: String(i), name: `P${i}`, order, rank: i + 1, is_self: order === 6 })),
+    };
+    expect(compactSummaryText(depthChartParts(gappy))).toBe("RB5 · ARI · 4 ahead");
+    expect(gappy.entries.map((e) => depthRowKind(e, 5))).toEqual(["ahead", "ahead", "ahead", "ahead", "self", "behind"]);
+    expect(depthPlace({ order: 3 })).toBe(3);
+  });
+  it("does not show a false 0 missed for an injured player the reports do not cover", () => {
+    const ir = { ...record, seasons: [{ season: 2025, games_missed: 3, stints: [] }], career_games_missed: 4, current_season_tracked: false, current: { ...record.current!, unavailable: true, line: "Knee · Injured Reserve" } };
+    expect(compactSummaryText(injurySummaryParts(ir))).toBe("Knee · Injured Reserve · 2026 games not counted · 4 career");
+    expect(compactSummaryText(injurySummaryParts({ ...ir, career_games_missed: 0, seasons: [] }))).toBe("Knee · Injured Reserve · 2026 games not counted");
   });
 });

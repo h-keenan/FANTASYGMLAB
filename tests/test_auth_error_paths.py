@@ -90,8 +90,20 @@ def test_missing_header_stays_401():
 
 
 def test_outage_is_not_cached_so_recovery_is_immediate():
+    # ``auth_supabase.requests`` is the process-global ``requests`` module, so patching ``get`` also
+    # intercepts any other thread's HTTP call (leaked background threads from earlier tests under
+    # xdist).  Only GoTrue calls may consume the scripted sequence; everything else fails on its own.
     seq = [requests.ConnectionError("x"), _resp(200, {"id": "u1", "email": "a@b.c"})]
-    with patch.object(auth_supabase.requests, "get", side_effect=seq), patch.object(
+
+    def gotrue_only(url, *args, **kwargs):
+        if "/auth/v1/user" not in str(url):
+            raise requests.ConnectionError("unrelated call")
+        item = seq.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    with patch.object(auth_supabase.requests, "get", side_effect=gotrue_only), patch.object(
         api, "_fetch_profile_fields", return_value={"entitlement": "free", "sleeper_username": "", "status": "ok"}
     ):
         c = TestClient(api.app)

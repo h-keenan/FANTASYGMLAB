@@ -14,6 +14,8 @@ export interface DepthChartEntry {
   team?: string | null;
   /** The team's own order at this slot (1 = starter); not always contiguous. */
   order: number;
+  /** His place among the players actually listed (1 = first); the raw `order` can skip numbers. Absent on older payloads. */
+  rank?: number;
   status?: string | null;
   injury_status?: string | null;
   is_self: boolean;
@@ -28,6 +30,7 @@ export interface DepthChartData {
   slot: string | null;
   slot_label: string | null;
   self_order: number | null;
+  self_rank?: number | null;
   entries: DepthChartEntry[];
   total: number;
   reason?: string;
@@ -65,6 +68,8 @@ export interface InjuryRecordData {
   player_id?: string;
   /** The in-progress (or latest) season the "this season" figure refers to. */
   current_season?: number;
+  /** False when the current season's official reports hold no row for him while he is out (IR players drop off them), so a 0 would be a guess. */
+  current_season_tracked?: boolean;
   current: CurrentInjury | null;
   seasons: InjurySeason[];
   career_games_missed: number;
@@ -84,7 +89,12 @@ export function weeksLabel(stint: InjuryStint): string {
   return `Wk ${stint.start_week}–${stint.end_week}`;
 }
 
-/** The slot the chart is for, e.g. "RB2": the first letters of the slot code plus his order. */
+/** An entry's place in the list: the rank among listed players, else the team's own order (contiguous charts, the sim). */
+export function depthPlace(entry: Pick<DepthChartEntry, "order" | "rank">): number {
+  return entry.rank ?? entry.order;
+}
+
+/** The slot the chart is for, e.g. "RB2": the first letters of the slot code plus his place. */
 export function depthRoleLabel(slot: string | null | undefined, order: number | null | undefined): string | null {
   if (!slot || order == null) return null;
   return `${slot}${order}`;
@@ -94,12 +104,13 @@ export function depthRoleLabel(slot: string | null | undefined, order: number | 
 export function depthChartParts(chart: DepthChartData | null | undefined): CompactPart[] {
   if (!chart || !chart.ok || chart.self_order == null || chart.entries.length === 0) return [];
   const mine = chart.entries.find((e) => e.is_self);
-  const ahead = chart.entries.filter((e) => e.order < chart.self_order!).length;
+  const place = chart.self_rank ?? chart.self_order;
+  const ahead = place - 1;
   const moved = mine ? depthChange(mine.change) : null;
   const parts: CompactPart[] = [
-    { key: "role", text: depthRoleLabel(chart.slot, chart.self_order) ?? "", strong: true, tone: chart.self_order === 1 ? "success" : undefined },
+    { key: "role", text: depthRoleLabel(chart.slot, place) ?? "", strong: true, tone: place === 1 ? "success" : undefined },
     { key: "team", text: chart.team ?? "" },
-    { key: "ahead", text: chart.self_order === 1 ? "Starter" : `${ahead} ahead`, tone: chart.self_order === 1 ? "success" : "muted" },
+    { key: "ahead", text: place === 1 ? "Starter" : `${ahead} ahead`, tone: place === 1 ? "success" : "muted" },
   ];
   if (moved) parts.push({ key: "moved", text: moved.text, tone: moved.tone });
   return parts;
@@ -119,9 +130,9 @@ export function depthChange(change: number | null | undefined): DepthChange | nu
 }
 
 /** Who is ahead / behind / him, in order, for the list. */
-export function depthRowKind(entry: DepthChartEntry, selfOrder: number | null): "ahead" | "self" | "behind" {
+export function depthRowKind(entry: DepthChartEntry, selfPlace: number | null): "ahead" | "self" | "behind" {
   if (entry.is_self) return "self";
-  return selfOrder != null && entry.order < selfOrder ? "ahead" : "behind";
+  return selfPlace != null && depthPlace(entry) < selfPlace ? "ahead" : "behind";
 }
 
 /** One line of the injury section's collapsed summary: current injury (or Healthy), this season, career. */
@@ -134,10 +145,13 @@ export function injurySummaryParts(record: InjuryRecordData | null | undefined):
       ? { key: "current", text: record.current.line, strong: true, tone: record.current.unavailable ? "danger" : "warning" }
       : { key: "current", text: "Healthy", tone: "success" },
   ];
+  // Out with no official report row this season (IR players drop off them): "0 missed" would be a guess, so say so.
+  const uncounted = record.current?.unavailable === true && record.current_season_tracked === false && thisSeason === 0;
+  if (uncounted) parts.push({ key: "season", text: `${currentSeason} games not counted`, tone: "muted" });
   if (record.career_games_missed > 0) {
-    parts.push({ key: "season", text: thisSeason > 0 ? `${gamesLabel(thisSeason)} missed in ${currentSeason}` : `0 missed in ${currentSeason}` });
+    if (!uncounted) parts.push({ key: "season", text: thisSeason > 0 ? `${gamesLabel(thisSeason)} missed in ${currentSeason}` : `0 missed in ${currentSeason}` });
     parts.push({ key: "career", text: `${record.career_games_missed} career` });
-  } else {
+  } else if (!uncounted) {
     parts.push({ key: "none", text: "No games missed on record", tone: "muted" });
   }
   return parts;
