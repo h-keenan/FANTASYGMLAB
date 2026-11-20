@@ -8089,6 +8089,10 @@ def _build_my_player_fallback_ideas(
             _record_closest_structure(diagnostics, kind, delta, "acceptance")
         else:
             _record_closest_structure(diagnostics, kind, delta, "accepted")
+        stash_notes = [str(a.get("availability_note") or "") for a in receive_assets if a.get("availability_framing")]
+        if stash_notes:
+            # Same posture-aware framing the Trade Board gives (modules.target_viability labels).
+            rationale = " ".join(part for part in (rationale, *stash_notes) if part)
         idea = commit_idea(
             partner_name=partner_name,
             partner_mode=partner_mode,
@@ -8178,6 +8182,11 @@ def _build_my_player_fallback_ideas(
             for _, row in partner_team_df.iterrows()
             if _row_score(row, score_field) > 0
         ]
+        if target_viability.enabled():
+            # Same availability + depth-role check the Trade Board applies (shared, modules.target_viability).
+            partner_player_assets = _viable_target_assets(
+                partner_player_assets, partner_team_df, strategy=active_strategy, league_settings=league_settings,
+            )
         partner_player_assets.sort(
             key=lambda asset: abs(int(asset.get("score") or 0) - selected_score),
         )
@@ -8783,6 +8792,9 @@ def build_player_trade_hub_ideas(
                 ),
                 reverse=True,
             )
+            if target_viability.enabled():
+                # An injured stash is a buy-low note, never ahead of a healthy return (same rule as the Trade Board).
+                combined.sort(key=lambda idea: 1 if _is_injured_stash_idea(idea) else 0)
             selected = [
                 idea
                 for idea in _select_player_search_ideas(combined, max_ideas)

@@ -63,6 +63,7 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 from modules import multi_team_trade as mt
+from modules import target_viability
 from modules import posture_model
 from modules import multi_team_trade_engine as engine
 from modules import roster_value_model, trade_analyzer_fit, trade_grade, trade_veto, trade_value_bands as bands
@@ -143,6 +144,8 @@ class _League:
             }
             self.sendable[rid] = self._sendable(rid, positions)
         self._start_cache: dict[tuple[str, str], bool] = {}
+        self._viable_cache: dict[tuple[str, str], bool] = {}
+        self._rows_by_id: dict[str, Mapping[str, Any]] | None = None
         self.pick_want: dict[str, float] = {}
         self.group: dict[str, str] = {}
         self.picks: dict[str, Asset] = {}
@@ -233,6 +236,35 @@ class _League:
             return True  # an unreadable roster never blocks a candidate; the real grade decides
         return asset.player_id in trade_analyzer_fit._starter_ids(snapshot) if snapshot else True
 
+    def viable_for(self, dst: str, asset: Asset) -> bool:
+        """Availability + depth-role check on a received player (shared ``target_viability``, same flag as the Trade Board).
+        Only a plain ``target`` verdict passes: a three-way deal is never a buy-low stash. Always True with the flag off."""
+
+        if asset.kind != "player" or not target_viability.enabled():
+            return True
+        key = (dst, asset.player_id)
+        if key not in self._viable_cache:
+            rows = self._frame_rows()
+            row = rows.get(asset.player_id)
+            if row is None:
+                self._viable_cache[key] = True
+            else:
+                from modules import trade_ideas as trade_ideas_module
+
+                strategy = str(self.ctx.posture(dst).get("key") or "retool")
+                verdict = target_viability.assess(
+                    row, strategy=strategy, window=self.ctx.window, value=asset.value,
+                    cheap_value=float(trade_ideas_module._vs(3500)),
+                )
+                self._viable_cache[key] = verdict.verdict == "target"
+        return self._viable_cache[key]
+
+    def _frame_rows(self) -> dict[str, Mapping[str, Any]]:
+        if self._rows_by_id is None:
+            frame = self.ctx.valued
+            self._rows_by_id = {str(r.get("player_id")): r for _, r in frame.iterrows()} if "player_id" in frame.columns else {}
+        return self._rows_by_id
+
     def edge(self, src: str, dst: str) -> list[Asset]:
         """Up to ``EDGE_ASSETS`` of ``src``'s sendable players at a position ``dst`` needs (and, for the
         redundancy-scoped positions, who would actually start for ``dst``)."""
@@ -240,7 +272,7 @@ class _League:
         want = self.need_pos.get(dst, {})
         fits = [
             a for a in self.sendable.get(src, [])
-            if a.kind == "player" and a.position in want and self.would_start(dst, a)
+            if a.kind == "player" and a.position in want and self.would_start(dst, a) and self.viable_for(dst, a)
         ]
         fits.sort(key=lambda a: (-want[a.position], -a.value, a.player_id))
         picks = [a for a in self.sendable.get(src, []) if a.kind == "pick" and self.want(dst, a) > 0]
@@ -436,6 +468,7 @@ def _repair(league: _League, graded: Mapping[str, Any], base: Sequence[mt.Transf
         a for a in league.sendable.get(giver, [])
         if a.player_id not in used and a.position not in keep
         and (a.kind != "pick" or league.want(hurt, a) > 0)
+        and league.viable_for(hurt, a)
     ]
     if not pool:
         return None
