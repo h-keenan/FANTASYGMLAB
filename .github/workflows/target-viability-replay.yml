@@ -4,7 +4,7 @@ name: Target Viability Replay
 # generator on point-in-time synthetic leagues) twice, DYNASTYGM_TARGET_VIABILITY_V1 OFF and ON, and uploads each run's results
 # as an artifact so the two can be compared (docs/audits/2026-11-target-viability.md, "Replay").
 #
-# Needs the replay input data (nflverse weekly stats parquet in nv/ and DynastyProcess snapshots in dp/, public data, a few GB).
+# Needs the replay input data (nflverse weekly stats parquet in nv/ and DynastyProcess snapshots in dp/, public data, about 9 MB as a tar.gz, about 39 MB extracted).
 # It is not in the repo and is not downloaded here: point `data_url` at a tar.gz of a directory holding nv/ and dp/ (for example a
 # private release asset). No secrets are used; the data URL is the only input that reaches the network.
 #
