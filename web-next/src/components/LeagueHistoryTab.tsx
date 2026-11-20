@@ -14,7 +14,7 @@ import { PillRow, TabStack } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
-import { TeamAvatar } from "@/components/TeamAvatar";
+import { TeamNameLink } from "@/components/TeamNameLink";
 
 import {
   HISTORY_FILTERS,
@@ -113,7 +113,7 @@ function faabLine(side: HistorySide, txType: string): string {
   return bits.join(" · ");
 }
 
-function HistorySideBlock({ side, txType }: { side: HistorySide; txType: string }) {
+function HistorySideBlock({ side, txType, leagueId }: { side: HistorySide; txType: string; leagueId?: string }) {
   const faab = faabLine(side, txType);
   return (
     <div
@@ -121,11 +121,10 @@ function HistorySideBlock({ side, txType }: { side: HistorySide; txType: string 
       style={txType === "trade" ? { background: "var(--color-surface-muted)", padding: "0.5rem 0.75rem" } : undefined}
     >
       <div className="flex items-center gap-2 min-w-0">
-        <TeamAvatar avatarUrl={side.avatar_url} name={side.team_name} size={28} />
+        <TeamNameLink leagueId={leagueId} rosterId={side.roster_id} name={side.team_name} avatarUrl={side.avatar_url} showAvatar avatarSize={28} className="text-sm font-extrabold">
+          {side.team_name}
+        </TeamNameLink>
         <div className="flex flex-col min-w-0">
-          <span className="text-sm font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
-            {side.team_name}
-          </span>
           {side.owner_handle ? (
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               {side.owner_handle}
@@ -297,7 +296,7 @@ function HistoryGradeBlock({ grade }: { grade: HistoryTransaction["grade"] }) {
   );
 }
 
-function HistoryItemCard({ transaction }: { transaction: HistoryTransaction }) {
+function HistoryItemCard({ transaction, leagueId }: { transaction: HistoryTransaction; leagueId?: string }) {
   const sideCount = (transaction.sides || []).length;
   const kicker = transaction.type === "trade" ? (sideCount > 2 ? `${sideCount}-team trade` : "Trade") : transaction.type === "waiver" ? "Waiver" : "Free agent";
   const when = formatHistoryWhen(transaction.week, transaction.timestamp);
@@ -321,7 +320,7 @@ function HistoryItemCard({ transaction }: { transaction: HistoryTransaction }) {
       </header>
       <div className="grid gap-2" style={{ gridTemplateColumns: sides.length > 1 ? "repeat(auto-fit, minmax(16rem, 1fr))" : "1fr" }}>
         {sides.map((side) => (
-          <HistorySideBlock key={side.roster_id} side={side} txType={transaction.type} />
+          <HistorySideBlock key={side.roster_id} side={side} txType={transaction.type} leagueId={leagueId} />
         ))}
       </div>
       {extraPicks.length ? (
@@ -422,7 +421,7 @@ export function HistoryTab({
       ) : (
         <div className="flex flex-col gap-3">
           {visible.map((transaction) => (
-            <HistoryItemCard key={transaction.transaction_id} transaction={transaction} />
+            <HistoryItemCard key={transaction.transaction_id} transaction={transaction} leagueId={selectedSeasonLeagueId === leagueId ? leagueId : undefined} />
           ))}
         </div>
       )}

@@ -17,7 +17,7 @@ import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TradeOddsEffect } from "@/components/TradeOddsEffect";
 import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { TeamAvatar } from "@/components/TeamAvatar";
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { LEVEL_SEGMENTS, levelColor } from "@/lib/tradeHubPresentation";
@@ -227,8 +227,9 @@ export function TradeIdeaCardView({
       getLabel="You get"
       title={
         <span className="flex items-center gap-2 min-w-0">
-          <TeamAvatar avatarUrl={idea.partner_team_avatar_url} name={idea.partner_team_name} size={24} />
-          <span className="min-w-0 flex-1 break-words">{idea.partner_team_name}</span>
+          <span className="min-w-0 flex-1">
+            <TeamNameLink leagueId={leagueId} rosterId={idea.partner_roster_id} name={idea.partner_team_name} avatarUrl={idea.partner_team_avatar_url} showAvatar avatarSize={24} />
+          </span>
           <span className="shrink-0 font-black" style={{ color: deltaColor }}>{tradeIdeaGainText(gain)}</span>
         </span>
       }

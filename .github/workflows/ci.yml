@@ -82,6 +82,8 @@ jobs:
         run: node scripts/check_storage_keys.mjs
       - name: Check every player and pick is tappable
         run: node scripts/check_player_tap.mjs
+      - name: Check every league team name is tappable
+        run: node scripts/check_team_tap.mjs
       - name: Check the one InfoMark standard
         run: node scripts/check_info_mark_usage.mjs
       - name: Check select-and-submit screens use selection mode

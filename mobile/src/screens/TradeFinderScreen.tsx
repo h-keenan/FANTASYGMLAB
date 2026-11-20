@@ -26,7 +26,7 @@ import TradeFinderNoResults, {
   TradeFinderSummary,
 } from '../components/TradeFinderNoResults';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import TeamAvatar from '../components/TeamAvatar';
+import TeamNameLink from '../components/TeamNameLink';
 import TradeValueHero from '../components/TradeValueHero';
 import ValuesCredit from '../components/ValuesCredit';
 import {
@@ -287,10 +287,14 @@ const RosterRow = React.memo(function RosterRow({
  */
 function ResultCard({
   idea,
+  leagueId,
+  leagueName,
   onPressPlayer,
   onPressPick,
 }: {
   idea: TradeIdea;
+  leagueId: string;
+  leagueName: string;
   onPressPlayer: (asset: PresentationAsset) => void;
   onPressPick: (asset: PresentationAsset) => void;
 }) {
@@ -304,18 +308,28 @@ function ResultCard({
   return (
     <AnimatedCard style={styles.resultCard}>
       <View style={styles.partnerRow}>
-        {idea.partner_team_avatar_url ? (
-          <TeamAvatar avatarId={idea.partner_team_avatar_url} name={idea.partner_team_name} size={36} />
-        ) : (
-          <View style={styles.partnerAvatar}>
-            <AppText style={styles.partnerInitial}>{idea.partner_team_name.charAt(0).toUpperCase()}</AppText>
-          </View>
-        )}
         <View style={styles.partnerTextGroup}>
           <View style={styles.partnerNameRow}>
-            <AppText style={styles.partnerName} numberOfLines={2}>
-              {idea.partner_team_name}
-            </AppText>
+            <TeamNameLink
+              leagueId={leagueId}
+              leagueName={leagueName}
+              rosterId={idea.partner_roster_id}
+              name={idea.partner_team_name}
+              avatarId={idea.partner_team_avatar_url}
+              showAvatar
+              avatarSize={36}
+            >
+              <View>
+                <AppText style={[styles.partnerName, idea.partner_roster_id ? { textDecorationLine: 'underline' } : null]} numberOfLines={2}>
+                  {idea.partner_team_name}
+                </AppText>
+                {idea.partner_team_archetype_label ? (
+                  <AppText style={styles.partnerArchetype} numberOfLines={1}>
+                    {idea.partner_team_archetype_label}
+                  </AppText>
+                ) : null}
+              </View>
+            </TeamNameLink>
             {idea.value_edge_band ? (
               <View style={[styles.fairnessPill, { borderColor: bandColor }]}>
                 <AppText style={[styles.fairnessPillText, { color: bandColor }]} numberOfLines={1}>
@@ -324,11 +338,6 @@ function ResultCard({
               </View>
             ) : null}
           </View>
-          {idea.partner_team_archetype_label ? (
-            <AppText style={styles.partnerArchetype} numberOfLines={1}>
-              {idea.partner_team_archetype_label}
-            </AppText>
-          ) : null}
         </View>
       </View>
 
@@ -624,6 +633,8 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
                     <ResultCard
                       key={`${idea.partner_team_name}-closest-${index}`}
                       idea={idea}
+                      leagueId={leagueId}
+                      leagueName={leagueName}
                       onPressPlayer={openPlayer}
                       onPressPick={openPick}
                     />
@@ -638,7 +649,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
                 {ideas.map((idea, index) => (
                   <View key={`${idea.partner_team_name}-${index}`}>
                     <TradeFinderNoteRow note={idea.finder_note} />
-                    <ResultCard idea={idea} onPressPlayer={openPlayer} onPressPick={openPick} />
+                    <ResultCard idea={idea} leagueId={leagueId} leagueName={leagueName} onPressPlayer={openPlayer} onPressPick={openPick} />
                   </View>
                 ))}
                 {!searching ? (
@@ -648,6 +659,8 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
                       <ResultCard
                         key={`${idea.partner_team_name}-closest-${index}`}
                         idea={idea}
+                        leagueId={leagueId}
+                        leagueName={leagueName}
                         onPressPlayer={openPlayer}
                         onPressPick={openPick}
                       />

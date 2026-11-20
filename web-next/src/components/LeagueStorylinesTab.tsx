@@ -15,7 +15,7 @@ import type {
 
 
 
-import { TeamAvatar } from "@/components/TeamAvatar";
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { AccentCard } from "@/components/AccentCard";
 import {
   FILTER_TRADES,
@@ -40,14 +40,13 @@ function breakdownNote(breakdown: StorylineLeader["breakdown"]): string {
   return bits.join(" · ");
 }
 
-function StorylineTeamLine({ team }: { team: StorylineTeam }) {
+function StorylineTeamLine({ team, leagueId }: { team: StorylineTeam; leagueId: string }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <TeamAvatar avatarUrl={team.avatar_url} name={team.team_name} size={28} />
+      <TeamNameLink leagueId={leagueId} rosterId={team.roster_id} name={team.team_name} avatarUrl={team.avatar_url} showAvatar avatarSize={28} className="text-sm font-extrabold">
+        {team.team_name}
+      </TeamNameLink>
       <div className="flex flex-col min-w-0">
-        <span className="text-sm font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
-          {team.team_name}
-        </span>
         {team.owner_handle ? (
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {team.owner_handle}
@@ -172,7 +171,7 @@ export function StorylinesTab({
       .join(" · ");
     cards.push(
       <StorylineCard key="most-active" kicker="Most Active" question="Who is driving league activity?">
-        <StorylineTeamLine team={leader} />
+        <StorylineTeamLine team={leader} leagueId={leagueId} />
         <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
           {leader.metric} move{leader.metric !== 1 ? "s" : ""}
         </span>
@@ -189,7 +188,7 @@ export function StorylinesTab({
     const leader = report.trade_market_leader;
     cards.push(
       <StorylineCard key="trade-market" kicker="Trade Market" question="Who is driving the trade market?">
-        <StorylineTeamLine team={leader} />
+        <StorylineTeamLine team={leader} leagueId={leagueId} />
         <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
           {leader.metric} completed trade{leader.metric !== 1 ? "s" : ""}
         </span>
@@ -210,7 +209,7 @@ export function StorylinesTab({
       >
         <div className="flex flex-col gap-2">
           {trade.teams.slice(0, 3).map((team) => (
-            <StorylineTeamLine key={team.roster_id || team.team_name} team={team} />
+            <StorylineTeamLine key={team.roster_id || team.team_name} team={team} leagueId={leagueId} />
           ))}
         </div>
         <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
@@ -237,7 +236,7 @@ export function StorylinesTab({
         route={FILTER_WIRE}
         onOpenHistory={onOpenHistory}
       >
-        <StorylineTeamLine team={faab} />
+        <StorylineTeamLine team={faab} leagueId={leagueId} />
         {player ? (
           <div className="flex flex-wrap gap-1">
             <AssetChip asset={player} />
@@ -259,7 +258,7 @@ export function StorylinesTab({
     const leader = report.most_picks_acquired;
     cards.push(
       <StorylineCard key="most-picks" kicker="Most Picks Acquired" question="Who collected the most future picks?">
-        <StorylineTeamLine team={leader} />
+        <StorylineTeamLine team={leader} leagueId={leagueId} />
         <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
           {leader.metric} pick{leader.metric !== 1 ? "s" : ""} acquired
         </span>
@@ -274,7 +273,7 @@ export function StorylinesTab({
     const leader = report.roster_turnover;
     cards.push(
       <StorylineCard key="roster-turnover" kicker="Roster Turnover" question="Which roster changed the most player assets?">
-        <StorylineTeamLine team={leader} />
+        <StorylineTeamLine team={leader} leagueId={leagueId} />
         <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
           {leader.metric} player-asset change{leader.metric !== 1 ? "s" : ""}
         </span>
@@ -289,7 +288,7 @@ export function StorylinesTab({
     const leader = report.quietest;
     cards.push(
       <StorylineCard key="quietest" kicker="Quietest Desk" question="Who stayed out of the market?">
-        <StorylineTeamLine team={leader} />
+        <StorylineTeamLine team={leader} leagueId={leagueId} />
         <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
           {leader.metric} completed move{leader.metric !== 1 ? "s" : ""}
         </span>
