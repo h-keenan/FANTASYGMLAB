@@ -34,6 +34,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { RookieAdpBoard } from "@/components/RookieAdpBoard";
 import { StructuredRow, StructuredRowList } from "@/components/ui/StructuredRow";
 import { TeamAvatar } from "@/components/TeamAvatar";
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { cardRows, signalPills, signalSpokenLabel, strategyTone, type DraftSignalRow } from "@/lib/draftSignals";
 import { PageTitle } from "@/components/PageTitle";
 
@@ -264,8 +265,8 @@ export function DraftCenterContent({
       {tab === "overview" ? (
         <>
           <RookieAdpBoard board={data.rookie_adp_board} />
-          <DraftCardSection id="decision-signals-heading" title="League Draft Decision Signals" cards={decisionCards} myRosterId={myRosterId} />
-          <DraftCardSection id="partner-discovery-heading" title="Draft Partner Discovery" cards={partnerCards} myRosterId={myRosterId} />
+          <DraftCardSection id="decision-signals-heading" title="League Draft Decision Signals" cards={decisionCards} myRosterId={myRosterId} leagueId={leagueId} />
+          <DraftCardSection id="partner-discovery-heading" title="Draft Partner Discovery" cards={partnerCards} myRosterId={myRosterId} leagueId={leagueId} />
         </>
       ) : null}
 
@@ -347,7 +348,7 @@ function CapitalCell({
  * card, railed and badged in the tone's semantic color (same vocabulary as the
  * `.tone-*` CSS classes), with the items as icon rows.
  */
-function DraftCardSection({ id, title, cards, myRosterId }: { id: string; title: string; cards: DraftCard[]; myRosterId: string }) {
+function DraftCardSection({ id, title, cards, myRosterId, leagueId }: { id: string; title: string; cards: DraftCard[]; myRosterId: string; leagueId?: string }) {
   if (cards.length === 0) return null;
   return (
     <CompactModule
@@ -377,7 +378,7 @@ function DraftCardSection({ id, title, cards, myRosterId }: { id: string; title:
                     <StructuredRowList
                       ariaLabel={card.label}
                       items={rows}
-                      renderRow={(row) => <DraftSignalRowView row={row} mine={Boolean(myRosterId) && row.team_id === myRosterId} />}
+                      renderRow={(row) => <DraftSignalRowView row={row} leagueId={leagueId} mine={Boolean(myRosterId) && row.team_id === myRosterId} />}
                     />
                   );
                 }
@@ -410,9 +411,10 @@ const SIGNAL_TONE_COLOR = {
  * One Draft Center signal row: crest, team, direction chip, rank pills, one
  * short reason. Tapping it opens the full sentence and the numbers behind it.
  */
-function DraftSignalRowView({ row, mine }: { row: DraftSignalRow; mine: boolean }) {
+function DraftSignalRowView({ row, mine, leagueId }: { row: DraftSignalRow; mine: boolean; leagueId?: string }) {
   return (
     <StructuredRow
+      // team-tap-exempt: the whole row is one tap target (opens the detail sheet, which holds the team sheet link)
       lead={<TeamAvatar avatarUrl={row.avatar_url} name={row.team_name} size={36} />}
       title={row.team_name}
       chip={{ label: row.strategy_display, color: SIGNAL_TONE_COLOR[strategyTone(row.strategy)] }}
@@ -423,6 +425,7 @@ function DraftSignalRowView({ row, mine }: { row: DraftSignalRow; mine: boolean 
       detailTitle={row.team_name}
       detail={
         <>
+          <TeamNameLink leagueId={leagueId} rosterId={row.team_id} name={row.team_name} avatarUrl={row.avatar_url} showAvatar avatarSize={28} className="text-sm font-bold" />
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {row.reason_long}
           </p>

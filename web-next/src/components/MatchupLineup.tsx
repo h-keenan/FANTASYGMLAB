@@ -4,6 +4,7 @@ import { probabilityColorVar } from "@/lib/verdictToneCss";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { EmptySlotCard, PlayerCard } from "@/components/PlayerCardKit";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerName } from "@/components/PlayerName";
@@ -68,7 +69,9 @@ export function ComparisonHeader({
   live,
   sort,
   onSort,
+  leagueId,
 }: {
+  leagueId?: string | null;
   mine: MatchupSide;
   opponent: MatchupSide;
   slots: SlotComparison[];
@@ -89,7 +92,7 @@ export function ComparisonHeader({
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
         <div className="flex flex-col min-w-0">
           <span className="text-[11px] font-bold break-words" style={{ color: "var(--color-accent)" }}>
-            {mine.team_name || "You"}
+            <TeamNameLink leagueId={leagueId} rosterId={mine.roster_id} name={mine.team_name || "You"} avatarUrl={mine.avatar_url} />
           </span>
           <TickNumber value={totals.mineNow} testId="total-mine" className="text-2xl font-extrabold leading-none" style={{ color: "var(--color-text-primary)" }} />
           {showFinal ? (
@@ -112,7 +115,7 @@ export function ComparisonHeader({
         </div>
         <div className="flex flex-col items-end min-w-0 text-right">
           <span className="text-[11px] font-bold break-words max-w-full" style={{ color: "var(--color-text-primary)" }}>
-            {opponent.team_name || "Opponent"}
+            <TeamNameLink leagueId={leagueId} rosterId={opponent.roster_id} name={opponent.team_name || "Opponent"} avatarUrl={opponent.avatar_url} className="justify-end" />
           </span>
           <TickNumber value={totals.opponentNow} testId="total-opponent" className="text-2xl font-extrabold leading-none" style={{ color: "var(--color-text-primary)" }} />
           {showFinal ? (

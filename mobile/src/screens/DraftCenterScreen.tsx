@@ -1,4 +1,5 @@
 import StructuredRow, { StructuredRowList } from '../components/StructuredRow';
+import TeamNameLink from '../components/TeamNameLink';
 import TeamAvatar from '../components/TeamAvatar';
 import { cardRows, signalPills, signalSpokenLabel, strategyTone } from '../lib/draftSignals';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -349,12 +350,12 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
 
             <SectionHeading title="League Draft Decision Signals" topGap={16} />
             {decisionCards.map((card) => (
-              <DraftInsightCard key={card.label} card={card} myRosterId={myRosterId} />
+              <DraftInsightCard key={card.label} card={card} myRosterId={myRosterId} leagueId={leagueId} leagueName={leagueName} />
             ))}
 
             <SectionHeading title="Draft Partner Discovery" topGap={16} />
             {partnerCards.map((card) => (
-              <DraftInsightCard key={card.label} card={card} myRosterId={myRosterId} />
+              <DraftInsightCard key={card.label} card={card} myRosterId={myRosterId} leagueId={leagueId} leagueName={leagueName} />
             ))}
           </>
         ) : null}
@@ -460,7 +461,7 @@ function CapitalCell({
  * AccentCard railed and badged in the tone's semantic color, items as icon
  * rows. Mirrors web-next's DraftCardSection (PR #1696).
  */
-function DraftInsightCard({ card, myRosterId }: { card: DraftCard; myRosterId: string }) {
+function DraftInsightCard({ card, myRosterId, leagueId, leagueName }: { card: DraftCard; myRosterId: string; leagueId: string; leagueName: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const toneColor = toneColorMap(colors)[card.tone] ?? colors.accent;
@@ -476,6 +477,7 @@ function DraftInsightCard({ card, myRosterId }: { card: DraftCard; myRosterId: s
           items={rows}
           renderRow={(row) => (
             <StructuredRow
+              // team-tap-exempt: the whole row is one tap target (opens the detail sheet, which holds the team sheet link)
               lead={<TeamAvatar avatarId={row.avatar_url} name={row.team_name} size={36} />}
               title={row.team_name}
               chip={{ label: row.strategy_display, color: signalColor[strategyTone(row.strategy)] }}
@@ -486,6 +488,7 @@ function DraftInsightCard({ card, myRosterId }: { card: DraftCard; myRosterId: s
               detailTitle={row.team_name}
               detail={
                 <>
+                  <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={row.team_id} name={row.team_name} avatarId={row.avatar_url} showAvatar avatarSize={28} textStyle={styles.signalReason} />
                   <AppText style={styles.signalReason}>{row.reason_long}</AppText>
                   {row.evidence.map((entry) => (
                     <View key={entry.key} style={styles.signalEvidence}>

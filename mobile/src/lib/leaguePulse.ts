@@ -6,6 +6,7 @@
  */
 
 export interface PulseTeam {
+  roster_id?: string | number | null;
   team_name?: string | null;
   avatar_url?: string | null;
   transaction_activity_count?: number | null;

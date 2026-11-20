@@ -1,3 +1,4 @@
+import TeamNameLink from './TeamNameLink';
 import ConfirmInPlace from './ConfirmInPlace';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,7 +20,6 @@ import PremiumLock from './PremiumLock';
 import TradePickerSheet from './TradePickerSheet';
 import SkeletonBlock from './Skeleton';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
-import TeamAvatar from './TeamAvatar';
 import ToneBadge from './ToneBadge';
 import { api, type DraftPickAsset, type PresentationAsset, type RankedPlayer, type ValuationLens } from '../lib/api';
 import { trackUse } from '../lib/analytics';
@@ -349,11 +349,12 @@ export default function MultiTeamTradePanel({
         return (
           <View key={rosterId} style={[styles.teamPanel, open && styles.teamPanelActive]} testID="team-panel">
             <View style={styles.teamHeader}>
-              <TeamAvatar avatarId={teamById.get(rosterId)?.avatarId ?? null} name={nameOf(rosterId)} size={22} />
-              <AppText style={styles.teamName}>
-                {nameOf(rosterId)}
-                {isMe ? '  YOU' : ''}
-              </AppText>
+              <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={rosterId} name={nameOf(rosterId)} avatarId={teamById.get(rosterId)?.avatarId ?? null} showAvatar avatarSize={22}>
+                <AppText style={styles.teamName}>
+                  {nameOf(rosterId)}
+                  {isMe ? '  YOU' : ''}
+                </AppText>
+              </TeamNameLink>
               <Button
                 label={sends.length ? 'Edit assets' : 'Add assets'}
                 variant="secondary"

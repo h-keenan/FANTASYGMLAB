@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { AppState, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import ManagerProfileModal from '../components/ManagerProfileModal';
+import { AppState, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import TeamNameLink from '../components/TeamNameLink';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import FreshnessLabel from '../components/FreshnessLabel';
@@ -38,7 +38,6 @@ import { liveGamesFromStarters, mergeLivePlays } from '../lib/matchupLive';
 import type { MatchupSwingPlayer } from '../lib/matchupModules';
 import { bandColor } from '../lib/verdictToneTheme';
 import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, swingInputsFromMatchup, teamsValuesParts } from '../lib/matchupModules';
-import TeamAvatar from '../components/TeamAvatar';
 import RangeCompare from '../components/RangeCompare';
 import WeatherReasonChip from '../components/WeatherReasonChip';
 import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from '../lib/startSitRange';
@@ -409,12 +408,14 @@ function ScoreSide({
   score,
   projected,
   kickedOff,
-  onOpenTeam,
+  leagueId,
+  leagueName,
 }: {
   side: MatchupSide;
   accent: string;
-  /** Opens the team sheet (the opponent's name is the tap target). */
-  onOpenTeam?: () => void;
+  /** Both teams' avatar + name open the shared team sheet (TeamNameLink). */
+  leagueId: string;
+  leagueName: string;
   score: number | null;
   projected: number | null;
   kickedOff: boolean;
@@ -427,23 +428,19 @@ function ScoreSide({
   const caption = live ? (projected != null ? <TickNumber value={projected} format={(n) => `Proj ${n.toFixed(1)}`} /> : null) : 'Projected';
   return (
     <View style={styles.scoreSide}>
-      <TeamAvatar
-        avatarId={side.avatar_url}
+      <TeamNameLink
+        leagueId={leagueId}
+        leagueName={leagueName}
+        rosterId={side.roster_id}
         name={side.team_name}
-        size={56}
-        style={StyleSheet.flatten([styles.scoreAvatar, { borderColor: accent }])}
+        ownerName={side.owner_name}
+        avatarId={side.avatar_url}
+        showAvatar
+        avatarSize={56}
+        avatarStyle={StyleSheet.flatten([styles.scoreAvatar, { borderColor: accent }])}
+        vertical
+        textStyle={[styles.scoreTeam, { textDecorationLine: 'underline' }]}
       />
-      {onOpenTeam ? (
-        <Pressable onPress={onOpenTeam} accessibilityRole="button" accessibilityLabel={`Open ${side.team_name} team sheet`} hitSlop={8}>
-          <AppText style={[styles.scoreTeam, { textDecorationLine: 'underline' }]} numberOfLines={2}>
-            {side.team_name}
-          </AppText>
-        </Pressable>
-      ) : (
-        <AppText style={styles.scoreTeam} numberOfLines={2}>
-          {side.team_name}
-        </AppText>
-      )}
       <AppText style={styles.scoreRecord}>{recordLabel(side)}</AppText>
       <TickNumber value={headline} variant="roll" style={styles.scoreValue} />
       {caption ? <AppText style={styles.scoreCaption}>{caption}</AppText> : null}
@@ -542,7 +539,6 @@ function TeamsValues({
   leagueId: string;
   leagueName: string;
 }) {
-  const [sheetOpen, setSheetOpen] = useState(false);
   const { colors } = useThemeMode();
   const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -573,6 +569,8 @@ function TeamsValues({
           score={mine.has_live_data ? mine.real_points : null}
           projected={myProjected}
           kickedOff={kickedOff}
+          leagueId={leagueId}
+          leagueName={leagueName}
         />
         <AppText style={styles.vs}>VS</AppText>
         <ScoreSide
@@ -581,17 +579,8 @@ function TeamsValues({
           score={opponent.has_live_data ? opponent.real_points : null}
           projected={opponentProjected}
           kickedOff={kickedOff}
-          onOpenTeam={opponent.roster_id ? () => setSheetOpen(true) : undefined}
-        />
-        <ManagerProfileModal
-          visible={sheetOpen}
-          onClose={() => setSheetOpen(false)}
           leagueId={leagueId}
           leagueName={leagueName}
-          rosterId={opponent.roster_id}
-          teamName={opponent.team_name}
-          ownerName={opponent.owner_name}
-          avatarId={opponent.avatar_url}
         />
       </View>
 
@@ -771,6 +760,7 @@ function LineupComparison({
             live={matchup.game_state === 'live'}
             sort={sort}
             onSort={setSort}
+            leagueId={leagueId}
           />
           <SlotList
             slots={slots}

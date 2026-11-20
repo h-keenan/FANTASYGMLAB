@@ -1,3 +1,4 @@
+import TeamNameLink from '../components/TeamNameLink';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
@@ -122,7 +123,7 @@ export default function CommissionerScreen({ route, navigation }: Props) {
       </View>
     );
   } else {
-    body = <IntegrityBody data={data} draftOrder={draftOrder} onDraftOrder={setDraftOrder} toneColor={toneColor} styles={styles} />;
+    body = <IntegrityBody leagueId={leagueId} leagueName={leagueName} data={data} draftOrder={draftOrder} onDraftOrder={setDraftOrder} toneColor={toneColor} styles={styles} />;
   }
 
   return (
@@ -202,11 +203,15 @@ function EfficiencyBars({ team, colors, styles }: { team: IntegrityTeam; colors:
 }
 
 function TeamCard({
+  leagueId,
+  leagueName,
   team,
   toneColor,
   colors,
   styles,
 }: {
+  leagueId: string;
+  leagueName: string;
   team: IntegrityTeam;
   toneColor: (band: IntegrityBand) => string;
   colors: ThemeColors;
@@ -228,7 +233,7 @@ function TeamCard({
           />
         ) : null}
         <View style={styles.flex}>
-          <AppText style={styles.teamName}>{team.team_name}</AppText>
+          <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={team.roster_id} name={team.team_name} textStyle={styles.teamName} />
           <AppText style={styles.muted}>
             {team.owner_name}
             {team.weeks.evaluated ? ` · ${team.weeks.flagged} of ${team.weeks.evaluated} weeks flagged` : ''}
@@ -260,12 +265,16 @@ function TeamCard({
 }
 
 function IntegrityBody({
+  leagueId,
+  leagueName,
   data,
   draftOrder,
   onDraftOrder,
   toneColor,
   styles,
 }: {
+  leagueId: string;
+  leagueName: string;
   data: CommissionerIntegrityResponse;
   draftOrder: DraftOrderRule;
   onDraftOrder: (value: DraftOrderRule) => void;
@@ -295,7 +304,7 @@ function IntegrityBody({
         <View style={styles.stack}>
           <SectionHeading title="Worth a look" />
           {flagged.map((team) => (
-            <TeamCard key={team.roster_id} team={team} toneColor={toneColor} colors={colors} styles={styles} />
+            <TeamCard key={team.roster_id} leagueId={leagueId} leagueName={leagueName} team={team} toneColor={toneColor} colors={colors} styles={styles} />
           ))}
         </View>
       ) : null}
@@ -316,7 +325,7 @@ function IntegrityBody({
         <View style={styles.stack}>
           <SectionHeading title="Possibly inactive" />
           {data.inactive.map((m) => (
-            <InactiveCard key={m.roster_id} manager={m} accent={colors.warning} infoColor={colors.accent} styles={styles} />
+            <InactiveCard key={m.roster_id} leagueId={leagueId} leagueName={leagueName} manager={m} accent={colors.warning} infoColor={colors.accent} styles={styles} />
           ))}
         </View>
       ) : null}
@@ -337,7 +346,7 @@ function IntegrityBody({
             </View>
           </AccentCard>
           {showRest
-            ? rest.map((team) => <TeamCard key={team.roster_id} team={team} toneColor={toneColor} colors={colors} styles={styles} />)
+            ? rest.map((team) => <TeamCard key={team.roster_id} leagueId={leagueId} leagueName={leagueName} team={team} toneColor={toneColor} colors={colors} styles={styles} />)
             : null}
         </View>
       ) : null}
@@ -436,11 +445,15 @@ function CollusionCard({
 }
 
 function InactiveCard({
+  leagueId,
+  leagueName,
   manager,
   accent,
   infoColor,
   styles,
 }: {
+  leagueId: string;
+  leagueName: string;
   manager: IntegrityInactiveManager;
   accent: string;
   infoColor: string;
@@ -448,7 +461,7 @@ function InactiveCard({
 }) {
   return (
     <AccentCard accent={accent}>
-      <AppText style={styles.teamName}>{manager.team_name}</AppText>
+      <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={manager.roster_id} name={manager.team_name} textStyle={styles.teamName} />
       <Bullets title="Evidence" items={manager.evidence} styles={styles} icon="clock" color={accent} />
       <Bullets title="Could be innocent" items={manager.innocent_explanations} styles={styles} icon="info" color={infoColor} />
     </AccentCard>

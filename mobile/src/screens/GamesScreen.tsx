@@ -18,6 +18,7 @@ import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import PageControlRow, { ViewTabs } from '../components/PageControlRow';
+import TeamNameLink from '../components/TeamNameLink';
 import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -186,16 +187,15 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
         {data.teams.map((team, index) => (
           <View key={team.roster_id} style={[styles.teamRow, team.mine && styles.teamRowMine, index > 0 && styles.divider]}>
             <AppText style={styles.rank}>{index + 1}</AppText>
-            <TeamAvatar avatarId={team.avatar_url} name={team.team_name} size={32} />
-            <View style={styles.flex}>
-              <AppText style={styles.teamName}>
-                {team.team_name}
-              </AppText>
-              <AppText style={styles.muted}>
-                {team.record_label ? `${team.record_label} · ` : ''}Seed #{team.median_seed}
-                {titleAvailable && team.title_probability != null ? ` · Title ${formatTitleOdds(team.title_probability)}` : ''}
-              </AppText>
-            </View>
+            <TeamNameLink leagueId={leagueId} rosterId={team.roster_id} name={team.team_name} avatarId={team.avatar_url} showAvatar avatarSize={32} fill>
+              <View>
+                <AppText style={styles.teamName}>{team.team_name}</AppText>
+                <AppText style={styles.muted}>
+                  {team.record_label ? `${team.record_label} · ` : ''}Seed #{team.median_seed}
+                  {titleAvailable && team.title_probability != null ? ` · Title ${formatTitleOdds(team.title_probability)}` : ''}
+                </AppText>
+              </View>
+            </TeamNameLink>
             <AppText style={[styles.metric, { color: percentColor(colors, team.playoff_probability) }]}>
               {formatOdds(team.playoff_probability)}
             </AppText>
@@ -460,6 +460,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
                     onPress={() => pick(matchup, team.roster_id)}
                     style={[styles.pickTeam, picked && styles.pickTeamOn]}
                   >
+                    {/* team-tap-exempt: a pick'em choice, tapping selects the winner (picker rule), not a profile link */}
                     <TeamAvatar avatarId={team.avatar_url} name={team.team_name} size={28} />
                     <View style={styles.pickText}>
                       <AppText style={styles.pickName} numberOfLines={1}>
@@ -492,13 +493,12 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
           {data.leaderboard.map((row, i) => (
             <View key={row.roster_id} style={[styles.teamRow, row.mine && styles.teamRowMine, i > 0 && styles.divider]}>
               <AppText style={styles.rank}>{row.rank}</AppText>
-              <TeamAvatar avatarId={row.avatar_url} name={row.team_name} size={32} />
-              <View style={styles.flex}>
-                <AppText style={styles.teamName}>
-                  {row.team_name}
-                </AppText>
-                <AppText style={styles.muted}>{row.accuracy}%</AppText>
-              </View>
+              <TeamNameLink leagueId={leagueId} rosterId={row.roster_id} name={row.team_name} avatarId={row.avatar_url} showAvatar avatarSize={32} fill>
+                <View>
+                  <AppText style={styles.teamName}>{row.team_name}</AppText>
+                  <AppText style={styles.muted}>{row.accuracy}%</AppText>
+                </View>
+              </TeamNameLink>
               <AppText style={[styles.metric, { color: percentileColor(row.accuracy, colors) }]}>
                 {row.correct}/{row.graded}
               </AppText>

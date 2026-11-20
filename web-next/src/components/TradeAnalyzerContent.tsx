@@ -28,6 +28,7 @@ import {
 import { trackUse } from "@/lib/analytics";
 import { isCompletedShare } from "@/lib/shareImage";
 import { cautionDetail, cautionShareLine, verdictCautions } from "@/lib/tradeCautions";
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { teamPickerLabel } from "@/lib/teamLabel";
 import { pickCompactLabel, pickProjectionLine } from "@/lib/tradeIdeaPick";
 import { useShareImage } from "@/lib/useShareImage";
@@ -1071,6 +1072,22 @@ export function TradeAnalyzerContent({
         }
       />
 
+      {selectedTeamId !== ALL_TEAMS_ID && teamProfiles[selectedTeamId]?.team_name ? (
+        <div className="flex items-center gap-2" data-testid="analyzer-partner-team">
+          <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Partner</span>
+          <TeamNameLink
+            leagueId={leagueId}
+            leagueName={leagueName}
+            rosterId={selectedTeamId}
+            name={teamProfiles[selectedTeamId]?.team_name}
+            avatarUrl={teamProfiles[selectedTeamId]?.avatar_url}
+            ownerName={teamProfiles[selectedTeamId]?.owner_name}
+            showAvatar
+            avatarSize={24}
+            className="text-sm font-bold"
+          />
+        </div>
+      ) : null}
       {selectedTeamId !== ALL_TEAMS_ID ? (
         <ManagerTendenciesCard
           leagueId={leagueId}

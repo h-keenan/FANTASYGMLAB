@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from './AnimatedCard';
 import AppText from './AppText';
-import TeamAvatar from './TeamAvatar';
+import PressableScale from './PressableScale';
+import TeamNameLink from './TeamNameLink';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { leaguePulseHighlights, type PulseTeam, type PulseTone } from '../lib/leaguePulse';
 import { spacing, type ThemeColors } from '../theme';
@@ -19,9 +20,14 @@ import { toneColor as sharedToneColor } from '../lib/verdictToneTheme';
 export default function LeaguePulseCard({
   teams,
   onPress,
+  leagueId,
+  leagueName,
 }: {
   teams: PulseTeam[];
+  /** Opens the league recap; only the header is this target, each team name is its own team-sheet target. */
   onPress?: () => void;
+  leagueId?: string | null;
+  leagueName?: string;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -31,19 +37,31 @@ export default function LeaguePulseCard({
     tone === 'positive' ? colors.success : tone === 'negative' ? sharedToneColor(colors, 'negative') : colors.textSecondary;
 
   return (
-    <AnimatedCard style={styles.card} onPress={onPress} accessibilityLabel="League activity, open league recap">
-      <View style={styles.header}>
+    <AnimatedCard style={styles.card}>
+      <PressableScale
+        onPress={onPress}
+        disabled={!onPress}
+        accessibilityRole="button"
+        accessibilityLabel="League activity, open league recap"
+        style={styles.header}
+      >
         <AppText style={styles.title}>League Activity</AppText>
         <Ionicons name="chevron-forward" size={16} color={colors.accent} />
-      </View>
+      </PressableScale>
       {highlights.map((h) => (
         <View key={h.key} style={styles.row}>
-          <TeamAvatar avatarId={h.team.avatar_url} name={h.team.team_name} size={28} />
           <View style={styles.text}>
             <AppText style={[styles.label, { color: toneColor(h.tone) }]}>{h.label.toUpperCase()}</AppText>
-            <AppText style={styles.team}>
-              {h.team.team_name || 'Team'}
-            </AppText>
+            <TeamNameLink
+              leagueId={leagueId}
+              leagueName={leagueName}
+              rosterId={h.team.roster_id}
+              name={h.team.team_name || 'Team'}
+              avatarId={h.team.avatar_url}
+              showAvatar
+              avatarSize={28}
+              textStyle={styles.team}
+            />
           </View>
           <AppText style={[styles.metric, { color: toneColor(h.tone) }]}>{h.metric}</AppText>
         </View>
@@ -55,7 +73,7 @@ export default function LeaguePulseCard({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: { flex: 1, padding: spacing.md, gap: spacing.sm },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
     title: { fontSize: 16.5, fontWeight: '800', color: colors.textPrimary, flexShrink: 1 },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     text: { flex: 1, minWidth: 0 },

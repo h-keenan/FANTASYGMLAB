@@ -7,7 +7,6 @@ import { RangeCompare } from "@/components/RangeCompare";
 import { TickNumber } from "@/components/TickNumber";
 import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from "@/lib/startSitRange";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type {
@@ -37,7 +36,7 @@ import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { bandColorVar } from "@/lib/verdictToneCss";
 import { deltaBand } from "@/lib/verdictTone";
 import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, swingInputsFromMatchup, teamsValuesParts } from "@/lib/matchupModules";
-import { TeamAvatar } from "@/components/TeamAvatar";
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { ToneBadge } from "@/components/ToneBadge";
 import { freshnessLabel } from "@/lib/liveScores";
 import { PageStatusLine } from "@/components/ui/PageStatusLine";
@@ -91,7 +90,6 @@ function signedTone(value: number | null | undefined): "positive" | "risk" | "ne
   return value > 0 ? "positive" : "risk";
 }
 
-const ManagerProfileSheet = dynamic(() => import("@/components/ManagerProfileSheet").then((m) => m.ManagerProfileSheet), { ssr: false });
 
 function MatchupHeader({
   week,
@@ -139,12 +137,14 @@ function ScoreSide({
   score,
   projected,
   kickedOff,
-  onOpenTeam,
+  leagueId,
+  leagueName,
 }: {
   side: MatchupSide;
   mine: boolean;
-  /** Opens the team sheet (the opponent's name is the tap target). */
-  onOpenTeam?: () => void;
+  /** Both teams' avatar + name open the shared team sheet (TeamNameLink). */
+  leagueId?: string;
+  leagueName?: string;
   score: number | null;
   projected: number | null;
   kickedOff: boolean;
@@ -156,21 +156,18 @@ function ScoreSide({
   const caption = live ? (projected != null ? <TickNumber value={projected} format={(n) => `Proj ${n.toFixed(1)}`} /> : null) : "Projected";
   return (
     <div className="flex-1 flex flex-col items-center text-center gap-1 min-w-0">
-      <TeamAvatar
-        avatarUrl={side.avatar_url}
+      <TeamNameLink
+        leagueId={leagueId}
+        leagueName={leagueName}
+        rosterId={side.roster_id}
         name={side.team_name}
-        size={56}
+        ownerName={side.owner_name}
+        avatarUrl={side.avatar_url}
+        showAvatar
+        avatarSize={56}
         ringColor={mine ? "var(--color-accent)" : "var(--color-border-strong)"}
+        className="flex-col justify-center text-center text-sm font-bold w-full"
       />
-      {onOpenTeam ? (
-        <button type="button" onClick={onOpenTeam} className="text-sm font-bold break-words w-full underline decoration-dotted underline-offset-2" style={{ color: "var(--color-text-primary)", minHeight: 44 }} aria-label={`Open ${side.team_name} team sheet`}>
-          {side.team_name}
-        </button>
-      ) : (
-        <span className="text-sm font-bold break-words w-full" style={{ color: "var(--color-text-primary)" }}>
-          {side.team_name}
-        </span>
-      )}
       <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         {recordLabel(side)}
       </span>
@@ -270,7 +267,6 @@ function MatchupHero({ matchup, leagueId, ageSeconds }: { matchup: MatchupRespon
 
 /** Teams, both scores, the win-probability bar and the value tiles: one compact module under the Hero. */
 function TeamsValues({ matchup, leagueId, leagueName = "" }: { matchup: MatchupResponse; leagueId?: string; leagueName?: string }) {
-  const [sheetOpen, setSheetOpen] = useState(false);
   const mine = matchup.my_team!;
   const opponent = matchup.opponent!;
   const comparison = matchup.comparison!;
@@ -300,6 +296,8 @@ function TeamsValues({ matchup, leagueId, leagueName = "" }: { matchup: MatchupR
             score={mine.has_live_data ? mine.real_points : null}
             projected={myProjected}
             kickedOff={kickedOff}
+            leagueId={leagueId}
+            leagueName={leagueName}
           />
           <span
             className="self-center text-xs font-extrabold"
@@ -313,19 +311,9 @@ function TeamsValues({ matchup, leagueId, leagueName = "" }: { matchup: MatchupR
             score={opponent.has_live_data ? opponent.real_points : null}
             projected={opponentProjected}
             kickedOff={kickedOff}
-            onOpenTeam={leagueId && opponent.roster_id ? () => setSheetOpen(true) : undefined}
+            leagueId={leagueId}
+            leagueName={leagueName}
           />
-          {sheetOpen && leagueId ? (
-            <ManagerProfileSheet
-              leagueId={leagueId}
-              leagueName={leagueName}
-              rosterId={opponent.roster_id}
-              teamName={opponent.team_name}
-              ownerName={opponent.owner_name}
-              avatarUrl={opponent.avatar_url}
-              onClose={() => setSheetOpen(false)}
-            />
-          ) : null}
         </div>
 
         {/* Win chance, its bar and its label live in the hero (one owner per fact). */}
@@ -573,6 +561,7 @@ function LineupComparison({
             live={matchup.game_state === "live"}
             sort={sort}
             onSort={setSort}
+            leagueId={leagueId}
           />
           <SlotList
             slots={slots}

@@ -1,3 +1,4 @@
+import TeamNameLink from './TeamNameLink';
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
@@ -94,7 +95,7 @@ function AssetChips({ label, items, fromTeam, styles }: { label: string; items: 
   );
 }
 
-function SideCard({ side, hurt, otherName, styles }: { side: VetoSide; hurt: boolean; otherName: string; styles: Styles }) {
+function SideCard({ side, hurt, otherName, styles, leagueId }: { side: VetoSide; hurt: boolean; otherName: string; styles: Styles; leagueId?: string }) {
   const { colors } = useThemeMode();
   const posture = vetoSideDirection(side);
   const standing = vetoStandingLine(side);
@@ -103,7 +104,7 @@ function SideCard({ side, hurt, otherName, styles }: { side: VetoSide; hurt: boo
     <AccentCard accent={hurt ? colors.warning : colors.glassBorder}>
       <View style={styles.cardHead}>
         <View style={styles.flex}>
-          <AppText style={styles.teamName}>{side.team_name}</AppText>
+          <TeamNameLink leagueId={leagueId} rosterId={side.roster_id} name={side.team_name} textStyle={styles.teamName} />
           {standing ? <AppText style={styles.muted}>{standing}</AppText> : null}
         </View>
         {posture ? <ToneBadge label={posture} color={colors.textTertiary} /> : null}
@@ -139,7 +140,7 @@ function OutrageMeter({ outrage, color, styles }: { outrage: number; color: stri
   );
 }
 
-function VetoResult({ result, styles }: { result: VetoCheckResponse; styles: Styles }) {
+function VetoResult({ result, styles, leagueId }: { result: VetoCheckResponse; styles: Styles; leagueId?: string }) {
   const toneColor = useToneColor();
   const { colors } = useThemeMode();
   const [showLimits, setShowLimits] = useState(false);
@@ -168,6 +169,7 @@ function VetoResult({ result, styles }: { result: VetoCheckResponse; styles: Sty
           hurt={String(side.roster_id) === String(result.hurt_roster_id)}
           otherName={all[1 - i]?.team_name ?? ''}
           styles={styles}
+          leagueId={leagueId}
         />
       ))}
       {result.reasons?.length ? (
@@ -337,7 +339,7 @@ function VetoBuilder({ leagueId, lens, pool, styles }: { leagueId: string; lens:
         />
       );
     } else if (result.status === 'ok' && vetoHasResult(result)) {
-      outcome = <VetoResult result={result} styles={styles} />;
+      outcome = <VetoResult result={result} styles={styles} leagueId={leagueId} />;
     } else if (result.status === 'error' || result.status === 'unavailable') {
       outcome = (
         <ErrorState

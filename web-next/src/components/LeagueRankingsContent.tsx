@@ -91,7 +91,9 @@ export function RankingRow({
   firstPlace,
   secondary,
   badges,
-  onOpen,
+  onOpen: onOpenProp,
+  leagueId,
+  rosterId,
 }: {
   rankLabel: string;
   teamName: string;
@@ -106,8 +108,15 @@ export function RankingRow({
   badges?: { label: string; tone?: "positive" | "negative" | "neutral" }[];
   /** Opens the manager profile (Manager Tendencies) for this team. */
   onOpen?: () => void;
+  /** With a roster id, the whole row opens the shared team sheet itself (no per-screen sheet wiring). */
+  leagueId?: string | null;
+  rosterId?: string | number | null;
 }) {
+  const [showSheet, setShowSheet] = useState(false);
+  const canSheet = Boolean(!onOpenProp && leagueId && rosterId != null && String(rosterId).length > 0);
+  const onOpen = onOpenProp ?? (canSheet ? () => setShowSheet(true) : undefined);
   return (
+    <>
     <div
       role={onOpen ? "button" : undefined}
       tabIndex={onOpen ? 0 : undefined}
@@ -164,6 +173,10 @@ export function RankingRow({
       </div>
       {onOpen ? <span className="sr-only">. Open manager profile</span> : null}
     </div>
+    {showSheet && leagueId && rosterId != null ? (
+      <ManagerProfileSheet leagueId={leagueId} rosterId={rosterId} teamName={teamName} ownerName={ownerName} avatarUrl={avatarUrl} onClose={() => setShowSheet(false)} />
+    ) : null}
+    </>
   );
 }
 

@@ -11,7 +11,7 @@ import InfoMark from '../components/InfoMark';
 import SectionHeading from '../components/SectionHeading';
 import { SkeletonText } from '../components/Skeleton';
 import GridBackground from '../components/GridBackground';
-import TeamAvatar from '../components/TeamAvatar';
+import TeamNameLink from '../components/TeamNameLink';
 import { api, type PlayoffOddsTeam } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -162,6 +162,8 @@ export default function PlayoffOddsPanel({ leagueId, leagueName }: { leagueId: s
             isMine={Boolean(myRosterId) && String(item.roster_id) === myRosterId}
             colors={colors}
             styles={styles}
+            leagueId={leagueId}
+            leagueName={leagueName}
           />
         )}
       />
@@ -176,7 +178,11 @@ function PlayoffOddsRow({
   isMine,
   colors,
   styles,
+  leagueId,
+  leagueName,
 }: {
+  leagueId: string;
+  leagueName: string;
   item: PlayoffOddsTeam;
   isFirst: boolean;
   isLast: boolean;
@@ -197,7 +203,7 @@ function PlayoffOddsRow({
         isMine && styles.rowMine,
       ]}
     >
-      <TeamAvatar avatarId={item.avatar_url} name={item.team_name} size={36} style={styles.avatar} />
+      <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={item.roster_id} name={item.team_name} avatarId={item.avatar_url} showAvatar avatarSize={36} avatarStyle={styles.avatar} fill>
       <View style={styles.ownerGroup}>
         <View style={styles.nameRow}>
           <AppText style={styles.owner} numberOfLines={1}>
@@ -217,6 +223,7 @@ function PlayoffOddsRow({
           </View>
         ) : null}
       </View>
+      </TeamNameLink>
       <View style={[styles.oddsPill, { borderColor: `${probabilityColor}80` }]}>
         <AppText style={styles.oddsLabel}>ODDS</AppText>
         <AppText style={[styles.oddsValue, { color: probabilityColor }]}>

@@ -1,3 +1,4 @@
+import TeamNameLink from './TeamNameLink';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
@@ -60,7 +61,11 @@ export function ComparisonHeader({
   live,
   sort,
   onSort,
+  leagueId,
+  leagueName,
 }: {
+  leagueId?: string | null;
+  leagueName?: string;
   mine: MatchupSide;
   opponent: MatchupSide;
   slots: SlotComparison[];
@@ -82,9 +87,7 @@ export function ComparisonHeader({
     <View style={{ gap: spacing.sm }} testID="comparison-header">
       <View style={styles.headerRow}>
         <View style={styles.flex}>
-          <AppText style={[styles.teamName, { color: colors.accent }]}>
-            {mine.team_name || 'You'}
-          </AppText>
+          <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={mine.roster_id} name={mine.team_name || 'You'} avatarId={mine.avatar_url} textStyle={[styles.teamName, { color: colors.accent }]} />
           <TickNumber value={totals.mineNow} variant="roll" style={styles.total} />
           {showFinal ? <AppText style={styles.sub}>{`Proj final ${totals.mineFinal.toFixed(1)}`}</AppText> : null}
         </View>
@@ -98,9 +101,7 @@ export function ComparisonHeader({
           />
         </View>
         <View style={[styles.flex, { alignItems: 'flex-end' }]}>
-          <AppText style={[styles.teamName, { color: colors.textPrimary }]}>
-            {opponent.team_name || 'Opponent'}
-          </AppText>
+          <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={opponent.roster_id} name={opponent.team_name || 'Opponent'} avatarId={opponent.avatar_url} textStyle={[styles.teamName, { color: colors.textPrimary }]} alignEnd />
           <TickNumber value={totals.opponentNow} variant="roll" style={styles.total} />
           {showFinal ? <AppText style={styles.sub}>{`Proj final ${totals.opponentFinal.toFixed(1)}`}</AppText> : null}
         </View>
