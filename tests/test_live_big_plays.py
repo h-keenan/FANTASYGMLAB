@@ -84,7 +84,10 @@ def test_ingest_falls_back_to_scored_stats_when_points_lag():
 
 def test_stale_baseline_rebaselines_without_guessing():
     lbp.ingest("L", 9, _sides(4.0, {"rec": 3, "rec_yd": 30}), scoring_settings=PPR, now=1000)
-    assert lbp.ingest("L", 9, _sides(14.0, {"rec": 5, "rec_yd": 90, "rec_td": 1}), scoring_settings=PPR, now=1000 + 3600) == []
+    out = lbp.ingest("L", 9, _sides(14.0, {"rec": 5, "rec_yd": 90, "rec_td": 1}), scoring_settings=PPR, now=1000 + 3600)
+    # No played-by-play guessed from a stale baseline: the only thing shown is the
+    # honest "so far" line read from the current stats (re-seeded cold start).
+    assert [e["description"] for e in out] == ["1 TD so far"] and all(e["so_far"] for e in out)
 
 
 def test_ingest_fails_open_without_redis(monkeypatch):

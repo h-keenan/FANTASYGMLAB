@@ -169,6 +169,56 @@ def derive_events(
                 "description": play["description"],
                 "approx": play["approx"],
                 "kinds": play["kinds"],
+                "clock": current.get("clock"),
+            }
+        )
+    return sorted(events, key=lambda e: -abs(e["points"]))
+
+
+_SO_FAR_KEYS: tuple[str, ...] = ("pass_td", "rush_td", "rec_td", "def_td", "pass_int", "fum_lost", "safe")
+
+
+def so_far_events(
+    snapshot: Mapping[str, Mapping[str, Any]],
+    *,
+    now: float,
+    scoring_settings: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Honest "already happened this game" events read straight from each
+    started player's current stat line (e.g. "2 TD so far"). Seeds a cold start
+    (and covers Redis being down) so the feed is not blank while a player has
+    already scored; labelled ``so_far`` and ``approx`` because the time of each
+    play is unknown. Never invents a play."""
+
+    events: list[dict[str, Any]] = []
+    for key, current in snapshot.items():
+        stats = current.get("stats") or {}
+        labels: list[str] = []
+        td = sum(number_or_default(stats.get(k)) for k in ("pass_td", "rush_td", "rec_td", "def_td"))
+        if td > 0:
+            labels.append(f"{int(td)} TD so far")
+        giveaways = number_or_default(stats.get("pass_int")) + number_or_default(stats.get("fum_lost"))
+        if giveaways > 0:
+            labels.append(f"{int(giveaways)} turnover{'s' if giveaways > 1 else ''} so far")
+        if not labels:
+            continue
+        subset = {k: stats[k] for k in _SO_FAR_KEYS if k in stats}
+        points = score_stat_delta({}, subset, scoring_settings)
+        events.append(
+            {
+                "id": f"{key}:sofar:{'/'.join(labels)}",
+                "at": int(now * 1000),
+                "player_id": current.get("player_id"),
+                "name": current.get("name"),
+                "position": current.get("position"),
+                "team": current.get("team"),
+                "roster_id": current.get("roster_id"),
+                "points": points if points is not None else 0.0,
+                "description": ", ".join(labels),
+                "approx": True,
+                "so_far": True,
+                "kinds": ["so_far"],
+                "clock": current.get("clock"),
             }
         )
     return sorted(events, key=lambda e: -abs(e["points"]))
@@ -193,6 +243,7 @@ def snapshot_from_sides(sides: list[tuple[str, list[dict[str, Any]]]]) -> dict[s
                 "roster_id": str(roster_id),
                 "points": points if isinstance(points, (int, float)) else None,
                 "stats": stats,
+                "clock": starter.get("game_clock_label"),
             }
     return out
 
@@ -221,7 +272,8 @@ def ingest(
         state = json.loads(raw) if raw else {}
     except Exception:  # noqa: BLE001 - never breaks the matchup
         logger.debug("big play state unavailable", exc_info=True)
-        return []
+        # No shared history: still say what the current lines already show.
+        return so_far_events(snapshot, now=now, scoring_settings=scoring_settings)[:MAX_STORED_EVENTS]
     events = [e for e in state.get("events", []) if now * 1000 - number_or_default(e.get("at")) <= EVENT_RETENTION_SECONDS * 1000]
     baseline = state.get("snap") or {}
     if snapshot and baseline and now - number_or_default(state.get("t")) <= MAX_BASELINE_AGE_SECONDS:
@@ -232,6 +284,10 @@ def ingest(
             if e["id"] not in seen
         ]
         events = sorted(fresh + events, key=lambda e: -number_or_default(e.get("at")))[:MAX_STORED_EVENTS]
+    elif snapshot and not events:
+        # Cold start (no usable baseline): seed it below and surface what the
+        # current lines already show, labelled "so far", never invented plays.
+        events = so_far_events(snapshot, now=now, scoring_settings=scoring_settings)[:MAX_STORED_EVENTS]
     if snapshot:
         try:
             client.set(key, json.dumps({"t": now, "snap": snapshot, "events": events}), ex=STATE_TTL_SECONDS)
@@ -255,6 +311,8 @@ def present(events: list[dict[str, Any]], my_roster_id: str) -> list[dict[str, A
             "points": e["points"],
             "description": e["description"],
             "approx": bool(e.get("approx")),
+            "clock": e.get("clock"),
+            "so_far": bool(e.get("so_far")),
         }
         for e in events[:MAX_RETURNED_EVENTS]
     ]

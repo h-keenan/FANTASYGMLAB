@@ -96,6 +96,11 @@ def game_fraction_remaining(starter: dict[str, Any], *, now: datetime | None = N
         return 1.0
     if starter.get("game_final") is True:
         return 0.0
+    # Real quarter/clock from the scoreboard (DYNASTYGM_LIVE_REAL_CLOCK); the
+    # wall-clock estimate below is the fallback when it is absent.
+    real = starter.get("game_remaining")
+    if isinstance(real, (int, float)) and not isinstance(real, bool) and 0.0 <= float(real) <= 1.0:
+        return float(real)
     kickoff_at = starter.get("game_kickoff_at")
     if not kickoff_at:
         return None

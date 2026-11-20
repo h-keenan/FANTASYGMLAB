@@ -67,6 +67,14 @@ def _hermetic_fantasycalc_cache(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _hermetic_live_scoreboard(monkeypatch):
+    """The live-clock scoreboard is default ON in production and fetches ESPN's public JSON; tests never hit the network
+    (the tests that exercise it feed payloads to ``parse_scoreboard`` or set the flag themselves)."""
+
+    monkeypatch.setenv("DYNASTYGM_LIVE_REAL_CLOCK", "0")
+
+
+@pytest.fixture(autouse=True)
 def _guard_real_players_db():
     yield
     stat, content = _PLAYERS_DB_BASELINE
