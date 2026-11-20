@@ -208,6 +208,9 @@ def run_public_checks(now: datetime, get: Callable = http_get) -> tuple[list[Res
     if isinstance(health, dict) and health.get("status") == "ok":
         build = str(health.get("build") or "")
         out.append(result("api_health", "ok", f"{took * 1000:.0f} ms, build {build[:12] or 'unknown'}"))
+        degraded = health.get("degraded")
+        if isinstance(degraded, list) and degraded:
+            out.append(result("api_degraded", "fail", ", ".join(str(d) for d in degraded)))
     else:
         out.append(result("api_health", "fail", f"HTTP {status or 'no response'} or unexpected body"))
 

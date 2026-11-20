@@ -380,6 +380,37 @@ def _report_to_sentry(exc: BaseException) -> None:
         logger.exception("Failed to report exception to Sentry.")
 
 
+DEGRADED_PUSH_TOKEN_KEY_MISSING = "push_token_handoff_service_key_missing"
+_degraded_flags: list[str] = []
+
+
+def _check_push_token_handoff_key() -> None:
+    """Startup, once: make the silent push-token re-own fallback visible.
+
+    Presence-only check of the process environment; the value is never read
+    into a log line. Surfaces via a WARNING, Sentry (when SENTRY_DSN is set)
+    and the /health `degraded` list, which scripts/ops_health_check.py turns
+    into the existing ops issue + OPS_ALERT_WEBHOOK_URL notification.
+    """
+
+    _degraded_flags[:] = [f for f in _degraded_flags if f != DEGRADED_PUSH_TOKEN_KEY_MISSING]
+    if not push_tokens.handoff_enabled() or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip():
+        return
+    _degraded_flags.append(DEGRADED_PUSH_TOKEN_KEY_MISSING)
+    logger.warning(
+        "%s: DYNASTYGM_PUSH_TOKEN_HANDOFF_V1 is on but SUPABASE_SERVICE_ROLE_KEY is absent; "
+        "push-token re-own falls back to the user JWT path.",
+        DEGRADED_PUSH_TOKEN_KEY_MISSING,
+    )
+    if SENTRY_DSN:
+        try:
+            import sentry_sdk
+
+            sentry_sdk.capture_message(DEGRADED_PUSH_TOKEN_KEY_MISSING, level="warning")
+        except Exception:
+            logger.exception("Failed to report degraded state to Sentry.")
+
+
 # --- Rate limiting -------------------------------------------------------
 #
 # Backed by Redis (see modules/redis_cache.py and docker-compose.yml's
@@ -637,6 +668,7 @@ def _enable_background_sleeper_players_refresh() -> None:
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
+    _check_push_token_handoff_key()
     _enable_background_sleeper_players_refresh()
     _warm_players_cache_at_startup()
     stats_self_heal.start_background()  # background; never blocks startup/readiness
@@ -890,7 +922,7 @@ def get_app_config() -> JSONResponse:
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+def health() -> dict[str, Any]:
     """Liveness only — must not depend on Supabase reachability.
 
     Also piggybacks the same stale-while-revalidate players refresh
@@ -926,11 +958,14 @@ def health() -> dict[str, str]:
 
     _maybe_schedule_players_refresh()
     identity = build_identity.resolve_build_identity()
-    return {
+    body: dict[str, Any] = {
         "status": "ok",
         "build": identity.revision,
         "deployed_at": identity.deployed_at,
     }
+    if _degraded_flags:
+        body["degraded"] = list(_degraded_flags)
+    return body
 
 
 @app.get("/ready")
