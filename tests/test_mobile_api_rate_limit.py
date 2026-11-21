@@ -343,3 +343,38 @@ def test_fail_open_log_does_not_contain_the_client_ip(monkeypatch, caplog):
         allowed, _ = mobile_api_service._rate_limiter.hit("general|198.51.100.7:abcd", 5, 60)
     assert allowed is True
     assert "198.51.100.7" not in caplog.text
+
+
+def test_client_ip_uses_rightmost_trusted_hop_not_client_supplied_first(monkeypatch):
+    _client(monkeypatch)
+    from services import mobile_api_service as svc
+
+    class _Req:
+        def __init__(self, xff):
+            self.headers = {"x-forwarded-for": xff}
+            self.client = None
+
+    monkeypatch.setattr(svc, "TRUSTED_PROXY_COUNT", 1)
+    assert svc._client_ip(_Req("6.6.6.6, 203.0.113.9")) == "203.0.113.9"
+    monkeypatch.setattr(svc, "TRUSTED_PROXY_COUNT", 2)
+    assert svc._client_ip(_Req("6.6.6.6, 203.0.113.9, 10.0.0.1")) == "203.0.113.9"
+    monkeypatch.setattr(svc, "TRUSTED_PROXY_COUNT", 0)
+    assert svc._client_ip(_Req("6.6.6.6")) == "unknown"
+
+
+def test_health_hides_deploy_time_keeps_build(monkeypatch):
+    client, _svc = _client(monkeypatch)
+    monkeypatch.setenv("DYNASTYGM_DEPLOYED_AT", "2026-11-01T00:00:00Z")
+    body = client.get("/health").json()
+    assert "deployed_at" not in body
+    assert "build" in body
+
+
+def test_analytics_hash_uses_env_salt_with_fallback(monkeypatch):
+    from modules import launch_analytics as la
+
+    monkeypatch.delenv("ANALYTICS_HASH_SALT", raising=False)
+    legacy = la.hash_account_id("user-1")
+    monkeypatch.setenv("ANALYTICS_HASH_SALT", "s3cret")
+    salted = la.hash_account_id("user-1")
+    assert salted != legacy and salted.startswith("acct_")

@@ -18,6 +18,7 @@ See ``docs/founder-beta-product-analytics-contract.md``.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import threading
@@ -877,13 +878,21 @@ def anonymous_id(state: MutableMapping[str, Any] | None = None) -> str:
     return f"anon_{uuid.uuid4().hex[:16]}"
 
 
+ANALYTICS_HASH_SALT_ENV = "ANALYTICS_HASH_SALT"
+
+
 def hash_account_id(user_id: str) -> str:
     """Non-reversible account scope for internal correlation."""
 
     text = str(user_id or "").strip()
     if not text:
         return ""
-    digest = hashlib.sha256(f"dynastygm-analytics:{text}".encode("utf-8")).hexdigest()
+    secret = os.environ.get(ANALYTICS_HASH_SALT_ENV, "").strip()
+    if secret:
+        # Secret-keyed: not recomputable from a user id without the server-side salt.
+        digest = hmac.new(secret.encode("utf-8"), f"dynastygm-analytics:{text}".encode("utf-8"), hashlib.sha256).hexdigest()
+    else:
+        digest = hashlib.sha256(f"dynastygm-analytics:{text}".encode("utf-8")).hexdigest()
     return f"acct_{digest[:16]}"
 
 
