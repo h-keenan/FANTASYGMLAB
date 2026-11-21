@@ -36,3 +36,18 @@ server. The mobile confirm dialog tells the user to cancel in their store accoun
   (codes expire in minutes, so it cannot be stored from sign-in).
 - Web has no Sign in with Apple, so a user who signed up with Apple on iOS and deletes from the
   web is deleted without revocation; they can remove the app from Settings > Apple ID > Sign in with Apple.
+
+## 2026-11 privacy pass (anonymize what is kept, no path skips billing)
+
+Run `docs/supabase_account_deletion_2026_11.sql` (owner), then redeploy `delete-account`. Optional edge secret:
+`ANALYTICS_HASH_SALT` (same value as the API, so analytics rows hashed with the secret salt can be found).
+
+- Kept, anonymized: Stripe customer (name, email, phone, address, user-id metadata cleared), `billing_webhook_events`
+  (`user_id` blanked), `deleted_account_billing` (ids only, no name/email), analytics rows (account hash, anon and
+  session ids cleared), anonymous feedback rows (account hash removed), referrer settings (deleted user's id replaced by
+  a `deleted:` tombstone so the count and comp already earned stay).
+- Deleted: everything cascading from `auth.users`, plus referral attribution pointing at the deleted user.
+- No path skips billing: the edge function cancels first and aborts on failure; a `before delete` trigger on `profiles`
+  snapshots billing ids into `deleted_account_billing` with `needs_stripe_cancel`, so any other deletion path (old RPC,
+  dashboard) leaves a flagged row. The old `delete_user()` RPC is also revoked. Ops query:
+  `select * from public.deleted_account_billing where needs_stripe_cancel and not stripe_cancel_confirmed;`

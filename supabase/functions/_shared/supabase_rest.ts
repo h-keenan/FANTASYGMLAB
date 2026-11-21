@@ -237,6 +237,52 @@ export function revenueCatStore(cfg: SupabaseConfig, fetchFn: FetchFn): BillingS
   };
 }
 
+/**
+ * Anonymize everything that is kept but must stop identifying the user (referral links, analytics rows, feedback
+ * context, billing-event user ids): public.anonymize_deleted_user (docs/supabase_account_deletion_2026_11.sql).
+ * Best effort: returns false when the SQL has not been applied yet or the call fails.
+ */
+export async function anonymizeDeletedUser(
+  cfg: SupabaseConfig,
+  fetchFn: FetchFn,
+  userId: string,
+  refs: { analyticsHashes: string[]; feedbackHashes: string[] },
+): Promise<boolean> {
+  try {
+    const res = await fetchFn(`${cfg.url}/rest/v1/rpc/anonymize_deleted_user`, {
+      method: "POST",
+      headers: serviceHeaders(cfg),
+      body: JSON.stringify({ p_user_id: userId, p_analytics_hashes: refs.analyticsHashes, p_feedback_hashes: refs.feedbackHashes }),
+    });
+    return res.status < 400;
+  } catch {
+    return false;
+  }
+}
+
+/** Mark the billing snapshot (written by the profiles delete trigger) as handled. Best effort. */
+export async function markBillingHandled(
+  cfg: SupabaseConfig,
+  fetchFn: FetchFn,
+  billingRef: string,
+  state: { stripeCanceled: boolean; customerAnonymized: boolean },
+): Promise<boolean> {
+  try {
+    const res = await fetchFn(`${cfg.url}/rest/v1/deleted_account_billing?user_ref=eq.${encodeURIComponent(billingRef)}`, {
+      method: "PATCH",
+      headers: serviceHeaders(cfg, { Prefer: "return=minimal" }),
+      body: JSON.stringify({
+        stripe_cancel_confirmed: state.stripeCanceled,
+        stripe_customer_anonymized: state.customerAnonymized,
+        handled_at: new Date().toISOString(),
+      }),
+    });
+    return res.status < 400;
+  } catch {
+    return false;
+  }
+}
+
 /** Remove the auth user (cascades to every app table). 404 = already deleted, which is success (idempotent retry). */
 export async function deleteAuthUser(cfg: SupabaseConfig, fetchFn: FetchFn, userId: string): Promise<void> {
   const res = await fetchFn(`${cfg.url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {

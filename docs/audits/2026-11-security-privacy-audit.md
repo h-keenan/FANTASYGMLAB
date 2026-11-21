@@ -28,7 +28,7 @@ SQL editor (`docs/supabase_security_fixes_2026_11.sql`), **Zach** = secrets, bil
 | M2 | Medium | `trade_outcomes` server-owned columns are client-writable, feeding the community trade feed | coridian_ SQL | open, SQL provided |
 | M3 | Medium | PostgREST filter built by string interpolation of path/query values | code | FIXED (#2173) |
 | M4 | Medium | Referral Pro comp can be farmed with anonymous guest accounts | Zach + code (escalated) | open, not touched |
-| M5 | Medium | Delete-account gaps (RevenueCat, Stripe customer, analytics, referrer links, free-trial resets) | Zach + code (escalated) | open, not touched |
+| M5 | Medium | Delete-account gaps (RevenueCat, Stripe customer, analytics, referrer links, free-trial resets) | code + SQL | FIXED except store subscriptions (`docs/supabase_account_deletion_2026_11.sql`) |
 | M6 | Medium | `X-Forwarded-For` first hop is trusted for rate-limit identity | code | FIXED (`TRUSTED_PROXY_COUNT`, default 1) |
 | M7 | Medium | `scouting_reports` and `community_shared_trades` expose other users' `user_id` and free text | coridian_ product decision | open |
 | L1 | Low | Anonymous feedback insert is unbounded | code + SQL | FIXED (API caps + rate bucket; `docs/supabase_privacy_hardening_2026_11.sql`) |
