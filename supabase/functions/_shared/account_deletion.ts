@@ -87,6 +87,70 @@ export async function cancelUserSubscriptions(
   return result;
 }
 
+/**
+ * Strip name/email/phone from the Stripe customer. The customer and its invoices/charges stay (payment records
+ * must be kept), but they no longer identify a person. Best effort: returns false on any failure so the caller
+ * can log it; an already-deleted customer (404) counts as done.
+ */
+export async function anonymizeStripeCustomer(
+  fetchFn: FetchFn,
+  config: StripeConfig,
+  customerId: string,
+): Promise<boolean> {
+  if (!customerId || !secretModeConfigured(config)) return false;
+  try {
+    // Empty strings unset the field in Stripe's API.
+    await stripeRequest(fetchFn, config.secretKey, "POST", `/customers/${encodeURIComponent(customerId)}`, {
+      email: "",
+      name: "",
+      phone: "",
+      description: "Deleted account",
+      shipping: "",
+      address: "",
+      metadata: { supabase_user_id: "" },
+    });
+    return true;
+  } catch (e) {
+    if (e instanceof StripeHttpError && (e.status === 404 || e.stripeCode === "resource_missing")) return true;
+    console.error("delete-account: stripe customer anonymize failed (non-fatal)", (e as Error).message);
+    return false;
+  }
+}
+
+// ---- One-way references used to anonymize rows that cannot be deleted ----
+
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function hmacHex(key: string, text: string): Promise<string> {
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export interface AccountRefs {
+  /** Matches public.deleted_account_billing.user_ref (computed by the same formula in SQL). */
+  billingRef: string;
+  /** modules/launch_analytics.hash_account_id: legacy salt, plus the secret-keyed form when ANALYTICS_HASH_SALT is set. */
+  analyticsHashes: string[];
+  /** modules/verdict_feedback.account_hash (FEEDBACK_ACCOUNT_HASH_SALT or its default). */
+  feedbackHashes: string[];
+}
+
+export async function accountRefs(userId: string, env: Env): Promise<AccountRefs> {
+  const analytics = [`acct_${(await sha256Hex(`dynastygm-analytics:${userId}`)).slice(0, 16)}`];
+  const analyticsSalt = envValue(env, "ANALYTICS_HASH_SALT").trim();
+  if (analyticsSalt) analytics.push(`acct_${(await hmacHex(analyticsSalt, `dynastygm-analytics:${userId}`)).slice(0, 16)}`);
+  const feedbackSalt = envValue(env, "FEEDBACK_ACCOUNT_HASH_SALT") || "fantasydesk-verdict-feedback-v1";
+  return {
+    billingRef: await sha256Hex(`billing-ref:${userId}`),
+    analyticsHashes: analytics,
+    feedbackHashes: [(await hmacHex(feedbackSalt, userId)).slice(0, 16)],
+  };
+}
+
 // ---- Sign in with Apple token revocation ----
 
 export interface AppleConfig {

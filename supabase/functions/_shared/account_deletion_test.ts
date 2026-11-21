@@ -133,3 +133,39 @@ Deno.test("delete-account: Apple key not configured fails soft (deleted, apple_r
   assertEquals(res.status, 200);
   assertEquals((await res.json()).apple_revoked, null);
 });
+
+Deno.test("delete-account: anonymizes the Stripe customer and the kept records, then marks billing handled", async () => {
+  const f = fakeFetch(routes({ stripe_customer_id: "cus_1", stripe_subscription_id: "sub_a" }, {
+    "GET https://api.stripe.com/v1/subscriptions/search": noSearch,
+    "GET https://api.stripe.com/v1/subscriptions?": subList({ id: "sub_a", status: "active" }),
+    "DELETE https://api.stripe.com/v1/subscriptions/sub_a": () => j({ id: "sub_a", status: "canceled" }),
+    "POST https://api.stripe.com/v1/customers/cus_1": () => j({ id: "cus_1" }),
+    "POST /rest/v1/rpc/anonymize_deleted_user": () => j({}),
+    "PATCH /rest/v1/deleted_account_billing": () => j({}),
+  }));
+  const res = await deleteAccount(req(), { env: envOf(BASE_ENV), fetch: f.fn });
+  assertEquals(res.status, 200);
+  assertEquals((await res.json()).data_anonymized, true);
+  const cust = f.calls.find((c) => c.url.endsWith("/customers/cus_1"))!;
+  assert(String(cust.init.body).includes("email=&") && String(cust.init.body).includes("name=&"));
+  const iAnon = f.calls.findIndex((c) => c.url.includes("anonymize_deleted_user"));
+  const iDelete = f.calls.findIndex((c) => c.url.includes("/auth/v1/admin/users/"));
+  const iMark = f.calls.findIndex((c) => c.url.includes("deleted_account_billing"));
+  assert(iAnon >= 0 && iDelete > iAnon && iMark > iDelete);
+});
+
+Deno.test("delete-account: missing anonymize SQL does not block deletion", async () => {
+  const f = fakeFetch(routes({}, {}));
+  const res = await deleteAccount(req(), { env: envOf(BASE_ENV), fetch: f.fn });
+  assertEquals(res.status, 200);
+  assertEquals((await res.json()).data_anonymized, false);
+});
+
+Deno.test("accountRefs matches the Python analytics/feedback hash formulas (vectors from modules/)", async () => {
+  const { accountRefs } = await import("./account_deletion.ts");
+  const refs = await accountRefs("user-1", envOf({}));
+  assertEquals(refs.analyticsHashes, ["acct_9485655c3f67b8cc"]);
+  assertEquals(refs.feedbackHashes, ["e7c532644c558abc"]);
+  const salted = await accountRefs("user-1", envOf({ ANALYTICS_HASH_SALT: "s3cret" }));
+  assertEquals(salted.analyticsHashes, ["acct_9485655c3f67b8cc", "acct_2ea041976cbc11e3"]);
+});
