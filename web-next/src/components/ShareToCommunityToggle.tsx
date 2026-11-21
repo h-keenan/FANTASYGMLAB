@@ -35,6 +35,7 @@ export function ShareToCommunityToggle({
   const [available, setAvailable] = useState(false);
   const [on, setOn] = useState(false);
   const [name, setName] = useState("");
+  const [anonymous, setAnonymous] = useState(true);
   const [busy, setBusy] = useState(false);
   const [sharedId, setSharedId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -66,7 +67,8 @@ export function ShareToCommunityToggle({
       grade: verdict.ui_verdict,
       band: verdict.band,
       why: (verdict.rationale || "").slice(0, 280),
-      display_name: name.trim(),
+      display_name: anonymous ? "" : name.trim(),
+      anonymous,
     });
     return result.ok && result.trade ? result.trade.id : null;
   };
@@ -117,16 +119,22 @@ export function ShareToCommunityToggle({
       </div>
       {on && !sharedId ? (
         <div className="flex flex-col gap-2">
-          <Input
-            type="text"
-            value={name}
-            maxLength={24}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Display name (optional)"
-            aria-label="Display name (optional)"
-          />
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span style={{ color: "var(--color-text-secondary)" }}>Post anonymously</span>
+            <Toggle label="Post anonymously" checked={anonymous} onChange={setAnonymous} />
+          </div>
+          {anonymous ? null : (
+            <Input
+              type="text"
+              value={name}
+              maxLength={24}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Display name (blank uses your profile name)"
+              aria-label="Display name"
+            />
+          )}
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Shows the assets, grade and reason. Blank is Anonymous.
+            Shows the assets, grade and reason{anonymous ? ", with no name." : " under your display name."}
           </span>
           <Button size="sm" loading={busy} onClick={() => void share()}>
             {busy ? "Sharing…" : "Share"}

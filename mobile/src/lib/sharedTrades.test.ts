@@ -11,10 +11,17 @@ test('buildShareBody caps the reason and trims the display name', () => {
     [{ asset_type: 'player', name: 'A' }],
     [{ asset_type: 'pick', name: '2027 1st' }],
     '  Coach Z  ',
+    false,
   );
   assert.equal(body.why.length, 280);
   assert.equal(body.display_name, 'Coach Z');
   assert.equal(body.grade, 'ACCEPT');
+});
+
+test('anonymous (the default) drops the typed name', () => {
+  const body = buildShareBody(verdict, [], [], 'Coach Z');
+  assert.equal(body.display_name, '');
+  assert.equal(body.anonymous, true);
 });
 
 test('blank display name stays blank (server treats it as Anonymous)', () => {

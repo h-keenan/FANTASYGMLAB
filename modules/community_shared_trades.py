@@ -5,8 +5,11 @@ default). This module owns validation, sanitizing and the Supabase I/O for
 docs/supabase_community_trades.sql. Every call uses the CALLER's own access
 token, so RLS does the access control; nothing here uses service role.
 
-Public output never contains user_id, league ids or team names. The display
-name is whatever the user typed (or "Anonymous").
+Public output never contains user_id, league ids or team names. A share is
+anonymous unless the author turns "Post anonymously" off, in which case the
+public name is the one they typed or, if blank, their profile display name.
+Raw user_id reads are closed off in docs/supabase_scouting_privacy_2026_11.sql
+(feed is read through a view that has no user_id).
 """
 
 from __future__ import annotations
@@ -21,6 +24,9 @@ import requests
 from modules import account_store, auth_supabase
 
 TRADES_TABLE = "community_shared_trades"
+# Read-only projection without user_id (docs/supabase_scouting_privacy_2026_11.sql); falls back to the table before
+# that SQL is applied.
+FEED_VIEW = "community_shared_trades_feed"
 REPORTS_TABLE = "community_shared_trade_reports"
 SETUP_DOC = "docs/supabase_community_trades.sql"
 
@@ -120,8 +126,11 @@ def clean_assets(assets: Any) -> list[dict[str, Any]]:
     return cleaned
 
 
-def build_share_row(user_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
-    """Validated insert payload, or ShareError."""
+def build_share_row(user_id: str, body: Mapping[str, Any], *, profile_name: str = "") -> dict[str, Any]:
+    """Validated insert payload, or ShareError.
+
+    ``anonymous`` (default True) wins over any typed name: the row then carries no display name at all.
+    """
 
     send = clean_assets(body.get("send"))
     receive = clean_assets(body.get("receive"))
@@ -132,13 +141,42 @@ def build_share_row(user_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
         raise ShareError("Unknown trade grade.")
     return {
         "user_id": user_id,
-        "display_name": clean_display_name(body.get("display_name")) or None,
+        "display_name": _author_name(body, profile_name),
         "send": send,
         "receive": receive,
         "grade": grade,
         "band": clean_text(body.get("band"), BAND_MAX),
         "why": clean_why(body.get("why")),
     }
+
+
+def _author_name(body: Mapping[str, Any], profile_name: str) -> str | None:
+    if body.get("anonymous", True) is not False:
+        return None
+    typed = clean_display_name(body.get("display_name"))
+    if typed:
+        return typed
+    try:
+        return clean_display_name(profile_name) or None
+    except ShareError:
+        return None
+
+
+def fetch_profile_display_name(config: dict, token: str, user_id: str) -> str:
+    """The caller's own profile display name ("" when unavailable). Best effort."""
+
+    try:
+        response = requests.get(
+            auth_supabase.rest_api_url(config, "profiles", f"select=display_name&user_id=eq.{account_store.pg_eq(user_id)}&limit=1"),
+            headers=_headers(config, token),
+            timeout=10,
+        )
+        rows = response.json() if response.status_code < 400 else []
+    except Exception:
+        return ""
+    if isinstance(rows, list) and rows and isinstance(rows[0], Mapping):
+        return _text(rows[0].get("display_name"))
+    return ""
 
 
 def project_item(row: Mapping[str, Any], viewer_user_id: str) -> dict[str, Any]:
@@ -153,7 +191,7 @@ def project_item(row: Mapping[str, Any], viewer_user_id: str) -> dict[str, Any]:
         "band": _text(row.get("band")),
         "why": _text(row.get("why")),
         "created_at": row.get("created_at"),
-        "mine": bool(viewer_user_id) and _text(row.get("user_id")) == viewer_user_id,
+        "mine": row.get("mine") is True or (bool(viewer_user_id) and _text(row.get("user_id")) == viewer_user_id),
     }
 
 
@@ -194,12 +232,16 @@ def _check(response: requests.Response) -> None:
 def fetch_feed(config: dict, token: str, viewer_user_id: str, limit: int = FEED_LIMIT_DEFAULT) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit), FEED_LIMIT_MAX))
     query = f"select=*&hidden=eq.false&order=created_at.desc&limit={limit}"
-    try:
-        response = requests.get(
-            auth_supabase.rest_api_url(config, TRADES_TABLE, query), headers=_headers(config, token), timeout=15
-        )
-    except Exception as exc:
-        raise Unavailable("unreachable") from exc
+    response = None
+    for table in (FEED_VIEW, TRADES_TABLE):
+        try:
+            response = requests.get(
+                auth_supabase.rest_api_url(config, table, query), headers=_headers(config, token), timeout=15
+            )
+        except Exception as exc:
+            raise Unavailable("unreachable") from exc
+        if not (response.status_code >= 400 and is_missing_table(response)):
+            break
     _check(response)
     rows = response.json()
     if not isinstance(rows, list):

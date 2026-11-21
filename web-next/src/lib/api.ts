@@ -339,8 +339,9 @@ export interface SleeperLeaguesResponse {
   /** True when one season's lookup failed: the list may be missing leagues (say so, offer retry). */
   partial?: boolean;
   partial_message?: string;
-  /** Present only when a pending ?ref= code was sent with the lookup. */
-  referral?: unknown;
+  /** Present only when a pending ?ref= code was sent with the lookup. `pending_verification`: guest or
+   * unverified account, nothing was credited, keep the code for later. */
+  referral?: { attempted?: boolean; ok?: boolean; pending_verification?: boolean; message?: string };
 }
 
 export interface SaveLeagueResponse {
@@ -4130,6 +4131,8 @@ export interface ShareCommunityTradeBody {
   band: string;
   why: string;
   display_name: string;
+  /** Default true: the trade is posted without a name. Send false to show display_name. */
+  anonymous?: boolean;
 }
 
 export interface CommunityPreferencesResponse {
@@ -4249,6 +4252,8 @@ export interface MyScoutingReport {
   grade: number | null;
   round_projection: number | null;
   note: string;
+  /** True (the default) = other scouts never see your display name next to this report. */
+  anonymous?: boolean;
 }
 
 export interface CollegeProspect {
@@ -5425,7 +5430,7 @@ export const api = {
     authorizedRequest<ProspectProfileResponse>(`/v1/scouting/prospects/${encodeURIComponent(prospectId)}/profile`).then(normalizeProspectProfile),
   submitScoutingReport: (
     prospectId: string,
-    body: { grade: number; round_projection: number | null; note: string },
+    body: { grade: number; round_projection: number | null; note: string; anonymous?: boolean },
   ) =>
     authorizedRequest<ScoutingMutationResponse>(
       `/v1/scouting/prospects/${encodeURIComponent(prospectId)}/report`,

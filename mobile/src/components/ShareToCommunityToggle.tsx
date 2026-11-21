@@ -30,6 +30,7 @@ export default function ShareToCommunityToggle({
   const [available, setAvailable] = useState(false);
   const [on, setOn] = useState(false);
   const [name, setName] = useState('');
+  const [anonymous, setAnonymous] = useState(true);
   const [busy, setBusy] = useState(false);
   const [sharedId, setSharedId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -55,7 +56,7 @@ export default function ShareToCommunityToggle({
   if (!available || !isShareableGrade(verdict.ui_verdict)) return null;
 
   const sendShare = async () => {
-    const result = await api.shareCommunityTrade(buildShareBody(verdict, send, receive, name));
+    const result = await api.shareCommunityTrade(buildShareBody(verdict, send, receive, name, anonymous));
     return result.ok && result.trade ? result.trade.id : null;
   };
 
@@ -103,14 +104,22 @@ export default function ShareToCommunityToggle({
       </View>
       {on && !sharedId ? (
         <View style={styles.form}>
-          <Input
-            value={name}
-            onChangeText={setName}
-            maxLength={SHARE_NAME_MAX}
-            placeholder="Display name (optional)"
-            accessibilityLabel="Display name (optional)"
-          />
-          <AppText style={styles.hint}>Shows the assets, grade and reason. Blank is Anonymous.</AppText>
+          <View style={styles.row}>
+            <AppText style={styles.label}>Post anonymously</AppText>
+            <Toggle value={anonymous} onValueChange={setAnonymous} label="Post anonymously" />
+          </View>
+          {anonymous ? null : (
+            <Input
+              value={name}
+              onChangeText={setName}
+              maxLength={SHARE_NAME_MAX}
+              placeholder="Display name (blank uses your profile name)"
+              accessibilityLabel="Display name"
+            />
+          )}
+          <AppText style={styles.hint}>
+            {anonymous ? 'Shows the assets, grade and reason, with no name.' : 'Shows the assets, grade and reason under your display name.'}
+          </AppText>
           <Button label="Share" onPress={() => void share()} loading={busy} />
         </View>
       ) : null}

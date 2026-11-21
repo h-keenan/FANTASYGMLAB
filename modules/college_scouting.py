@@ -44,6 +44,9 @@ from modules import auth_supabase
 # ---------------------------------------------------------------------------
 PROSPECTS_TABLE = "college_prospects"
 SCOUTING_REPORTS_TABLE = "scouting_reports"
+# Read-only projection with no user_id (docs/supabase_scouting_privacy_2026_11.sql): author_display_name is null
+# for anonymous reports. Falls back to the table until that SQL is applied.
+SCOUTING_REPORTS_PUBLIC_VIEW = "scouting_reports_public"
 WATCHLIST_TABLE = "prospect_watchlist"
 
 # ---------------------------------------------------------------------------
@@ -170,6 +173,7 @@ def build_prospect_views(
     reports: Sequence[Mapping[str, Any]],
     *,
     my_user_id: str = "",
+    my_reports: Sequence[Mapping[str, Any]] | None = None,
     watchlist_prospect_ids: Iterable[str] = (),
 ) -> List[Dict[str, Any]]:
     """One row per prospect for the mobile scouting/watchlist screen: the
@@ -179,13 +183,15 @@ def build_prospect_views(
     """
 
     aggregate = aggregate_prospect_scouting(reports)
-    my_reports: Dict[str, Dict[str, Any]] = {}
-    if my_user_id:
-        for report in reports:
-            if _safe_text(report.get("user_id")) == my_user_id:
-                pid = _safe_text(report.get("prospect_id"))
-                if pid:
-                    my_reports[pid] = report
+    my_reports_by_prospect: Dict[str, Dict[str, Any]] = {}
+    # The caller's own rows come from their own RLS-scoped read (``my_reports``); the shared list carries no user_id.
+    own_rows = my_reports if my_reports is not None else (reports if my_user_id else ())
+    for report in own_rows:
+        if my_reports is None and _safe_text(report.get("user_id")) != my_user_id:
+            continue
+        pid = _safe_text(report.get("prospect_id"))
+        if pid:
+            my_reports_by_prospect[pid] = report
     watchlist_ids = {_safe_text(pid) for pid in watchlist_prospect_ids if _safe_text(pid)}
 
     rows: List[Dict[str, Any]] = []
@@ -193,7 +199,7 @@ def build_prospect_views(
         pid = _safe_text(prospect.get("id"))
         if not pid:
             continue
-        my_report = my_reports.get(pid)
+        my_report = my_reports_by_prospect.get(pid)
         agg = aggregate.get(pid)
         rows.append(
             {
@@ -212,6 +218,8 @@ def build_prospect_views(
                         "grade": normalize_grade(my_report.get("grade")),
                         "round_projection": normalize_round_projection(my_report.get("round_projection")),
                         "note": _safe_text(my_report.get("note"))[:280],
+                        # Absent column (SQL not applied) reads as anonymous.
+                        "anonymous": my_report.get("anonymous") is not False,
                     }
                     if my_report
                     else None
@@ -292,17 +300,24 @@ def fetch_all_scouting_reports(
 
     if not auth_supabase.is_configured(config):
         return [], "not_configured"
-    try:
-        response = requests.get(
-            auth_supabase.rest_api_url(
-                config, SCOUTING_REPORTS_TABLE, "select=user_id,prospect_id,grade,round_projection,note"
-            ),
-            headers=auth_supabase.auth_headers(config, access_token),
-            timeout=timeout,
-        )
-    except Exception:
-        return [], "not_available"
-    if response.status_code >= 400:
+    # Never selects user_id: the shared pool is anonymous aggregate input plus, for non-anonymous authors, a
+    # display name. Prefer the public view; fall back to the table (still without user_id) before the SQL is applied.
+    response = None
+    for table, columns in (
+        (SCOUTING_REPORTS_PUBLIC_VIEW, "prospect_id,grade,round_projection,note,author_display_name"),
+        (SCOUTING_REPORTS_TABLE, "prospect_id,grade,round_projection,note"),
+    ):
+        try:
+            response = requests.get(
+                auth_supabase.rest_api_url(config, table, f"select={columns}"),
+                headers=auth_supabase.auth_headers(config, access_token),
+                timeout=timeout,
+            )
+        except Exception:
+            return [], "not_available"
+        if response.status_code < 400:
+            break
+    if response is None or response.status_code >= 400:
         return [], "not_available"
     try:
         rows = response.json()

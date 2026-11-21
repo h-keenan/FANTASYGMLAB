@@ -7473,16 +7473,21 @@ def test_get_scouting_prospects_reflects_shared_aggregate_and_my_report(monkeypa
         {"id": "p1", "name": "Test Prospect", "position": "QB", "school": "Test U", "draft_year": 2026},
     ]
     reports_response = Mock(status_code=200)
+    # The shared pool carries no user_id at all; the caller's own row comes from a separate own-rows read.
     reports_response.json.return_value = [
-        {"user_id": "user-123", "prospect_id": "p1", "grade": 4, "round_projection": 1, "note": "sleeper"},
-        {"user_id": "someone-else", "prospect_id": "p1", "grade": 2, "round_projection": 3, "note": ""},
+        {"prospect_id": "p1", "grade": 4, "round_projection": 1, "note": "sleeper", "author_display_name": None},
+        {"prospect_id": "p1", "grade": 2, "round_projection": 3, "note": "", "author_display_name": "Scout Sam"},
     ]
     watchlist_response = Mock(status_code=200)
     watchlist_response.json.return_value = [{"user_id": "user-123", "prospect_id": "p1"}]
+    my_reports_response = Mock(status_code=200)
+    my_reports_response.json.return_value = [
+        {"user_id": "user-123", "prospect_id": "p1", "grade": 4, "round_projection": 1, "note": "sleeper"}
+    ]
 
     with patch(
         "requests.get",
-        side_effect=[auth_user_response, prospects_response, reports_response, watchlist_response],
+        side_effect=[auth_user_response, prospects_response, reports_response, watchlist_response, my_reports_response],
     ):
         response = client.get("/v1/scouting/prospects", headers={"Authorization": "Bearer good-token"})
 
@@ -7492,7 +7497,7 @@ def test_get_scouting_prospects_reflects_shared_aggregate_and_my_report(monkeypa
     [prospect] = body["prospects"]
     assert prospect["id"] == "p1"
     assert prospect["aggregate"] == {"avg_grade": 3.0, "scout_count": 2, "avg_round_projection": 2.0}
-    assert prospect["my_report"] == {"grade": 4, "round_projection": 1, "note": "sleeper"}
+    assert prospect["my_report"] == {"grade": 4, "round_projection": 1, "note": "sleeper", "anonymous": True}
     assert prospect["on_watchlist"] is True
 
 
@@ -7539,6 +7544,48 @@ def test_submit_scouting_report_upserts_my_grade(monkeypatch):
     assert sent_payload["grade"] == 5
     assert sent_payload["round_projection"] == 1
     assert sent_payload["note"] == "big arm"
+    assert sent_payload["anonymous"] is True  # default: no display name unless the author opts out
+
+
+def test_submit_scouting_report_can_opt_out_of_anonymity(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(
+        "services.mobile_api_service._fetch_profile_fields",
+        lambda *a, **k: {"entitlement": "premium", "sleeper_username": "gm_dynasty", "status": "ok"},
+    )
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    upsert_response = Mock(status_code=200)
+    upsert_response.json.return_value = [{}]
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            client.post(
+                "/v1/scouting/prospects/2026-qb-01/report",
+                json={"grade": 4, "anonymous": False},
+                headers={"Authorization": "Bearer good-token"},
+            )
+    assert mock_post.call_args.kwargs["json"]["anonymous"] is False
+
+
+def test_lookup_sleeper_leagues_referral_is_not_credited_to_a_guest_account(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import referrals
+    from modules import sleeper_leagues
+
+    code = referrals.referral_code_for_user("22222222-2222-4222-8222-222222222222")
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "11111111-1111-4111-8111-111111111111", "is_anonymous": True}
+    lookup = sleeper_leagues.LeagueLookupResult([], "no_leagues")
+    with patch("requests.get", side_effect=[auth_user_response]):
+        with patch("requests.post") as mock_post:
+            with patch("modules.sleeper_leagues.lookup_user_leagues", return_value=lookup):
+                response = client.get(
+                    f"/v1/sleeper/leagues?username=gm_dynasty&referral_code={code}",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+    referral = response.json()["referral"]
+    assert referral["pending_verification"] is True and referral["ok"] is False
+    mock_post.assert_not_called()
 
 
 def test_add_and_remove_prospect_watchlist(monkeypatch):
@@ -14919,7 +14966,7 @@ def test_lookup_sleeper_leagues_with_referral_code_records_attribution_and_fails
     code = referrals.referral_code_for_user(referrer_id)
 
     auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": referred_id, "email": "gm@example.com"}
+    auth_user_response.json.return_value = {"id": referred_id, "email": "gm@example.com", "email_confirmed_at": "2026-01-01T00:00:00Z"}
     settings_response = Mock(status_code=200)
     settings_response.json.return_value = []
     upsert_response = Mock(status_code=200)
@@ -14954,7 +15001,7 @@ def test_lookup_sleeper_leagues_ignores_self_referral_code(monkeypatch):
     code = referrals.referral_code_for_user(user_id)
 
     auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": user_id, "email": "gm@example.com"}
+    auth_user_response.json.return_value = {"id": user_id, "email": "gm@example.com", "email_confirmed_at": "2026-01-01T00:00:00Z"}
     settings_response = Mock(status_code=200)
     settings_response.json.return_value = []
     lookup = sleeper_leagues.LeagueLookupResult([], "no_leagues")
@@ -14985,7 +15032,7 @@ def test_lookup_sleeper_leagues_referral_redemption_is_idempotent_once_already_a
     already_attributed = referrals.with_attribution_recorded(None, referrer_user_id=referrer_id, code=code)["settings"]
 
     auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": referred_id, "email": "gm@example.com"}
+    auth_user_response.json.return_value = {"id": referred_id, "email": "gm@example.com", "email_confirmed_at": "2026-01-01T00:00:00Z"}
     settings_response = Mock(status_code=200)
     settings_response.json.return_value = [{"user_id": referred_id, "settings": already_attributed}]
     lookup = sleeper_leagues.LeagueLookupResult([], "no_leagues")

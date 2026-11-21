@@ -386,7 +386,8 @@ export default function HomeScreen({ navigation, route }: Props) {
     try {
       const pendingRef = await getPendingReferralCode();
       const result = await api.lookupSleeperLeagues(trimmed, pendingRef || undefined);
-      if (pendingRef && result.ok) void clearPendingReferralCode();
+      // A guest/unverified account is not credited yet: keep the code so it redeems after the account verifies.
+      if (pendingRef && result.ok && !result.referral?.pending_verification) void clearPendingReferralCode();
       setAddOptions(result.leagues);
       setAddSelected(defaultLeagueSelection(result.leagues));
       // One season's lookup failed: the list may be missing leagues. Say so above the picker; searching again retries.

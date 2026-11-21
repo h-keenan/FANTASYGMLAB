@@ -258,6 +258,8 @@ export interface SleeperLeagueLookupResponse {
   // True when one season's lookup failed: the list may be missing leagues (say so, offer retry).
   partial?: boolean;
   partial_message?: string;
+  /** Present only when a pending ref code was sent. `pending_verification`: guest/unverified, keep the code. */
+  referral?: { attempted?: boolean; ok?: boolean; pending_verification?: boolean; message?: string };
 }
 
 export type SaveLeagueReason =
@@ -2956,6 +2958,8 @@ export interface MyScoutingReport {
   grade: number | null;
   round_projection: number | null;
   note: string;
+  /** True (the default) = other scouts never see your display name next to this report. */
+  anonymous?: boolean;
 }
 
 export interface CollegeProspect {
@@ -4705,7 +4709,7 @@ export const api = {
     authorizedFetch<ProspectProfileResponse>(`/v1/scouting/prospects/${encodeURIComponent(prospectId)}/profile`).then(normalizeProspectProfile),
   submitScoutingReport: (
     prospectId: string,
-    body: { grade: number; round_projection?: number | null; note?: string },
+    body: { grade: number; round_projection?: number | null; note?: string; anonymous?: boolean },
   ) =>
     authorizedPost<ScoutingMutationResponse>(
       `/v1/scouting/prospects/${encodeURIComponent(prospectId)}/report`,
@@ -4947,6 +4951,8 @@ export const api = {
     band: string;
     why: string;
     display_name: string;
+    /** Default true: posted without a name. */
+    anonymous?: boolean;
   }) => authorizedPost<{ ok: boolean; available?: boolean; trade?: SharedCommunityTrade }>('/v1/community/shared-trades', body),
   deleteSharedCommunityTrade: (id: string) =>
     authorizedDelete<{ ok: boolean }>(`/v1/community/shared-trades/${encodeURIComponent(id)}`),

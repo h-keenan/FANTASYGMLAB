@@ -31,6 +31,7 @@ export function buildShareBody(
   send: SharedTradeAssetInput[],
   receive: SharedTradeAssetInput[],
   displayName: string,
+  anonymous = true,
 ) {
   return {
     send,
@@ -38,7 +39,8 @@ export function buildShareBody(
     grade: verdict.ui_verdict,
     band: verdict.band,
     why: (verdict.rationale || '').slice(0, SHARE_WHY_MAX),
-    display_name: displayName.trim().slice(0, SHARE_NAME_MAX),
+    display_name: anonymous ? '' : displayName.trim().slice(0, SHARE_NAME_MAX),
+    anonymous,
   };
 }
 

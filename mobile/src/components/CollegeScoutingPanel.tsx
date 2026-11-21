@@ -198,9 +198,9 @@ export default function CollegeScoutingPanel({
     if (draft.grade == null) return;
     setBusyId(prospect.id);
     try {
-      const result = await api.submitScoutingReport(prospect.id, { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim() });
+      const result = await api.submitScoutingReport(prospect.id, { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim(), anonymous: draft.anonymous });
       if (result.ok) {
-        setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, my_report: { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim() } } : row)));
+        setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, my_report: { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim(), anonymous: draft.anonymous } } : row)));
         setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'success', message: 'Saved: thanks for scouting.' } }));
       } else {
         setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'error', message: 'Could not save your grade. Try again in a moment.' } }));
@@ -218,7 +218,7 @@ export default function CollegeScoutingPanel({
       const result = await api.deleteScoutingReport(prospect.id);
       if (!result.ok) return false;
       setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, my_report: null } : row)));
-      setDrafts((prev) => ({ ...prev, [prospect.id]: { grade: null, roundProjection: null, note: '' } }));
+      setDrafts((prev) => ({ ...prev, [prospect.id]: { grade: null, roundProjection: null, note: '', anonymous: true } }));
       setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: 'success', message: 'Removed your report.' } }));
       return true;
     } catch {

@@ -88,7 +88,11 @@ describe("ShareToCommunityToggle", () => {
     expect(mocks.shareCommunityTrade).not.toHaveBeenCalled();
 
     fireEvent.click(toggle);
-    fireEvent.change(screen.getByLabelText("Display name (optional)"), { target: { value: "Coach Z" } });
+    // Anonymous by default: no name field until the author opts out.
+    expect(screen.getByRole("switch", { name: "Post anonymously" })).toBeChecked();
+    expect(screen.queryByLabelText("Display name")).toBeNull();
+    fireEvent.click(screen.getByRole("switch", { name: "Post anonymously" }));
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Coach Z" } });
     fireEvent.click(screen.getByRole("button", { name: "Share" }));
     await waitFor(() => expect(mocks.shareCommunityTrade).toHaveBeenCalledTimes(1));
     expect(mocks.shareCommunityTrade.mock.calls[0][0]).toMatchObject({
@@ -96,6 +100,7 @@ describe("ShareToCommunityToggle", () => {
       band: "LEAN ACCEPT",
       why: "Because.",
       display_name: "Coach Z",
+      anonymous: false,
     });
 
     await screen.findByText(/Shared\./);

@@ -153,7 +153,7 @@ def test_share_inserts_own_sanitized_row(monkeypatch):
     created.json.return_value = [{"id": TRADE_ID, "user_id": "user-123", "grade": "ACCEPT"}]
     with patch("requests.get", side_effect=[_auth_response(), recent]):
         with patch("requests.post", return_value=created) as mock_post:
-            response = client.post("/v1/community/shared-trades", json=_body(display_name="  Coach  Z "), headers=AUTH)
+            response = client.post("/v1/community/shared-trades", json=_body(display_name="  Coach  Z ", anonymous=False), headers=AUTH)
     assert response.status_code == 200
     assert response.json()["ok"] is True
     posted = mock_post.call_args.kwargs["json"]
@@ -165,7 +165,7 @@ def test_share_inserts_own_sanitized_row(monkeypatch):
 def test_share_rejects_bad_name_and_bad_grade(monkeypatch):
     client = _client(monkeypatch)
     with patch("requests.get", return_value=_auth_response()):
-        assert client.post("/v1/community/shared-trades", json=_body(display_name="shit"), headers=AUTH).status_code == 422
+        assert client.post("/v1/community/shared-trades", json=_body(display_name="shit", anonymous=False), headers=AUTH).status_code == 422
         assert client.post("/v1/community/shared-trades", json=_body(grade="WOW"), headers=AUTH).status_code == 422
         too_many = [{"name": f"P{i}"} for i in range(30)]
         assert client.post("/v1/community/shared-trades", json=_body(send=too_many), headers=AUTH).status_code == 422
@@ -227,3 +227,36 @@ def test_sql_hides_after_same_threshold_as_python():
     sql = (Path(__file__).resolve().parents[1] / "docs" / "supabase_community_trades.sql").read_text()
     assert f">= {cst.HIDE_AFTER_REPORTS}" in sql
     assert "enable row level security" in sql
+
+
+def test_share_is_anonymous_by_default_even_with_a_typed_name(monkeypatch):
+    client = _client(monkeypatch)
+    recent = Mock(status_code=200)
+    recent.json.return_value = []
+    created = Mock(status_code=201)
+    created.json.return_value = [{"id": TRADE_ID, "user_id": "user-123", "grade": "ACCEPT"}]
+    with patch("requests.get", side_effect=[_auth_response(), recent]):
+        with patch("requests.post", return_value=created) as mock_post:
+            client.post("/v1/community/shared-trades", json=_body(display_name="Coach Z"), headers=AUTH)
+    assert mock_post.call_args.kwargs["json"]["display_name"] is None
+
+
+def test_non_anonymous_share_without_a_typed_name_uses_the_profile_display_name(monkeypatch):
+    client = _client(monkeypatch)
+    profile = Mock(status_code=200)
+    profile.json.return_value = [{"display_name": "Profile Pat"}]
+    recent = Mock(status_code=200)
+    recent.json.return_value = []
+    created = Mock(status_code=201)
+    created.json.return_value = [{"id": TRADE_ID, "user_id": "user-123", "grade": "ACCEPT"}]
+    with patch("requests.get", side_effect=[_auth_response(), profile, recent]):
+        with patch("requests.post", return_value=created) as mock_post:
+            client.post("/v1/community/shared-trades", json=_body(anonymous=False), headers=AUTH)
+    assert mock_post.call_args.kwargs["json"]["display_name"] == "Profile Pat"
+
+
+def test_feed_item_never_carries_user_id_and_reads_mine_from_the_view():
+    from modules import community_shared_trades as cst
+
+    item = cst.project_item({"id": TRADE_ID, "user_id": "someone", "mine": True, "grade": "ACCEPT"}, "")
+    assert "user_id" not in item and item["mine"] is True

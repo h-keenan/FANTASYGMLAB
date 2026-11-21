@@ -27,10 +27,10 @@ SQL editor (`docs/supabase_security_fixes_2026_11.sql`), **Zach** = secrets, bil
 | M1 | Medium | Backend Sentry could ship ESPN cookies / bearer tokens / emails in request bodies | code | FIXED (#2172) |
 | M2 | Medium | `trade_outcomes` server-owned columns are client-writable, feeding the community trade feed | coridian_ SQL | open, SQL provided |
 | M3 | Medium | PostgREST filter built by string interpolation of path/query values | code | FIXED (#2173) |
-| M4 | Medium | Referral Pro comp can be farmed with anonymous guest accounts | Zach + code (escalated) | open, not touched |
+| M4 | Medium | Referral Pro comp can be farmed with anonymous guest accounts | code | FIXED (credit only for a verified email or Apple/Google account) |
 | M5 | Medium | Delete-account gaps (RevenueCat, Stripe customer, analytics, referrer links, free-trial resets) | code + SQL | FIXED except store subscriptions (`docs/supabase_account_deletion_2026_11.sql`) |
 | M6 | Medium | `X-Forwarded-For` first hop is trusted for rate-limit identity | code | FIXED (`TRUSTED_PROXY_COUNT`, default 1) |
-| M7 | Medium | `scouting_reports` and `community_shared_trades` expose other users' `user_id` and free text | coridian_ product decision | open |
+| M7 | Medium | `scouting_reports` and `community_shared_trades` expose other users' `user_id` and free text | code + SQL | FIXED (display name only, "post anonymously" toggle; `docs/supabase_scouting_privacy_2026_11.sql`) |
 | L1 | Low | Anonymous feedback insert is unbounded | code + SQL | FIXED (API caps + rate bucket; `docs/supabase_privacy_hardening_2026_11.sql`) |
 | L2 | Low | `user_id` appears in 5 backend log lines | code | FIXED (hashed `u_` ref) |
 | L3 | Low | Free ad-unlock is an honor system (no server-side ad verification) | product | open |
