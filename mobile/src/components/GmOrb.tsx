@@ -52,6 +52,9 @@ import { showProMarkers } from '../lib/plan';
 import { PRO, getEntitlementTier, isAtLeast } from '../lib/revenuecat';
 import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
 import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
+
+/** Width of the one-time orb coachmark bubble (wraps its text to ~3 lines). */
+const COACH_WIDTH = ORB_SIZE + 160;
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
 import { PLAYER_SEARCH_MAX_RESULTS, PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from '../lib/leaguePlayerSearch';
 import { OPEN_ORB_SEARCH_EVENT } from '../lib/orbEvents';
@@ -541,6 +544,13 @@ export default function GmOrb() {
   const leftBound = Math.min(-1, insets.left + ORB_SIZE / 2 + spacing.sm - screenWidth / 2);
   const rightBound = Math.max(1, screenWidth - insets.right - ORB_SIZE / 2 - spacing.sm - screenWidth / 2);
 
+  // Keep the one-time coachmark inside the screen wherever the orb is docked: centred on the orb
+  // when there is room, otherwise slid inward so its text never clips past either edge.
+  const orbCenterX = screenWidth / 2 + (horizontalFraction >= 0 ? horizontalFraction * rightBound : horizontalFraction * -leftBound);
+  const coachMinLeft = insets.left + spacing.sm - (orbCenterX - ORB_SIZE / 2);
+  const coachMaxLeft = screenWidth - insets.right - spacing.sm - COACH_WIDTH - (orbCenterX - ORB_SIZE / 2);
+  const coachLeft = Math.max(coachMinLeft, Math.min(coachMaxLeft, (ORB_SIZE - COACH_WIDTH) / 2));
+
   useEffect(() => {
     dragX.value = horizontalFraction >= 0 ? horizontalFraction * rightBound : horizontalFraction * -leftBound;
   }, [horizontalFraction, leftBound, rightBound]);
@@ -810,7 +820,7 @@ export default function GmOrb() {
               <Ionicons name="menu" size={13} color={colors.accent} style={styles.orbCue} />
             </PressableScale>
             {coachOpen ? (
-              <View pointerEvents="none" style={styles.coach} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <View pointerEvents="none" style={[styles.coach, { left: coachLeft }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                 <AppText style={styles.coachText}>{ORB_COACHMARK_TEXT}</AppText>
               </View>
             ) : null}
@@ -1008,8 +1018,7 @@ function createStyles(colors: ThemeColors) {
   coach: {
     position: 'absolute',
     bottom: ORB_SIZE + spacing.sm,
-    left: -80,
-    width: ORB_SIZE + 160,
+    width: COACH_WIDTH,
     alignItems: 'center',
   },
   coachText: {
