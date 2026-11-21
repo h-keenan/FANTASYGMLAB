@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { EspnUnavailableState } from "@/components/EspnUnavailableState";
 import { AppShellBar } from "@/components/AppShellBar";
-import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
+import { pathOwnsBottomStack } from "@/lib/bottomNav";
+import { useSimGameOwnsOrb } from "@/lib/simGameChrome";
 import { useShellNav } from "@/lib/useShellNav";
 import { espnUnavailableLeagueId } from "@/lib/leaguePlatform";
 
@@ -33,8 +34,9 @@ export function AppContentShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const espnLeagueId = espnUnavailableLeagueId(pathname);
   const { barVisible } = useShellNav();
+  const gameStackShown = useSimGameOwnsOrb();
   return (
-    <div className={`app-shell flex flex-col flex-auto ${session ? `md:pl-60 md:pb-0 ${pathOwnsPhoneChrome(pathname) ? "" : barVisible ? "max-md:pb-[var(--bottom-clearance,4.5rem)]" : "pb-12"}` : ""}`}>
+    <div className={`app-shell flex flex-col flex-auto ${session ? `md:pl-60 md:pb-0 ${pathOwnsBottomStack(pathname, gameStackShown) ? "" : barVisible ? "max-md:pb-[var(--bottom-clearance,4.5rem)]" : "pb-12"}` : ""}`}>
       {espnLeagueId ? (
         // EspnUnavailableState reads ?name= (useSearchParams), which Next
         // requires to sit under a Suspense boundary.

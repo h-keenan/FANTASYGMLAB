@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { activeBottomTab, bottomTabAriaLabel, bottomTabBadgeText, pathOwnsPhoneChrome, simCompactSeason, simCompactWeek, simGameBottomTabs, simStatusChips } from "./bottomNav";
+import { activeBottomTab, bottomTabAriaLabel, bottomTabBadgeText, pathOwnsBottomStack, pathOwnsPhoneChrome, simCompactSeason, simCompactWeek, simGameBottomTabs, simStatusChips } from "./bottomNav";
 
 describe("bottom tab badges", () => {
   it("hides zero/undefined, caps at 9+", () => {
@@ -58,6 +58,11 @@ describe("route ownership", () => {
     expect(pathOwnsPhoneChrome("/fantasy-sim/abc")).toBe(false);
     expect(pathOwnsPhoneChrome("/dashboard/1")).toBe(false);
     expect(pathOwnsPhoneChrome(null)).toBe(false);
+  });
+  it("the sim hub (no game stack) does not own the bottom stack, so the global footer shows", () => {
+    expect(pathOwnsBottomStack("/gm-game", false)).toBe(false);
+    expect(pathOwnsBottomStack("/gm-game", true)).toBe(true);
+    expect(pathOwnsBottomStack("/dashboard/1", true)).toBe(false);
   });
 });
 

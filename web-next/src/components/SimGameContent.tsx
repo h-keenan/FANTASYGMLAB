@@ -26,6 +26,7 @@ import { useFooterHideOnScroll } from "@/lib/useFooterHideOnScroll";
 import { usePillState } from "@/lib/useBottomPillContext";
 import { SimActionBar } from "@/components/SimActionBar";
 import { SimGameHeader, SimStatusChips } from "@/components/SimGameHeader";
+import { simGameChrome } from "@/lib/simGameChrome";
 import { SimGameOrb } from "@/components/SimGameOrb";
 import { SimHub } from "@/components/SimHub";
 import { Sheet } from "@/components/ui/Sheet";
@@ -1026,6 +1027,11 @@ function GameScreen({
   useFooterHideOnScroll(isSelectionAction(usePillState().ctx?.primary));
   // Phones: the game orb (docked above the Advance pill) is the page navigator; the top PillRows render from md up.
   const showOrb = showBar || showOffBar || (stage === "draft" && !draftRecap && !recap);
+  // Tell the global chrome the game draws its own orb + bar; the hub/setup screens do not, so they keep the global footer.
+  useEffect(() => {
+    simGameChrome.set(showOrb);
+    return () => simGameChrome.set(false);
+  }, [showOrb]);
   const orbNode = showOrb ? (
     <SimGameOrb
               tab={flow.tab}
