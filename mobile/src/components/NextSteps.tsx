@@ -47,12 +47,13 @@ export default function NextSteps({
   return (
     <View style={styles.wrap} testID="next-steps">
       <SectionHeading title={title} />
-      <View style={styles.row}>
+      <View style={steps.length === 2 ? styles.row : styles.column}>
         {steps.map((step) => (
           <Button
             key={step}
             variant="secondary"
             size="sm"
+            style={steps.length === 2 ? styles.cell : undefined}
             label={`${NEXT_STEPS[step].label} →`}
             onPress={() => {
               const target = NEXT_STEPS[step];
@@ -67,5 +68,8 @@ export default function NextSteps({
 
 const styles = StyleSheet.create({
   wrap: { marginTop: spacing.md, marginBottom: spacing.md },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  // Even grid: two steps share one row at equal width; three or more stack full-width (never 2 + 1 at uneven widths).
+  row: { flexDirection: 'row', gap: spacing.sm },
+  column: { flexDirection: 'column', alignSelf: 'stretch', gap: spacing.sm },
+  cell: { flex: 1 },
 });
