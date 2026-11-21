@@ -169,7 +169,7 @@ export function StatStripModule({
         </View>
         <View accessibilityLabel={`${title}: ${summary}`} testID="stat-strip-tiles">
           {rows.map((row, i) => (
-            <DashboardStatRow key={i} items={row.map((item) => ({ ...item, fill: null, why: undefined }))} />
+            <DashboardStatRow key={i} items={row.map((item) => ({ ...item, label: shortLabel(item.label), fill: null, why: undefined }))} />
           ))}
         </View>
         <Pressable

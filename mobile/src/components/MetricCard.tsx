@@ -134,7 +134,7 @@ export default function MetricCard({
       <View style={[styles.labelRow, centered && styles.labelRowCentered]}>
         <View style={[styles.labelTextRow, centered && styles.centeredText]}>
           {icon ? <Ionicons name={icon} size={11} color={colors.accent} style={styles.labelIcon} /> : null}
-          <AppText style={[styles.label, centered && styles.centeredText]} numberOfLines={1}>
+          <AppText style={[styles.label, centered && styles.centeredText]} numberOfLines={centered ? 2 : 1}>
             {label}
           </AppText>
           {labelAccessory ? <View style={styles.labelAccessory}>{labelAccessory}</View> : null}
