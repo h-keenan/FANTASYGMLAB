@@ -24,5 +24,5 @@ export const simGameChrome = {
 };
 
 export function useSimGameOwnsOrb(): boolean {
-  return useSyncExternalStore(simGameChrome.subscribe, simGameChrome.get, () => false);
+  return useSyncExternalStore(simGameChrome.subscribe, simGameChrome.get, simGameChrome.get);
 }
