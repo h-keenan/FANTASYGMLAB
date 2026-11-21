@@ -5,6 +5,7 @@ import AppText from './AppText';
 import Button from './Button';
 import ConfirmInPlace from './ConfirmInPlace';
 import Input from './Input';
+import Toggle from './Toggle';
 import PressableScale from './PressableScale';
 import { MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION, type CollegeProspect } from '../lib/api';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -23,6 +24,8 @@ export interface ReportDraft {
   grade: number | null;
   roundProjection: number | null;
   note: string;
+  /** Post anonymously (default): other scouts never see your display name. */
+  anonymous: boolean;
 }
 
 export interface ReportFlash {
@@ -35,6 +38,7 @@ export function draftFromProspect(prospect: CollegeProspect): ReportDraft {
     grade: prospect.my_report?.grade ?? null,
     roundProjection: prospect.my_report?.round_projection ?? null,
     note: prospect.my_report?.note ?? '',
+    anonymous: prospect.my_report?.anonymous !== false,
   };
 }
 
@@ -102,6 +106,11 @@ export default function ProspectReportForm({
         {draft.note.length}/{NOTE_MAX_LENGTH}
       </AppText>
 
+      <View style={styles.anonRow}>
+        <AppText style={styles.fieldLabel}>Post anonymously</AppText>
+        <Toggle value={draft.anonymous} onValueChange={(anonymous) => onDraftChange({ ...draft, anonymous })} label="Post anonymously" />
+      </View>
+
       {flash ? <AppText style={flash.tone === 'success' ? styles.saved : styles.error}>{flash.message}</AppText> : null}
 
       <Button label={hasReport ? 'Update Grade' : 'Submit Grade'} onPress={onSubmit} disabled={draft.grade == null} loading={busy} style={styles.submitButton} />
@@ -127,6 +136,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     fieldLabel: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
     fieldLabelSpaced: { marginTop: spacing.md },
+    anonRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.md },
     pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
     pill: {
       minWidth: 44,

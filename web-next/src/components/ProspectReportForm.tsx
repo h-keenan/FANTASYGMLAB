@@ -3,6 +3,7 @@
 import { MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION, type CollegeProspect } from "@/lib/api";
 import { PillRow } from "@/components/PillRow";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
+import { Toggle } from "@/components/Toggle";
 
 /**
  * Your own scouting report on a college prospect (grade, round projection, note): the one form, shown in the prospect sheet's
@@ -16,6 +17,8 @@ export interface ReportDraft {
   grade: number | null;
   roundProjection: number | null;
   note: string;
+  /** Post anonymously (default): other scouts never see your display name. */
+  anonymous: boolean;
 }
 
 export interface ReportFlash {
@@ -28,6 +31,7 @@ export function draftFromProspect(prospect: CollegeProspect): ReportDraft {
     grade: prospect.my_report?.grade ?? null,
     roundProjection: prospect.my_report?.round_projection ?? null,
     note: prospect.my_report?.note ?? "",
+    anonymous: prospect.my_report?.anonymous !== false,
   };
 }
 
@@ -104,6 +108,15 @@ export function ProspectReportForm({
         <span className="text-xs self-end" style={{ color: "var(--color-text-muted)" }}>
           {draft.note.length}/{NOTE_MAX_LENGTH}
         </span>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span style={{ color: "var(--color-text-secondary)" }}>Post anonymously</span>
+        <Toggle
+          label="Post anonymously"
+          checked={draft.anonymous}
+          onChange={(next) => onDraftChange({ ...draft, anonymous: next })}
+        />
       </div>
 
       <div className="flex items-center gap-2">

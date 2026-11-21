@@ -236,7 +236,8 @@ function SleeperUsernameImport({
       // resolves (the server only credits it once and ignores bad codes).
       const pendingRef = getPendingReferralCode();
       const result = pendingRef ? await api.lookupSleeperLeagues(clean, pendingRef) : await api.lookupSleeperLeagues(clean);
-      if (pendingRef && result.ok) clearPendingReferralCode();
+      // A guest/unverified account is not credited yet: keep the code so it redeems after the account verifies.
+      if (pendingRef && result.ok && !result.referral?.pending_verification) clearPendingReferralCode();
       if (result.ok) {
         // Mirrors app.py: the username itself resolved on Sleeper's side
         // (even a zero-leagues account counts here, same as lookup.status

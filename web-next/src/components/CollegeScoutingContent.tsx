@@ -196,13 +196,13 @@ export function CollegeScoutingContent({
     }
     setBusyId(prospect.id);
     api
-      .submitScoutingReport(prospect.id, { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim() })
+      .submitScoutingReport(prospect.id, { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim(), anonymous: draft.anonymous })
       .then((result) => {
         if (result.ok) {
           setProspects((prev) =>
             prev.map((row) =>
               row.id === prospect.id
-                ? { ...row, my_report: { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim() } }
+                ? { ...row, my_report: { grade: draft.grade, round_projection: draft.roundProjection, note: draft.note.trim(), anonymous: draft.anonymous } }
                 : row,
             ),
           );
@@ -223,7 +223,7 @@ export function CollegeScoutingContent({
       const result = await api.deleteScoutingReport(prospect.id);
       if (!result.ok) return false;
       setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, my_report: null } : row)));
-      setDrafts((prev) => ({ ...prev, [prospect.id]: { grade: null, roundProjection: null, note: "" } }));
+      setDrafts((prev) => ({ ...prev, [prospect.id]: { grade: null, roundProjection: null, note: "", anonymous: true } }));
       setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: "success", message: "Removed your report." } }));
       return true;
     } catch {

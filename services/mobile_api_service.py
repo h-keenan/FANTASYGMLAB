@@ -1831,6 +1831,11 @@ def _redeem_referral_code(*, user: dict[str, Any], config: dict, code: str) -> d
     clean_code = str(code or "").strip()
     if not clean_code:
         return {"attempted": False}
+    if not referrals.referred_user_counts(user):
+        # Guests and unverified accounts never earn a referrer credit. Nothing is recorded, so the client keeps the
+        # pending code and it redeems on the first lookup after the account verifies its email or signs in with
+        # Apple/Google.
+        return {"attempted": True, "ok": False, "pending_verification": True, "message": ""}
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
     settings_row, _error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
@@ -9851,6 +9856,8 @@ def list_shared_community_trades(
 
 
 class ShareCommunityTradeRequest(BaseModel):
+    # Default True: a client that never sends the flag posts anonymously.
+    anonymous: bool = True
     send: list[dict[str, Any]] = Field(default_factory=list, max_length=community_shared_trades.ASSET_MAX)
     receive: list[dict[str, Any]] = Field(default_factory=list, max_length=community_shared_trades.ASSET_MAX)
     grade: str = Field(default="", max_length=24)
@@ -9869,7 +9876,11 @@ def share_community_trade(
     if not user_id or not auth_supabase.is_configured(config):
         return {"ok": False, "available": False, "reason": "not_available"}
     try:
-        row = community_shared_trades.build_share_row(user_id, body.model_dump())
+        payload = body.model_dump()
+        profile_name = ""
+        if not body.anonymous and not body.display_name.strip():
+            profile_name = community_shared_trades.fetch_profile_display_name(config, token, user_id)
+        row = community_shared_trades.build_share_row(user_id, payload, profile_name=profile_name)
     except community_shared_trades.ShareError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     try:
@@ -12081,8 +12092,13 @@ def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict
         )
         watchlist_ids = [str(row.get("prospect_id")) for row in watchlist_rows if row.get("prospect_id")]
 
+    my_report_rows: list[dict[str, Any]] = []
+    if user_id:
+        my_report_rows, _my_reports_error = account_store.fetch_rows(
+            config, access_token, college_scouting.SCOUTING_REPORTS_TABLE, user_id=user_id
+        )
     rows = college_scouting.build_prospect_views(
-        prospects, reports, my_user_id=user_id, watchlist_prospect_ids=watchlist_ids
+        prospects, reports, my_user_id=user_id, my_reports=my_report_rows, watchlist_prospect_ids=watchlist_ids
     )
     return {
         "ok": True,
@@ -12123,6 +12139,8 @@ def get_scouting_prospect_profile(prospect_id: str, user: dict[str, Any] = Depen
 
 
 class SubmitScoutingReportRequest(BaseModel):
+    # Default True: the author's display name is shown only when they turn this off.
+    anonymous: bool = True
     grade: int
     round_projection: int | None = None
     note: str = ""
@@ -12177,13 +12195,12 @@ def submit_scouting_report(
     }
     if round_projection is not None:
         payload["round_projection"] = round_projection
-    ok, error = account_store.upsert_row(
-        config,
-        access_token,
-        college_scouting.SCOUTING_REPORTS_TABLE,
-        payload,
-        on_conflict="user_id,prospect_id",
-    )
+    # `anonymous` needs docs/supabase_scouting_privacy_2026_11.sql. If the column is not there yet the write
+    # retries without it (the report stays anonymous: nothing else is exposed before the SQL runs).
+    upsert_args = (config, access_token, college_scouting.SCOUTING_REPORTS_TABLE)
+    ok, _error = account_store.upsert_row(*upsert_args, {**payload, "anonymous": body.anonymous}, on_conflict="user_id,prospect_id")
+    if not ok:
+        ok, _error = account_store.upsert_row(*upsert_args, payload, on_conflict="user_id,prospect_id")
     if not ok:
         return {"ok": False, "reason": "not_available"}
     return {"ok": True, "reason": ""}

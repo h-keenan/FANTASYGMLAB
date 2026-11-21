@@ -467,3 +467,15 @@ class TestEffectiveEntitlementReferralComp(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_referred_user_counts_requires_a_verified_non_anonymous_account():
+    assert referrals.referred_user_counts({"id": "u", "is_anonymous": True, "email_confirmed_at": "2026-01-01"}) is False
+    assert referrals.referred_user_counts({"id": "u", "is_anonymous": True}) is False
+    assert referrals.referred_user_counts({"id": "u", "email": "a@b.co"}) is False
+    assert referrals.referred_user_counts({"id": "u", "email_confirmed_at": "2026-01-01T00:00:00Z"}) is True
+    assert referrals.referred_user_counts({"id": "u", "app_metadata": {"provider": "apple"}}) is True
+    assert referrals.referred_user_counts({"id": "u", "app_metadata": {"providers": ["google"]}}) is True
+    assert referrals.referred_user_counts({"id": "u", "identities": [{"provider": "apple"}]}) is True
+    assert referrals.referred_user_counts({"id": "u", "app_metadata": {"provider": "email"}}) is False
+    assert referrals.referred_user_counts(None) is False

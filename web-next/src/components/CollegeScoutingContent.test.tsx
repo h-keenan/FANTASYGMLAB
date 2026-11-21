@@ -121,6 +121,7 @@ describe("CollegeScoutingContent", () => {
       grade: 4,
       round_projection: null,
       note: "",
+      anonymous: true,
     });
     expect(await screen.findByText("Saved: thanks for scouting.")).toBeInTheDocument();
   });

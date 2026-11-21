@@ -310,6 +310,31 @@ def with_referral_connection_recorded(
     return {"settings": merged, "already_counted": False, "program": new_program}
 
 
+_VERIFIED_PROVIDERS = frozenset({"apple", "google"})
+
+
+def referred_user_counts(user: Mapping[str, Any] | None) -> bool:
+    """Whether a referred account may earn its referrer credit.
+
+    Anonymous guests never count. A real account counts once it has a verified email, or signed in with Apple or
+    Google (those providers verify the identity themselves). ``user`` is the GoTrue user the bearer token resolved to.
+    """
+
+    if not _is_mapping(user):
+        return False
+    if user.get("is_anonymous") is True:
+        return False
+    if _safe_text(user.get("email_confirmed_at")) or _safe_text(user.get("confirmed_at")):
+        return True
+    metadata = user.get("app_metadata") if _is_mapping(user.get("app_metadata")) else {}
+    providers = {_safe_text(metadata.get("provider")).lower()}
+    providers.update(_safe_text(p).lower() for p in (metadata.get("providers") or []) if isinstance(p, str))
+    for identity in user.get("identities") or []:
+        if _is_mapping(identity):
+            providers.add(_safe_text(identity.get("provider")).lower())
+    return bool(providers & _VERIFIED_PROVIDERS)
+
+
 def comp_is_active(user_settings: Mapping[str, Any] | None, *, now: datetime | None = None) -> bool:
     """True when this account currently holds a live referral comp window."""
 
