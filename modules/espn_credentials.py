@@ -131,9 +131,34 @@ def _user_query(user_id: str) -> str:
     return f"user_id=eq.{requests.utils.quote(str(user_id or '').strip(), safe='')}"
 
 
+def _service_headers() -> dict[str, str] | None:
+    """Service-role headers, or None when the key is not configured (then the
+    caller's own token + RLS is used, the pre-hardening behaviour)."""
+
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if not key:
+        return None
+    return {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+
+def _service_url(config: dict, query: str = "") -> str:
+    return auth_supabase.rest_api_url(config, TABLE, query)
+
+
 def load(config: dict, access_token: str, *, user_id: str) -> EspnCredentials | None:
     if not is_configured() or not user_id:
         return None
+    headers = _service_headers()
+    if headers is not None:
+        # Ciphertext is read server-side only; the browser session cannot select this table.
+        try:
+            response = requests.get(
+                _service_url(config, f"{_user_query(user_id)}&limit=1"), headers=headers, timeout=15
+            )
+            rows = response.json() if response.status_code < 400 else []
+        except Exception:
+            return None
+        return decrypt(rows[0]) if rows else None
     rows, error = account_store.fetch_rows(
         config, access_token, TABLE, user_id=user_id, timing_label="supabase_espn_credentials_lookup"
     )
@@ -150,12 +175,37 @@ def has_saved(config: dict, access_token: str, *, user_id: str) -> bool:
 
 def save(config: dict, access_token: str, *, user_id: str, credentials: EspnCredentials) -> None:
     payload = {"user_id": str(user_id), **encrypt(credentials)}
+    headers = _service_headers()
+    if headers is not None:
+        try:
+            response = requests.post(
+                _service_url(config, "on_conflict=user_id"),
+                headers={**headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
+                json=payload,
+                timeout=15,
+            )
+        except Exception:
+            raise EspnCredentialError("storage_failed", "Couldn't save your ESPN connection.") from None
+        if response.status_code >= 400:
+            raise EspnCredentialError("storage_failed", "Couldn't save your ESPN connection.")
+        return
     ok, error = account_store.upsert_row(config, access_token, TABLE, payload, on_conflict="user_id")
     if not ok:
         raise EspnCredentialError("storage_failed", error or "Couldn't save your ESPN connection.")
 
 
 def delete(config: dict, access_token: str, *, user_id: str) -> None:
+    headers = _service_headers()
+    if headers is not None:
+        try:
+            response = requests.delete(
+                _service_url(config, _user_query(user_id)), headers={**headers, "Prefer": "return=minimal"}, timeout=8
+            )
+        except Exception:
+            raise EspnCredentialError("storage_failed", "Couldn't remove your ESPN connection.") from None
+        if response.status_code >= 400:
+            raise EspnCredentialError("storage_failed", "Couldn't remove your ESPN connection.")
+        return
     ok, error = account_store.delete_rows(
         config, access_token, TABLE, query=_user_query(user_id), timing_label="supabase_espn_credentials_delete"
     )

@@ -55,7 +55,7 @@ def test_unhandled_exception_returns_the_same_clean_500_body(monkeypatch, caplog
     assert response.json() == {"ok": False, "error": "Request failed."}
 
 
-def test_unhandled_exception_is_logged_with_path_and_user_id(monkeypatch, caplog):
+def test_unhandled_exception_is_logged_with_path_and_hashed_user_ref(monkeypatch, caplog):
     client, mobile_api_service = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
@@ -75,7 +75,8 @@ def test_unhandled_exception_is_logged_with_path_and_user_id(monkeypatch, caplog
     record = error_records[0]
     message = record.getMessage()
     assert "/v1/me" in message
-    assert "user-123" in message
+    assert "user-123" not in message, "raw user ids must not reach the logs"
+    assert "user=u_" in message
     assert record.exc_info is not None
     assert record.exc_info[0] is RuntimeError
 

@@ -470,6 +470,10 @@ _RATE_LIMIT_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # AND the user's real writes started failing. A separate, larger budget fixes both.
 RATE_LIMIT_ANALYTICS_MAX = int(os.environ.get("RATE_LIMIT_ANALYTICS_MAX", "240"))
 RATE_LIMIT_ANALYTICS_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_ANALYTICS_WINDOW_SECONDS", "60"))
+# Feedback is stored as an anonymous row, so it gets its own small bucket (default 10 per 10 minutes).
+RATE_LIMIT_FEEDBACK_MAX = int(os.environ.get("RATE_LIMIT_FEEDBACK_MAX", "10"))
+RATE_LIMIT_FEEDBACK_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_FEEDBACK_WINDOW_SECONDS", "600"))
+_RATE_LIMIT_FEEDBACK_PATHS = frozenset({"/v1/feedback/verdict"})
 _RATE_LIMIT_ANALYTICS_PATH = "/v1/analytics/event"
 # Neutral alias for the same ingest: "/analytics/" in a URL is a common
 # ad-blocker filter pattern, so current web/mobile clients post here instead.
@@ -533,9 +537,16 @@ _rate_limiter = _RedisFixedWindowRateLimiter()
 RATE_LIMIT_IP_CEILING_MULTIPLIER = int(os.environ.get("RATE_LIMIT_IP_CEILING_MULTIPLIER", "5"))
 
 
+# Number of trusted reverse proxies in front of the API (Caddy = 1). Each appends the address it saw to
+# X-Forwarded-For, so the real client is the Nth hop from the RIGHT; anything further left is client-supplied
+# and spoofable. 0 means "no proxy": ignore the header entirely.
+TRUSTED_PROXY_COUNT = max(0, int(os.environ.get("TRUSTED_PROXY_COUNT", "1") or 0))
+
+
 def _client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
-    ip = forwarded.split(",")[0].strip() if forwarded else ""
+    hops = [hop.strip() for hop in forwarded.split(",") if hop.strip()] if TRUSTED_PROXY_COUNT else []
+    ip = hops[max(-TRUSTED_PROXY_COUNT, -len(hops))] if hops else ""
     if not ip:
         ip = request.client.host if request.client else "unknown"
     return ip
@@ -544,8 +555,8 @@ def _client_ip(request: Request) -> str:
 def _client_rate_limit_key(request: Request) -> str:
     """Bucket by client IP, further split by caller identity when present.
 
-    Render terminates TLS behind a proxy, so the real client address is the
-    first hop of X-Forwarded-For when present. A hash (not a decode/verify)
+    TLS terminates at a trusted proxy, so the real client address is the
+    TRUSTED_PROXY_COUNT-th hop from the right of X-Forwarded-For when present. A hash (not a decode/verify)
     of the raw Authorization header is enough to keep two different signed-in
     users behind the same IP/NAT from sharing one bucket — verifying the
     token is require_user's job, not this middleware's.
@@ -575,6 +586,8 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
         scope = "mutating" if is_mutating else "general"
         if is_mutating and request.url.path in _RATE_LIMIT_ANALYTICS_PATHS:
             limit, window, scope = RATE_LIMIT_ANALYTICS_MAX, RATE_LIMIT_ANALYTICS_WINDOW_SECONDS, "analytics"
+        if is_mutating and request.url.path in _RATE_LIMIT_FEEDBACK_PATHS:
+            limit, window, scope = RATE_LIMIT_FEEDBACK_MAX, RATE_LIMIT_FEEDBACK_WINDOW_SECONDS, "feedback"
         client_key = _client_rate_limit_key(request)
         # hit() calls the plain synchronous redis-py client (see
         # modules/redis_cache.py), which can block for up to
@@ -797,6 +810,15 @@ class _ServerTimingMiddleware:
 app.add_middleware(_ServerTimingMiddleware)
 
 
+def _log_user_ref(user_id: Any) -> str:
+    """Short one-way reference for log lines: attribution without the raw user id."""
+
+    text = str(user_id or "").strip()
+    if not text:
+        return "anonymous"
+    return "u_" + hashlib.sha256(f"log:{text}".encode("utf-8")).hexdigest()[:10]
+
+
 @app.exception_handler(HTTPException)
 async def _http_exception_handler(request: Request, exc: HTTPException):
     detail = exc.detail if isinstance(exc.detail, str) else "Request failed."
@@ -806,11 +828,11 @@ async def _http_exception_handler(request: Request, exc: HTTPException):
         # traceback — no exc_info here since there isn't one.
         user_id = getattr(request.state, "user_id", None)
         logger.warning(
-            "HTTP %s on %s %s (user_id=%s): %s",
+            "HTTP %s on %s %s (user=%s): %s",
             exc.status_code,
             request.method,
             request.url.path,
-            user_id or "anonymous",
+            _log_user_ref(user_id),
             detail,
         )
     content: dict[str, Any] = {"ok": False, "error": detail}
@@ -873,10 +895,10 @@ async def _unhandled_exception_handler(request: Request, exc: Exception):
     # client-facing response (unchanged) is returned.
     user_id = getattr(request.state, "user_id", None)
     logger.error(
-        "Unhandled exception on %s %s (user_id=%s)",
+        "Unhandled exception on %s %s (user=%s)",
         request.method,
         request.url.path,
-        user_id or "anonymous",
+        _log_user_ref(user_id),
         exc_info=exc,
     )
     _report_to_sentry(exc)
@@ -962,7 +984,6 @@ def health() -> dict[str, Any]:
     body: dict[str, Any] = {
         "status": "ok",
         "build": identity.revision,
-        "deployed_at": identity.deployed_at,
     }
     if _degraded_flags:
         body["degraded"] = list(_degraded_flags)
@@ -2062,7 +2083,7 @@ def create_billing_checkout(
         # (stdout + Sentry, if configured — see this file's own Sentry
         # init above) without changing the generic detail returned to the
         # caller, which still must never leak internal Stripe error text.
-        logger.exception("Stripe checkout session creation failed for user_id=%s tier=%s interval=%s", user_id, body.tier, body.interval)
+        logger.exception("Stripe checkout session creation failed for user=%s tier=%s interval=%s", _log_user_ref(user_id), body.tier, body.interval)
         raise HTTPException(status_code=502, detail="Could not start checkout.") from None
 
     if embedded:
@@ -9316,19 +9337,20 @@ def record_trade_share(
 
 
 class VerdictFeedbackRequest(BaseModel):
-    reason: str
-    surface: str = "trade_analyzer"
-    platform: str = ""
-    league_id: str = ""
-    lens: str = ""
-    strategy: str = ""
-    send_ids: list[str] = Field(default_factory=list)
-    receive_ids: list[str] = Field(default_factory=list)
+    # Hard size caps (the stored row is trimmed again in modules.verdict_feedback).
+    reason: str = Field(max_length=40)
+    surface: str = Field(default="trade_analyzer", max_length=40)
+    platform: str = Field(default="", max_length=20)
+    league_id: str = Field(default="", max_length=64)
+    lens: str = Field(default="", max_length=20)
+    strategy: str = Field(default="", max_length=20)
+    send_ids: list[str] = Field(default_factory=list, max_length=20)
+    receive_ids: list[str] = Field(default_factory=list, max_length=20)
     # What the reporter was looking at, echoed so a reviewer can see it.
-    verdict_label: str = ""
-    confidence: str = ""
+    verdict_label: str = Field(default="", max_length=40)
+    confidence: str = Field(default="", max_length=40)
     value_delta: float | None = None
-    assumptions_line: str = ""
+    assumptions_line: str = Field(default="", max_length=600)
 
 
 @app.post("/v1/feedback/verdict")

@@ -29,15 +29,15 @@ SQL editor (`docs/supabase_security_fixes_2026_11.sql`), **Zach** = secrets, bil
 | M3 | Medium | PostgREST filter built by string interpolation of path/query values | code | FIXED (#2173) |
 | M4 | Medium | Referral Pro comp can be farmed with anonymous guest accounts | Zach + code (escalated) | open, not touched |
 | M5 | Medium | Delete-account gaps (RevenueCat, Stripe customer, analytics, referrer links, free-trial resets) | Zach + code (escalated) | open, not touched |
-| M6 | Medium | `X-Forwarded-For` first hop is trusted for rate-limit identity | Zach (proxy) / code | open |
+| M6 | Medium | `X-Forwarded-For` first hop is trusted for rate-limit identity | code | FIXED (`TRUSTED_PROXY_COUNT`, default 1) |
 | M7 | Medium | `scouting_reports` and `community_shared_trades` expose other users' `user_id` and free text | coridian_ product decision | open |
-| L1 | Low | Anonymous feedback insert is unbounded | coridian_ SQL | open, SQL provided |
-| L2 | Low | `user_id` appears in 5 backend log lines | code (policy) | open |
+| L1 | Low | Anonymous feedback insert is unbounded | code + SQL | FIXED (API caps + rate bucket; `docs/supabase_privacy_hardening_2026_11.sql`) |
+| L2 | Low | `user_id` appears in 5 backend log lines | code | FIXED (hashed `u_` ref) |
 | L3 | Low | Free ad-unlock is an honor system (no server-side ad verification) | product | open |
 | L4 | Low | No Content-Security-Policy on web-next | code | open |
-| L5 | Low | `/health` publishes build SHA and deploy time to anonymous callers | code (policy) | open |
-| L6 | Low | `espn_credentials` ciphertext is readable back by the browser session | code + SQL | open |
-| L7 | Low | Analytics account hash uses a static, public salt | code | open |
+| L5 | Low | `/health` publishes build SHA and deploy time to anonymous callers | code | FIXED (deploy time removed, build SHA kept) |
+| L6 | Low | `espn_credentials` ciphertext is readable back by the browser session | code + SQL | FIXED (service-role reads; SQL drops the client policy) |
+| L7 | Low | Analytics account hash uses a static, public salt | code | FIXED (`ANALYTICS_HASH_SALT`, falls back to the old salt when unset) |
 | L8 | Low | Supabase Auth dashboard hardening for anonymous sign-ins | Zach / coridian_ | open |
 
 Pass list (checked, no finding) is at the end.
