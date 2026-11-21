@@ -80,6 +80,10 @@ describe("shellBarVisible", () => {
     expect(shellBarVisible({ ...base, pathname: "/" })).toBe(false);
     expect(shellBarVisible({ ...base, pathname: "/gm-game" })).toBe(false);
   });
+  it("shows on the Fantasy Sim hub/setup, which draw no bottom stack of their own (regression: footer missing)", () => {
+    expect(shellBarVisible({ ...base, pathname: "/gm-game", gameStackShown: false })).toBe(true);
+    expect(shellBarVisible({ ...base, pathname: "/gm-game", gameStackShown: true })).toBe(false);
+  });
 });
 
 describe("shellParent (back label)", () => {

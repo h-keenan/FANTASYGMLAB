@@ -11,7 +11,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useHydrated } from "@/lib/useHydrated";
 import { trackFeatureUse } from "@/lib/analytics";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
-import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
+import { pathOwnsBottomStack } from "@/lib/bottomNav";
+import { useSimGameOwnsOrb } from "@/lib/simGameChrome";
 import { useShellNav } from "@/lib/useShellNav";
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
@@ -37,6 +38,7 @@ export function GmOrb() {
   const hydrated = useHydrated();
   const pathname = usePathname();
   const { barVisible: shellBar } = useShellNav();
+  const gameStackShown = useSimGameOwnsOrb();
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
@@ -55,7 +57,7 @@ export function GmOrb() {
   // The game's own bottom bar replaces the floating trigger on phones; the sheet (search, destinations) stays
   // mounted and opens from the game header's search icon.
   // Phase B: with the site bottom bar showing, the orb is retired on phones too (More holds the menu).
-  const showTrigger = !pathOwnsPhoneChrome(pathname) && !shellBar;
+  const showTrigger = !pathOwnsBottomStack(pathname, gameStackShown) && !shellBar;
 
   return (
     <>

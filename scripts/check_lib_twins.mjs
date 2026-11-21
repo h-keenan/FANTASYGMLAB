@@ -165,6 +165,7 @@ export const MIRRORED = [
   "waiversHeader.ts",
   "playerNameFit.ts",
   "bottomNav.ts",
+  "simGameChrome.ts",
   "bottomPillStore.ts",
   "useBottomPillContext.ts",
   "useDataFreshness.ts",

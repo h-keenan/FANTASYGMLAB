@@ -1,5 +1,5 @@
 import type { BottomTab } from "@/lib/bottomNav";
-import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
+import { pathOwnsBottomStack, pathOwnsPhoneChrome } from "@/lib/bottomNav";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
 import { HOME_PATH } from "@/lib/retiredRoutes";
 import { TERMS } from "@/lib/terms";
@@ -115,10 +115,10 @@ export function shellActiveTab(pathname: string | null | undefined, inLeague: bo
 }
 
 /** Paths where the shell bar can render: signed in, not the onboarding "/" flow... except outside a league "/" is Home. */
-export function shellBarVisible(opts: { enabled: boolean; signedIn: boolean; pathname: string | null | undefined }): boolean {
+export function shellBarVisible(opts: { enabled: boolean; signedIn: boolean; pathname: string | null | undefined; gameStackShown?: boolean }): boolean {
   if (!opts.enabled || !opts.signedIn) return false;
   const p = opts.pathname || "";
-  if (pathOwnsPhoneChrome(p)) return false; // the game has its own header and orb
+  if (pathOwnsBottomStack(p, opts.gameStackShown ?? true)) return false; // the game has its own orb and bar
   if (p === "/") return false; // sign-in / onboarding / paywall / import flow
   return true;
 }

@@ -475,9 +475,10 @@ export default function GmGameScreen({ navigation }: Props) {
   const hasStack = anyBar || pillOnly;
   // The game draws its own orb above the Advance pill, so the global GM orb steps aside while it is up.
   useEffect(() => {
-    simGameChrome.set(hasStack);
+    // Only while the stack (and so SimGameOrb) is really rendered; hasStack alone can be true with no game/ctx yet.
+    simGameChrome.set(hasStack && Boolean(game) && Boolean(ctx));
     return () => simGameChrome.set(false);
-  }, [hasStack]);
+  }, [hasStack, game, ctx]);
   const goHub = () => {
     dispatch({ type: 'hub' });
     setGameState(null);

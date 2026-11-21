@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/context/AuthContext";
+import { useSimGameOwnsOrb } from "@/lib/simGameChrome";
 import { isFounderSession } from "@/lib/navDestinations";
 import { SHELL_NAV_STORAGE_KEY, shellBarVisible, shellNavEnabled, shellNavQueryToStore } from "@/lib/shellNav";
 
@@ -29,6 +30,7 @@ function readFlag(isFounder: boolean): boolean {
  * NEXT_PUBLIC_BOTTOM_NAV=off, or ?nav=off (remembered).
  */
 export function useShellNav(): { enabled: boolean; barVisible: boolean } {
+  const gameStackShown = useSimGameOwnsOrb();
   const { session } = useAuth();
   const pathname = usePathname();
   const founder = isFounderSession(session);
@@ -40,5 +42,5 @@ export function useShellNav(): { enabled: boolean; barVisible: boolean } {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (signedIn) setEnabled(readFlag(founder));
   }, [signedIn, founder, pathname]);
-  return { enabled, barVisible: shellBarVisible({ enabled, signedIn: Boolean(session), pathname }) };
+  return { enabled, barVisible: shellBarVisible({ enabled, signedIn: Boolean(session), pathname, gameStackShown }) };
 }

@@ -115,6 +115,15 @@ export function pathOwnsPhoneChrome(pathname: string | null | undefined): boolea
   return p === "/gm-game" || p.startsWith("/gm-game/");
 }
 
+/**
+ * Whether the page's own bottom stack (game orb + action bar) replaces the global GM orb and shell bar. The path
+ * alone is not enough: the Fantasy Sim hub, setup and error screens live under /gm-game but draw no bottom stack,
+ * so they keep the global footer. `gameStackShown` comes from lib/simGameChrome.
+ */
+export function pathOwnsBottomStack(pathname: string | null | undefined, gameStackShown: boolean): boolean {
+  return pathOwnsPhoneChrome(pathname) && gameStackShown;
+}
+
 /** Accessible name of the game orb: the page you are on, plus pending trade offers. */
 export function simOrbAriaLabel(currentLabel: string, inbox: number | null | undefined): string {
   const n = Math.floor(inbox ?? 0);
