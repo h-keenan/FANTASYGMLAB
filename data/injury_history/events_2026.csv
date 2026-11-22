@@ -475,3 +475,33 @@ captured_at,season,week,player_id,team,position,status,injury_status,body_part,p
 2026-11-22T01:30:17Z,2026,11,8150,LAR,RB,Active,Questionable,Toe,,,sleeper_live
 2026-11-22T01:30:17Z,2026,11,9486,PHI,WR,Inactive,IR,Ankle,,,sleeper_live
 2026-11-22T08:45:06Z,2026,11,9493,LAR,WR,Inactive,IR,Knee - MCL,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,10236,BUF,TE,Active,Out,Thumb,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,10871,DAL,TE,Active,,,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,11577,PHI,RB,Active,,,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,11579,NO,RB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,11600,CAR,TE,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,11630,PIT,WR,Active,,,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,11648,BAL,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,11729,DET,RB,Active,,,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,12511,PIT,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,12658,BUF,TE,Active,,,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13268,BAL,WR,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13279,TEN,WR,Active,,,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13288,TEN,RB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13289,PIT,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13302,BAL,RB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13335,PHI,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13400,MIA,TE,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13402,BUF,WR,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13404,KC,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13411,CHI,WR,Active,,,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13415,CAR,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13423,PIT,RB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,13491,PIT,WR,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,1737,CHI,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,2505,CAR,TE,Active,,,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,4892,TB,QB,Active,,,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,6185,TB,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,6828,CAR,RB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,7538,NO,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-22T17:00:04Z,2026,11,7694,CAR,TE,Active,,,,,sleeper_live
