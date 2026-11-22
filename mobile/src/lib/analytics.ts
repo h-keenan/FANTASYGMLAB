@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Platform } from 'react-native';
 
-import { createAnalytics, parseAnalyticsFlag, type AnalyticsEvent } from './analyticsCore';
+import { createAnalytics, resolveAnalyticsEnabled, type AnalyticsEvent } from './analyticsCore';
 import { env } from './env';
 import { supabase } from './supabase';
 
@@ -9,8 +9,8 @@ import { supabase } from './supabase';
  * Mobile product analytics -> the existing `POST /v1/e` (neutral alias of /v1/analytics/event)
  * ingest (same pipeline and taxonomy as web-next/src/lib/analytics.ts).
  *
- * KILL SWITCH: ships DARK. Analytics is OFF unless the build sets
- * EXPO_PUBLIC_ANALYTICS_ENABLED=1 (see docs/analytics-coverage-2026-10.md).
+ * KILL SWITCH: production builds default ON (2026-11 funnel gap: iOS sent 0 events); development stays OFF. Set
+ * EXPO_PUBLIC_ANALYTICS_ENABLED=0 at build time to turn it off (see docs/analytics-coverage-2026-10.md).
  * Turning it on needs a new app build and, before that, the owner's sign-off
  * on the App Store "Data collection" answers. Owner decision 2026-10-25: keep
  * it OFF in the app (Apple App Privacy concerns).
@@ -48,7 +48,7 @@ async function send(event: AnalyticsEvent): Promise<void> {
 }
 
 const analytics = createAnalytics({
-  enabled: () => parseAnalyticsFlag(process.env.EXPO_PUBLIC_ANALYTICS_ENABLED),
+  enabled: () => resolveAnalyticsEnabled(process.env.EXPO_PUBLIC_ANALYTICS_ENABLED, __DEV__),
   send,
   storage: AsyncStorage,
   platform: Platform.OS,

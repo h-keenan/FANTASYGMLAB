@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { InteractionManager, View } from 'react-native';
+import { InteractionManager, Linking, View } from 'react-native';
+import { isSimQuickStartUrl } from '../lib/simDeepLink';
 import PressableScale from '../components/PressableScale';
 import AppBackground from '../components/AppBackground';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
@@ -190,7 +191,8 @@ export type RootStackParamList = {
   // Not league-scoped — the whole point is standing/needs across every
   // saved league at once, not one league's context.
   Portfolio: undefined;
-  GmGame: undefined;
+  // quickStart (deep link fantasygmlab://gm-game?quickstart=1): open straight into a Quick game, no league needed.
+  GmGame: { quickStart?: boolean } | undefined;
   // Founder-only (server enforces founder_ops; the screen also bounces non-founders).
   FounderAnalytics: undefined;
   // Sleeper-only (gated like the other league screens) — read-only draft room.
@@ -251,8 +253,35 @@ const TOP_SCREEN_LOADERS = [DashboardScreen, TradesScreen, PlayersScreen, GmPlan
 const PRELOAD_GAP_MS = 150;
 
 export default function RootNavigator() {
-  const { session, loading } = useAuth();
+  const { session, loading, signInAsGuest } = useAuth();
   const { onboardingComplete } = useOnboarding();
+  // Ad / share deep link fantasygmlab://gm-game?quickstart=1: remembered until a session exists (a brand-new
+  // visitor gets a disposable guest session, like Connect), then opens Fantasy Sim straight into a Quick game.
+  const [pendingSimQuickStart, setPendingSimQuickStart] = useState(false);
+  useEffect(() => {
+    const take = (url: string | null) => {
+      if (isSimQuickStartUrl(url)) setPendingSimQuickStart(true);
+    };
+    Linking.getInitialURL().then(take).catch(() => {});
+    const sub = Linking.addEventListener('url', (event) => take(event.url));
+    return () => sub.remove();
+  }, []);
+  const guestTried = useRef(false);
+  useEffect(() => {
+    if (!pendingSimQuickStart || loading || session || guestTried.current) return;
+    guestTried.current = true;
+    void signInAsGuest();
+  }, [pendingSimQuickStart, loading, session, signInAsGuest]);
+  useEffect(() => {
+    if (!pendingSimQuickStart || !session || onboardingComplete === null) return;
+    const id = setInterval(() => {
+      if (!navigationRef.isReady()) return;
+      clearInterval(id);
+      setPendingSimQuickStart(false);
+      navigationRef.navigate('GmGame', { quickStart: true });
+    }, 100);
+    return () => clearInterval(id);
+  }, [pendingSimQuickStart, session, onboardingComplete]);
   const { colors, isDark } = useThemeMode();
   // Tracked purely so the GM orb / trade-outcome prompt can hide themselves
   // while the first-launch tutorial is the active screen — slide 3 already

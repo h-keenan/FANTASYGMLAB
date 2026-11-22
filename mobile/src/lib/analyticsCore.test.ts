@@ -7,6 +7,7 @@ import {
   QUEUE_KEY,
   createAnalytics,
   parseAnalyticsFlag,
+  resolveAnalyticsEnabled,
   sanitizeProps,
   type AnalyticsEvent,
 } from './analyticsCore.ts';
@@ -194,4 +195,13 @@ test('onboarding and push pre-prompt props survive sanitizeProps', () => {
     { feature: 'onboarding', action: 'step_viewed', step: 'value', step_index: 0, experience: 'new' },
   );
   assert.deepEqual(sanitizeProps({ os_result: 'granted' }), { os_result: 'granted' });
+});
+
+test('resolveAnalyticsEnabled: production defaults ON, dev OFF, explicit value always wins', () => {
+  assert.equal(resolveAnalyticsEnabled(undefined, false), true);
+  assert.equal(resolveAnalyticsEnabled('', false), true);
+  assert.equal(resolveAnalyticsEnabled(undefined, true), false);
+  assert.equal(resolveAnalyticsEnabled('0', false), false);
+  assert.equal(resolveAnalyticsEnabled('false', false), false);
+  assert.equal(resolveAnalyticsEnabled('1', true), true);
 });

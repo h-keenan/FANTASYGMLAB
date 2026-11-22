@@ -65,7 +65,7 @@ Legal copy today (`modules/legal_pages.py`, `mobile/src/data/legalContent.json`,
 
 ## Mobile kill switch
 
-`EXPO_PUBLIC_ANALYTICS_ENABLED` (read in `mobile/src/lib/analytics.ts`) defaults OFF. Only `1/true/yes/on` enables it. When off nothing is queued, stored or sent. To turn on: set the variable in `mobile/.env` / EAS env for the next build (needs a new app build; never from fastlane without approval) and make sure `DYNASTYGM_LAUNCH_ANALYTICS=1` on the API. Events are batched (25 per flush), flushed every 30 s and on background, kept in a persisted queue (200 max, 3-day expiry), and every failure is swallowed.
+`EXPO_PUBLIC_ANALYTICS_ENABLED` (read in `mobile/src/lib/analytics.ts`) is unset by default: production builds then run ON and `__DEV__` stays OFF (`resolveAnalyticsEnabled`, committed non-secret default, 2026-11). An explicit `1/true/yes/on` enables it and `0/false` is the kill switch. When off nothing is queued, stored or sent. To turn on: set the variable in `mobile/.env` / EAS env for the next build (needs a new app build; never from fastlane without approval) and make sure `DYNASTYGM_LAUNCH_ANALYTICS=1` on the API. Events are batched (25 per flush), flushed every 30 s and on background, kept in a persisted queue (200 max, 3-day expiry), and every failure is swallowed.
 
 ## Recommendations
 

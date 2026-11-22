@@ -85,6 +85,17 @@ export function parseAnalyticsFlag(value: string | undefined | null): boolean {
   return ['1', 'true', 'yes', 'on'].includes(String(value ?? '').trim().toLowerCase());
 }
 
+/**
+ * Whether analytics runs. An explicit EXPO_PUBLIC_ANALYTICS_ENABLED value always wins ("0"/"false" is the kill switch);
+ * when it is absent, production builds default ON and development (__DEV__) stays OFF. The default is not a secret and
+ * is committed on purpose: the fastlane build env never exported the flag, so iOS sent no events. All privacy rules
+ * (allowed prop keys, no names/emails, 3-day queue expiry) apply either way.
+ */
+export function resolveAnalyticsEnabled(value: string | undefined | null, isDev: boolean): boolean {
+  if (String(value ?? '').trim() === '') return !isDev;
+  return parseAnalyticsFlag(value);
+}
+
 export function sanitizeProps(
   props: Record<string, unknown> | undefined,
 ): Record<string, string | number | boolean> {

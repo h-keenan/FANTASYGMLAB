@@ -230,7 +230,8 @@ def _pct(part: int, whole: int) -> float:
 
 
 # Signup onboarding was 10 steps (8 feature slides, connect 8, level 9) until
-# 2026-10-23, then 3 (value 0, connect 1, level 2, web-only paywall 3). Old
+# 2026-10-23, then level 0, value 1, connect 2, first_league_view 3 (the current
+# order, lib/firstRunFlow.ts FIRST_RUN_FUNNEL_STEPS). Old
 # rows share the connect/level names but with indexes 8/9; they must not be
 # merged into the new funnel (ordering and drop-off would be garbage).
 LEGACY_ONBOARDING_STEPS = frozenset(

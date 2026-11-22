@@ -9,7 +9,7 @@ import AppText from './AppText';
 import SegmentedTabBar from './SegmentedTabBar';
 import { ApiError, api, type EspnLeaguePreviewResponse } from '../lib/api';
 import { trackUse } from '../lib/analytics';
-import { ESPN_PRIVATE_LEAGUE_HINT, ESPN_SAVE_FAILURE_COPY, espnImportFailureResult, espnSeasonOptions } from '../lib/leaguePlatform';
+import { ESPN_PRIVATE_HELP_STEPS, ESPN_PRIVATE_LEAGUE_HINT, ESPN_SAVE_FAILURE_COPY, espnImportFailureResult, espnSeasonOptions } from '../lib/leaguePlatform';
 
 export type ImportPlatform = 'espn' | 'fleaflicker' | 'mfl';
 
@@ -53,11 +53,14 @@ export default function EspnLeagueImport({
   onSaved,
   onCapReached,
   onCancel,
+  onTrySample,
 }: {
   platform?: ImportPlatform;
   onSaved: (leagueId: string, leagueName: string) => void;
   onCapReached: (cap: number) => void;
   onCancel: () => void;
+  /** Opens the existing SampleLeague screen; offered next to the private-league help. */
+  onTrySample?: () => void;
 }) {
   const copy = PLATFORM_COPY[platform];
   const { colors } = useThemeMode();
@@ -289,6 +292,18 @@ export default function EspnLeagueImport({
         onChange={setSeason}
       />
       {message ? <AppText style={styles.error}>{message}</AppText> : null}
+      {isPrivate && !canConnect ? (
+        <View testID="espn-private-help">
+          {ESPN_PRIVATE_HELP_STEPS.map((step, index) => (
+            <AppText key={step} style={styles.featureText}>{`${index + 1}. ${step}`}</AppText>
+          ))}
+          {onTrySample ? (
+            <PressableScale onPress={onTrySample} accessibilityRole="button" accessibilityLabel="Try a sample league">
+              <AppText style={styles.retryText}>Try a sample league</AppText>
+            </PressableScale>
+          ) : null}
+        </View>
+      ) : null}
       {isPrivate ? (
         <PressableScale onPress={() => void findLeague()} disabled={busy} accessibilityRole="button" accessibilityLabel="Retry">
           <AppText style={styles.retryText}>Try again</AppText>

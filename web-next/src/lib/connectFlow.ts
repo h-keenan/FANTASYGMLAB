@@ -112,3 +112,15 @@ export function summarizeSaves(outcomes: ReadonlyArray<SaveOutcome>): SaveSummar
     failedReason: failed.find((o) => o.reason !== "at_cap")?.reason ?? null,
   };
 }
+
+export type ConnectMode = "connect" | "sample" | "sim";
+
+/** The connect step's three ways in (segments/tabs on web and in the app). Sim needs no league. */
+export const CONNECT_MODES: ReadonlyArray<{ key: ConnectMode; label: string; blurb: string; action: string }> = [
+  { key: "connect", label: "Connect my league", blurb: "", action: "Connect" },
+  { key: "sample", label: "Try a sample league", blurb: "Look around a ready-made league. No sign-up, 20 seconds.", action: "Try a sample league" },
+  { key: "sim", label: "Play Fantasy Sim", blurb: "Draft a team and play a season against AI managers. No league needed. Your first season is free.", action: "Start a quick game" },
+];
+
+/** Web deep link into a Quick Fantasy Sim game (ads, onboarding). The app twin is fantasygmlab://gm-game?quickstart=1. */
+export const SIM_QUICKSTART_PATH = "/gm-game?quickstart=1";

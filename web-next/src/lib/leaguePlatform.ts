@@ -105,6 +105,14 @@ export function espnSeasonOptions(now: Date = new Date()): number[] {
 export const ESPN_PRIVATE_LEAGUE_HINT =
   "This league is private. Ask your league manager to turn on League Settings > Make League Viewable to Public in ESPN, then retry.";
 
+/** Inline help when an ESPN league is private and no login can be stored here. Uses only the existing private-league options (public toggle, or the espn_s2/SWID login panel); no new auth. */
+export const ESPN_PRIVATE_HELP_STEPS: readonly string[] = [
+  "Easiest: ask your league manager to open League Settings in ESPN and turn on Make League Viewable to Public.",
+  "Then come back here and tap Try again.",
+  "Or connect your ESPN login (two cookies from your own signed-in ESPN session). Sign in to FantasyDesk first, then enter the league ID again and we'll walk you through it.",
+  "Don't want to wait? Try a sample league now and connect this one later.",
+];
+
 /** Privacy-safe analytics `result` for a failed ESPN import preview. */
 export function espnImportFailureResult(reason: string | null | undefined): "espn_private" | "espn_not_found" | "espn_error" {
   if (reason === "private_league") return "espn_private";

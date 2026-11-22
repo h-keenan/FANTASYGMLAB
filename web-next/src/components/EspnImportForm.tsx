@@ -5,11 +5,12 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse, trackUse } from "@/lib/analytics";
 import { api, type EspnLeaguePreviewResponse } from "@/lib/api";
-import { ESPN_PRIVATE_LEAGUE_HINT, espnImportFailureResult, espnSeasonOptions } from "@/lib/leaguePlatform";
+import { ESPN_PRIVATE_HELP_STEPS, ESPN_PRIVATE_LEAGUE_HINT, espnImportFailureResult, espnSeasonOptions } from "@/lib/leaguePlatform";
 import { Button } from "@/components/Button";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { LEAGUE_CAP_UPSELL, saveFailureMessage } from "@/lib/leagueSave";
 import { Input, Select } from "@/components/Input";
+import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { EspnLoginPanel, EspnLoginStatus } from "@/components/EspnLoginPanel";
 import { ErrorState } from "@/components/ErrorState";
 
@@ -351,6 +352,14 @@ export function EspnImportForm({
           {message}
         </p>
       ) : null}
+      {isPrivate && !canConnect ? (
+        <ol className="m-0 flex list-decimal flex-col gap-1 pl-5 text-xs" data-testid="espn-private-help" style={{ color: "var(--color-text-secondary)" }}>
+          {ESPN_PRIVATE_HELP_STEPS.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      ) : null}
+      {isPrivate && !canConnect ? <SampleLeagueButton surface="connect_error" variant="secondary" /> : null}
       {isPrivate ? (
         <button
           type="button"

@@ -58,6 +58,7 @@ import {
 import { SkeletonCard } from "@/components/Skeleton";
 import { DifficultyTiles, SetupCard, SetupField, SetupNote, SetupStickyBar, SetupSummaryCard, SetupToggleGroup, SetupToggleRow } from "@/components/SimSetupParts";
 import { MotionIn } from "@/components/Motion";
+import { simHubPresets } from "@/lib/simHubPresets";
 import { SIM_DIFFICULTY_FOOTNOTE, SIM_SETUP_TABS, simSetupCardSummaries, simSetupChips, simSetupHeadline, type SimSetupTab } from "@/lib/simSetupView";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { overlayStack } from "@/lib/overlayStack";
@@ -136,7 +137,12 @@ const UPSELL_FALLBACK = {
 };
 
 /** Fantasy Sim: the GM Game. Standalone and turn-based; see lib/simGame.ts and docs/fantasy-sim-game-design.md. */
-export function SimGameContent() {
+/**
+ * `quickStart` (deep link /gm-game?quickstart=1, used by ads and the onboarding "Play Fantasy Sim" choice): with no saved
+ * game yet, the hub opens straight into a Quick preset game. The usual limits still apply: a used free season or a full
+ * saved-games list keeps the hub (with its own notice) and the server enforces the same gate.
+ */
+export function SimGameContent({ quickStart = false }: { quickStart?: boolean } = {}) {
   useSimWarmChunks();
   const [flow, dispatch] = useReducer(simFlowReducer, SIM_FLOW_INITIAL);
   const [options, setOptions] = useState<SimGameOptionsResponse | null>(null);
@@ -435,6 +441,18 @@ export function SimGameContent() {
         : null,
     [game, preview, call, setGame, reloadGame, notify, tick],
   );
+
+  const quickStarted = useRef(false);
+  useEffect(() => {
+    if (!quickStart || quickStarted.current || flow.view !== "hub" || !options) return;
+    if (games.length > 0 || simNewGameBlock(games.length, options.max_games ?? 1, options.is_premium, options.free_season_used)) return;
+    const quick = simHubPresets(options).find((p) => p.id === "quick");
+    if (!quick) return;
+    quickStarted.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot quickstart deep link
+    void createGame(simSetupBody(quick.state));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickStart, flow.view, options, games]);
 
   // ----------------------------------------------------------------- views
   if (flow.view === "loading") {

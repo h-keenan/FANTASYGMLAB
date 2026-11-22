@@ -38,6 +38,7 @@ import IconCircle from '../components/IconCircle';
 import LeaguesGlanceSection from '../components/LeaguesGlanceSection';
 import PremiumLock from '../components/PremiumLock';
 import EspnLeagueImport from '../components/EspnLeagueImport';
+import { ConnectModePanel, ConnectModeTabs } from '../components/ConnectModeTabs';
 import PlatformPicker from '../components/PlatformPicker';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
 import { trackUse } from '../lib/analytics';
@@ -54,6 +55,7 @@ import {
   connectCtaLabel,
   connectPlatformNotice,
   connectWays,
+  type ConnectMode,
   defaultLeagueSelection,
   leagueMeta,
   planSaves,
@@ -124,6 +126,7 @@ export default function HomeScreen({ navigation, route }: Props) {
   // Which platform the Add League sheet is importing from. Sleeper is the
   // default; ESPN is EspnLeagueImport (public leagues, a subset of
   // features — see lib/leaguePlatform.ts).
+  const [connectMode, setConnectMode] = useState<ConnectMode>('connect');
   const [addPlatform, setAddPlatform] = useState<'sleeper' | 'espn' | 'fleaflicker' | 'mfl'>('sleeper');
   // Fix (welcome audit, tester feedback "I don't even know where to start"):
   // a brand-new user with no existing Sleeper account/league has no path
@@ -679,6 +682,18 @@ export default function HomeScreen({ navigation, route }: Props) {
         }
         ListEmptyComponent={
           <View>
+          {!leaguesError ? <ConnectModeTabs mode={connectMode} onChange={setConnectMode} /> : null}
+          {!leaguesError && connectMode !== 'connect' ? (
+            <ConnectModePanel
+              mode={connectMode}
+              onSample={() => navigation.navigate('SampleLeague')}
+              onSim={() => {
+                trackOnboarding('sim_selected', { step: 'connect', step_index: funnelStepIndex('connect') });
+                navigation.navigate('GmGame', { quickStart: true });
+              }}
+            />
+          ) : (
+          <>
           <EmptyState
             icon={leaguesError ? 'cloud-offline-outline' : 'shield-outline'}
             title={leaguesError ? "Couldn't load your leagues" : 'No leagues yet'}
@@ -711,14 +726,8 @@ export default function HomeScreen({ navigation, route }: Props) {
                 : undefined
             }
           />
-          {!leaguesError ? (
-            <Button
-              label={SAMPLE_TRY_LABEL}
-              variant="secondary"
-              onPress={() => navigation.navigate('SampleLeague')}
-              style={styles.sampleLeagueButton}
-            />
-          ) : null}
+          </>
+          )}
           </View>
         }
         renderItem={({ item, index }) => {
@@ -793,6 +802,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   key={addPlatform}
                   platform={addPlatform}
                   onCancel={closeAddLeague}
+                  onTrySample={openSampleLeague}
                   onCapReached={(cap) => setAddCapMessage(capMessageFor(cap))}
                   onSaved={(leagueId, leagueName) => {
                     autoNavigated.current = true;
