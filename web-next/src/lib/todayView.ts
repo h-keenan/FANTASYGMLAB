@@ -4,8 +4,9 @@
  * page already has (lib/teamStatus.ts, lib/decisionQueue.ts); nothing is estimated here, and a fact lives in exactly one
  * of these models so it is never drawn twice. Import-light, byte-identical twin of mobile/src/lib/todayView.ts.
  */
+import { playerSurname } from "./playerNameDisplay.ts";
 import { bandSimTone, percentBand } from "./verdictTone.ts";
-import type { DecisionSwap } from "./decisionQueue";
+import type { Decision, DecisionPlayer, DecisionSwap, DecisionTone } from "./decisionQueue";
 import type { TeamStatusMatchup, TeamStatusPosition, TeamStatusStanding } from "./teamStatus";
 
 type Tone = "success" | "danger" | "warning" | "accent" | "muted";
@@ -96,11 +97,49 @@ export function parseMatchupPlan(params: { plan?: string | null; out?: string | 
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// "Do this now" one-line rows
+// ---------------------------------------------------------------------------------------------------------------------
+
+export interface TodayActionRow {
+  key: string;
+  tone: DecisionTone;
+  /** The player whose avatar leads the row; null when the decision is not about one player. */
+  player: DecisionPlayer | null;
+  /** At most ~6 words. The full reason sits behind the row's tap. */
+  reason: string;
+  /** The row's one button: "Swap", "Fix all", or the decision's own primary label. */
+  button: string;
+}
+
+/** First `max` words of a line, with an ellipsis when it was cut. */
+export function clampWords(text: string, max: number = 6): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= max) return words.join(" ");
+  return `${words.slice(0, max).join(" ").replace(/[,.:;\-]+$/, "")}…`;
+}
+
+
+/** One queue decision as a one-line row: avatar, a short reason, one button. Lineup problems collapse into one row. */
+export function todayActionRow(d: Pick<Decision, "key" | "kind" | "tone" | "title" | "players" | "swaps" | "primary">): TodayActionRow {
+  if (d.kind === "lineup" && d.swaps.length > 0) {
+    const first = d.swaps[0];
+    if (d.swaps.length === 1) {
+      const who = first.out ? playerSurname(first.out.name) : "Empty slot";
+      const into = first.replacement?.name ? `, start ${playerSurname(first.replacement.name)}` : "";
+      return { key: d.key, tone: d.tone, player: first.out, reason: `${who} ${first.status.toLowerCase()}${into}`, button: "Swap" };
+    }
+    const fix = todayFixAll(d.swaps);
+    return { key: d.key, tone: d.tone, player: first.out, reason: `${d.swaps.length} lineup swaps${fix?.total != null ? ` · +${fix.total.toFixed(1)}` : ""}`, button: "Fix all" };
+  }
+  return { key: d.key, tone: d.tone, player: d.players[0] ?? null, reason: clampWords(d.title), button: d.primary.label };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Tiles: Standing / Playoffs / Trades
 // ---------------------------------------------------------------------------------------------------------------------
 
 export interface TodayTile {
-  key: "standing" | "playoffs" | "trades";
+  key: "standing" | "playoffs" | "rank";
   label: string;
   value: string;
   sub: string;
@@ -123,10 +162,11 @@ function oddsTone(odds: string, standingTone: TeamStatusStanding["tone"]): Tone 
 }
 
 /**
- * The compact tile row. Standing and Playoffs read the one standing model (so the old Standing row and these tiles can
- * never both appear); Trades is the idea count. Tiles with no data are dropped, never zero-filled.
+ * The one snapshot strip: Standing, Playoffs, Team rank. Standing and Playoffs read the one standing model (so the old
+ * Standing row and these tiles can never both appear); Team rank is the "this season" power rank (already formatted by
+ * the caller, e.g. "#3"). The strip as a whole opens My Team. Tiles with no data are dropped, never zero-filled.
  */
-export function todayTiles(input: { standing: TeamStatusStanding | null; tradeCount: number; /** The trade deadline has passed: the tile says so instead of counting ideas. */ tradesClosed?: boolean }): TodayTile[] {
+export function todayTiles(input: { standing: TeamStatusStanding | null; /** Power rank text ("#3") and the league size, when known. */ teamRank?: { value: string; of: number | null } | null }): TodayTile[] {
   const tiles: TodayTile[] = [];
   const s = input.standing;
   if (s && (s.place || s.record)) {
@@ -142,10 +182,9 @@ export function todayTiles(input: { standing: TeamStatusStanding | null; tradeCo
   if (s?.playoffOdds) {
     tiles.push({ key: "playoffs", label: "PLAYOFFS", value: s.playoffOdds, sub: /%$/.test(s.playoffOdds) ? "odds" : "status", tone: oddsTone(s.playoffOdds, s.tone) });
   }
-  if (input.tradesClosed) {
-    tiles.push({ key: "trades", label: "TRADES", value: "Closed", sub: "deadline passed", tone: "muted" });
-  } else if (input.tradeCount > 0) {
-    tiles.push({ key: "trades", label: "TRADES", value: String(input.tradeCount), sub: input.tradeCount === 1 ? "idea" : "ideas", tone: "accent" });
+  const rank = input.teamRank;
+  if (rank && rank.value && rank.value !== "—") {
+    tiles.push({ key: "rank", label: "TEAM RANK", value: rank.value, sub: rank.of ? `of ${rank.of}` : "this season", tone: "accent" });
   }
   return tiles;
 }
@@ -237,6 +276,23 @@ export function todayTradeIdea(item: {
   const title = lead?.position && partner ? `Get ${article} ${lead.position} from ${partner}` : item.headline;
   const gain = typeof item.presentation?.trade_gain === "number" && Number.isFinite(item.presentation.trade_gain) ? item.presentation.trade_gain : null;
   return { title, send, receive, gain };
+}
+
+/**
+ * The one idea Today leads with: the biggest positive gain. An idea that costs the user value is never the headline
+ * (and never drawn red): it is skipped, and an idea with no figure is used only when no idea has a positive gain.
+ * Null when nothing qualifies (the row is then simply not drawn; Trade Hub still has every idea).
+ */
+export function bestTradeIdea(ideas: ReadonlyArray<TodayTradeIdea | null | undefined>): TodayTradeIdea | null {
+  const real = ideas.filter((i): i is TodayTradeIdea => i != null);
+  const positive = real.filter((i) => i.gain != null && i.gain > 0).sort((a, b) => (b.gain as number) - (a.gain as number));
+  if (positive.length > 0) return positive[0];
+  return real.find((i) => i.gain == null) ?? null;
+}
+
+/** "+450": the gain, only when positive. Never a negative or zero figure. */
+export function tradeGainLabel(idea: Pick<TodayTradeIdea, "gain">): string | null {
+  return idea.gain != null && idea.gain > 0 ? `+${Math.round(idea.gain).toLocaleString("en-US")}` : null;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

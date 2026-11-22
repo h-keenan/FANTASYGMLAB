@@ -80,21 +80,20 @@ describe("DashboardContent", () => {
 
     expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Do this now · 1" })).toBeInTheDocument();
-    expect(screen.getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
+    // The row is one short line (about six words); the full reason sits behind its tap.
+    expect(screen.getByText("Trade for a top-12 RB before…")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("decision-item-toggle"));
+    expect(screen.getByTestId("decision-full-title")).toHaveTextContent("Trade for a top-12 RB before the deadline");
 
-    // My Team is one compact module: its collapsed summary carries the ranks; the tiles open on tap.
-    expect(screen.getByRole("group", { name: /^My Team: .*This season/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
-    // The record lives once, in the Standing tile under "Do this now", not repeated in My Team.
-    expect(await screen.findByTestId("today-tile-standing")).toHaveTextContent("7-6");
-    expect(screen.queryByText("Record")).not.toBeInTheDocument();
-    expect(screen.getAllByText("This season").length).toBeGreaterThan(0); // the tile and its rank bar
-    expect(screen.getByText("Starter Strength")).toBeInTheDocument();
-    expect(screen.getByText("Bench Strength")).toBeInTheDocument();
-    // Injured starters are the swap stack's business, not a My Team tile.
-    expect(screen.queryByText("Injured starters")).not.toBeInTheDocument();
-    expect(screen.getAllByText("#2").length).toBeGreaterThan(0); // power rank
-    expect(screen.getAllByText("T-1").length).toBeGreaterThan(0); // franchise rank, tied
+    // One snapshot strip (Standing / Playoffs / Team rank) that opens My Team; the rank bars live there now.
+    const strip = await screen.findByTestId("today-tiles");
+    expect(strip).toHaveAttribute("href", expect.stringContaining("/my-team/abc"));
+    expect(screen.getByTestId("today-tile-standing")).toHaveTextContent("7-6");
+    expect(screen.getByTestId("today-tile-rank")).toHaveTextContent("#2"); // power rank
+    expect(screen.queryByTestId("stat-strip-toggle")).not.toBeInTheDocument();
+    expect(screen.queryByText("Starter Strength")).not.toBeInTheDocument();
+    // Plan ahead is gone from Today (GM Plan / Waivers / Trade Hub stay reachable from their own entry points).
+    expect(screen.queryByText("Plan ahead")).not.toBeInTheDocument();
 
     expect(screen.getByText(/2 more moves? on Pro/)).toBeInTheDocument();
   });
@@ -122,7 +121,7 @@ describe("DashboardContent", () => {
     expect(await screen.findByText("Nothing needs you this week")).toBeInTheDocument();
   });
 
-  it("orders modules: do this now, glance tiles, trade idea, My Team, alerts, More", async () => {
+  it("orders modules: do this now, snapshot strip, best trade, alerts, More", async () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       entitlement: { ...FIXTURE.entitlement, free_limit: 1 },
@@ -133,14 +132,14 @@ describe("DashboardContent", () => {
     await screen.findByTestId("today-tiles");
     const html = container.innerHTML;
     const at = (marker: string) => html.indexOf(marker);
-    const order = [at("decision-queue-heading"), at("today-tiles"), at("today-trade-idea"), at('aria-label="Team summary"'), at("dashboard-alerts"), at("dashboard-more")];
+    const order = [at("decision-queue-heading"), at("today-tiles"), at("today-trade-idea"), at("dashboard-alerts"), at("dashboard-more")];
     expect(order.every((i) => i > -1)).toBe(true);
     expect([...order].sort((x, y) => x - y)).toEqual(order);
     // Free caps are one compact upsell row (no separate free-limit note).
     expect(screen.getByTestId("more-moves-upsell")).toBeInTheDocument();
   });
 
-  it("shows the trade idea as one card (title, send and get, value) that opens Trade Hub, with the real deadline", async () => {
+  it("shows the best trade as one compact row (send to get, green gain) that opens Trade Hub, with the real deadline", async () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       trade_window: { trade_deadline_week: 11, current_week: 9, trade_deadline_passed: false, message: "" },
@@ -150,11 +149,24 @@ describe("DashboardContent", () => {
     const card = await screen.findByTestId("today-trade-idea");
     expect(card).toHaveTextContent("Get a QB from Team Iron");
     expect(card).toHaveTextContent(/deadline 2 wks left/);
-    expect(card).toHaveTextContent("+450 value");
+    expect(screen.getByTestId("today-trade-gain")).toHaveTextContent("+450");
+    expect(screen.getByTestId("today-trade-gain")).toHaveStyle({ color: "var(--color-success)" });
     expect(within(card).getByRole("link")).toHaveAttribute("href", expect.stringContaining("/trade-hub/abc"));
-    // The tile carries the count; the trade is not in the Decision Queue too.
-    expect(screen.getByTestId("today-tile-trades")).toHaveTextContent("1");
+    // No trades tile any more (the row is the one place); the trade is not in the Decision Queue too.
+    expect(screen.queryByTestId("today-tile-trades")).not.toBeInTheDocument();
     expect(screen.queryByTestId("decision-item")).not.toBeInTheDocument();
+  });
+
+  it("never headlines a trade that costs value: a negative idea is hidden, the best positive one leads, nothing is red", async () => {
+    const neg = { ...TRADE_PRESENTATION, trade_gain: -125 };
+    const mk = (presentation: typeof TRADE_PRESENTATION, id: string) => ({ ...FIXTURE.items[0], presentation, recommendation_id: id }) as unknown as DashboardResponse["items"][number];
+    const only = render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={{ ...FIXTURE, items: [mk(neg, "n")] }} />);
+    await screen.findByTestId("today-tiles");
+    expect(screen.queryByTestId("today-trade-idea")).not.toBeInTheDocument();
+    expect(only.container.textContent).not.toMatch(/-125/);
+    only.unmount();
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={{ ...FIXTURE, items: [mk(neg, "n"), mk(TRADE_PRESENTATION, "p")] }} />);
+    expect(await screen.findByTestId("today-trade-gain")).toHaveTextContent("+450");
   });
 
   it("lists urgent items once in the Decision Queue, linking to GM Plan / Matchup", () => {
@@ -182,8 +194,8 @@ describe("DashboardContent", () => {
   it("treats the server's top-priority non-trade tile as a queue decision and shows it once", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
     const block = screen.getByTestId("decision-queue");
-    expect(within(block).getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
-    expect(screen.getAllByText("Trade for a top-12 RB before the deadline")).toHaveLength(1);
+    expect(within(block).getByText("Trade for a top-12 RB before…")).toBeInTheDocument();
+    expect(screen.getAllByText(/Trade for a top-12 RB/)).toHaveLength(1);
   });
 
   it("caps the queue at three rows and opens the rest in place with See all (N)", () => {
@@ -211,17 +223,18 @@ describe("DashboardContent", () => {
     expect(screen.queryByText(/Trade deadline/i)).not.toBeInTheDocument();
   });
 
-  it("says trades are closed after the deadline, in the Trades tile only", async () => {
+  it("hides the trade row after the deadline", async () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       trade_window: { trade_deadline_week: 11, current_week: 12, trade_deadline_passed: true, message: "x" },
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
-    expect(await screen.findByTestId("today-tile-trades")).toHaveTextContent(/Closed.*deadline passed/);
+    await screen.findByTestId("today-tiles");
+    expect(screen.queryByTestId("today-tile-trades")).not.toBeInTheDocument();
     expect(screen.queryByTestId("today-trade-idea")).not.toBeInTheDocument();
   });
 
-  it("turns the matchup's lineup problems into one swap row each, with the bench fix, the gain and a Fix all button", async () => {
+  it("turns the matchup's lineup problems into ONE one-line row; its tap lists each swap with the bench fix, the gain and a Fix all button", async () => {
     const player = (id: string, name: string, pos: string, injury = "") => ({ player_id: id, name, position: pos, team: "NE", tier: "starter", slot: pos, points: 10, projection_status: null, injury_label: injury });
     const spy = vi.spyOn(api, "getLeagueMatchup").mockResolvedValue({
       ok: true,
@@ -240,6 +253,10 @@ describe("DashboardContent", () => {
     vi.spyOn(api, "getTeamRankings").mockRejectedValue(new Error("x"));
     try {
       render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={{ ...FIXTURE, items: [] }} />);
+      const lineup = await screen.findByTestId("decision-lineup");
+      expect(lineup).toHaveTextContent("2 lineup swaps · +21.0");
+      expect(within(lineup).getByTestId("decision-primary")).toHaveTextContent("Fix all");
+      fireEvent.click(within(lineup).getByTestId("decision-lineup-toggle"));
       const stack = await screen.findByTestId("swap-stack");
       const rows = within(stack).getAllByTestId("swap-row");
       // The locked move (his game started) is never offered.
@@ -284,10 +301,11 @@ describe("DashboardContent", () => {
     expect(within(screen.getByTestId("dashboard-more")).getByRole("button", { name: /^More/ })).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("offers one shared ? for the rank labels, after the strip's title", () => {
+  it("keeps League type off Today (it lives on My Team's league settings) and the mini-games one line each", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
-    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
-    expect(screen.getAllByRole("button", { name: "About My Team" })).toHaveLength(1);
+    expect(screen.queryByText("League type")).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("dashboard-more")).getByRole("button", { name: /^More/ }));
+    for (const id of ["more-league-activity", "more-guess-player", "more-name-match"]) expect(screen.getByTestId(id)).toBeInTheDocument();
   });
 
   it("shows the direction check-in the server asks for, on the real Dashboard only (not the sample preview)", async () => {

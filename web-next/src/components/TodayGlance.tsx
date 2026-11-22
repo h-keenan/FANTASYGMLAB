@@ -1,19 +1,16 @@
 "use client";
 
-import { bandColorVar } from "@/lib/verdictToneCss";
 import Link from "next/link";
 import { useId, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { PickAvatar } from "@/components/PickAvatar";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { InfoMark } from "@/components/ui/InfoMark";
 import { Collapse } from "@/components/ui/Presence";
 import { playerHeadshotId, playerInitials } from "@/lib/playerAnatomy";
-import { tradeIdeaGainText } from "@/lib/tradeIdeaSummary";
-import type { TodayRoomChip, TodayTile, TodayTradeAsset, TodayTradeIdea } from "@/lib/todayView";
+import { tradeGainLabel, type TodayRoomChip, type TodayTile, type TodayTradeAsset, type TodayTradeIdea } from "@/lib/todayView";
 
 const TONE = {
   success: "var(--color-success)",
@@ -26,34 +23,31 @@ const TONE = {
 const KICKER_STYLE = { color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" } as const;
 
 /**
- * The compact tile row under "Do this now": Standing, Playoffs, Trades. One tile per fact (the model is
- * lib/todayView.ts todayTiles); each is a link to the page that owns the detail. Mobile twin: components/TodayGlance.tsx.
+ * The one snapshot strip under "Do this now": Standing, Playoffs, Team rank (model: lib/todayView.ts todayTiles). It is a
+ * single link: the whole strip opens My Team, which hosts the rank bars, position rooms and tiles. Mobile twin:
+ * components/TodayGlance.tsx.
  */
-export function TodayTiles({ tiles, hrefs }: { tiles: TodayTile[]; hrefs: Record<TodayTile["key"], string> }) {
+export function TodaySnapshotStrip({ tiles, href }: { tiles: TodayTile[]; href: string }) {
   if (tiles.length === 0) return null;
   return (
-    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }} data-testid="today-tiles">
-      {tiles.map((tile) => (
-        <Link
-          key={tile.key}
-          href={hrefs[tile.key]}
-          aria-label={`${tile.label.toLowerCase()}: ${tile.value} ${tile.sub}. Open`}
-          className="glass-surface flex min-w-0 flex-col items-center justify-center gap-0.5 px-2 py-2 text-center"
-          style={{ minHeight: 72, borderRadius: "var(--radius-card, 12px)", color: "inherit", textDecoration: "none" }}
-          data-testid={`today-tile-${tile.key}`}
-        >
+    <Link href={href} aria-label={`${tiles.map((t) => `${t.label.toLowerCase()} ${t.value} ${t.sub}`).join(", ")}. Open My Team`} className="glass-surface flex items-stretch" style={{ minHeight: 56, borderRadius: "var(--radius-card, 12px)", color: "inherit", textDecoration: "none" }} data-testid="today-tiles">
+      {tiles.map((tile, i) => (
+        <span key={tile.key} className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0 px-2 py-1.5 text-center" style={i > 0 ? { borderLeft: "var(--border-width-default) solid var(--color-border)" } : undefined} data-testid={`today-tile-${tile.key}`}>
           <span className="text-[0.6875rem] font-extrabold uppercase" style={KICKER_STYLE}>
             {tile.label}
           </span>
-          <span className="text-2xl font-extrabold tabular-nums leading-none" style={{ color: TONE[tile.tone] }}>
+          <span className="text-lg font-extrabold tabular-nums leading-tight" style={{ color: TONE[tile.tone] }}>
             {tile.value}
           </span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>
             {tile.sub}
           </span>
-        </Link>
+        </span>
       ))}
-    </div>
+      <span aria-hidden="true" className="flex items-center pr-3" data-row-arrow style={{ color: "var(--color-accent)" }}>
+        →
+      </span>
+    </Link>
   );
 }
 
@@ -123,64 +117,43 @@ export function TodayRooms({ chips, tradeHref }: { chips: TodayRoomChip[]; trade
   );
 }
 
-function TradeSide({ label, assets }: { label: string; assets: TodayTradeAsset[] }) {
-  if (assets.length === 0) return null;
-  return (
-    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="w-9 shrink-0 text-[0.6875rem] font-extrabold uppercase" style={KICKER_STYLE}>
-        {label}
-      </span>
-      {assets.slice(0, 2).map((a) => (
-        <span key={`${a.id ?? a.name}`} className="inline-flex min-w-0 items-center gap-1.5">
-          {a.isPick ? (
-            <PickAvatar label={a.name} size={24} />
-          ) : (
-            <PlayerAvatar playerId={playerHeadshotId({ id: a.id, name: a.name })} tier={a.tier ?? undefined} size={24} fallbackLabel={playerInitials(a.name)} />
-          )}
-          {a.isPick ? <span className="text-sm font-bold">{a.name}</span> : <PlayerName name={a.name} className="min-w-0 text-sm font-bold" />}
-          {a.position ? <PositionBadge position={a.position} /> : null}
-        </span>
-      ))}
-      {assets.length > 2 ? (
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          +{assets.length - 2}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-/** The trade idea as one card (concept B): kicker, "Get a QB from Team Iron", who goes and who comes, the value gain. The whole card opens it in Trade Hub. */
-export function TodayTradeIdeaCard({ idea, href, deadline, info }: { idea: TodayTradeIdea; href: string; /** "2 wks left (Wk 11)": the trade deadline, shown here and nowhere else. */ deadline?: string | null; /** Beginner explainer for the card's ONE "?", inline after the kicker. */ info?: string | null }) {
-  const gain = idea.gain != null && idea.gain !== 0 ? tradeIdeaGainText(idea.gain) : null;
+/**
+ * The best trade as ONE compact row: avatars of who you send → who you get, and the gain in green. A trade that costs value
+ * never reaches this row (lib/todayView.ts bestTradeIdea) and no negative or red figure is ever drawn. The row opens it
+ * in Trade Hub. Mobile twin: components/TodayGlance.tsx.
+ */
+export function TodayTradeRow({ idea, href, deadline, info }: { idea: TodayTradeIdea; href: string; /** "2 wks left (Wk 11)": the trade deadline, shown here and nowhere else. */ deadline?: string | null; /** Beginner explainer for the row's ONE "?". */ info?: string | null }) {
+  const gain = tradeGainLabel(idea);
+  const faces = (assets: TodayTradeAsset[]) =>
+    assets.slice(0, 2).map((a) =>
+      a.isPick ? <PickAvatar key={a.name} label={a.name} size={28} /> : <PlayerAvatar key={a.id ?? a.name} playerId={playerHeadshotId({ id: a.id, name: a.name })} tier={a.tier ?? undefined} size={28} fallbackLabel={playerInitials(a.name)} />,
+    );
+  const names = (assets: TodayTradeAsset[]) => assets.map((a) => a.name).join(" + ");
   return (
     <AccentCard accent="var(--color-action)" as="section" compact data-testid="today-trade-idea">
-      {info ? (
-        <div className="flex items-center">
-          <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-action)", letterSpacing: "var(--letter-spacing-badge)" }}>
-            Trade idea{deadline ? ` · deadline ${deadline}` : ""}
-          </span>
-          <InfoMark label="trade ideas" lines={[info]} beginnerOnly />
-        </div>
-      ) : null}
-      <Link href={href} aria-label={`Trade idea: ${idea.title}. Open in Trade Hub`} className="flex items-center gap-2" style={{ minHeight: "var(--touch-target-min)", color: "inherit", textDecoration: "none" }}>
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="flex items-center gap-2">
-            {info ? null : (
-              <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-action)", letterSpacing: "var(--letter-spacing-badge)" }}>
-                Trade idea{deadline ? ` · deadline ${deadline}` : ""}
-              </span>
-            )}
-            {gain ? (
-              <span className="text-xs font-extrabold tabular-nums" style={{ color: bandColorVar(idea.gain != null && idea.gain > 0 ? "good" : "bad") }} data-testid="today-trade-gain">
-                {gain} value
-              </span>
-            ) : null}
-          </span>
-          <span className="text-base font-extrabold leading-snug">{idea.title}</span>
-          <TradeSide label="Send" assets={idea.send} />
-          <TradeSide label="Get" assets={idea.receive} />
+      <div className="flex items-center gap-1">
+        <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-action)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          Best trade{deadline ? ` · deadline ${deadline}` : ""}
         </span>
+        {info ? <InfoMark label="trade ideas" lines={[info]} beginnerOnly /> : null}
+      </div>
+      <Link href={href} aria-label={`Best trade: ${idea.title}${gain ? `, ${gain} value` : ""}. Open in Trade Hub`} className="flex items-center gap-2" style={{ minHeight: 44, color: "inherit", textDecoration: "none" }}>
+        <span className="flex shrink-0 items-center gap-1" aria-hidden="true">
+          {faces(idea.send)}
+          <span style={{ color: "var(--color-text-muted)" }}>→</span>
+          {faces(idea.receive)}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-sm font-bold leading-snug">{idea.title}</span>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {[idea.send.length > 0 ? names(idea.send) : null, idea.receive.length > 0 ? names(idea.receive) : null].filter(Boolean).join(" → ")}
+          </span>
+        </span>
+        {gain ? (
+          <span className="shrink-0 text-sm font-extrabold tabular-nums" style={{ color: "var(--color-success)" }} data-testid="today-trade-gain">
+            {gain}
+          </span>
+        ) : null}
         <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
           →
         </span>

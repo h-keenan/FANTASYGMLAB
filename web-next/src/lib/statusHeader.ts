@@ -396,12 +396,8 @@ export const PAGE_FACT_OWNERS = {
     winChance: "matchup",
     standing: "tiles",
     playoffs: "tiles",
-    trades: "tiles",
-    power: "team",
-    franchise: "team",
-    starter: "team",
-    bench: "team",
-    age: "team",
+    rank: "tiles",
+    trades: "trade",
   },
 } as const;
 

@@ -10,6 +10,9 @@ import {
   todayMatchupRing,
   todayRoomChips,
   todayTiles,
+  bestTradeIdea,
+  tradeGainLabel,
+  todayActionRow,
   todayTradeIdea,
 } from './todayView.ts';
 import { slotsWithSwap } from './matchupPlanner.ts';
@@ -95,13 +98,36 @@ test('todayMatchupRing: ring, kicker, score line and trailing chip', () => {
   assert.ok(live.kicker.endsWith('LIVE'));
 });
 
-test('todayTiles: standing and odds from one model, trades closed or counted, no zero-filling', () => {
+test('todayTiles: standing, odds and team rank from one model, no zero-filling, no trades tile', () => {
   const standing = { record: '3-6', place: '8th of 12', playoffStatus: null, powerRank: null, playoffOdds: '1%', projectedRecord: null, tone: 'neutral' as const };
-  const tiles = todayTiles({ standing, tradeCount: 1 });
-  assert.deepEqual(tiles.map((t) => [t.key, t.value, t.sub]), [['standing', '8th', 'of 12 · 3-6'], ['playoffs', '1%', 'odds'], ['trades', '1', 'idea']]);
+  const tiles = todayTiles({ standing, teamRank: { value: '#3', of: 12 } });
+  assert.deepEqual(tiles.map((t) => [t.key, t.value, t.sub]), [['standing', '8th', 'of 12 · 3-6'], ['playoffs', '1%', 'odds'], ['rank', '#3', 'of 12']]);
   assert.equal(tiles[1].tone, 'danger');
-  assert.deepEqual(todayTiles({ standing: null, tradeCount: 0 }), []);
-  assert.equal(todayTiles({ standing: null, tradeCount: 3, tradesClosed: true })[0].value, 'Closed');
+  assert.deepEqual(todayTiles({ standing: null }), []);
+  assert.deepEqual(todayTiles({ standing: null, teamRank: { value: '—', of: 12 } }), []);
+});
+
+test('bestTradeIdea: biggest positive gain leads; a negative idea is never the headline or shown', () => {
+  const mk = (gain: number | null) => ({ title: 't', send: [], receive: [], gain });
+  assert.equal(bestTradeIdea([mk(-125), mk(40), mk(300)])?.gain, 300);
+  assert.equal(bestTradeIdea([mk(-125), mk(0)]), null);
+  assert.equal(bestTradeIdea([mk(-125), mk(null)])?.gain, null);
+  assert.equal(bestTradeIdea([]), null);
+  assert.equal(tradeGainLabel(mk(1234)), '+1,234');
+  assert.equal(tradeGainLabel(mk(-125)), null);
+});
+
+test('todayActionRow: one short line per decision, lineup swaps collapse to one row', () => {
+  const p = (name: string) => ({ id: name, name, position: 'WR', team: null, tier: null, injuryStatus: null, note: null, stat: null });
+  const swap = (name: string, gain: number | null) => ({ key: name, out: p(name), status: 'OUT', reason: '', tone: 'danger' as const, replacement: p('Sam Ortiz'), gain });
+  const base = { key: 'k', kind: 'lineup' as const, tone: 'danger' as const, title: 'x', players: [], primary: { label: 'Open', target: 'matchup' as const } };
+  assert.equal(todayActionRow({ ...base, swaps: [swap('Ray Reyes', 4)] }).reason, 'Reyes out, start Ortiz');
+  const many = todayActionRow({ ...base, swaps: [swap('A B', 4), swap('C D', 2.5)] });
+  assert.equal(many.reason, '2 lineup swaps · +6.5');
+  assert.equal(many.button, 'Fix all');
+  const waiver = todayActionRow({ ...base, kind: 'waiver', swaps: [], players: [p('Gibbs')], title: 'Add Jahmyr Gibbs before waivers run tonight at midnight', primary: { label: 'Bid', target: 'waivers' as const } });
+  assert.equal(waiver.reason.split(' ').length <= 6, true);
+  assert.equal(waiver.player?.name, 'Gibbs');
 });
 
 test('todayRoomChips: marks and qualitative meter fill', () => {

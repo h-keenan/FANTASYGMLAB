@@ -1,36 +1,27 @@
 import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { TERMS } from "@/lib/terms";
-import { ModuleMore } from "@/components/ui/ModuleMore";
-import { useEffect, useState, type MouseEvent } from "react";
+import type { MouseEvent } from "react";
 
-import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
-import { NextSteps } from "@/components/NextSteps";
-import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
-import { formatRank, rankFill } from "@/components/SnapshotTile";
-import type { StatStripItem } from "@/components/StatStrip";
-import { StatStripModule } from "@/components/ui/ModuleTemplates";
+import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
+import { GuillotineCard, useGuillotineState } from "@/components/GuillotineCard";
+import { formatRank } from "@/components/SnapshotTile";
 import { useTeamStatusData, type TeamStatusPrefetch } from "@/lib/useTeamStatusData";
-import { leagueAverageAge } from "@/lib/teamStatus";
 import { useSeasonOdds } from "@/components/DashboardOddsStrip";
 import { DashboardMore } from "@/components/DashboardBlocks";
 import { SkeletonHero } from "@/components/Skeleton";
 import { TodayMatchupCard } from "@/components/TodayMatchupCard";
-import { TodayRooms, TodayTiles, TodayTradeIdeaCard } from "@/components/TodayGlance";
+import { TodaySnapshotStrip, TodayTradeRow } from "@/components/TodayGlance";
 import { GAME_PLAN_INTERNAL_ROUTES, gamePlanTileHref, resolveGamePlanTargetPlayerId } from "@/lib/gamePlanPresentation";
 import { DecisionQueue } from "@/components/DecisionQueue";
 import { buildDecisionQueue } from "@/lib/decisionQueue";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
-import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY, tradesStanceLine } from "@/lib/dashboardLayout";
-import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusPositions, buildTeamStatusStanding } from "@/lib/teamStatus";
-import { todayRoomChips, todayTiles, todayTradeIdea } from "@/lib/todayView";
+import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY } from "@/lib/dashboardLayout";
+import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusStanding } from "@/lib/teamStatus";
+import { bestTradeIdea, todayTiles, todayTradeIdea } from "@/lib/todayView";
 
 // Below-the-fold and conditional modules load as their own chunks (after the above-the-fold content has hydrated), so they are not
 // part of Today's first-load JS. Each renders nothing until its chunk lands; none sits above the matchup card.
-const GuessThePlayerCard = dynamic(() => import("@/components/GuessThePlayerCard").then((m) => m.GuessThePlayerCard), { loading: () => null });
-const GuessThePlayerNameMatchCard = dynamic(() => import("@/components/GuessThePlayerNameMatchCard").then((m) => m.GuessThePlayerNameMatchCard), { loading: () => null });
 const LeaguePulseCard = dynamic(() => import("@/components/LeaguePulseCard").then((m) => m.LeaguePulseCard), { loading: () => null });
 const StartHereCard = dynamic(() => import("@/components/StartHereCard").then((m) => m.StartHereCard), { loading: () => null });
 const FirstValueOfferCard = dynamic(() => import("@/components/FirstValueOfferCard").then((m) => m.FirstValueOfferCard), { loading: () => null });
@@ -89,26 +80,10 @@ export function DashboardContent({
   sample?: { onBlockedLink: () => void };
 }) {
   const snapshot = data.team_snapshot;
-  const { data: guillotine, reload: reloadGuillotine } = useGuillotineState(sample ? undefined : leagueId);
+  const { data: guillotine } = useGuillotineState(sample ? undefined : leagueId);
   // Beginner helper text (onboarding experience level) — null/undefined for
   // advanced or unset accounts, so every tile below renders as before.
   const copy = useExperienceCopy();
-  // The league's real GM stance (what trade advice is tuned by), shown on the trade line for beginners.
-  const [stance, setStance] = useState<string>("");
-  const showStance = copy.isBeginner && !sample;
-  useEffect(() => {
-    if (!showStance || !leagueId) return;
-    let cancelled = false;
-    api
-      .getTeamStance(leagueId)
-      .then((res) => {
-        if (!cancelled) setStance(res.stance || "");
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [showStance, leagueId]);
   const query = `?name=${encodeURIComponent(leagueName)}`;
   const Shell: "div" | "main" = sample ? "div" : "main";
   const watchItems = data.items.filter((item) => item.category !== "top_priority");
@@ -153,21 +128,16 @@ export function DashboardContent({
     odds: buildTeamStatusOdds(sim),
   });
   const deadlinePassed = Boolean(data.trade_window?.trade_deadline_passed);
-  const stanceLine = copy.isBeginner ? tradesStanceLine(stance) : "";
-  const tiles = todayTiles({ standing, tradeCount: tradeItems.length, tradesClosed: deadlinePassed });
-  const roomChips = todayRoomChips(buildTeamStatusPositions(teamStatus.needs));
-  const idea = tradeItems[0] ? todayTradeIdea(tradeItems[0]) : null;
+  const tiles = todayTiles({ standing, teamRank: snapshot && snapshot.power_rank != null ? { value: formatRank(snapshot.power_rank, snapshot.power_rank_tied), of: teams && teams.length > 1 ? teams.length : null } : null });
+  // The best trade: the biggest positive gain. An idea that costs the user value is never the headline (lib/todayView.ts).
+  const ideas = tradeItems.map(todayTradeIdea);
+  const idea = bestTradeIdea(ideas);
+  const ideaItem = idea ? tradeItems[ideas.indexOf(idea)] : null;
   const id = encodeURIComponent(leagueId);
   const tradeHubHref = `/trade-hub/${id}${query}`;
-  const ideaHref = tradeItems[0]
-    ? gamePlanTileHref(GAME_PLAN_INTERNAL_ROUTES[tradeItems[0].destination] ?? "trade-hub", leagueId, leagueName, resolveGamePlanTargetPlayerId(tradeItems[0]))
+  const ideaHref = ideaItem
+    ? gamePlanTileHref(GAME_PLAN_INTERNAL_ROUTES[ideaItem.destination] ?? "trade-hub", leagueId, leagueName, resolveGamePlanTargetPlayerId(ideaItem))
     : tradeHubHref;
-  const teamStats = snapshot
-    ? buildTeamStats(snapshot, copy.label("averageAge", "Avg Age"), {
-        teamCount: teams && teams.length > 1 ? teams.length : null,
-        leagueAge: leagueAverageAge(teams),
-      })
-    : null;
 
   return (
     // coridian_, 2026-10-17 (screenshot): too much empty space above the
@@ -234,45 +204,17 @@ export function DashboardContent({
           briefing (paywall-after-connect). Dismissible; nothing is gated. */}
       {userId && !sample ? <FirstValueOfferCard userId={userId} isPremium={data.entitlement?.is_premium === true} /> : null}
 
-      {teamStatus.settled ? (
-        <>
-          <TodayTiles tiles={tiles} hrefs={{ standing: `/league-rankings/${id}${query}`, playoffs: `/league-rankings/${id}${query}`, trades: tradeHubHref }} />
-          {idea && !deadlinePassed ? <TodayTradeIdeaCard idea={idea} href={ideaHref} deadline={deadlineChip(data.trade_window)?.value.replace(/\s*\(.*\)$/, "")} info={copy.isBeginner ? TRADES_BLOCK_COPY.beginnerExplainer : null} /> : null}
-          {copy.isBeginner && stanceLine ? (
-            // The league's real GM stance (what the trade advice is tuned by). The trade explainer is the "?" on the idea card.
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="today-trade-help">
-              <Link href={`/gm-plan/${id}${query}`} className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="dashboard-stance-line">
-                {stanceLine} <span className="font-bold" style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.changeStance}</span>
-              </Link>
-            </div>
-          ) : null}
-          <TodayRooms chips={roomChips} tradeHref={tradeHubHref} />
-        </>
-      ) : null}
-
-      {snapshot && teamStats ? (
-        // My Team: a StatStripModule. Collapsed it reads "This season #3 · Long term #5 · Starters #2 · Bench #7"; the tiles
-        // (each an insight link) and the glossary open on tap. The marker below is the "dashboard rendered" signal.
+      {/* The snapshot strip (Standing / Playoffs / Team rank) is one link to My Team, which hosts the rank bars, tiles and position rooms.
+          The marker is the "dashboard rendered" signal. */}
+      {snapshot ? (
         <section aria-label="Team summary" data-fgl-dashboard-complete="true">
-          <StatStripModule
-            id="today.team"
-            title="My Team"
-            items={teamStats.main}
-            league={{ id: leagueId, name: leagueName }}
-            infoLines={[copy.help("dashboardSnapshot")]}
-            footer={
-              <>
-                <ModuleMore href={`/my-team/${encodeURIComponent(leagueId)}${query}`}>Open My Team</ModuleMore>
-              </>
-            }
-          />
+          {teamStatus.settled ? <TodaySnapshotStrip tiles={tiles} href={`/my-team/${id}${query}`} /> : null}
         </section>
       ) : null}
 
-      <GuillotineCard data={guillotine} />
+      {teamStatus.settled && idea && !deadlinePassed ? <TodayTradeRow idea={idea} href={ideaHref} deadline={deadlineChip(data.trade_window)?.value.replace(/\s*\(.*\)$/, "")} info={copy.isBeginner ? TRADES_BLOCK_COPY.beginnerExplainer : null} /> : null}
 
-      {/* GM Plan lives in More (the bar does not show it), so Today carries it as a standing next step. */}
-      {sample ? null : <NextSteps title="Plan ahead" steps={["gm-plan", "waivers", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />}
+      <GuillotineCard data={guillotine} />
 
       {/* Alerts (with the watchlist folded in) is a section of Today: avatars + newest headline collapsed, unread count badge, tap to expand, `#alerts` opens it. */}
       {sample ? null : <DashboardAlerts leagueId={leagueId} leagueName={leagueName} watchItems={watchItems} />}
@@ -280,55 +222,11 @@ export function DashboardContent({
       {/* The sample preview has no More section, so it keeps League Activity inline. */}
       {sample ? <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} /> : null}
 
-      {/* Secondary modules (the two mini-games are play, not decisions) stay
-          collapsed behind "More" so they never push the actionable modules down. */}
+      {/* Secondary modules stay collapsed behind "More": league activity and the two mini-games, one line each (they are play, not
+          decisions). The League type control lives on My Team's league settings. */}
       {sample ? null : (
-        <DashboardMore>
-          <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
-          <GuessThePlayerCard leagueId={leagueId} leagueName={leagueName} />
-          <GuessThePlayerNameMatchCard leagueId={leagueId} leagueName={leagueName} />
-          <LeagueTypeControl leagueId={leagueId} data={guillotine} onChanged={reloadGuillotine} />
-        </DashboardMore>
+        <DashboardMore leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
       )}
     </Shell>
   );
-}
-
-/**
- * My Team tiles: the league ranks and roster-health facts the hero does not
- * carry (record, standing and odds live there). Each tile adds its context
- * only when the data exists: team count from team-rankings, league-average age
- * from the same response.
- */
-function buildTeamStats(
-  snapshot: NonNullable<DashboardResponse["team_snapshot"]>,
-  ageLabel: string,
-  context: { teamCount: number | null; leagueAge: string | null },
-): { main: StatStripItem[] } {
-  const ofTeams = context.teamCount ? `of ${context.teamCount} teams` : undefined;
-  const WHY_BY_GLYPH = { power: "power_rank", franchise: "franchise_rank", starter: "starter_strength", bench: "bench_strength" } as const;
-  const rank = (glyph: "power" | "franchise" | "starter" | "bench", label: string, value: number | null, tied: boolean, note?: string): StatStripItem => ({
-    glyph,
-    insight: glyph,
-    why: WHY_BY_GLYPH[glyph],
-    label,
-    value: formatRank(value, tied),
-    tone: value === 1 ? "premium" : "neutral",
-    note: value != null ? note : undefined,
-    fill: rankFill(value, context.teamCount),
-  });
-  const main: StatStripItem[] = [
-    rank("power", TERMS.thisSeason, snapshot.power_rank, snapshot.power_rank_tied, ofTeams),
-    rank("franchise", TERMS.longTerm, snapshot.franchise_rank, snapshot.franchise_rank_tied, ofTeams),
-    rank("starter", "Starter Strength", snapshot.starter_rank, snapshot.starter_rank_tied, ofTeams),
-    rank("bench", "Bench Strength", snapshot.bench_rank, snapshot.bench_rank_tied, ofTeams),
-    {
-      glyph: "age",
-      insight: "age",
-      label: ageLabel,
-      value: snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—",
-      note: snapshot.average_age !== null && context.leagueAge ? `League avg ${context.leagueAge}` : undefined,
-    },
-  ];
-  return { main };
 }

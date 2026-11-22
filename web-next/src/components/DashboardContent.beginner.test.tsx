@@ -68,13 +68,13 @@ function expandHelp() {
 
 describe("DashboardContent for a beginner", () => {
   beforeEach(() => window.localStorage.clear());
-  it("explains the rank terms behind the strip's one inline ? (no per-tile corner)", () => {
+  it("keeps the Do this now help; the rank-term glossary moved with the rank bars to My Team", async () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
-    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
+    await screen.findByTestId("today-tiles");
     expandHelp();
-    const strip = screen.getByLabelText("Team summary");
-    expect(strip.querySelectorAll("[data-info-mark]")).toHaveLength(1);
-    expect(screen.getByText(/What "This season" means/)).toBeInTheDocument();
+    // The snapshot strip is one link (no "?" in it); the rank glossary lives on My Team.
+    expect(screen.getByLabelText("Team summary").querySelectorAll("[data-info-mark]")).toHaveLength(0);
+    expect(screen.queryByText(/What "This season" means/)).not.toBeInTheDocument();
     expect(screen.getByText(/^Today lists the roster moves/)).toBeInTheDocument(); // the Do this now help
   });
 
@@ -86,8 +86,7 @@ describe("DashboardContent for a beginner", () => {
     expect(screen.getByText(/No move is needed right now/)).toBeInTheDocument();
   });
 
-  it("explains trades to a beginner under the trade idea, and names the league's real GM stance with a link to change it (no account-goal line)", async () => {
-    vi.spyOn(api, "getTeamStance").mockResolvedValue({ ok: true, stance: "rebuilding" });
+  it("explains trades to a beginner on the best-trade row's one \"?\"; the stance line moved off Today (GM Plan owns it)", async () => {
     const withIdea: DashboardResponse = {
       ...FIXTURE,
       items: [
@@ -106,11 +105,7 @@ describe("DashboardContent for a beginner", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={withIdea} />);
     await screen.findByTestId("today-trade-idea");
     expandHelp();
-    const block = screen.getByTestId("today-trade-help");
-    expect(screen.getByText(/who you give, who you get/)).toBeInTheDocument(); // the trade card's one "?"
-    const line = await screen.findByTestId("dashboard-stance-line");
-    expect(line.textContent).toMatch(/building future value/);
-    expect(line.getAttribute("href")).toBe("/gm-plan/abc?name=Dynasty%20Overlords");
-    expect(block.textContent).not.toMatch(/Tuned for winning this season/);
+    expect(screen.getByText(/who you give, who you get/)).toBeInTheDocument(); // the trade row's one "?"
+    expect(screen.queryByTestId("dashboard-stance-line")).not.toBeInTheDocument();
   });
 });

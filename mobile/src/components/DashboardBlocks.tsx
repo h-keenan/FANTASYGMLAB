@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import CompactModule from './CompactModule';
+import { ExpandRow } from './ExpandRow';
 import { type StatStripItem } from './DashboardStatRow';
 import { StatStripModule } from './ModuleTemplates';
 import ToneBadge from './ToneBadge';
@@ -147,8 +148,12 @@ export function DashboardTeamStats({
   );
 }
 
-/** Secondary modules (league activity, mini-games, league type): one compact module, mounted only when opened. */
-export function DashboardMore({ children }: { children: React.ReactNode }) {
+/**
+ * Secondary modules, collapsed (twin of web DashboardMore): league activity and the mini-games, ONE line each in the
+ * module's own ExpandRow; the rest (storylines, quick actions, standings strips) keeps its place inside. The League type
+ * control lives on My Team's league settings.
+ */
+export function DashboardMore({ leagueActivity, guessGame, children }: { leagueActivity?: React.ReactNode; guessGame?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <CompactModule
       id="today.more"
@@ -157,10 +162,21 @@ export function DashboardMore({ children }: { children: React.ReactNode }) {
       tone="muted"
       parts={[
         { key: 'a', text: 'League activity' },
-        { key: 'g', text: '2 mini-games' },
-        { key: 't', text: 'League type' },
+        { key: 'g', text: 'Mini-game' },
       ]}
     >
+      <View testID="more-rows">
+        {leagueActivity ? (
+          <ExpandRow label="League activity" title="League activity" caption="Most active manager, streaks" testID="more-league-activity">
+            {leagueActivity}
+          </ExpandRow>
+        ) : null}
+        {guessGame ? (
+          <ExpandRow label="Guess the Player" title="Guess the Player" caption="Today's round" testID="more-guess-player">
+            {guessGame}
+          </ExpandRow>
+        ) : null}
+      </View>
       {children}
     </CompactModule>
   );

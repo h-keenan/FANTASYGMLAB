@@ -5,14 +5,12 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import PickAvatar from './PickAvatar';
 import PlayerAvatar from './PlayerAvatar';
-import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import { Collapse } from './Presence';
 import PressableScale from './PressableScale';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { playerHeadshotId, playerInitials } from '../lib/playerAnatomy';
-import type { TodayRoomChip, TodayTile, TodayTradeAsset, TodayTradeIdea } from '../lib/todayView';
-import { tradeIdeaGainText } from '../lib/tradeIdeaSummary';
+import { tradeGainLabel, type TodayRoomChip, type TodayTile, type TodayTradeAsset, type TodayTradeIdea } from '../lib/todayView';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 
 type Tone = 'success' | 'danger' | 'warning' | 'accent' | 'muted' | 'neutral';
@@ -29,30 +27,25 @@ function toneColor(tone: Tone, colors: ThemeColors): string {
 }
 
 /**
- * The compact tile row under "Do this now": Standing, Playoffs, Trades (model: lib/todayView.ts todayTiles). One tile per
- * fact; each opens the screen that owns the detail. Web twin: components/TodayGlance.tsx.
+ * The one snapshot strip under "Do this now": Standing, Playoffs, Team rank (model: lib/todayView.ts todayTiles). It is a
+ * single control: the whole strip opens My Team, which hosts the rank bars, position rooms and tiles. Web twin:
+ * components/TodayGlance.tsx.
  */
-export function TodayTiles({ tiles, onOpen }: { tiles: TodayTile[]; onOpen: (key: TodayTile['key']) => void }) {
+export function TodaySnapshotStrip({ tiles, onOpen }: { tiles: TodayTile[]; onOpen: () => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (tiles.length === 0) return null;
   return (
-    <View style={styles.tiles} testID="today-tiles">
-      {tiles.map((tile) => (
-        <PressableScale
-          key={tile.key}
-          accessibilityRole="button"
-          accessibilityLabel={`${tile.label.toLowerCase()}: ${tile.value} ${tile.sub}. Open`}
-          onPress={() => onOpen(tile.key)}
-          style={styles.tile}
-          testID={`today-tile-${tile.key}`}
-        >
+    <PressableScale accessibilityRole="button" accessibilityLabel={`${tiles.map((t) => `${t.label.toLowerCase()} ${t.value} ${t.sub}`).join(', ')}. Open My Team`} onPress={onOpen} style={styles.tiles} testID="today-tiles">
+      {tiles.map((tile, i) => (
+        <View key={tile.key} style={[styles.tile, i > 0 ? styles.tileDivider : null]} testID={`today-tile-${tile.key}`}>
           <AppText style={styles.kicker}>{tile.label}</AppText>
           <AppText style={[styles.tileValue, { color: toneColor(tile.tone === 'muted' ? 'neutral' : tile.tone, colors) }]}>{tile.value}</AppText>
           <AppText style={styles.tileSub}>{tile.sub}</AppText>
-        </PressableScale>
+        </View>
       ))}
-    </View>
+      <AppText style={styles.arrow}>›</AppText>
+    </PressableScale>
   );
 }
 
@@ -114,46 +107,42 @@ export function TodayRooms({ chips, onOpenTrades }: { chips: TodayRoomChip[]; on
   );
 }
 
-function TradeSide({ label, assets }: { label: string; assets: TodayTradeAsset[] }) {
+/**
+ * The best trade as ONE compact row: avatars of who you send, an arrow, who you get, and the gain in green. A trade that
+ * costs value never reaches this row (lib/todayView.ts bestTradeIdea); no negative or red figure is ever drawn. The row
+ * opens it in Trade Hub. Web twin: TodayTradeRow in components/TodayGlance.tsx.
+ */
+export function TodayTradeRow({ idea, deadline, onOpen, info }: { idea: TodayTradeIdea; deadline?: string | null; onOpen: () => void; info?: React.ReactNode }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  if (assets.length === 0) return null;
+  const gain = tradeGainLabel(idea);
+  const faces = (assets: TodayTradeAsset[]) =>
+    assets.slice(0, 2).map((a) =>
+      a.isPick ? <PickAvatar key={a.name} label={a.name} size={28} /> : <PlayerAvatar key={a.id ?? a.name} playerId={playerHeadshotId({ id: a.id, name: a.name })} tier={a.tier ?? undefined} size={28} fallbackLabel={playerInitials(a.name)} />,
+    );
+  const names = (assets: TodayTradeAsset[]) => assets.map((a) => a.name).join(' + ');
   return (
-    <View style={styles.sideRow}>
-      <AppText style={[styles.kicker, styles.sideLabel]}>{label.toUpperCase()}</AppText>
-      {assets.slice(0, 2).map((a) => (
-        <View key={a.id ?? a.name} style={styles.asset}>
-          {a.isPick ? (
-            <PickAvatar label={a.name} size={24} />
-          ) : (
-            <PlayerAvatar playerId={playerHeadshotId({ id: a.id, name: a.name })} tier={a.tier ?? undefined} size={24} fallbackLabel={playerInitials(a.name)} />
-          )}
-          {a.isPick ? <AppText style={styles.assetName}>{a.name}</AppText> : <PlayerName name={a.name} style={styles.assetName} />}
-          {a.position ? <PositionBadge position={a.position} /> : null}
-        </View>
-      ))}
-      {assets.length > 2 ? <AppText style={styles.tileSub}>+{assets.length - 2}</AppText> : null}
-    </View>
-  );
-}
-
-/** The trade idea as one card (concept B): kicker, "Get a QB from Team Iron", who goes and who comes, the value gain. The whole card opens it in Trade Hub. */
-export function TodayTradeIdeaCard({ idea, deadline, onOpen, info }: { idea: TodayTradeIdea; deadline?: string | null; onOpen: () => void; info?: React.ReactNode }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const gain = idea.gain != null && idea.gain !== 0 ? tradeIdeaGainText(idea.gain) : null;
-  return (
-    <AccentCard accent={colors.accent} compact onPress={onOpen}>
+    <AccentCard accent={colors.accent} compact>
       <View style={styles.tradeHead}>
-        <AppText style={[styles.kicker, { color: colors.accent }]}>{`TRADE IDEA${deadline ? ` · DEADLINE ${deadline.toUpperCase()}` : ''}`}</AppText>
+        <AppText style={[styles.kicker, { color: colors.accent }]}>{`BEST TRADE${deadline ? ` · DEADLINE ${deadline.toUpperCase()}` : ''}`}</AppText>
         {info}
-        {gain ? <AppText style={[styles.gain, styles.gainEnd, { color: (idea.gain ?? 0) > 0 ? colors.success : colors.textSecondary }]}>{gain} value</AppText> : null}
       </View>
-      <View testID="today-trade-idea" accessible accessibilityRole="button" accessibilityLabel={`Trade idea: ${idea.title}. Open in Trade Hub`} style={styles.tradeBody}>
-        <AppText style={styles.tradeTitle}>{idea.title}</AppText>
-        <TradeSide label="Send" assets={idea.send} />
-        <TradeSide label="Get" assets={idea.receive} />
-      </View>
+      <PressableScale testID="today-trade-idea" accessibilityRole="button" accessibilityLabel={`Best trade: ${idea.title}${gain ? `, ${gain} value` : ''}. Open in Trade Hub`} onPress={onOpen} style={styles.tradeRow}>
+        <View style={styles.faces}>
+          {faces(idea.send)}
+          <AppText style={styles.tileSub}>→</AppText>
+          {faces(idea.receive)}
+        </View>
+        <View style={styles.tradeText}>
+          <AppText style={styles.tradeTitle}>{idea.title}</AppText>
+          <AppText style={styles.tileSub}>{[idea.send.length > 0 ? names(idea.send) : null, idea.receive.length > 0 ? names(idea.receive) : null].filter(Boolean).join(' → ')}</AppText>
+        </View>
+        {gain ? (
+          <AppText style={[styles.gain, { color: colors.success }]} testID="today-trade-gain">
+            {gain}
+          </AppText>
+        ) : null}
+      </PressableScale>
     </AccentCard>
   );
 }
@@ -161,9 +150,11 @@ export function TodayTradeIdeaCard({ idea, deadline, onOpen, info }: { idea: Tod
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, color: colors.textTertiary },
-    tiles: { flexDirection: 'row', gap: spacing.sm },
-    tile: { flex: 1, minWidth: 0, minHeight: 76, alignItems: 'center', justifyContent: 'center', gap: 2, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: spacing.xs },
-    tileValue: { fontSize: 24, fontWeight: '800' },
+    tiles: { flexDirection: 'row', alignItems: 'stretch', minHeight: 60, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+    tile: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xs, paddingHorizontal: spacing.xs },
+    tileDivider: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border },
+    arrow: { alignSelf: 'center', paddingRight: spacing.md, fontSize: 20, color: colors.accent },
+    tileValue: { fontSize: 20, fontWeight: '800' },
     tileSub: { fontSize: 12.5, color: colors.textTertiary },
     roomsHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
     roomsText: { flex: 1, minWidth: 0, gap: 4 },
@@ -178,14 +169,11 @@ function createStyles(colors: ThemeColors) {
     barLabel: { fontSize: 12.5, fontWeight: '700', minWidth: 72, textAlign: 'right' },
     link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
     linkText: { color: colors.accent, fontWeight: '700', fontSize: 14 },
-    tradeBody: { gap: 4 },
-    tradeHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    gain: { fontSize: 12.5, fontWeight: '800' },
-    gainEnd: { marginLeft: 'auto' },
-    tradeTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
-    sideRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
-    sideLabel: { width: 36 },
-    asset: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-    assetName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    tradeHead: { flexDirection: 'row', alignItems: 'center' },
+    tradeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
+    faces: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    tradeText: { flex: 1, minWidth: 0 },
+    gain: { fontSize: 14, fontWeight: '800' },
+    tradeTitle: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
   });
 }
