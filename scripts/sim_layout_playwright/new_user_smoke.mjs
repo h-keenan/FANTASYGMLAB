@@ -146,6 +146,7 @@ const goto = (env, path) => env.page.goto(`${BASE}${path}`, { waitUntil: "domcon
   await check(env, "1a intro (signed out, first visit)", { expectSel: [".onboarding-skip"] });
   await env.page.locator(".onboarding-skip").first().click();
   await check(env, "1a landing (signed out)", { expectSel: ['[data-testid="connect-hero"] input'], expectText: ["Connect your league"] });
+  await env.page.locator('[data-testid="connect-mode-tabs"]').getByText("Try a sample league", { exact: true }).first().click();
   await env.page.getByTestId("sample-league-button").first().click();
   await env.page.waitForURL("**/sample-league", { timeout: T });
   await check(env, "1b sample league Today", { expectSel: ['[data-testid="sample-banner"]'], expectText: ["Sample league"] });

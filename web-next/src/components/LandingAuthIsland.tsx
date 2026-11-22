@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { OnboardingShell } from "@/components/OnboardingShell";
-import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
+import { ConnectModeTabs } from "@/components/ConnectModeTabs";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
 import { trackFeatureUse, trackUse } from "@/lib/analytics";
@@ -298,8 +298,8 @@ export function LandingAuthIsland() {
           <h1 className="onboarding-headline onboarding-headline--sm">Connect your league</h1>
           <p className="onboarding-body">Type your Sleeper username. We read your real roster and build your first Today briefing. No account needed to start.</p>
         </header>
+        <ConnectModeTabs>
         <SleeperImportForm
-          sampleCtaBelow
           onLeagueChosen={handleLeagueChosen}
           onStartSession={() => {
             setGuestFlow(true);
@@ -313,8 +313,7 @@ export function LandingAuthIsland() {
             />
           }
         />
-        {/* Always-visible escape for someone without a league to connect (reuses the sample route). */}
-        <SampleLeagueButton surface="connect_step" variant="secondary" />
+        </ConnectModeTabs>
       </div>
     );
   }
@@ -330,7 +329,7 @@ export function LandingAuthIsland() {
       }}
     />
   ) : (
-    <OnboardingShell footer={<SampleLeagueButton surface="connect_step" />}>
+    <OnboardingShell>
       <div className="onboarding-connect" data-testid="connect-first-heading">
         {returnedFromCheckout ? (
           <p role="status" className="text-sm font-bold text-center" style={{ color: "var(--color-success)" }}>
@@ -343,7 +342,9 @@ export function LandingAuthIsland() {
           <h1 className="onboarding-headline onboarding-headline--sm">Connect your league</h1>
           <p className="onboarding-body">Type your Sleeper username. We read your real roster and build your first Today briefing.</p>
         </header>
-        <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
+        <ConnectModeTabs>
+          <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
+        </ConnectModeTabs>
       </div>
     </OnboardingShell>
   );

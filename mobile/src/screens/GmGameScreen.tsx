@@ -17,6 +17,7 @@ import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import BottomPill from '../components/BottomPill';
+import { simHubPresets } from '../lib/simHubPresets';
 import SimActionBar from '../components/SimActionBar';
 import { SimGameHeader, SimStatusChips } from '../components/SimGameHeader';
 import { SimNotificationBell, useSimNotifications } from '../components/SimNotificationBell';
@@ -144,7 +145,8 @@ type FlowState = typeof SIM_FLOW_INITIAL;
  * gating (premium_required is a 200 that did nothing, 409 = reload + retry)
  * behaves the same on both platforms.
  */
-export default function GmGameScreen({ navigation }: Props) {
+export default function GmGameScreen({ navigation, route }: Props) {
+  const quickStart = route.params?.quickStart === true;
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -275,6 +277,19 @@ export default function GmGameScreen({ navigation }: Props) {
       cancelled = true;
     };
   }, [attempt]);
+
+  // Deep link / onboarding "Play Fantasy Sim": with no saved game yet, open straight into a Quick preset game. The
+  // free-season and saved-game limits still apply (a blocked hub stays on the hub; the server enforces the same gate).
+  const quickStarted = useRef(false);
+  useEffect(() => {
+    if (!quickStart || quickStarted.current || flow.view !== 'hub' || !options) return;
+    if (games.length > 0 || simNewGameBlock(games.length, options.max_games ?? 1, options.is_premium, options.free_season_used)) return;
+    const quick = simHubPresets(options).find((p) => p.id === 'quick');
+    if (!quick) return;
+    quickStarted.current = true;
+    void createGame(simSetupBody(quick.state));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickStart, flow.view, options, games]);
 
   const refreshList = useCallback(async () => {
     try {
