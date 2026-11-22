@@ -273,7 +273,7 @@ const EXPECTED_HTTP = /HTTP (401|404|500)|Failed to load resource/;
   const env = await newPage(browser, bd());
   env.w.fail = { match: DASH, override: { ...FIX.dashboard, items: [], quiet: false, this_week: undefined } };
   await goto(env, "/dashboard");
-  await check(env, "7e partial data: page still renders", { app: true, expectText: ["Team rank"] });
+  await check(env, "7e partial data: page still renders", { app: true, expectText: ["Rank #2"] });
   await env.ctx.close();
 }
 {
