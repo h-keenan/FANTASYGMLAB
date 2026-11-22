@@ -143,6 +143,8 @@ const goto = (env, path) => env.page.goto(`${BASE}${path}`, { waitUntil: "domcon
 {
   const env = await newPage(browser, world());
   await goto(env, "/");
+  await check(env, "1a intro (signed out, first visit)", { expectSel: [".onboarding-skip"] });
+  await env.page.locator(".onboarding-skip").first().click();
   await check(env, "1a landing (signed out)", { expectSel: ['[data-testid="connect-hero"] input'], expectText: ["Connect your league"] });
   await env.page.getByTestId("sample-league-button").first().click();
   await env.page.waitForURL("**/sample-league", { timeout: T });
@@ -156,6 +158,8 @@ const goto = (env, path) => env.page.goto(`${BASE}${path}`, { waitUntil: "domcon
 {
   const env = await newPage(browser, world());
   await goto(env, "/");
+  await check(env, "2 intro (signed out, first visit)", { expectSel: [".onboarding-skip"] });
+  await env.page.locator(".onboarding-skip").first().click();
   await env.page.locator('[data-testid="connect-hero"] input').first().fill(SLEEPER_USERNAME);
   await env.page.locator('[data-testid="connect-hero"] button[type="submit"], [data-testid="connect-hero"] form button').first().click();
   await env.page.waitForURL(`**/dashboard/${LID}**`, { timeout: T });
@@ -190,6 +194,8 @@ const goto = (env, path) => env.page.goto(`${BASE}${path}`, { waitUntil: "domcon
   const env = await newPage(browser, world());
   await goto(env, "/dashboard");
   await env.page.waitForURL(`${BASE}/`, { timeout: T });
+  await check(env, "4a intro (signed out, first visit)", { expectSel: [".onboarding-skip"] });
+  await env.page.locator(".onboarding-skip").first().click();
   await check(env, "4a /dashboard signed out -> /", { expectSel: ['[data-testid="connect-hero"]'] });
   await env.ctx.close();
 }
