@@ -133,6 +133,13 @@ describe("leaguePulseHighlights", () => {
 });
 
 describe("LeaguePulseCard", () => {
+  it("shows initials, not a blank disc, for a team without an avatar", async () => {
+    vi.mocked(api.getTeamRankings).mockResolvedValue({ ok: true, reason: "", teams: [team({ roster_id: "1", team_name: "Trade Machine", avatar_url: null, transaction_activity_count: 9 })] } as never);
+    render(<LeaguePulseCard leagueId="abc" leagueName="My League" />);
+    const card = await screen.findByTestId("league-pulse-card");
+    expect(card.textContent).toMatch(/TM/);
+  });
+
   it("the header links to News > My League with a chevron; each team name is its own team-sheet button, never nested in that link", async () => {
     vi.mocked(api.getTeamRankings).mockResolvedValue({ ok: true, reason: "", teams: [team({ roster_id: "1", current_streak: 3, transaction_activity_count: 5 })] } as never);
     render(<LeaguePulseCard leagueId="abc" leagueName="My League" />);

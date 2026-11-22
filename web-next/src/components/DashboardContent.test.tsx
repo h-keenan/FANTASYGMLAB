@@ -121,7 +121,7 @@ describe("DashboardContent", () => {
     expect(await screen.findByText("Nothing needs you this week")).toBeInTheDocument();
   });
 
-  it("orders modules: do this now, snapshot strip, best trade, alerts, More", async () => {
+  it("orders modules: do this now (best trade is one of its rows), standing line, alerts; no More", async () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       entitlement: { ...FIXTURE.entitlement, free_limit: 1 },
@@ -132,29 +132,33 @@ describe("DashboardContent", () => {
     await screen.findByTestId("today-tiles");
     const html = container.innerHTML;
     const at = (marker: string) => html.indexOf(marker);
-    const order = [at("decision-queue-heading"), at("today-tiles"), at("today-trade-idea"), at("dashboard-alerts"), at("dashboard-more")];
+    const order = [at("decision-queue-heading"), at("decision-trade"), at("today-tiles"), at("dashboard-alerts")];
     expect(order.every((i) => i > -1)).toBe(true);
     expect([...order].sort((x, y) => x - y)).toEqual(order);
+    // League activity, the mini-games and League type moved off Today (League tab / My Team).
+    expect(at("dashboard-more")).toBe(-1);
     // Free caps are one compact upsell row (no separate free-limit note).
     expect(screen.getByTestId("more-moves-upsell")).toBeInTheDocument();
   });
 
-  it("shows the best trade as one compact row (send to get, green gain) that opens Trade Hub, with the real deadline", async () => {
+  it("puts the best trade in Do this now as one row (receive avatar, short reason, Send offer) that opens Trade Hub", async () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       trade_window: { trade_deadline_week: 11, current_week: 9, trade_deadline_passed: false, message: "" },
       items: [{ ...FIXTURE.items[0], presentation: TRADE_PRESENTATION } as unknown as DashboardResponse["items"][number]],
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
-    const card = await screen.findByTestId("today-trade-idea");
-    expect(card).toHaveTextContent("Get a QB from Team Iron");
-    expect(card).toHaveTextContent(/deadline 2 wks left/);
-    expect(screen.getByTestId("today-trade-gain")).toHaveTextContent("+450");
-    expect(screen.getByTestId("today-trade-gain")).toHaveStyle({ color: "var(--color-success)" });
-    expect(within(card).getByRole("link")).toHaveAttribute("href", expect.stringContaining("/trade-hub/abc"));
-    // No trades tile any more (the row is the one place); the trade is not in the Decision Queue too.
+    const row = await screen.findByTestId("decision-trade");
+    expect(row).toHaveTextContent("Get a QB from Team Iron");
+    const button = within(row).getByTestId("decision-primary");
+    expect(button).toHaveTextContent("Send offer");
+    expect(button).toHaveAttribute("href", expect.stringContaining("/trade-hub/abc"));
+    // Its tap shows what you send and get, and the gain, in green-safe wording (never a negative figure).
+    fireEvent.click(within(row).getByTestId("decision-trade-toggle"));
+    expect(screen.getByTestId("decision-trade-detail")).toHaveTextContent("Send R. Walsh · Get C. Murray · +450 value");
+    // The old standalone trade card is gone (one place), and no trades tile.
+    expect(screen.queryByTestId("today-trade-idea")).not.toBeInTheDocument();
     expect(screen.queryByTestId("today-tile-trades")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("decision-item")).not.toBeInTheDocument();
   });
 
   it("never headlines a trade that costs value: a negative idea is hidden, the best positive one leads, nothing is red", async () => {
@@ -162,11 +166,12 @@ describe("DashboardContent", () => {
     const mk = (presentation: typeof TRADE_PRESENTATION, id: string) => ({ ...FIXTURE.items[0], presentation, recommendation_id: id }) as unknown as DashboardResponse["items"][number];
     const only = render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={{ ...FIXTURE, items: [mk(neg, "n")] }} />);
     await screen.findByTestId("today-tiles");
-    expect(screen.queryByTestId("today-trade-idea")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("decision-trade")).not.toBeInTheDocument();
     expect(only.container.textContent).not.toMatch(/-125/);
     only.unmount();
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={{ ...FIXTURE, items: [mk(neg, "n"), mk(TRADE_PRESENTATION, "p")] }} />);
-    expect(await screen.findByTestId("today-trade-gain")).toHaveTextContent("+450");
+    fireEvent.click(await screen.findByTestId("decision-trade-toggle"));
+    expect(await screen.findByTestId("decision-trade-detail")).toHaveTextContent("+450 value");
   });
 
   it("lists urgent items once in the Decision Queue, linking to GM Plan / Matchup", () => {
@@ -198,18 +203,17 @@ describe("DashboardContent", () => {
     expect(screen.getAllByText(/Trade for a top-12 RB/)).toHaveLength(1);
   });
 
-  it("caps the queue at three rows and opens the rest in place with See all (N)", () => {
+  it("caps Do this now at five rows and sends the rest to the GM Plan with See all (N)", () => {
     const many: DashboardResponse = {
       ...FIXTURE,
-      items: Array.from({ length: 5 }, (_, i) => ({ ...FIXTURE.items[0], headline: `Decision ${i}`, recommendation_id: `r${i}`, route_player_score: 50 - i })),
+      items: Array.from({ length: 7 }, (_, i) => ({ ...FIXTURE.items[0], headline: `Decision ${i}`, recommendation_id: `r${i}`, route_player_score: 50 - i })),
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={many} />);
     const block = screen.getByTestId("decision-queue");
-    expect(within(block).getAllByTestId("decision-primary")).toHaveLength(3);
-    fireEvent.click(within(block).getByRole("button", { name: "See all (5)" }));
     expect(within(block).getAllByTestId("decision-primary")).toHaveLength(5);
-    fireEvent.click(within(block).getByRole("button", { name: "Show top 3" }));
-    expect(within(block).getAllByTestId("decision-primary")).toHaveLength(3);
+    expect(within(block).getByRole("heading", { name: /^Do this now · 7/ })).toBeInTheDocument();
+    expect(within(block).getByTestId("decision-see-all")).toHaveTextContent("See all (7)");
+    expect(within(block).getByTestId("decision-see-all")).toHaveAttribute("href", "/gm-plan/abc?name=Dynasty%20Overlords");
   });
 
   it("shows no decision rows when nothing is urgent", async () => {
@@ -223,7 +227,7 @@ describe("DashboardContent", () => {
     expect(screen.queryByText(/Trade deadline/i)).not.toBeInTheDocument();
   });
 
-  it("hides the trade row after the deadline", async () => {
+  it("has no trade row after the deadline", async () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       trade_window: { trade_deadline_week: 11, current_week: 12, trade_deadline_passed: true, message: "x" },
@@ -231,10 +235,10 @@ describe("DashboardContent", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
     await screen.findByTestId("today-tiles");
     expect(screen.queryByTestId("today-tile-trades")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("today-trade-idea")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("decision-trade")).not.toBeInTheDocument();
   });
 
-  it("turns the matchup's lineup problems into ONE one-line row; its tap lists each swap with the bench fix, the gain and a Fix all button", async () => {
+  it("turns each lineup problem into its own one-line row (avatar, reason, Swap) and puts the best move on the matchup card", async () => {
     const player = (id: string, name: string, pos: string, injury = "") => ({ player_id: id, name, position: pos, team: "NE", tier: "starter", slot: pos, points: 10, projection_status: null, injury_label: injury });
     const spy = vi.spyOn(api, "getLeagueMatchup").mockResolvedValue({
       ok: true,
@@ -253,25 +257,23 @@ describe("DashboardContent", () => {
     vi.spyOn(api, "getTeamRankings").mockRejectedValue(new Error("x"));
     try {
       render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={{ ...FIXTURE, items: [] }} />);
-      const lineup = await screen.findByTestId("decision-lineup");
-      expect(lineup).toHaveTextContent("2 lineup swaps · +21.0");
-      expect(within(lineup).getByTestId("decision-primary")).toHaveTextContent("Fix all");
-      fireEvent.click(within(lineup).getByTestId("decision-lineup-toggle"));
-      const stack = await screen.findByTestId("swap-stack");
-      const rows = within(stack).getAllByTestId("swap-row");
-      // The locked move (his game started) is never offered.
+      const rows = await screen.findAllByTestId("decision-lineup");
+      // The locked move (his game started) is never offered; biggest gain first.
       expect(rows).toHaveLength(2);
-      expect(rows[0]).toHaveTextContent("Jordan Reyes");
-      expect(rows[0]).toHaveTextContent("Out");
-      expect(rows[0]).toHaveTextContent("start Sam Ortiz");
-      expect(rows[0]).toHaveTextContent("+11.2");
-      expect(rows[1]).toHaveTextContent("Questionable");
-      expect(within(rows[0]).getByTestId("swap-button")).toHaveAttribute("href", expect.stringContaining("plan=swap&out=o1&in=s1"));
-      expect(within(stack).getByTestId("swap-fix-all")).toHaveTextContent("Fix all 2 · +21.0 proj");
-      expect(within(stack).getByTestId("swap-fix-all")).toHaveAttribute("href", expect.stringContaining("plan=all"));
+      expect(rows[0]).toHaveTextContent("Reyes out, start Ortiz");
+      expect(rows[0]).toHaveTextContent("+11.2 projected");
+      expect(rows[1]).toHaveTextContent("Bell questionable, start Kline");
+      expect(within(rows[0]).getByTestId("decision-primary")).toHaveTextContent("Swap");
+      expect(within(rows[0]).getByTestId("decision-primary")).toHaveAttribute("href", expect.stringContaining("plan=swap&out=o1&in=s1"));
+      // Its tap shows the replacement as a player card.
+      fireEvent.click(within(rows[0]).getByTestId("decision-lineup-toggle"));
+      expect(within(rows[0]).getByTestId("decision-player")).toHaveTextContent("Sam Ortiz");
+      // The matchup card's one best-move line opens the planner on the same swap.
+      const move = screen.getByTestId("today-matchup-move");
+      expect(move).toHaveTextContent("Start Ortiz over Reyes (+11.2)");
+      expect(move).toHaveAttribute("href", expect.stringContaining("plan=swap&out=o1&in=s1"));
       // Each fact once: the lineup problems are not repeated as a Lineup module, and nothing says "nothing needs you".
       expect(screen.queryByText(/Nothing needs you/)).not.toBeInTheDocument();
-      expect(screen.getAllByText("Jordan Reyes")).toHaveLength(1);
       // The matchup ring card: win chance, scores, trailing chip; tap opens the detail.
       const card = screen.getByTestId("today-matchup");
       expect(card).toHaveTextContent("WK 10 · VS SHIESTY");
@@ -296,16 +298,11 @@ describe("DashboardContent", () => {
     expect(collapsedModuleProblems(container)).toEqual([]);
   });
 
-  it("keeps the mini-games collapsed behind More", () => {
+  it("keeps League activity, Guess the Player and League type off Today", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
-    expect(within(screen.getByTestId("dashboard-more")).getByRole("button", { name: /^More/ })).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("keeps League type off Today (it lives on My Team's league settings) and the mini-games one line each", () => {
-    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    expect(screen.queryByTestId("dashboard-more")).not.toBeInTheDocument();
     expect(screen.queryByText("League type")).not.toBeInTheDocument();
-    fireEvent.click(within(screen.getByTestId("dashboard-more")).getByRole("button", { name: /^More/ }));
-    for (const id of ["more-league-activity", "more-guess-player", "more-name-match"]) expect(screen.getByTestId(id)).toBeInTheDocument();
+    for (const id of ["more-league-activity", "more-guess-player", "more-name-match"]) expect(screen.queryByTestId(id)).not.toBeInTheDocument();
   });
 
   it("shows the direction check-in the server asks for, on the real Dashboard only (not the sample preview)", async () => {

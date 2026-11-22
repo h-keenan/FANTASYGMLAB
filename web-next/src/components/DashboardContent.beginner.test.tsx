@@ -86,7 +86,7 @@ describe("DashboardContent for a beginner", () => {
     expect(screen.getByText(/No move is needed right now/)).toBeInTheDocument();
   });
 
-  it("explains trades to a beginner on the best-trade row's one \"?\"; the stance line moved off Today (GM Plan owns it)", async () => {
+  it("explains trades to a beginner on the Do this now \"?\" when a trade row is in it; the stance line moved off Today (GM Plan owns it)", async () => {
     const withIdea: DashboardResponse = {
       ...FIXTURE,
       items: [
@@ -103,9 +103,9 @@ describe("DashboardContent for a beginner", () => {
       ],
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={withIdea} />);
-    await screen.findByTestId("today-trade-idea");
+    await screen.findByTestId("decision-trade");
     expandHelp();
-    expect(screen.getByText(/who you give, who you get/)).toBeInTheDocument(); // the trade row's one "?"
+    expect(screen.getByText(/who you give, who you get/)).toBeInTheDocument(); // the Do this now "?" carries the trade explainer
     expect(screen.queryByTestId("dashboard-stance-line")).not.toBeInTheDocument();
   });
 });

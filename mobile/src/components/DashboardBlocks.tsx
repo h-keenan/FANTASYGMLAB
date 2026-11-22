@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import CompactModule from './CompactModule';
-import { ExpandRow } from './ExpandRow';
 import { type StatStripItem } from './DashboardStatRow';
 import { StatStripModule } from './ModuleTemplates';
 import ToneBadge from './ToneBadge';
@@ -149,34 +148,13 @@ export function DashboardTeamStats({
 }
 
 /**
- * Secondary modules, collapsed (twin of web DashboardMore): league activity and the mini-games, ONE line each in the
- * module's own ExpandRow; the rest (storylines, quick actions, standings strips) keeps its place inside. The League type
- * control lives on My Team's league settings.
+ * Secondary modules, collapsed (twin of nothing on web: web's Today has no More): the storylines, quick actions and standings
+ * strips keep their place inside. League activity and the mini-games moved to the League tab (screens/TeamsScreen.tsx), and
+ * the League type control lives on My Team's league settings.
  */
-export function DashboardMore({ leagueActivity, guessGame, children }: { leagueActivity?: React.ReactNode; guessGame?: React.ReactNode; children?: React.ReactNode }) {
+export function DashboardMore({ children }: { children?: React.ReactNode }) {
   return (
-    <CompactModule
-      id="today.more"
-      title="More"
-      testID="dashboard-more"
-      tone="muted"
-      parts={[
-        { key: 'a', text: 'League activity' },
-        { key: 'g', text: 'Mini-game' },
-      ]}
-    >
-      <View testID="more-rows">
-        {leagueActivity ? (
-          <ExpandRow label="League activity" title="League activity" caption="Most active manager, streaks" testID="more-league-activity">
-            {leagueActivity}
-          </ExpandRow>
-        ) : null}
-        {guessGame ? (
-          <ExpandRow label="Guess the Player" title="Guess the Player" caption="Today's round" testID="more-guess-player">
-            {guessGame}
-          </ExpandRow>
-        ) : null}
-      </View>
+    <CompactModule id="today.more" title="More" testID="dashboard-more" tone="muted" parts={[{ key: 'a', text: 'Quick actions, standings' }]}>
       {children}
     </CompactModule>
   );

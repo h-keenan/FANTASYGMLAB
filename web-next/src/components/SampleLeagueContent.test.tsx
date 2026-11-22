@@ -25,7 +25,7 @@ describe("SampleLeagueContent", () => {
     expect(screen.getAllByRole("link", { name: "Connect your league" })[0].getAttribute("href")).toBe("/connect-league");
   });
 
-  it("opens on the sample Dashboard with the real modules, filled from static data and no network", async () => {
+  it("opens on the sample Dashboard with the real modules, filled from static data and no network", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     render(<SampleLeagueContent />);
     expect(screen.getByTestId("sample-dashboard")).toBeTruthy();
@@ -34,8 +34,8 @@ describe("SampleLeagueContent", () => {
     expect(screen.getAllByText(/Sell Casey Placeholder/).length).toBeGreaterThan(0);
     // The snapshot strip (Standing / Playoffs / Team rank) is one link to My Team (inert in the sample).
     expect(screen.getByTestId("today-tiles")).toBeTruthy();
-    // League Activity fills from the static promise.
-    expect(await screen.findByTestId("league-pulse-card")).toBeTruthy();
+    // League activity moved to the League tab: the sample Today no longer carries it.
+    expect(screen.queryByTestId("league-pulse-card")).toBeNull();
     expect(screen.getByTestId("sample-banner")).toBeTruthy();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -71,13 +71,6 @@ describe("SampleLeagueContent", () => {
     expect(screen.getByTestId("sample-dashboard").hasAttribute("data-inert-links")).toBe(true);
     // The banner is one slim row: badge + CTA, no stacked layout.
     expect(screen.getByTestId("sample-banner").className).toContain("items-center");
-  });
-
-  it("shows initials, not blank discs, for League Activity teams", async () => {
-    render(<SampleLeagueContent />);
-    const card = await screen.findByTestId("league-pulse-card");
-    expect(card.textContent).toMatch(/TP|MM|EE/);
-    expect(card.textContent).not.toContain("›");
   });
 
   it("ends the Trade tab with a connect-your-league CTA module", () => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, { useEffect, useMemo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
@@ -16,8 +16,8 @@ import { SkeletonCard } from './Skeleton';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { DashboardEntitlementInfo, DashboardItem } from '../lib/api';
 import { trackUse } from '../lib/analytics';
-import { seeAllLabel, type Decision, type DecisionPlayer, type DecisionSwap, type DecisionQueue as Queue } from '../lib/decisionQueue';
-import { swapGainLabel, swapReplacementLine, todayActionRow, todayFixAll } from '../lib/todayView';
+import type { Decision, DecisionPlayer, DecisionSwap, DecisionQueue as Queue } from '../lib/decisionQueue';
+import { swapGainLabel, type TodayAction } from '../lib/todayView';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 
 const ITEM_ROUTE: Record<string, string> = { trade_hub: 'Trades', waivers: 'Waivers', my_team: 'MyTeam', draft_center: 'DraftCenter' };
@@ -39,60 +39,6 @@ function playerRef(p: DecisionPlayer) {
   return { id: p.id, name: p.name, position: p.position, team: p.team, tier: p.tier };
 }
 
-const SWAP_VISIBLE = 4;
-
-/**
- * The lineup row's detail (behind its tap): one row per lineup problem (the shared player card: avatar, status, who to
- * start instead, the projected gain) with a one-tap Swap, plus "Fix all N · +X proj". Swap opens the Matchup screen's lineup
- * planner already on that move (FantasyDesk plans, it cannot set a Sleeper lineup). Locked players (game started) are never
- * in `swaps`; see lib/decisionQueue.ts lineupSwaps. Web twin: SwapDetail in components/DecisionQueue.tsx.
- */
-function SwapDetail({ d, onOpen }: { d: Decision<DashboardItem>; onOpen: (swap: DecisionSwap | null) => void }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const [all, setAll] = useState(false);
-  const shown = all ? d.swaps : d.swaps.slice(0, SWAP_VISIBLE);
-  const fixAll = todayFixAll(d.swaps);
-  const hidden = d.swaps.length - shown.length;
-  return (
-    <View testID="swap-stack">
-      {shown.map((swap, i) => {
-        const gain = swapGainLabel(swap);
-        const detail = (
-          <>
-            <AppText style={{ color: swap.tone === 'danger' ? colors.danger : colors.warning, fontWeight: '800', fontSize: 12 }}>{swap.status.toUpperCase()}</AppText>
-            {` → ${swapReplacementLine(swap)}`}
-          </>
-        );
-        const gainFigure = gain ? <AppText style={[styles.statValue, { color: colors.success }]}>{gain}</AppText> : undefined;
-        return (
-          <View key={swap.key} style={[styles.swapRow, i > 0 ? styles.swapDivider : null]} testID="swap-row">
-            <View style={styles.swapPlayer}>
-              {swap.out ? (
-                <CompactPlayerCard player={playerRef(swap.out)} detail={detail} trailing={gainFigure} testID="swap-player" />
-              ) : (
-                <View style={styles.emptySlot}>
-                  <View style={[styles.emptyDot, { borderColor: colors.warning }]}>
-                    <AppText style={{ color: colors.warning, fontWeight: '800' }}>+</AppText>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <AppText style={styles.emptyTitle}>Empty starter slot</AppText>
-                    <AppText style={styles.facts}>{swapReplacementLine(swap)}</AppText>
-                  </View>
-                  {gainFigure}
-                </View>
-              )}
-            </View>
-            <Button label="Swap" size="sm" onPress={() => onOpen(swap)} />
-          </View>
-        );
-      })}
-      {hidden > 0 ? <Button label={`+${hidden} more`} variant="ghost" size="sm" onPress={() => setAll(true)} /> : null}
-      {fixAll ? <Button label={fixAll.label} onPress={() => onOpen(null)} /> : null}
-    </View>
-  );
-}
-
 /**
  * "Do this now" (docs/ui-patterns.md, "Decision Queue"): the lineup's swap stack first, then the other ranked decisions
  * (waivers, deadline, draft, injuries) as compact modules, the rest behind "See all (N)". The queue says "nothing needs you"
@@ -101,6 +47,7 @@ function SwapDetail({ d, onOpen }: { d: Decision<DashboardItem>; onOpen: (swap: 
  */
 export default function DecisionQueue({
   queue,
+  actions,
   leagueId,
   leagueName,
   onNavigate,
@@ -110,6 +57,8 @@ export default function DecisionQueue({
   renderItemCard,
 }: {
   queue: Queue<DashboardItem>;
+  /** The ranked, capped rows (lib/todayView.ts todayActions): lineup fixes, waivers, deadline, injuries, the best trade. */
+  actions: { rows: TodayAction<DashboardItem>[]; total: number };
   leagueId: string;
   leagueName: string;
   onNavigate: (name: string, params?: object) => void;
@@ -122,17 +71,13 @@ export default function DecisionQueue({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const copy = useExperienceCopy();
-  const [open, setOpen] = useState(false);
   const hidden = queue.proUpsell?.hidden ?? 0;
   useEffect(() => {
     if (hidden > 0) trackUse('more_next_moves', 'gate_seen', { tier: 'free' });
   }, [hidden]);
 
   if (pending) return <SkeletonCard rows={3} />;
-  const seeAll = seeAllLabel(queue, open);
-  const shown = open ? queue.all : queue.visible;
-  // The count is the number of rows (a lineup's swaps are one row).
-  const count = queue.total;
+  const more = actions.total - actions.rows.length;
 
   const trailing = (p: DecisionPlayer) =>
     p.stat ? (
@@ -142,48 +87,50 @@ export default function DecisionQueue({
       </View>
     ) : undefined;
 
+  const openSwap = (swap: DecisionSwap | null) =>
+    onNavigate('Matchup', swap?.out?.id && swap.replacement?.id ? { leagueId, leagueName, plan: 'swap', out: swap.out.id, in: swap.replacement.id } : { leagueId, leagueName, plan: 'all' });
+  const press = (a: TodayAction<DashboardItem>) => {
+    if (a.swap) return openSwap(a.swap);
+    const d = a.decision;
+    if (d) {
+      if (d.swaps.length > 0) return openSwap(null);
+      return onNavigate(decisionRoute(d), { leagueId, leagueName, ...(d.primary.playerId ? { playerId: d.primary.playerId } : {}) });
+    }
+    return onNavigate('Trades', { leagueId, leagueName, ...(a.player?.id ? { playerId: a.player.id } : {}) });
+  };
+
   return (
     <View style={styles.block} testID="decision-queue">
       <SectionHeading
-        title={queue.total > 0 ? `Do this now · ${count}` : 'Do this now'}
-        info={queue.total === 0 && !emptyOverride ? <InfoMark label="Do this now" beginnerOnly lines={[copy.help('dashboardNothingUrgent')]} /> : undefined}
-        right={
-          <PressableScale onPress={() => onNavigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP} accessibilityRole="link">
-            <AppText style={styles.link}>Full GM Plan ›</AppText>
-          </PressableScale>
-        }
+        title={actions.total > 0 ? `Do this now · ${actions.total}` : 'Do this now'}
+        info={actions.total === 0 && !emptyOverride ? <InfoMark label="Do this now" beginnerOnly lines={[copy.help('dashboardNothingUrgent')]} /> : undefined}
       />
-      {queue.total === 0 ? (
-        <>
-          <EmptyState icon="checkmark-circle-outline" title={emptyOverride ?? queue.empty?.title ?? 'Nothing needs you this week'} subtitle={emptyOverride ? undefined : (queue.empty?.detail ?? undefined)} />
-        </>
+      {actions.total === 0 ? (
+        <EmptyState icon="checkmark-circle-outline" title={emptyOverride ?? queue.empty?.title ?? 'Nothing needs you this week'} subtitle={emptyOverride ? undefined : (queue.empty?.detail ?? undefined)} />
       ) : (
-        <ExpandRowGroup accent={shown.some((d) => d.tone === 'danger') ? colors.danger : colors.accent} testID="decision-rows">
-          {shown.map((d) => {
-            const row = todayActionRow(d);
-            const [first, ...others] = d.players;
-            const openSwap = (swap: DecisionSwap | null) =>
-              onNavigate('Matchup', swap?.out?.id && swap.replacement?.id ? { leagueId, leagueName, plan: 'swap', out: swap.out.id, in: swap.replacement.id } : { leagueId, leagueName, plan: 'all' });
+        <ExpandRowGroup accent={actions.rows.some((a) => a.tone === 'danger') ? colors.danger : colors.accent} testID="decision-rows">
+          {actions.rows.map((a) => {
+            const d = a.decision;
+            const gain = a.swap ? swapGainLabel(a.swap) : null;
+            const [first, ...others] = d?.players ?? [];
             return (
               <ExpandRow
-                key={d.key}
-                testID={`decision-${d.kind}`}
-                label={`${d.label}: ${row.reason}`}
-                leading={row.player ? <PlayerAvatarSlot player={playerRef(row.player)} tier="row" nonInteractive="the row's toggle is the tap target" /> : <View style={[styles.dot, { backgroundColor: d.tone === 'danger' ? colors.danger : colors.warning }]} />}
-                title={row.reason}
-                action={
-                  <Button
-                    label={row.button}
-                    size="sm"
-                    onPress={() => (d.swaps.length > 0 ? openSwap(d.swaps.length === 1 ? d.swaps[0] : null) : onNavigate(decisionRoute(d), { leagueId, leagueName, ...(d.primary.playerId ? { playerId: d.primary.playerId } : {}) }))}
-                  />
-                }
+                key={a.key}
+                testID={`decision-${a.kind === 'swap' ? 'lineup' : a.kind}`}
+                label={`${a.kind === 'swap' ? 'LINEUP' : (d?.label ?? 'TRADE')}: ${a.reason}`}
+                leading={a.player ? <PlayerAvatarSlot player={playerRef(a.player)} tier="row" nonInteractive="the row's toggle is the tap target" /> : <View style={[styles.dot, { backgroundColor: a.tone === 'danger' ? colors.danger : colors.warning }]} />}
+                title={a.reason}
+                caption={gain ? `${gain} projected` : undefined}
+                action={<Button label={a.button} size="sm" onPress={() => press(a)} />}
               >
-                {d.swaps.length > 0 ? (
-                  <SwapDetail d={d} onOpen={openSwap} />
-                ) : (
+                {a.swap ? (
                   <>
-                    {row.reason !== d.title ? <AppText style={styles.fullTitle}>{d.title}</AppText> : null}
+                    {a.detail ? <AppText style={styles.why}>{a.detail}</AppText> : null}
+                    {a.swap.replacement?.name ? <CompactPlayerCard player={playerRef(a.swap.replacement)} detail="Best healthy replacement" trailing={gain ? <AppText style={[styles.statValue, { color: colors.success }]}>{gain}</AppText> : undefined} testID="decision-player" /> : null}
+                  </>
+                ) : d ? (
+                  <>
+                    {a.reason !== d.title ? <AppText style={styles.fullTitle}>{d.title}</AppText> : null}
                     {d.why ? <AppText style={styles.why}>{d.why}</AppText> : d.summary ? <AppText style={styles.why}>{d.summary}</AppText> : null}
                     {first ? <CompactPlayerCard player={playerRef(first)} detail={first.note} trailing={trailing(first)} testID="decision-player" /> : null}
                     {others.map((p) => (
@@ -192,17 +139,17 @@ export default function DecisionQueue({
                     {d.facts.length > 0 ? <AppText style={styles.facts}>{d.facts.join(' · ')}</AppText> : null}
                     {d.item && d.kind !== 'waiver' && renderItemCard ? renderItemCard(d.item) : null}
                   </>
-                )}
+                ) : a.detail ? (
+                  <AppText style={styles.why}>{a.detail}</AppText>
+                ) : null}
               </ExpandRow>
             );
           })}
         </ExpandRowGroup>
       )}
-      {seeAll ? (
-        <PressableScale accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={styles.seeAll} testID="decision-see-all">
-          <AppText style={styles.link}>{seeAll}</AppText>
-        </PressableScale>
-      ) : null}
+      <PressableScale accessibilityRole="link" onPress={() => onNavigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP} style={styles.seeAll} testID="decision-see-all">
+        <AppText style={styles.link}>{more > 0 ? `See all (${actions.total}) ›` : 'Full GM Plan ›'}</AppText>
+      </PressableScale>
       {queue.proUpsell ? (
         <PressableScale
           accessibilityRole="button"

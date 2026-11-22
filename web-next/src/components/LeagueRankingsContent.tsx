@@ -2,6 +2,7 @@
 
 import { percentColorVar, toneColorVar } from "@/lib/verdictToneCss";
 import { TERMS } from "@/lib/terms";
+import { LeagueMore } from "@/components/LeagueMore";
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { useRef, useState, useSyncExternalStore } from "react";
@@ -568,6 +569,7 @@ export function LeagueRankingsContent({
           onClose={() => setProfile(null)}
         />
       ) : null}
+      {notReady || !leagueId ? null : <LeagueMore leagueId={leagueId} leagueName={leagueName} />}
       {notReady ? null : <NextSteps title="Make a move" steps={["trade-hub", "matchup"]} leagueId={leagueId} leagueName={leagueName} />}
       <ValuesCredit />
     </main>

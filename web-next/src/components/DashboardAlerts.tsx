@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlertsFeed } from "@/components/AlertsContent";
-import { CompactModule } from "@/components/ui/CompactModule";
+import { ButtonLink } from "@/components/Button";
+import { ExpandRow, ExpandRowGroup } from "@/components/ui/ExpandRow";
+import { SectionHeading } from "@/components/SectionHeading";
 import { ErrorState } from "@/components/ErrorState";
 import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
 import { WatchListCard } from "@/components/WatchListCard";
 import { useAuth } from "@/context/AuthContext";
 import { api, type AlertsResponse, type BriefingItem } from "@/lib/api";
-import { todayAlertsSummary } from "@/lib/todayView";
+import { markAlertReadSynced } from "@/lib/alertReadSync";
+import { todayAlertRows } from "@/lib/todayView";
 import { overlayPendingAlertReads } from "@/lib/alertReadSync";
 import { alertsReasonMessage } from "@/lib/alertsPresentation";
 
@@ -17,17 +20,18 @@ import { alertsReasonMessage } from "@/lib/alertsPresentation";
 export const ALERTS_SECTION_HASH = "alerts";
 
 /**
- * The Alerts section of Today (2026-11-16 nav consolidation: Alerts is no longer its own page). A compact, tap-to-expand
- * module with the unread count as a badge; opening it shows the same roster-news feed the Alerts page used to. It opens
- * itself and scrolls into view when the URL carries `#alerts` (the old route redirects there, and so does the header
- * bell's "View all alerts"). Re-reads the feed when the tab becomes visible again, so a read made on the phone shows here.
+ * The Alerts section of Today: news about YOUR rostered players only, as action rows (avatar, one line, ONE button: Swap /
+ * Lineup for a starter, Read for a bench player). League-wide headlines never appear here. "All alerts" opens the full
+ * roster-news feed (and the watchlist); `#alerts` (the retired Alerts route, the header bell) opens it and scrolls here.
+ * Re-reads the feed when the tab becomes visible again, so a read made on the phone shows here. Mobile twin:
+ * components/AlertsSection.tsx.
  */
 export function DashboardAlerts({ leagueId, leagueName, watchItems = [] }: { leagueId: string; leagueName: string; /** The Dashboard's watchlist items: folded into this section (one place for "things to keep an eye on"). */ watchItems?: BriefingItem[] }) {
   const { session } = useAuth();
   const userId = session?.user?.id ?? "";
   const [data, setData] = useState<AlertsResponse | null>(null);
   const [failed, setFailed] = useState(false);
-  const [targeted, setTargeted] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const hasData = useRef(false);
 
@@ -58,7 +62,7 @@ export function DashboardAlerts({ leagueId, leagueName, watchItems = [] }: { lea
   useEffect(() => {
     const check = () => {
       if (window.location.hash !== `#${ALERTS_SECTION_HASH}`) return;
-      setTargeted(true);
+      setShowAll(true);
       ref.current?.scrollIntoView({ block: "start", behavior: "smooth" });
     };
     check();
@@ -68,13 +72,23 @@ export function DashboardAlerts({ leagueId, leagueName, watchItems = [] }: { lea
 
   const notice = data?.reason ? alertsReasonMessage(data.reason) : null;
   const items = data && !notice ? overlayPendingAlertReads(userId, leagueId, data.items) : [];
-  const unread = items.filter((item) => !item.read).length;
-  // The collapsed row: avatars of the players behind the newest alerts / watch items, then the newest headline and how many more.
-  const summary = todayAlertsSummary([
-    ...items.map((item) => ({ playerId: item.matched_player_id, name: item.matched_player, position: item.matched_player_position, team: item.matched_player_team, tier: item.matched_player_tier, title: item.title ?? "" })),
-    ...watchItems.map((item) => ({ playerId: item.route_player_id || null, name: item.route_player_name || null, position: item.route_player_position || null, team: item.route_player_team || null, tier: item.route_player_tier || null, title: item.headline })),
-  ]);
-  const total = items.length + watchItems.length;
+  // Only news tied to a player on this roster; the rest of the feed is not Today's business.
+  const rostered = items.filter((item) => item.matched_player_id && item.roster_relationship);
+  const unread = rostered.filter((item) => !item.read).length;
+  const { rows, total } = todayAlertRows(rostered);
+  const feed = data ? { ...data, items: rostered } : null;
+  const hasMore = total > rows.length || watchItems.length > 0;
+  const planHref = `/matchup/${encodeURIComponent(leagueId)}?${new URLSearchParams({ name: leagueName, plan: "all" }).toString()}`;
+  const read = (key: string) => void markAlertReadSynced(userId, leagueId, key);
+
+  if (failed) {
+    return (
+      <div id={ALERTS_SECTION_HASH} ref={ref}>
+        <ErrorState bare message="Could not load Alerts." onRetry={() => { setFailed(false); load(); }} />
+      </div>
+    );
+  }
+  if (!data || notice || (rows.length === 0 && !hasMore)) return <div id={ALERTS_SECTION_HASH} ref={ref} />;
 
   const title = (
     <span className="inline-flex items-center gap-2">
@@ -83,15 +97,7 @@ export function DashboardAlerts({ leagueId, leagueName, watchItems = [] }: { lea
         <span
           data-testid="dashboard-alerts-count"
           className="inline-flex items-center justify-center font-bold"
-          style={{
-            minWidth: "1.125rem",
-            height: "1.125rem",
-            padding: "0 0.3rem",
-            borderRadius: "var(--radius-pill)",
-            background: "var(--color-accent)",
-            color: "var(--color-on-accent)",
-            fontSize: "0.6875rem",
-          }}
+          style={{ minWidth: "1.125rem", height: "1.125rem", padding: "0 0.3rem", borderRadius: "var(--radius-pill)", background: "var(--color-accent)", color: "var(--color-on-accent)", fontSize: "0.6875rem" }}
         >
           {unread > 99 ? "99+" : unread}
         </span>
@@ -100,53 +106,44 @@ export function DashboardAlerts({ leagueId, leagueName, watchItems = [] }: { lea
   );
 
   return (
-    <div id={ALERTS_SECTION_HASH} ref={ref} style={{ scrollMarginTop: "calc(var(--shell-header-height, 3.5rem) + 0.5rem)" }}>
-      <CompactModule
-        // Not remembered: a section that opens itself on `#alerts` and otherwise starts collapsed should not fight a stored state.
-        id="today.alerts"
-        persist={false}
-        key={targeted ? "targeted" : "idle"}
-        defaultOpen={targeted}
-        title={title}
-        label="Alerts"
-        testId="dashboard-alerts"
-        tone={unread > 0 ? "warning" : "muted"}
-        loading={!data && !failed}
-        preview={
-          summary.avatars.length > 0 ? (
-            <span className="flex items-center gap-1" data-testid="dashboard-alerts-avatars">
-              {summary.avatars.map((a) => (
-                <PlayerAvatarSlot key={a.playerId} player={{ id: a.playerId, name: a.name ?? "this player", position: a.position, team: a.team, tier: a.tier }} tier="row" />
-              ))}
-            </span>
-          ) : undefined
-        }
-        parts={
-          data
-            ? notice
-              ? [{ key: "notice", text: notice }]
-              : total > 0
-                ? [
-                    unread > 0 ? { key: "unread", text: `${unread} new`, strong: true } : null,
-                    summary.lead ? { key: "lead", text: summary.lead } : null,
-                    summary.more > 0 ? { key: "more", text: `+${summary.more} more`, tone: "muted" as const } : null,
-                  ]
-                : [{ key: "quiet", text: "All quiet" }]
-            : []
-        }
-      >
-        {failed ? (
-          <ErrorState bare message="Could not load Alerts." onRetry={() => {
-              setFailed(false);
-              load();
-            }} />
-        ) : data ? (
-          <>
-            {watchItems.length > 0 ? <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} /> : null}
-            <AlertsFeed leagueId={leagueId} leagueName={leagueName} data={data} userId={userId} />
-          </>
-        ) : null}
-      </CompactModule>
+    <div id={ALERTS_SECTION_HASH} ref={ref} className="flex flex-col gap-2" style={{ scrollMarginTop: "calc(var(--shell-header-height, 3.5rem) + 0.5rem)" }} data-testid="dashboard-alerts">
+      <SectionHeading id="today-alerts-heading">{title}</SectionHeading>
+      {rows.length > 0 ? (
+        <ExpandRowGroup accent={rows.some((r) => r.tone === "danger") ? "var(--color-danger)" : "var(--color-accent)"} testId="alert-rows">
+          {rows.map((r) => (
+            <ExpandRow
+              key={r.key}
+              testId="alert-row"
+              label={`${r.player.name}: ${r.reason}`}
+              leading={<PlayerAvatarSlot player={{ id: r.player.id, name: r.player.name, position: r.player.position, team: r.player.team, tier: r.player.tier }} tier="row" nonInteractive="the row is the tap target" />}
+              title={<span className="line-clamp-2">{r.reason}</span>}
+              caption={r.unread ? "New" : undefined}
+              action={
+                r.target === "matchup" ? (
+                  <ButtonLink href={planHref} variant="primary" size="sm" aria-label={`${r.button}: ${r.reason}`} onClick={() => read(r.alertKey)} data-testid="alert-primary">
+                    {r.button}
+                  </ButtonLink>
+                ) : (
+                  <ButtonLink href={r.link ?? "#"} variant="primary" size="sm" target="_blank" rel="noopener noreferrer" aria-label={`${r.button}: ${r.reason}`} onClick={() => read(r.alertKey)} data-testid="alert-primary">
+                    {r.button}
+                  </ButtonLink>
+                )
+              }
+            />
+          ))}
+        </ExpandRowGroup>
+      ) : null}
+      {hasMore ? (
+        <button type="button" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll} className="tap-link self-start text-sm font-bold" style={{ minHeight: "var(--touch-target-min)", color: "var(--color-accent)" }} data-testid="alerts-see-all">
+          {showAll ? "Hide alerts" : `All alerts (${total + watchItems.length})`}
+        </button>
+      ) : null}
+      {showAll && feed ? (
+        <>
+          {watchItems.length > 0 ? <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} /> : null}
+          <AlertsFeed leagueId={leagueId} leagueName={leagueName} data={feed} userId={userId} />
+        </>
+      ) : null}
     </div>
   );
 }

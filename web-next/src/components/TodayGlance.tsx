@@ -4,13 +4,9 @@ import Link from "next/link";
 import { useId, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
-import { PickAvatar } from "@/components/PickAvatar";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
-import { InfoMark } from "@/components/ui/InfoMark";
 import { Collapse } from "@/components/ui/Presence";
-import { playerHeadshotId, playerInitials } from "@/lib/playerAnatomy";
-import { tradeGainLabel, type TodayRoomChip, type TodayTile, type TodayTradeAsset, type TodayTradeIdea } from "@/lib/todayView";
+import type { TodayRoomChip, TodayStandingPart } from "@/lib/todayView";
 
 const TONE = {
   success: "var(--color-success)",
@@ -23,28 +19,23 @@ const TONE = {
 const KICKER_STYLE = { color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" } as const;
 
 /**
- * The one snapshot strip under "Do this now": Standing, Playoffs, Team rank (model: lib/todayView.ts todayTiles). It is a
- * single link: the whole strip opens My Team, which hosts the rank bars, position rooms and tiles. Mobile twin:
- * components/TodayGlance.tsx.
+ * The standing as ONE slim line under "Do this now" ("8th of 12 · 6-4 · Playoffs 72% · Rank #3", model:
+ * lib/todayView.ts todayStandingLine). A single link to My Team, which hosts the rank bars, position rooms and tiles.
+ * Mobile twin: components/TodayGlance.tsx.
  */
-export function TodaySnapshotStrip({ tiles, href }: { tiles: TodayTile[]; href: string }) {
-  if (tiles.length === 0) return null;
+export function TodayStandingLine({ parts, href }: { parts: TodayStandingPart[]; href: string }) {
+  if (parts.length === 0) return null;
   return (
-    <Link href={href} aria-label={`${tiles.map((t) => `${t.label.toLowerCase()} ${t.value} ${t.sub}`).join(", ")}. Open My Team`} className="glass-surface flex items-stretch" style={{ minHeight: 56, borderRadius: "var(--radius-card, 12px)", color: "inherit", textDecoration: "none" }} data-testid="today-tiles">
-      {tiles.map((tile, i) => (
-        <span key={tile.key} className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0 px-2 py-1.5 text-center" style={i > 0 ? { borderLeft: "var(--border-width-default) solid var(--color-border)" } : undefined} data-testid={`today-tile-${tile.key}`}>
-          <span className="text-[0.6875rem] font-extrabold uppercase" style={KICKER_STYLE}>
-            {tile.label}
+    <Link href={href} aria-label={`${parts.map((p) => p.text).join(", ")}. Open My Team`} className="glass-surface flex items-center gap-2 px-3" style={{ minHeight: 44, borderRadius: "var(--radius-card, 12px)", color: "inherit", textDecoration: "none" }} data-testid="today-tiles">
+      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-sm font-bold">
+        {parts.map((p, i) => (
+          <span key={p.key} className="inline-flex items-center gap-2" data-testid={`today-tile-${p.key}`}>
+            {i > 0 ? <span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>·</span> : null}
+            <span style={{ color: TONE[p.tone === "muted" ? "muted" : p.tone] }}>{p.text}</span>
           </span>
-          <span className="text-lg font-extrabold tabular-nums leading-tight" style={{ color: TONE[tile.tone] }}>
-            {tile.value}
-          </span>
-          <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>
-            {tile.sub}
-          </span>
-        </span>
-      ))}
-      <span aria-hidden="true" className="flex items-center pr-3" data-row-arrow style={{ color: "var(--color-accent)" }}>
+        ))}
+      </span>
+      <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
         →
       </span>
     </Link>
@@ -113,51 +104,6 @@ export function TodayRooms({ chips, tradeHref }: { chips: TodayRoomChip[]; trade
           </Link>
         ) : null}
       </Collapse>
-    </AccentCard>
-  );
-}
-
-/**
- * The best trade as ONE compact row: avatars of who you send → who you get, and the gain in green. A trade that costs value
- * never reaches this row (lib/todayView.ts bestTradeIdea) and no negative or red figure is ever drawn. The row opens it
- * in Trade Hub. Mobile twin: components/TodayGlance.tsx.
- */
-export function TodayTradeRow({ idea, href, deadline, info }: { idea: TodayTradeIdea; href: string; /** "2 wks left (Wk 11)": the trade deadline, shown here and nowhere else. */ deadline?: string | null; /** Beginner explainer for the row's ONE "?". */ info?: string | null }) {
-  const gain = tradeGainLabel(idea);
-  const faces = (assets: TodayTradeAsset[]) =>
-    assets.slice(0, 2).map((a) =>
-      a.isPick ? <PickAvatar key={a.name} label={a.name} size={28} /> : <PlayerAvatar key={a.id ?? a.name} playerId={playerHeadshotId({ id: a.id, name: a.name })} tier={a.tier ?? undefined} size={28} fallbackLabel={playerInitials(a.name)} />,
-    );
-  const names = (assets: TodayTradeAsset[]) => assets.map((a) => a.name).join(" + ");
-  return (
-    <AccentCard accent="var(--color-action)" as="section" compact data-testid="today-trade-idea">
-      <div className="flex items-center gap-1">
-        <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-action)", letterSpacing: "var(--letter-spacing-badge)" }}>
-          Best trade{deadline ? ` · deadline ${deadline}` : ""}
-        </span>
-        {info ? <InfoMark label="trade ideas" lines={[info]} beginnerOnly /> : null}
-      </div>
-      <Link href={href} aria-label={`Best trade: ${idea.title}${gain ? `, ${gain} value` : ""}. Open in Trade Hub`} className="flex items-center gap-2" style={{ minHeight: 44, color: "inherit", textDecoration: "none" }}>
-        <span className="flex shrink-0 items-center gap-1" aria-hidden="true">
-          {faces(idea.send)}
-          <span style={{ color: "var(--color-text-muted)" }}>→</span>
-          {faces(idea.receive)}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-sm font-bold leading-snug">{idea.title}</span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {[idea.send.length > 0 ? names(idea.send) : null, idea.receive.length > 0 ? names(idea.receive) : null].filter(Boolean).join(" → ")}
-          </span>
-        </span>
-        {gain ? (
-          <span className="shrink-0 text-sm font-extrabold tabular-nums" style={{ color: "var(--color-success)" }} data-testid="today-trade-gain">
-            {gain}
-          </span>
-        ) : null}
-        <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
-          →
-        </span>
-      </Link>
     </AccentCard>
   );
 }

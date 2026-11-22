@@ -1131,6 +1131,15 @@ the first decision player as a shared `CompactPlayerCard` with avatar in `previe
 (`MotionIn` rows) and "Show top 3" folds them back. Web `components/DecisionQueue.tsx`, app `components/DecisionQueue.tsx`;
 the logic is the byte-identical twin `lib/decisionQueue.ts` (`buildDecisionQueue`).
 
+- **Actionable Today (2026-11-22, owner: "mostly info, nothing actionable")**: every Today row is something to do. The
+  matchup card carries ONE best-move line (`todayMatchupMove`, taps into the lineup planner on that swap). "Do this now" is
+  `todayActions` (`lib/todayView.ts`, byte-identical twin): each lineup fix (out / bye / injured starter, empty slot) is its own
+  row, then waivers, deadline, draft, injury items and the best trade (`Send offer`, never a value-losing one), ranked by
+  urgency, capped at 5 (`TODAY_ACTION_CAP`) with "See all (N)" to GM Plan. Each row = avatar + one short reason + ONE button.
+  Alerts are rostered-player news only (`todayAlertRows`: Swap / Lineup for a starter, Read for a bench player); league-wide
+  headlines never appear; "All alerts" opens the full roster feed + watchlist. Standing / Playoffs / Rank is one slim line
+  (`todayStandingLine`). League activity and Guess the Player moved to the League tab (`LeagueMore`); League type is on My Team.
+  Not wired (no data in any endpoint yet): pending trade offers awaiting the user, expiring waiver claims.
 - **Decision types and urgency** (`DECISION_URGENCY`): live draft 100, lineup holes (bye / out starters, open slots) 90, trade
   deadline this week 88 or next week 78 (carries the trade-idea count), injury item 76, waivers 74 on Tue/Wed else 62, draft
   prep 58, other top-priority item 52. Order: urgency desc, impact desc (summed swap gain, item score), kind order, key.
