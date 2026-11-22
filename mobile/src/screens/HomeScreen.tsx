@@ -793,6 +793,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   key={addPlatform}
                   platform={addPlatform}
                   onCancel={closeAddLeague}
+                  onTrySample={openSampleLeague}
                   onCapReached={(cap) => setAddCapMessage(capMessageFor(cap))}
                   onSaved={(leagueId, leagueName) => {
                     autoNavigated.current = true;

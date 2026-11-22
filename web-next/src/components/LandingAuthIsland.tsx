@@ -62,6 +62,9 @@ export function LandingAuthSlotPlaceholder() {
  * server-rendered LoadingScreen via CSS. A returning user about to be
  * redirected still sees only the loading screen, never the marketing copy.
  */
+/** Progress key for a visitor with no account yet (see onboardingProgress). */
+const DEVICE_PROGRESS_ID = "device";
+
 export function LandingAuthIsland() {
   const { session, loading } = useAuth();
   // True once Connect started a disposable guest session on THIS page view: the connect form stays mounted (no carousel,
@@ -79,7 +82,10 @@ export function LandingAuthIsland() {
   // replay the carousel and trial offer on every visit to "/". Steps already
   // completed/skipped on this browser for this account stay done.
   const userId = session?.user?.id ?? null;
-  const carouselSeen = carouselDoneState || hasCompletedOnboardingStep(userId, "carousel");
+  // The intro (level + value) is per device as well as per account: a signed-out visitor sees it BEFORE the connect
+  // form (it used to be reachable only after sign-in, which the one-field connect front door never asks for, so
+  // almost nobody saw it).
+  const carouselSeen = carouselDoneState || hasCompletedOnboardingStep(userId, "carousel") || hasCompletedOnboardingStep(DEVICE_PROGRESS_ID, "carousel");
   // Checkout completion is no longer recorded server-side as a client-visible
   // event (billing webhooks moved to Supabase edge functions), so the return
   // itself is counted: feature_use billing/checkout_return. Once per page load.
@@ -232,7 +238,17 @@ export function LandingAuthIsland() {
     }
   }, [loading, session, checkingSavedLeagues]);
 
-  const handleLeagueChosen = (leagueId: string, leagueName: string) => {
+  const handleLeagueChosen = async (leagueId: string, leagueName: string) => {
+    // A guest connect has no `userId` in this render's closure yet (the disposable session was created by Connect), and
+    // the offer is armed per account: resolve the live session so first_league_view can fire for every first connect.
+    let armUserId = userId;
+    if (!armUserId) {
+      try {
+        armUserId = (await supabase.auth.getSession()).data.session?.user?.id ?? null;
+      } catch {
+        armUserId = null;
+      }
+    }
     // Dashboard for Sleeper, My Team for ESPN (no ESPN Dashboard yet).
     // A trade carried over from the public Trade Analyzer opens in this
     // league's analyzer; otherwise the usual league home.
@@ -241,8 +257,8 @@ export function LandingAuthIsland() {
     // 2026-11): no wall here. Arm the dismissible trial-offer card that the
     // league's Today view shows (components/FirstValueOfferCard.tsx), once.
     // Returning from a completed checkout means they already have Pro.
-    if (!returnedFromCheckout && armTrialOffer(trialOfferState(userId)) === "armed") {
-      markOnboardingStepCompleted(userId, "offer_armed");
+    if (!returnedFromCheckout && armTrialOffer(trialOfferState(armUserId)) === "armed") {
+      markOnboardingStepCompleted(armUserId, "offer_armed");
     }
     trackOnboarding("completed", { step: "connect", step_index: funnelStepIndex("connect") });
     router.push(destination);
@@ -252,7 +268,9 @@ export function LandingAuthIsland() {
   // league_import_completed -> first_league_view).
   const stage = firstRunStage({ signedIn: accountReady, introSeen: carouselSeen, leagueCount: 0 });
   // Signed out (or in the middle of the guest connect): the landing IS the one-field connect form.
-  const showHero = LANDING_FRONT_DOOR === "connect" && (!session || guestFlow);
+  // Signed-out first visit on the connect front door: value step first (Skip still leaves in one tap).
+  const showIntroFirst = LANDING_FRONT_DOOR === "connect" && !session && !guestFlow && !carouselSeen;
+  const showHero = LANDING_FRONT_DOOR === "connect" && (!session || guestFlow) && !showIntroFirst;
   const connectViewed = stage === "connect" || showHero;
   useEffect(() => {
     if (connectViewed) trackOnboardingStepViewed("connect", funnelStepIndex("connect"));
@@ -260,6 +278,17 @@ export function LandingAuthIsland() {
 
   if (loading || checkingSavedLeagues) {
     return <LandingAuthSlotPlaceholder />;
+  }
+
+  if (showIntroFirst) {
+    return (
+      <OnboardingCarousel
+        onDone={() => {
+          markOnboardingStepCompleted(DEVICE_PROGRESS_ID, "carousel");
+          setCarouselDone(true);
+        }}
+      />
+    );
   }
 
   if (showHero) {
@@ -284,6 +313,8 @@ export function LandingAuthIsland() {
             />
           }
         />
+        {/* Always-visible escape for someone without a league to connect (reuses the sample route). */}
+        <SampleLeagueButton surface="connect_step" variant="secondary" />
       </div>
     );
   }
@@ -294,6 +325,7 @@ export function LandingAuthIsland() {
     <OnboardingCarousel
       onDone={() => {
         markOnboardingStepCompleted(userId, "carousel");
+        markOnboardingStepCompleted(DEVICE_PROGRESS_ID, "carousel");
         setCarouselDone(true);
       }}
     />
