@@ -469,3 +469,8 @@ captured_at,season,week,player_id,team,position,status,injury_status,body_part,p
 2026-11-21T21:00:59Z,2026,11,11630,PIT,WR,Active,Questionable,Hand,,,sleeper_live
 2026-11-21T21:00:59Z,2026,11,13272,ARI,QB,Active,Out,Back,,,sleeper_live
 2026-11-21T21:00:59Z,2026,11,9508,TEN,RB,Inactive,IR,Knee,,,sleeper_live
+2026-11-22T01:30:17Z,2026,11,11577,PHI,RB,Active,Questionable,Foot,,,sleeper_live
+2026-11-22T01:30:17Z,2026,11,8116,GB,RB,Active,,,,,sleeper_live
+2026-11-22T01:30:17Z,2026,11,8135,WAS,WR,Active,,,,,sleeper_live
+2026-11-22T01:30:17Z,2026,11,8150,LAR,RB,Active,Questionable,Toe,,,sleeper_live
+2026-11-22T01:30:17Z,2026,11,9486,PHI,WR,Inactive,IR,Ankle,,,sleeper_live
