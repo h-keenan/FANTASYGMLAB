@@ -33,13 +33,12 @@ import RecapReadyCard from '../components/RecapReadyCard';
 import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
 import GuillotineCard from '../components/GuillotineCard';
-import LeagueTypeControl from '../components/LeagueTypeControl';
 import DirectionCheckinCard from '../components/DirectionCheckinCard';
 import TodayMatchupCard from '../components/TodayMatchupCard';
-import { TodayRooms, TodayTiles, TodayTradeIdeaCard } from '../components/TodayGlance';
+import { TodaySnapshotStrip, TodayTradeRow } from '../components/TodayGlance';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
-import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusPositions, buildTeamStatusStanding } from '../lib/teamStatus';
-import { todayRoomChips, todayTiles, todayTradeIdea } from '../lib/todayView';
+import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusStanding } from '../lib/teamStatus';
+import { bestTradeIdea, todayTiles, todayTradeIdea } from '../lib/todayView';
 import StorylineSummaryCard from '../components/StorylineSummaryCard';
 import LeagueStandingStrips from '../components/LeagueStandingStrips';
 import {
@@ -66,7 +65,6 @@ import LeaguePulseCard from '../components/LeaguePulseCard';
 import { leaguePulseHighlights } from '../lib/leaguePulse';
 import TodayHero from '../components/TodayHero';
 import StartHereCard from '../components/StartHereCard';
-import NextSteps from '../components/NextSteps';
 import { useAuth } from '../context/AuthContext';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
@@ -86,11 +84,10 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
-import { useGmStance } from '../context/GmStanceContext';
-import { DashboardMore, DashboardTeamStats } from '../components/DashboardBlocks';
+import { DashboardMore } from '../components/DashboardBlocks';
 import DecisionQueue from '../components/DecisionQueue';
 import { buildDecisionQueue } from '../lib/decisionQueue';
-import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY, tradesStanceLine } from '../lib/dashboardLayout';
+import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY } from '../lib/dashboardLayout';
 import InfoMark from '../components/InfoMark';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
@@ -200,9 +197,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
   }, [scrollToAlerts]);
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const { showExplanations } = useDensity();
-  const experienceCopy = useExperienceCopy();
-  // The league's real GM stance (what trade advice is tuned by), shown on the trade line for beginners.
-  const { stance } = useGmStance(leagueId);
   const queryClient = useQueryClient();
   // The persisted AsyncStorage cache restores asynchronously — gating on it
   // keeps a query from firing (and racing/overwriting) before last session's
@@ -254,12 +248,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
     queryFn: () => api.getLeagueMatchup(leagueId),
     enabled: !isRestoring,
   });
-  // Position-room needs and the season simulation (playoff odds) feed the Today tiles and rooms chips.
-  const needsQuery = useQuery({
-    queryKey: queryKeys.myTeamNeeds(leagueId),
-    queryFn: () => api.getLeagueMyTeamNeeds(leagueId),
-    enabled: !isRestoring,
-  });
+  // The season simulation (playoff odds) feeds the snapshot strip.
   const simQuery = useQuery({
     queryKey: queryKeys.seasonSim(leagueId),
     queryFn: () => api.getGamesSeasonSim(leagueId),
@@ -473,10 +462,11 @@ export default function DashboardScreen({ route, navigation }: Props) {
     odds: buildTeamStatusOdds(simQuery.data),
   });
   const deadlinePassed = Boolean(dashboardData?.trade_window?.trade_deadline_passed);
-  const stanceLine = experienceCopy.isBeginner ? tradesStanceLine(stance) : '';
-  const tiles = todayTiles({ standing, tradeCount: tradeItems.length, tradesClosed: deadlinePassed });
-  const roomChips = todayRoomChips(buildTeamStatusPositions(needsQuery.data?.ok ? needsQuery.data : null));
-  const idea = tradeItems[0] ? todayTradeIdea(tradeItems[0]) : null;
+  const tiles = todayTiles({ standing, teamRank: teamSnapshot && teamSnapshot.power_rank != null ? { value: formatRank(teamSnapshot.power_rank, teamSnapshot.power_rank_tied), of: teamRankings && teamRankings.length > 1 ? teamRankings.length : null } : null });
+  // The best trade: the biggest positive gain. An idea that costs the user value is never the headline (lib/todayView.ts).
+  const ideas = tradeItems.map(todayTradeIdea);
+  const idea = bestTradeIdea(ideas);
+  const ideaItem = idea ? tradeItems[ideas.indexOf(idea)] : null;
   const watchItems = [...grouped.watch, ...grouped.opportunity];
   const watchLines = watchItems.map((item) => ({
     playerId: item.route_player_id || null,
@@ -544,54 +534,18 @@ export default function DashboardScreen({ route, navigation }: Props) {
           briefing (paywall after connect). Dismissible; nothing is gated. */}
       <FirstValueOfferCard isPremium={entitlement?.is_premium === true} />
 
-      <TodayTiles
-        tiles={tiles}
-        onOpen={(key) => navigate(key === 'trades' ? 'Trades' : 'Teams', { leagueId, leagueName })}
-      />
-      {idea && !deadlinePassed ? (
-        <TodayTradeIdeaCard
+      {/* The snapshot strip (Standing / Playoffs / Team rank) is one control that opens My Team (rank bars, tiles, position rooms). */}
+      {teamSnapshot ? <TodaySnapshotStrip tiles={tiles} onOpen={() => navigation.navigate('MyTeam', { leagueId, leagueName })} /> : null}
+      {idea && ideaItem && !deadlinePassed ? (
+        <TodayTradeRow
           info={<InfoMark label="this trade idea" beginnerOnly lines={[TRADES_BLOCK_COPY.beginnerExplainer]} />}
           idea={idea}
           deadline={deadlineChip(dashboardData?.trade_window)?.value.replace(/\s*\(.*\)$/, '')}
-          onOpen={() => navigate('Trades', { leagueId, leagueName, ...(tradeItems[0]?.route_player_id ? { playerId: tradeItems[0].route_player_id } : {}) })}
+          onOpen={() => navigate('Trades', { leagueId, leagueName, ...(ideaItem.route_player_id ? { playerId: ideaItem.route_player_id } : {}) })}
         />
-      ) : null}
-      {experienceCopy.isBeginner && stanceLine ? (
-        // The league's real GM stance (what the trade advice is tuned by) and the link to change it.
-        <View style={{ gap: spacing.xs }} testID="today-trade-help">
-          {stanceLine ? (
-            <PressableScale
-              onPress={() => navigate('GmPlan', { leagueId, leagueName })}
-              accessibilityRole="link"
-              accessibilityLabel={`${stanceLine} ${TRADES_BLOCK_COPY.changeStance}`}
-              style={{ minHeight: 44, justifyContent: 'center' }}
-              testID="dashboard-stance-line"
-            >
-              <AppText style={{ fontSize: 13, color: colors.textSecondary }}>
-                {stanceLine} <AppText style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>{TRADES_BLOCK_COPY.changeStance}</AppText>
-              </AppText>
-            </PressableScale>
-          ) : null}
-        </View>
-      ) : null}
-      <TodayRooms chips={roomChips} onOpenTrades={() => navigate('Trades', { leagueId, leagueName })} />
-
-      {teamSnapshot ? (
-        <View style={styles.snapshotSection}>
-          <DashboardTeamStats
-            snapshot={teamSnapshot}
-            teams={teamRankings}
-            leagueId={leagueId}
-            leagueName={leagueName}
-            onNavigate={navigate}
-            onOpen={() => navigation.navigate('MyTeam', { leagueId, leagueName })}
-          />
-        </View>
       ) : null}
 
       {guillotine ? <GuillotineCard data={guillotine} /> : null}
-
-      <NextSteps title="Plan ahead" steps={['gm-plan', 'waivers', 'trade-hub']} leagueId={leagueId} leagueName={leagueName} />
 
       <View
         onLayout={(event) => {
@@ -617,19 +571,13 @@ export default function DashboardScreen({ route, navigation }: Props) {
           }
         />
       </View>
-      {/* GM Plan lives in More (the orb), so Today carries it as a standing next step. Same slot as web: after Team summary, before Alerts. */}
 
       {/* Secondary modules stay collapsed behind "More" so the actionable ones
           above are reachable without scrolling past them. */}
-      <DashboardMore>
-        {teamRankings && leaguePulseHighlights(teamRankings).length > 0 ? (
-          <View style={styles.activityRow}>
-            {/* League Activity is free on web and in the app. */}
-            <View style={styles.activityCell}>
-              <LeaguePulseCard teams={teamRankings} leagueId={leagueId} leagueName={leagueName} onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} />
-            </View>
-          </View>
-        ) : null}
+      <DashboardMore
+        leagueActivity={teamRankings && leaguePulseHighlights(teamRankings).length > 0 ? <LeaguePulseCard teams={teamRankings} leagueId={leagueId} leagueName={leagueName} onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} /> : undefined}
+        guessGame={<DashboardGuessCard />}
+      >
         {readyRecap ? (
           <View>
             <SectionHeading title="Storylines" icon="newspaper-outline" />
@@ -670,12 +618,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
             inSeason={isInSeason(matchup?.week)}
           />
         </View>
-        <LeagueTypeControl
-          leagueId={leagueId}
-          data={guillotineQuery.data}
-          onChanged={() => void queryClient.invalidateQueries({ queryKey: queryKeys.guillotine(leagueId) })}
-        />
-        <DashboardGuessCard />
         <LeagueStandingStrips leagueId={leagueId} onNavigate={navigate} />
       </DashboardMore>
 

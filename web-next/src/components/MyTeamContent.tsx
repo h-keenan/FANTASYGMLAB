@@ -7,6 +7,10 @@ import { InfoMark } from "@/components/ui/InfoMark";
 import { StatStrip, type StatStripItem } from "@/components/StatStrip";
 import { RosterCompositionBar, RosterSections, TeamAnalysisList, type RosterTab } from "@/components/MyTeamSections";
 import { CompactModule } from "@/components/ui/CompactModule";
+import { TodayRooms } from "@/components/TodayGlance";
+import { LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
+import { buildTeamStatusPositions } from "@/lib/teamStatus";
+import { todayRoomChips } from "@/lib/todayView";
 import { StatStripModule } from "@/components/ui/ModuleTemplates";
 import { StatusHeader } from "@/components/ui/StatusHeader";
 import { buildTeamStatusHeader, rosterAttentionItems } from "@/lib/statusHeader";
@@ -112,6 +116,7 @@ export function MyTeamContent({
   /** Persist the per-league keeper round penalty; omit to hide the control. */
   onKeeperRoundPenalty?: (penalty: number) => void;
 }) {
+  const guillotine = useGuillotineState(leagueId || undefined);
   const pageHelp = usePageHelp([BEGINNER_HELP.myTeamIntro, BEGINNER_HELP.myTeamValueTiers]);
   const notice = myTeam.reason ? myTeamReasonMessage(myTeam.reason) : null;
   if (notice) {
@@ -133,6 +138,7 @@ export function MyTeamContent({
   const startersTotalValue = sumScore(starters);
   const teamTotalValue = sumScore(starters) + sumScore(bench);
 
+  const roomChips = todayRoomChips(buildTeamStatusPositions(needs));
   const showFranchiseConstruction = needs?.show_franchise_construction ?? false;
   // A percentile against a tiny league ("0th percentile of 2 teams") says nothing: show it only with enough teams.
   const valuePercentile = teamRanking && leagueSize >= MIN_TEAMS_FOR_PERCENTILE ? percentileFromRank(teamRanking.power_rank, leagueSize) : null;
@@ -278,6 +284,9 @@ export function MyTeamContent({
         }
       />
 
+      {/* Position rooms (moved here from Today): one chip per room, opening into a meter bar each. */}
+      {roomChips.length > 0 && leagueId ? <TodayRooms chips={roomChips} tradeHref={`/trade-hub/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} /> : null}
+
       {analysisRows.length > 0 ? (
         <CompactModule id="team.analysis" title="Team Analysis" testId="team-analysis" parts={analysisParts}>
           <TeamAnalysisList rows={analysisRows} />
@@ -405,6 +414,13 @@ export function MyTeamContent({
           </div>
         </CompactModule>
       ) : null}
+      {/* League settings (moved here from Today's More): the league-type override. Renders nothing until the status has loaded. */}
+      {leagueId && guillotine.data?.ok && guillotine.data.league_type_override !== undefined ? (
+        <CompactModule id="team.league-settings" title="League settings" testId="league-settings" tone="muted" parts={[{ key: "type", text: "League type" }]}>
+          <LeagueTypeControl leagueId={leagueId} data={guillotine.data} onChanged={guillotine.reload} />
+        </CompactModule>
+      ) : null}
+
       <ValuesCredit freshness={["values", "injuries"]} />
     </main>
   );

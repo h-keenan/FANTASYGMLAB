@@ -30,7 +30,7 @@ describe("My Team: record, holes and injured have one owner", () => {
 describe("Today: the Matchup hero owns week, opponent and score", () => {
   const standing = { record: "7-6", place: "1st of 8", playoffStatus: null, powerRank: null, playoffOdds: "60%", projectedRecord: null, tone: "neutral" as const };
   const ring = todayMatchupRing({ week: 10, opponentName: "Shiesty", opponentAvatar: null, myName: "GG", myAvatar: null, winPercent: 57, myProjected: 118.3, opponentProjected: 109.7, live: null, stateLabel: null });
-  const tiles = todayTiles({ standing, tradeCount: 2 });
+  const tiles = todayTiles({ standing, teamRank: { value: "#3", of: 8 } });
 
   it("no tile restates the week, opponent, score or win chance", () => {
     const heroFacts = ["wk 10", "shiesty", ring.scoreLine ?? "", "57%"];
@@ -38,7 +38,7 @@ describe("Today: the Matchup hero owns week, opponent and score", () => {
     for (const fact of heroFacts) expect(tileText).not.toContain(fact.toLowerCase());
   });
   it("owner map keeps matchup facts out of the other Today modules", () => {
-    const owned = Object.fromEntries(["matchup", "tiles", "team"].map((o) => [o, factsOwnedBy("today", o)]));
+    const owned = Object.fromEntries(["matchup", "tiles", "trade"].map((o) => [o, factsOwnedBy("today", o)]));
     expect(duplicatedFacts(owned)).toEqual([]);
     expect(tiles.map((t) => t.key).every((k) => factsOwnedBy("today", "tiles").includes(k))).toBe(true);
   });

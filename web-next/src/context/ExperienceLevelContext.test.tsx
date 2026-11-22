@@ -131,36 +131,26 @@ async function expandHelp() {
 }
 
 describe("experience level copy on Dashboard", () => {
-  it("adds plain-language helper text and spells out labels for a beginner", async () => {
+  // The rank glossary and "Average Age" label copy moved with the rank bars to My Team; Today keeps the Do this now help.
+  it("adds plain-language helper text on Do this now for a beginner", async () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("beginner"));
     render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
-    fireEvent.click(await screen.findByTestId("stat-strip-toggle"));
-
-    const marks = await screen.findAllByTestId("info-mark");
-    fireEvent.click(marks.find((m) => /team/i.test(m.getAttribute("aria-label") ?? "")) ?? marks[0]);
-    expect(await screen.findByText(BEGINNER_HELP.dashboardSnapshot)).toBeInTheDocument();
-    expect(screen.getByText("Average Age")).toBeInTheDocument();
-    expect(screen.queryByText("Avg Age")).not.toBeInTheDocument();
+    await expandHelp();
+    expect(await screen.findByText(BEGINNER_HELP.dashboardGamePlan)).toBeInTheDocument();
   });
 
-  it("gives an unset account beginner-lite: help shows, labels stay today's", async () => {
+  it("gives an unset account beginner-lite: help shows", async () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
     const { container } = render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
-    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
-
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
-    expect(screen.getByText("Avg Age")).toBeInTheDocument();
     await waitFor(() => expect(container.querySelector("[data-info-mark]")).not.toBeNull());
   });
 
   it.each([["advanced", "advanced" as const]])("renders today's terse copy for %s", async (_name, level) => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(level));
-    const { container } = render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
-    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
-
+    render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
-    expect(screen.getByText("Avg Age")).toBeInTheDocument();
-    expect(screen.queryByText(BEGINNER_HELP.powerRank)).not.toBeInTheDocument();
+    expect(screen.queryByText(BEGINNER_HELP.dashboardGamePlan)).not.toBeInTheDocument();
     expect(screen.queryByText(BEGINNER_HELP.dashboardSnapshot)).not.toBeInTheDocument();
   });
 });

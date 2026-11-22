@@ -51,6 +51,10 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { playerSurname } from '../lib/playerNameDisplay';
 import { Collapse } from '../components/Presence';
+import { TodayRooms } from '../components/TodayGlance';
+import LeagueTypeControl from '../components/LeagueTypeControl';
+import { buildTeamStatusPositions } from '../lib/teamStatus';
+import { todayRoomChips } from '../lib/todayView';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyTeam'>;
 
@@ -138,6 +142,13 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     enabled: !isRestoring,
   });
   // Best-effort: only keeper leagues return tags/candidates.
+  // League settings (moved here from Today's More): the league-type override.
+  const guillotineQuery = useQuery({
+    queryKey: queryKeys.guillotine(leagueId),
+    queryFn: () => api.getLeagueGuillotine(leagueId),
+    enabled: !isRestoring,
+  });
+  const roomChips = useMemo(() => todayRoomChips(buildTeamStatusPositions(needsQuery.data?.ok ? needsQuery.data : null)), [needsQuery.data]);
   const keepersQuery = useQuery({
     queryKey: queryKeys.keepers(leagueId),
     queryFn: () => api.getLeagueKeepers(leagueId),
@@ -288,6 +299,8 @@ export default function MyTeamScreen({ route, navigation }: Props) {
           onOpenLineup={() => navigation.navigate('Matchup', { leagueId, leagueName })}
         />
         <TeamSnapshotModule team={myTeam} leagueSize={leagueSize} open={(key) => openInsight(navigation.navigate as never, key, leagueId, leagueName)} />
+        {/* Position rooms (moved here from Today): one chip per room, opening into a meter bar each. */}
+        <TodayRooms chips={roomChips} onOpenTrades={() => navigation.navigate('Trades', { leagueId, leagueName })} />
         {analysisRows.length > 0 ? (
           <CompactModule
             id="team.analysis"
@@ -365,6 +378,11 @@ export default function MyTeamScreen({ route, navigation }: Props) {
             parts={composition.map((segment) => ({ key: segment.key, text: `${segment.label} ${segment.percent}%` }))}
           >
             <RosterCompositionBar segments={composition} />
+          </CompactModule>
+        ) : null}
+        {guillotineQuery.data?.ok && guillotineQuery.data.league_type_override !== undefined ? (
+          <CompactModule id="team.league-settings" title="League settings" tone="muted" testID="league-settings" parts={[{ key: 'type', text: 'League type' }]}>
+            <LeagueTypeControl leagueId={leagueId} data={guillotineQuery.data} onChanged={() => void queryClient.invalidateQueries({ queryKey: queryKeys.guillotine(leagueId) })} />
           </CompactModule>
         ) : null}
         <ValuesCredit freshness={['values', 'injuries']} />

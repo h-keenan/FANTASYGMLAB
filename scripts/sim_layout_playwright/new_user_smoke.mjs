@@ -25,7 +25,8 @@ const TOP_BUDGET = 110;
 const WIDTH = 390;
 const HYDRATION = /Hydration failed|hydrat(ed|ion) (but|error)|React error #(418|423|425)|did not match|#418|#423|#425/i;
 const T = 30000; // generous selector timeout: waits return the moment the selector appears, so it costs nothing when healthy
-const TODAY_HEADLINE = FIX.dashboard.items[0].headline;
+// Today shows the first six words of a decision as its one-line row; the full headline sits behind the row tap.
+const TODAY_HEADLINE = FIX.dashboard.items[0].headline.split(" ").slice(0, 6).join(" ");
 fs.mkdirSync(OUT, { recursive: true });
 
 const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
@@ -272,7 +273,7 @@ const EXPECTED_HTTP = /HTTP (401|404|500)|Failed to load resource/;
   const env = await newPage(browser, bd());
   env.w.fail = { match: DASH, override: { ...FIX.dashboard, items: [], quiet: false, this_week: undefined } };
   await goto(env, "/dashboard");
-  await check(env, "7e partial data: page still renders", { app: true, expectText: ["Position rooms"] });
+  await check(env, "7e partial data: page still renders", { app: true, expectText: ["Team rank"] });
   await env.ctx.close();
 }
 {
