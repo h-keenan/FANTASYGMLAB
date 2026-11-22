@@ -79,7 +79,7 @@ test('gm-game is a registered nav page with a route, a screen and an orb icon', 
   assert.equal(ROUTE_BY_PAGE['gm-game'], 'GmGame');
   const navigator = read('navigation', 'RootNavigator.tsx');
   assert.match(navigator, /AppStack\.Screen\s+name="GmGame"/);
-  assert.match(navigator, /GmGame: undefined;/);
+  assert.match(navigator, /GmGame: \{ quickStart\?: boolean \} \| undefined;/);
   const orb = read('components', 'GmOrb.tsx');
   assert.match(orb, /'gm-game': 'game-controller-outline'/);
   assert.match(orb, /navPage\('gm-game'\)/);
