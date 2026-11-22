@@ -79,6 +79,11 @@
 	@landing path /
 	redir @landing https://{$APP_DOMAIN}{uri} temporary
 
+	# Deep links on the apex (ads, shares: /gm-game?quickstart=1) used to 404 here. Any path
+	# that is not a checked-in static/landing file goes to the same path on the app, query kept.
+	@not_landing_file not file
+	redir @not_landing_file https://{$APP_DOMAIN}{uri} temporary
+
 	# Filenames here are NOT content-hashed/fingerprinted (checked-in as
 	# plain names like landing.css, favicon.png — see
 	# scripts/build_static_landing_assets.py), so a long, unconditional
