@@ -539,3 +539,5 @@ captured_at,season,week,player_id,team,position,status,injury_status,body_part,p
 2026-11-23T03:01:34Z,2026,11,6797,LAC,QB,Active,Questionable,Concussion,,,sleeper_live
 2026-11-23T03:01:34Z,2026,11,7527,SF,QB,Active,,,,,sleeper_live
 2026-11-23T03:01:34Z,2026,11,8527,LV,WR,Active,Questionable,Undisclosed,,,sleeper_live
+2026-11-23T13:32:09Z,2026,11,11786,JAX,K,Active,Questionable,Lower Body,,,sleeper_live
+2026-11-23T13:32:09Z,2026,11,12490,JAX,RB,Active,Questionable,Undisclosed,,,sleeper_live
