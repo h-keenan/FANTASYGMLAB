@@ -16,6 +16,7 @@ import { leagueHomePath } from "@/lib/leaguePlatform";
 import { analyzerBridgePath, bridgePickerPath, consumePendingBridge, pathAfterLeagueChosen } from "@/lib/tradeBridge";
 import { consumeProtectedReturnPath } from "@/lib/protectedRouteReturn";
 import { api } from "@/lib/api";
+import { hasPendingLandingOverride, readLastLeague } from "@/lib/lastLeagueHint";
 import { supabase } from "@/lib/supabase";
 import { hasCompletedOnboardingStep, markOnboardingStepCompleted, trialOfferState } from "@/lib/onboardingProgress";
 import { armTrialOffer, firstRunStage, funnelStepIndex } from "@/lib/firstRunFlow";
@@ -145,6 +146,17 @@ export function LandingAuthIsland() {
     savedLeaguesCheck.current = "pending";
     setAccountReady(true);
     setCheckingSavedLeagues(true);
+    // Fast path for the common returning visit: this device remembers the league this user last opened, and nothing
+    // asks for a different landing (a trade handed over from the public analyzer, a protected page to return to). Go
+    // straight there instead of waiting for saved_leagues (and, with several leagues, device preferences) first: that
+    // is two serial round trips before the route's own chunk and data requests could even start. The inline early-fetch
+    // script already has that league's Today request in flight. If the league is gone, Today clears the hint and the
+    // normal path below runs on the next visit.
+    const remembered = readLastLeague(session.user.id);
+    if (remembered && !hasPendingLandingOverride()) {
+      router.replace(leagueHomePath(remembered.id, remembered.name || remembered.id));
+      return;
+    }
     (async () => {
       try {
         const { data } = await supabase.from("saved_leagues").select("league_id, league_name");
