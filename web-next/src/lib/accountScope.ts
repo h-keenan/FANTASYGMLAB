@@ -87,6 +87,8 @@ function isKeptUserScopedKey(key: string): boolean {
 export const PURGE_UNSCOPED_KEYS: readonly string[] = [
   // web: valuation lens detected per league id (read by the inline early-fetch script before React)
   "fgl.detectedLens.v1",
+  // web: the league last opened on Today (read by the inline early-fetch script and the landing redirect before auth loads)
+  "fgl.lastLeague.v1",
   // web: return paths written before sign-in so the right page opens after it
   "fd_protected_route_return_path",
   "fd_auth_return_path",

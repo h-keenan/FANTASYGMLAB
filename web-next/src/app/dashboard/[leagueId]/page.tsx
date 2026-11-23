@@ -13,6 +13,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SkeletonModule, SkeletonRegion, SkeletonStatusHeader } from "@/components/Skeleton";
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
+import { clearLastLeague, writeLastLeague } from "@/lib/lastLeagueHint";
 
 export default function DashboardPage() {
   const params = useParams<{ leagueId: string }>();
@@ -62,6 +63,8 @@ function DashboardPageBody() {
     // keeps that lens and the data stands; a redraft league flips the lens, KeyedByLens remounts this body, and the page
     // fetches again. The skeleton below holds until `lensReady`, so speculative data never paints on the wrong lens.
     let cancelled = false;
+    // Remember this league for the next cold start (landing redirect + early fetch); cleared below if it fails to load.
+    if (userId) writeLastLeague(userId, leagueId, new URLSearchParams(window.location.search).get("name") ?? "");
     const rankings = api.getTeamRankings(leagueId, lens);
     rankings.catch(() => {
       /* the tile renders nothing on failure; avoid an unhandled rejection */
@@ -114,6 +117,7 @@ function DashboardPageBody() {
         });
       })
       .catch((err) => {
+        if (!cancelled) clearLastLeague(leagueId);
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load Today.");
       });
     return () => {

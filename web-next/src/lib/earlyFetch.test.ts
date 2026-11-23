@@ -139,10 +139,34 @@ describe("early-fetch inline script", () => {
 
   it("only fires on /dashboard/<league>", () => {
     seed(session());
-    for (const path of ["/", "/dashboard", "/matchup/L1", "/dashboard/L1/extra", "/my-team/L1"]) {
+    for (const path of ["/dashboard", "/matchup/L1", "/dashboard/L1/extra", "/my-team/L1"]) {
       goto(path);
       runScript();
     }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("on / fires for the remembered league of the same user, and only then", () => {
+    fetchMock.mockResolvedValue(jsonResponse({}));
+    seed(session());
+    goto("/");
+    runScript();
+    expect(fetchMock).not.toHaveBeenCalled();
+    window.localStorage.setItem("fgl.lastLeague.v1", JSON.stringify({ uid: "other", id: "L1", name: "x" }));
+    runScript();
+    expect(fetchMock).not.toHaveBeenCalled();
+    window.localStorage.setItem("fgl.lastLeague.v1", JSON.stringify({ uid: "u1", id: "L1", name: "x" }));
+    runScript();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(DASH());
+    expect(holder()[EARLY_FETCH_GLOBAL]!.lid).toBe("L1");
+  });
+
+  it("does not fire on / for an auth callback", () => {
+    seed(session());
+    window.localStorage.setItem("fgl.lastLeague.v1", JSON.stringify({ uid: "u1", id: "L1", name: "x" }));
+    goto("/?code=pkce");
+    runScript();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

@@ -11,9 +11,12 @@
  *    nothing new anywhere and logs nothing. The access token only ever goes in an Authorization header to the configured API
  *    origin, exactly like lib/api.ts. It is never put in a URL and never stored on `window`: the global holds only the
  *    in-flight request (url, user id, league id, promise).
+ *  - On "/" (a returning user opening the bare site, who is about to be redirected to their league) it fires for the league
+ *    remembered in `fgl.lastLeague.v1` when that entry belongs to the same signed-in user, so the request is in flight while
+ *    the bundle downloads and the redirect resolves. With no remembered league it does nothing.
  *  - It does not fire when there is no session, the stored token has < 120 s left (the same floor supabase.ts uses for its fast
  *    path, so an expiring token goes through the real client and its refresh), on any auth callback URL (OAuth / email-confirm /
- *    recovery, which the real client must parse first), or off the /dashboard/<league> route.
+ *    recovery, which the real client must parse first), or off the /dashboard/<league> route and "/".
  *  - The global is single-use and short-lived: cleared when consumed and after EARLY_FETCH_TTL_MS if nobody takes it.
  *  - The result is bound to the user id and league id it was fetched for, and to the exact URL (path + lens + query, so the
  *    request cache key is the same as today's). If the signed-in user, league or URL differs, the early response is ignored
@@ -26,11 +29,13 @@
 /** `window` property holding the in-flight early request. */
 export const EARLY_FETCH_GLOBAL = "__fdEarly";
 /** An unclaimed early request is dropped this long after it started. */
-export const EARLY_FETCH_TTL_MS = 15_000;
+export const EARLY_FETCH_TTL_MS = 30_000;
 /** Same floor as supabase.ts FAST_PATH_MIN_TTL_SECONDS: below this the real auth client must run (and refresh). */
 export const EARLY_FETCH_MIN_TTL_SECONDS = 120;
 /** Where valuation lens detection is remembered (ValuationLensContext.DETECTED_LENS_STORAGE_KEY). */
 const LENS_STORAGE_KEY = "fgl.detectedLens.v1";
+/** Where the last-opened league is remembered (lib/lastLeagueHint.ts). */
+const LAST_LEAGUE_STORAGE_KEY = "fgl.lastLeague.v1";
 
 export interface EarlyFetch {
   url: string;
@@ -45,14 +50,17 @@ export function buildEarlyFetchScript({ apiBase, storageKey }: { apiBase: string
   const lit = (value: string) => JSON.stringify(value).replace(/</g, "\\u003c");
   return (
     "(function(){try{" +
-    'var m=/^\\/dashboard\\/([^\\/]+)\\/?$/.exec(location.pathname);if(!m)return;' +
+    'var m=/^\\/dashboard\\/([^\\/]+)\\/?$/.exec(location.pathname);var home=location.pathname==="/";if(!m&&!home)return;' +
     "var cb=/[#&?](access_token|refresh_token|code|error|error_code|error_description|type)=/;" +
     "if(cb.test(location.hash)||cb.test(location.search))return;" +
     "var raw=localStorage.getItem(" + lit(storageKey) + ");if(!raw)return;" +
     "var s=JSON.parse(raw);" +
     'if(!s||typeof s.access_token!=="string"||!s.access_token||!s.refresh_token||!s.user||typeof s.user.id!=="string"||!s.user.id)return;' +
     'if(typeof s.expires_at!=="number"||s.expires_at-Date.now()/1000<' + EARLY_FETCH_MIN_TTL_SECONDS + ")return;" +
-    "var lid=decodeURIComponent(m[1]);var lens=\"Dynasty\";" +
+    "var lid;if(m){lid=decodeURIComponent(m[1])}else{" +
+    "var L=JSON.parse(localStorage.getItem(" + lit(LAST_LEAGUE_STORAGE_KEY) + ")||\"null\");" +
+    'if(!L||L.uid!==s.user.id||typeof L.id!=="string"||!L.id)return;lid=L.id}' +
+    "var lens=\"Dynasty\";" +
     "try{var d=JSON.parse(localStorage.getItem(" + lit(LENS_STORAGE_KEY) + ")||\"null\");if(d&&d[lid]===\"Non-Dynasty\")lens=\"Non-Dynasty\"}catch(e){}" +
     'var url=' + lit(apiBase) + '+"/v1/leagues/"+encodeURIComponent(lid)+"/dashboard?lens="+encodeURIComponent(lens)+"&defer_trade_ideas=true";' +
     'var p=fetch(url,{headers:{Authorization:"Bearer "+s.access_token}});p.catch(function(){});' +

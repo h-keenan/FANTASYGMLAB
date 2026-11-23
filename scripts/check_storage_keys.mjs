@@ -34,6 +34,7 @@ export const ALLOWED = {
   "web-next/src/lib/protectedRouteReturn.ts": "purged: return path written before sign-in (fd_protected_route_return_path)",
   "web-next/src/lib/tradeBridge.ts": "purged: trade handed from the public analyzer to sign-in (fd_pending_bridge_trade_v1)",
   "web-next/src/context/ValuationLensContext.tsx": "purged: detected lens per league, read by an inline script (fgl.detectedLens.v1)",
+  "web-next/src/lib/lastLeagueHint.ts": "purged: last league opened, read by the early-fetch script and landing redirect (fgl.lastLeague.v1)",
   "web-next/src/lib/earlyFetch.ts": "purged: inline script reads the lens map",
   // ---- keyed already, kept
   "web-next/src/components/StartHereCard.tsx": "keyed: fd:start-here:v1:<user>",
