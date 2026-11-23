@@ -35,10 +35,10 @@ import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHeal
 import GuillotineCard from '../components/GuillotineCard';
 import DirectionCheckinCard from '../components/DirectionCheckinCard';
 import TodayMatchupCard from '../components/TodayMatchupCard';
-import { TodaySnapshotStrip, TodayTradeRow } from '../components/TodayGlance';
+import { TodayStandingLine } from '../components/TodayGlance';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
 import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusStanding } from '../lib/teamStatus';
-import { bestTradeIdea, todayTiles, todayTradeIdea } from '../lib/todayView';
+import { bestTradeIdea, todayActions, todayMatchupMove, todayStandingLine, todayTiles, todayTradeIdea } from '../lib/todayView';
 import StorylineSummaryCard from '../components/StorylineSummaryCard';
 import LeagueStandingStrips from '../components/LeagueStandingStrips';
 import {
@@ -61,12 +61,9 @@ import SectionHeading from '../components/SectionHeading';
 import CompactModule from '../components/CompactModule';
 import { listSummaryParts } from '../lib/moduleTemplates';
 import BriefingItemPlayers from '../components/BriefingItemPlayers';
-import LeaguePulseCard from '../components/LeaguePulseCard';
-import { leaguePulseHighlights } from '../lib/leaguePulse';
 import TodayHero from '../components/TodayHero';
 import StartHereCard from '../components/StartHereCard';
 import { useAuth } from '../context/AuthContext';
-import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
 import ToneBadge from '../components/ToneBadge';
 import { trackUse } from '../lib/analytics';
@@ -87,7 +84,7 @@ import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import { DashboardMore } from '../components/DashboardBlocks';
 import DecisionQueue from '../components/DecisionQueue';
 import { buildDecisionQueue } from '../lib/decisionQueue';
-import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY } from '../lib/dashboardLayout';
+import { isTradeItem } from '../lib/dashboardLayout';
 import InfoMark from '../components/InfoMark';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
@@ -466,7 +463,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // The best trade: the biggest positive gain. An idea that costs the user value is never the headline (lib/todayView.ts).
   const ideas = tradeItems.map(todayTradeIdea);
   const idea = bestTradeIdea(ideas);
-  const ideaItem = idea ? tradeItems[ideas.indexOf(idea)] : null;
+  // "Do this now": every lineup fix, the waiver add, deadline / draft / injuries and the best trade, ranked and capped.
+  const actions = todayActions(queue, idea && !deadlinePassed ? idea : null);
+  const bestMove = todayMatchupMove(queue.all.find((d) => d.kind === 'lineup')?.swaps);
   const watchItems = [...grouped.watch, ...grouped.opportunity];
   const watchLines = watchItems.map((item) => ({
     playerId: item.route_player_id || null,
@@ -503,7 +502,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       {matchupQuery.isPending ? (
         <SkeletonBlock height={92} radius={radii.md} />
       ) : matchupLine ? (
-        <TodayMatchupCard line={matchupLine} matchup={matchup} onOpenMatchup={() => navigate('Matchup', { leagueId, leagueName })} />
+        <TodayMatchupCard line={matchupLine} matchup={matchup} onOpenMatchup={() => navigate('Matchup', { leagueId, leagueName })} move={bestMove ? { text: bestMove.text, onPress: () => navigate('Matchup', bestMove.swap.out?.id && bestMove.swap.replacement?.id ? { leagueId, leagueName, plan: 'swap', out: bestMove.swap.out.id, in: bestMove.swap.replacement.id } : { leagueId, leagueName, plan: 'all' }) } : null} />
       ) : null}
 
       {/* A few times a season: does the declared direction still fit? Server-decided,
@@ -512,6 +511,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       <DecisionQueue
         queue={queue}
+        actions={actions}
         leagueId={leagueId}
         leagueName={leagueName}
         onNavigate={navigate}
@@ -535,16 +535,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       <FirstValueOfferCard isPremium={entitlement?.is_premium === true} />
 
       {/* The snapshot strip (Standing / Playoffs / Team rank) is one control that opens My Team (rank bars, tiles, position rooms). */}
-      {teamSnapshot ? <TodaySnapshotStrip tiles={tiles} onOpen={() => navigation.navigate('MyTeam', { leagueId, leagueName })} /> : null}
-      {idea && ideaItem && !deadlinePassed ? (
-        <TodayTradeRow
-          info={<InfoMark label="this trade idea" beginnerOnly lines={[TRADES_BLOCK_COPY.beginnerExplainer]} />}
-          idea={idea}
-          deadline={deadlineChip(dashboardData?.trade_window)?.value.replace(/\s*\(.*\)$/, '')}
-          onOpen={() => navigate('Trades', { leagueId, leagueName, ...(ideaItem.route_player_id ? { playerId: ideaItem.route_player_id } : {}) })}
-        />
-      ) : null}
-
+      {teamSnapshot ? <TodayStandingLine parts={todayStandingLine(tiles)} onOpen={() => navigation.navigate('MyTeam', { leagueId, leagueName })} /> : null}
       {guillotine ? <GuillotineCard data={guillotine} /> : null}
 
       <View
@@ -574,10 +565,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       {/* Secondary modules stay collapsed behind "More" so the actionable ones
           above are reachable without scrolling past them. */}
-      <DashboardMore
-        leagueActivity={teamRankings && leaguePulseHighlights(teamRankings).length > 0 ? <LeaguePulseCard teams={teamRankings} leagueId={leagueId} leagueName={leagueName} onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} /> : undefined}
-        guessGame={<DashboardGuessCard />}
-      >
+      <DashboardMore>
         {readyRecap ? (
           <View>
             <SectionHeading title="Storylines" icon="newspaper-outline" />

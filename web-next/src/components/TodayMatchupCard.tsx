@@ -22,7 +22,7 @@ const TONE = { success: "var(--color-success)", danger: "var(--color-danger)", w
  * full Matchup page; it is the ONE place Today states the score and the win chance. Mobile twin:
  * components/TodayMatchupCard.tsx.
  */
-export function TodayMatchupCard({ line, matchup, href }: { line: TeamStatusMatchup; matchup: MatchupResponse | null; href: string }) {
+export function TodayMatchupCard({ line, matchup, href, move }: { line: TeamStatusMatchup; matchup: MatchupResponse | null; href: string; /** The single best move for this matchup (lib/todayView.ts todayMatchupMove) and where it opens: the lineup planner on that swap. */ move?: { text: string; href: string } | null }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   const ring = todayMatchupRing(line);
@@ -65,6 +65,15 @@ export function TodayMatchupCard({ line, matchup, href }: { line: TeamStatusMatc
           ⌄
         </span>
       </button>
+      {move ? (
+        <Link href={move.href} aria-label={`Best move: ${move.text}. Open the lineup`} className="flex items-center gap-2 text-sm font-bold" style={{ minHeight: "var(--touch-target-min)", color: "var(--color-accent)", textDecoration: "none" }} data-testid="today-matchup-move">
+          <span className="min-w-0 flex-1">
+            <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Best move </span>
+            {move.text}
+          </span>
+          <span aria-hidden="true" data-row-arrow>→</span>
+        </Link>
+      ) : null}
       <Collapse open={open} id={bodyId}>
         <div className="flex flex-col gap-2 pt-1">
           <SwingPlayers swing={swing} />

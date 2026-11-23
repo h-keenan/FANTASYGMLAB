@@ -7,22 +7,20 @@ import { GuillotineCard, useGuillotineState } from "@/components/GuillotineCard"
 import { formatRank } from "@/components/SnapshotTile";
 import { useTeamStatusData, type TeamStatusPrefetch } from "@/lib/useTeamStatusData";
 import { useSeasonOdds } from "@/components/DashboardOddsStrip";
-import { DashboardMore } from "@/components/DashboardBlocks";
 import { SkeletonHero } from "@/components/Skeleton";
 import { TodayMatchupCard } from "@/components/TodayMatchupCard";
-import { TodaySnapshotStrip, TodayTradeRow } from "@/components/TodayGlance";
+import { TodayStandingLine } from "@/components/TodayGlance";
 import { GAME_PLAN_INTERNAL_ROUTES, gamePlanTileHref, resolveGamePlanTargetPlayerId } from "@/lib/gamePlanPresentation";
 import { DecisionQueue } from "@/components/DecisionQueue";
 import { buildDecisionQueue } from "@/lib/decisionQueue";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
-import { useExperienceCopy } from "@/context/ExperienceLevelContext";
-import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY } from "@/lib/dashboardLayout";
+import { isTradeItem } from "@/lib/dashboardLayout";
 import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusStanding } from "@/lib/teamStatus";
-import { bestTradeIdea, todayTiles, todayTradeIdea } from "@/lib/todayView";
+import { bestTradeIdea, todayActions, todayMatchupMove, todayStandingLine, todayTiles, todayTradeIdea } from "@/lib/todayView";
+import { swapHref } from "@/components/DecisionQueue";
 
 // Below-the-fold and conditional modules load as their own chunks (after the above-the-fold content has hydrated), so they are not
 // part of Today's first-load JS. Each renders nothing until its chunk lands; none sits above the matchup card.
-const LeaguePulseCard = dynamic(() => import("@/components/LeaguePulseCard").then((m) => m.LeaguePulseCard), { loading: () => null });
 const StartHereCard = dynamic(() => import("@/components/StartHereCard").then((m) => m.StartHereCard), { loading: () => null });
 const FirstValueOfferCard = dynamic(() => import("@/components/FirstValueOfferCard").then((m) => m.FirstValueOfferCard), { loading: () => null });
 const DirectionCheckinCard = dynamic(() => import("@/components/DirectionCheckinCard").then((m) => m.DirectionCheckinCard), { loading: () => null });
@@ -81,9 +79,6 @@ export function DashboardContent({
 }) {
   const snapshot = data.team_snapshot;
   const { data: guillotine } = useGuillotineState(sample ? undefined : leagueId);
-  // Beginner helper text (onboarding experience level) — null/undefined for
-  // advanced or unset accounts, so every tile below renders as before.
-  const copy = useExperienceCopy();
   const query = `?name=${encodeURIComponent(leagueName)}`;
   const Shell: "div" | "main" = sample ? "div" : "main";
   const watchItems = data.items.filter((item) => item.category !== "top_priority");
@@ -139,6 +134,11 @@ export function DashboardContent({
     ? gamePlanTileHref(GAME_PLAN_INTERNAL_ROUTES[ideaItem.destination] ?? "trade-hub", leagueId, leagueName, resolveGamePlanTargetPlayerId(ideaItem))
     : tradeHubHref;
 
+  // "Do this now": every lineup fix, the waiver add, deadline / draft / injuries and the best trade, ranked and capped.
+  const actions = todayActions(queue, idea && !deadlinePassed ? idea : null);
+  const bestMove = todayMatchupMove(queue.all.find((d) => d.kind === "lineup")?.swaps);
+  const move = bestMove ? { text: bestMove.text, href: swapHref(bestMove.swap, leagueId, leagueName) } : null;
+
   return (
     // coridian_, 2026-10-17 (screenshot): too much empty space above the
     // first real card on Dashboard — the one page most people land on
@@ -184,7 +184,7 @@ export function DashboardContent({
           <SkeletonHero minHeight={92} />
         </div>
       ) : matchupLine ? (
-        <TodayMatchupCard line={matchupLine} matchup={teamStatus.matchup} href={`/matchup/${id}${query}`} />
+        <TodayMatchupCard line={matchupLine} matchup={teamStatus.matchup} href={`/matchup/${id}${query}`} move={move} />
       ) : null}
 
       {/* A few times a season: does the declared direction still fit? Server-decided,
@@ -193,6 +193,8 @@ export function DashboardContent({
 
       <DecisionQueue
         queue={queue}
+        actions={actions}
+        tradeHref={ideaHref}
         leagueId={leagueId}
         leagueName={leagueName}
         pending={queuePending}
@@ -204,29 +206,18 @@ export function DashboardContent({
           briefing (paywall-after-connect). Dismissible; nothing is gated. */}
       {userId && !sample ? <FirstValueOfferCard userId={userId} isPremium={data.entitlement?.is_premium === true} /> : null}
 
-      {/* The snapshot strip (Standing / Playoffs / Team rank) is one link to My Team, which hosts the rank bars, tiles and position rooms.
+      {/* The standing is one slim line (Standing / Playoffs / Team rank) linking to My Team, which hosts the rank bars, tiles and position rooms.
           The marker is the "dashboard rendered" signal. */}
       {snapshot ? (
         <section aria-label="Team summary" data-fgl-dashboard-complete="true">
-          {teamStatus.settled ? <TodaySnapshotStrip tiles={tiles} href={`/my-team/${id}${query}`} /> : null}
+          {teamStatus.settled ? <TodayStandingLine parts={todayStandingLine(tiles)} href={`/my-team/${id}${query}`} /> : null}
         </section>
       ) : null}
-
-      {teamStatus.settled && idea && !deadlinePassed ? <TodayTradeRow idea={idea} href={ideaHref} deadline={deadlineChip(data.trade_window)?.value.replace(/\s*\(.*\)$/, "")} info={copy.isBeginner ? TRADES_BLOCK_COPY.beginnerExplainer : null} /> : null}
 
       <GuillotineCard data={guillotine} />
 
       {/* Alerts (with the watchlist folded in) is a section of Today: avatars + newest headline collapsed, unread count badge, tap to expand, `#alerts` opens it. */}
       {sample ? null : <DashboardAlerts leagueId={leagueId} leagueName={leagueName} watchItems={watchItems} />}
-
-      {/* The sample preview has no More section, so it keeps League Activity inline. */}
-      {sample ? <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} /> : null}
-
-      {/* Secondary modules stay collapsed behind "More": league activity and the two mini-games, one line each (they are play, not
-          decisions). The League type control lives on My Team's league settings. */}
-      {sample ? null : (
-        <DashboardMore leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} />
-      )}
     </Shell>
   );
 }

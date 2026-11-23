@@ -28,6 +28,7 @@ import PlayoffOddsPanel from './PlayoffOddsPanel';
 import LeagueStandingsModule from '../components/LeagueStandingsModule';
 import { ReSettle } from '../components/Motion';
 import NextSteps from '../components/NextSteps';
+import LeagueMore from '../components/LeagueMore';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -534,6 +535,7 @@ function RankingsPanel({
       <FlatList
         ListFooterComponent={
           <>
+            <LeagueMore teams={teamRankingsQuery.data?.teams} leagueId={leagueId} leagueName={leagueName} onOpenRecap={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} />
             <NextSteps title="Make a move" steps={['trade-hub', 'matchup']} leagueId={leagueId} leagueName={leagueName} />
             <ValuesCredit />
           </>

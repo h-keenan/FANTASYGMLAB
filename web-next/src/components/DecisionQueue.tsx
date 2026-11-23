@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
-import { Button, ButtonLink } from "@/components/Button";
+import { ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { FreeLimitNote } from "@/components/FreeLimitNote";
 import { GamePlanCard } from "@/components/GamePlanCard";
@@ -15,10 +14,11 @@ import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { InfoMark } from "@/components/ui/InfoMark";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import type { BriefingItem } from "@/lib/api";
-import { seeAllLabel, type Decision, type DecisionPlayer, type DecisionSwap, type DecisionQueue as Queue } from "@/lib/decisionQueue";
+import type { Decision, DecisionPlayer, DecisionSwap, DecisionQueue as Queue } from "@/lib/decisionQueue";
 import { GAME_PLAN_INTERNAL_ROUTES, gamePlanTileHref } from "@/lib/gamePlanPresentation";
+import { TRADES_BLOCK_COPY } from "@/lib/dashboardLayout";
 import { thisWeekHref } from "@/lib/thisWeek";
-import { matchupPlanParams, swapGainLabel, swapReplacementLine, todayActionRow, todayFixAll } from "@/lib/todayView";
+import { matchupPlanParams, swapGainLabel, type TodayAction } from "@/lib/todayView";
 
 /** Where a decision's one primary action goes. Shared by the queue rows and the hero's next action. */
 export function decisionHref(d: Pick<Decision<BriefingItem>, "primary" | "item">, leagueId: string, leagueName: string): string {
@@ -40,7 +40,6 @@ export function swapHref(swap: Pick<DecisionSwap, "out" | "replacement"> | null,
 }
 
 const SWAP_TONE = { danger: "var(--color-danger)", warning: "var(--color-warning)" } as const;
-const SWAP_VISIBLE = 4;
 
 function playerRef(p: DecisionPlayer) {
   return { id: p.id, name: p.name, position: p.position, team: p.team, tier: p.tier };
@@ -57,106 +56,34 @@ function PlayerLine({ p }: { p: DecisionPlayer }) {
   );
 }
 
-/** One lineup problem: the starter as the shared player card (avatar, status, who to start instead, the projected gain) and the Swap. */
-function SwapRow({ swap, href, first }: { swap: DecisionSwap; href: string; first: boolean }) {
-  const out = swap.out;
-  const into = swap.replacement;
-  const gain = swapGainLabel(swap);
-  const detail = (
-    <>
-      <span className="font-extrabold uppercase" style={{ color: SWAP_TONE[swap.tone] }} data-testid="swap-status">
-        {swap.status}
-      </span>
-      <span aria-hidden="true"> → </span>
-      {swapReplacementLine(swap)}
-    </>
-  );
-  const gainFigure = gain ? (
-    <span style={{ color: "var(--color-success)" }} aria-label={`${gain} projected points`}>
-      {gain}
-    </span>
-  ) : undefined;
-  return (
-    <li className="flex items-center gap-2 py-1" style={first ? undefined : { borderTop: "var(--border-width-default) solid var(--color-border)" }} data-testid="swap-row">
-      <span className="min-w-0 flex-1">
-        {out ? (
-          <CompactPlayerCard player={playerRef(out)} detail={detail} trailing={gainFigure} testId="swap-player" />
-        ) : (
-          <span className="flex items-center gap-2" style={{ minHeight: 40 }}>
-            <span aria-hidden="true" className="flex shrink-0 items-center justify-center text-lg font-extrabold" style={{ width: 28, height: 28, borderRadius: "50%", border: "2px dashed var(--color-warning)", color: "var(--color-warning)" }}>
-              +
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-sm font-bold">Empty starter slot</span>
-              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{swapReplacementLine(swap)}</span>
-            </span>
-            {gainFigure ? <span className="shrink-0 text-sm font-extrabold tabular-nums">{gainFigure}</span> : null}
-          </span>
-        )}
-      </span>
-      <ButtonLink href={href} size="sm" variant="primary" aria-label={out ? `Swap ${out.name}${into?.name ? ` for ${into.name}` : ""}` : `Fill the empty slot${into?.name ? ` with ${into.name}` : ""}`} data-testid="swap-button">
-        Swap
-      </ButtonLink>
-    </li>
-  );
-}
-
-/**
- * The lineup row's detail (behind its tap): one row per lineup problem with its fix and a one-tap Swap, plus "Fix all N ·
- * +X proj". Swap opens the Matchup page's lineup planner already on that move (FantasyDesk plans, it cannot set a Sleeper
- * lineup). Locked players (game started) are never in `swaps`; see lib/decisionQueue.ts lineupSwaps.
- */
-function SwapDetail({ d, leagueId, leagueName }: { d: Decision<BriefingItem>; leagueId: string; leagueName: string }) {
-  const [all, setAll] = useState(false);
-  const shown = all ? d.swaps : d.swaps.slice(0, SWAP_VISIBLE);
-  const fixAll = todayFixAll(d.swaps);
-  const hidden = d.swaps.length - shown.length;
-  return (
-    <div className="flex flex-col" data-testid="swap-stack">
-      <ul className="m-0 flex list-none flex-col p-0">
-        {shown.map((swap, i) => (
-          <SwapRow key={swap.key} swap={swap} href={swapHref(swap, leagueId, leagueName)} first={i === 0} />
-        ))}
-      </ul>
-      {hidden > 0 ? (
-        <Button variant="ghost" size="sm" onClick={() => setAll(true)} data-testid="swap-more">
-          +{hidden} more
-        </Button>
-      ) : null}
-      {fixAll ? (
-        <ButtonLink href={swapHref(null, leagueId, leagueName)} variant="primary" fullWidth data-testid="swap-fix-all">
-          {fixAll.label}
-        </ButtonLink>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * One decision as a one-line ExpandRow: avatar, a short reason (lib/todayView.ts todayActionRow), one button. The full
- * reason, the other players and the briefing card sit behind the row's tap.
- */
-function DecisionRow({ d, leagueId, leagueName }: { d: Decision<BriefingItem>; leagueId: string; leagueName: string }) {
-  const row = todayActionRow(d);
-  const href = d.swaps.length > 0 ? swapHref(d.swaps.length === 1 ? d.swaps[0] : null, leagueId, leagueName) : decisionHref(d, leagueId, leagueName);
-  const [first, ...others] = d.players;
+/** One action as a one-line ExpandRow: avatar, a short reason, ONE button. The fuller reason and the players sit behind the row's tap. */
+function ActionRow({ a, leagueId, leagueName, tradeHref }: { a: TodayAction<BriefingItem>; leagueId: string; leagueName: string; tradeHref: string }) {
+  const d = a.decision;
+  const href = a.swap ? swapHref(a.swap, leagueId, leagueName) : d ? (d.swaps.length > 0 ? swapHref(null, leagueId, leagueName) : decisionHref(d, leagueId, leagueName)) : tradeHref;
+  const tone = SWAP_TONE[a.tone === "danger" ? "danger" : "warning"];
+  const gain = a.swap ? swapGainLabel(a.swap) : null;
+  const [first, ...others] = d?.players ?? [];
   return (
     <ExpandRow
-      testId={`decision-${d.kind}`}
-      label={`${d.label}: ${row.reason}`}
-      leading={row.player ? <PlayerAvatarSlot player={playerRef(row.player)} tier="row" nonInteractive="the row's toggle is the tap target" /> : <span aria-hidden="true" className="shrink-0 rounded-full" style={{ width: 10, height: 10, background: SWAP_TONE[d.tone === "danger" ? "danger" : "warning"] }} />}
-      title={row.reason}
+      testId={`decision-${a.kind === "swap" ? "lineup" : a.kind}`}
+      label={`${a.kind === "swap" ? "LINEUP" : (d?.label ?? "TRADE")}: ${a.reason}`}
+      leading={a.player ? <PlayerAvatarSlot player={playerRef(a.player)} tier="row" nonInteractive="the row's toggle is the tap target" /> : <span aria-hidden="true" className="shrink-0 rounded-full" style={{ width: 10, height: 10, background: tone }} />}
+      title={a.reason}
+      caption={gain ? <span style={{ color: "var(--color-success)" }}>{gain} projected</span> : undefined}
       action={
-        <ButtonLink href={href} variant="primary" size="sm" aria-label={`${row.button}: ${row.reason}`} data-testid="decision-primary">
-          {row.button}
+        <ButtonLink href={href} variant="primary" size="sm" aria-label={`${a.button}: ${a.reason}`} data-testid="decision-primary">
+          {a.button}
         </ButtonLink>
       }
     >
-      {d.swaps.length > 0 ? (
-        <SwapDetail d={d} leagueId={leagueId} leagueName={leagueName} />
-      ) : (
+      {a.swap ? (
         <>
-          {row.reason !== d.title ? (
+          {a.detail ? <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>{a.detail}</p> : null}
+          {a.swap.replacement?.name ? <PlayerLine p={{ ...a.swap.replacement, note: "Best healthy replacement", stat: gain ? { value: gain, label: "GAIN" } : null }} /> : null}
+        </>
+      ) : d ? (
+        <>
+          {a.reason !== d.title ? (
             <p className="m-0 text-sm font-bold" data-testid="decision-full-title">
               {d.title}
             </p>
@@ -181,7 +108,9 @@ function DecisionRow({ d, leagueId, leagueName }: { d: Decision<BriefingItem>; l
           ) : null}
           {d.item && d.kind !== "waiver" ? <GamePlanCard item={d.item} leagueId={leagueId} leagueName={leagueName} /> : null}
         </>
-      )}
+      ) : a.detail ? (
+        <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="decision-trade-detail">{a.detail}</p>
+      ) : null}
     </ExpandRow>
   );
 }
@@ -194,6 +123,8 @@ function DecisionRow({ d, leagueId, leagueName }: { d: Decision<BriefingItem>; l
  */
 export function DecisionQueue({
   queue,
+  actions,
+  tradeHref,
   leagueId,
   leagueName,
   pending = false,
@@ -201,6 +132,10 @@ export function DecisionQueue({
   entitlement,
 }: {
   queue: Queue<BriefingItem>;
+  /** The ranked, capped rows (lib/todayView.ts todayActions): lineup fixes, waivers, deadline, injuries, the best trade. */
+  actions: { rows: TodayAction<BriefingItem>[]; total: number };
+  /** Where the best-trade row's button opens. */
+  tradeHref: string;
   leagueId: string;
   leagueName: string;
   /** The matchup read has not settled: hold the place so nothing jumps when decisions land. */
@@ -210,7 +145,6 @@ export function DecisionQueue({
   /** The dashboard entitlement, for the Free-limit note (unchanged gating). */
   entitlement?: { is_premium: boolean; visible_count: number; hidden_count: number; free_limit?: number };
 }) {
-  const [open, setOpen] = useState(false);
   const copy = useExperienceCopy();
   if (pending) {
     return (
@@ -219,37 +153,28 @@ export function DecisionQueue({
       </section>
     );
   }
-  const seeAll = seeAllLabel(queue, open);
-  const shown = open ? queue.all : queue.visible;
-  // The count is the number of rows (a lineup's swaps are one row).
-  const count = queue.total;
+  const hidden = actions.total - actions.rows.length;
+  const planHref = `/gm-plan/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`;
   return (
     <section className="flex flex-col gap-2" aria-labelledby="decision-queue-heading" data-testid="decision-queue" data-fgl-dashboard-useful="true" data-fgl-this-week="true">
       <SectionHeading
         id="decision-queue-heading"
-        help={<InfoMark label="your game plan" lines={[copy.help("dashboardGamePlan"), queue.total === 0 && !emptyOverride ? copy.help("dashboardNothingUrgent") : null]} beginnerOnly />}
-        action={
-          <Link href={`/gm-plan/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} aria-label="Open the full GM Plan" className="tap-link text-sm font-bold shrink-0" style={{ color: "var(--color-accent)" }}>
-            Full GM Plan →
-          </Link>
-        }
+        help={<InfoMark label="your game plan" lines={[copy.help("dashboardGamePlan"), actions.total === 0 && !emptyOverride ? copy.help("dashboardNothingUrgent") : null, actions.rows.some((a) => a.kind === "trade") && copy.isBeginner ? TRADES_BLOCK_COPY.beginnerExplainer : null]} beginnerOnly />}
       >
-        {queue.total > 0 ? `Do this now · ${count}` : "Do this now"}
+        {actions.total > 0 ? `Do this now · ${actions.total}` : "Do this now"}
       </SectionHeading>
-      {queue.total === 0 ? (
+      {actions.total === 0 ? (
         <EmptyState title={emptyOverride ?? queue.empty?.title ?? "Nothing needs you this week"} subtitle={emptyOverride ? undefined : (queue.empty?.detail ?? undefined)} />
       ) : (
-        <ExpandRowGroup accent={shown.some((d) => d.tone === "danger") ? "var(--color-danger)" : "var(--color-accent)"} testId="decision-rows">
-          {shown.map((d) => (
-            <DecisionRow key={d.key} d={d} leagueId={leagueId} leagueName={leagueName} />
+        <ExpandRowGroup accent={actions.rows.some((a) => a.tone === "danger") ? "var(--color-danger)" : "var(--color-accent)"} testId="decision-rows">
+          {actions.rows.map((a) => (
+            <ActionRow key={a.key} a={a} leagueId={leagueId} leagueName={leagueName} tradeHref={tradeHref} />
           ))}
         </ExpandRowGroup>
       )}
-      {seeAll ? (
-        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap-link text-sm font-bold" style={{ minHeight: "var(--touch-target-min)", color: "var(--color-accent)" }} data-testid="decision-see-all">
-          {seeAll}
-        </button>
-      ) : null}
+      <Link href={planHref} aria-label={hidden > 0 ? `See all ${actions.total} in the GM Plan` : "Open the full GM Plan"} className="tap-link text-sm font-bold" style={{ minHeight: "var(--touch-target-min)", display: "inline-flex", alignItems: "center", color: "var(--color-accent)", textDecoration: "none" }} data-testid="decision-see-all">
+        {hidden > 0 ? `See all (${actions.total}) →` : "Full GM Plan →"}
+      </Link>
       {queue.proUpsell ? (
         <Link href="/premium" className="glass-surface flex items-center justify-between gap-2 px-3" style={{ minHeight: 44, border: "var(--border-width-default) solid var(--color-premium)", color: "inherit", textDecoration: "none" }} data-testid="more-moves-upsell">
           <span className="text-sm font-bold">

@@ -21,7 +21,7 @@ import { LINK_HIT_SLOP, spacing, type ThemeColors } from '../theme';
  * compact card. Tapping expands the detail (the swing players, with avatars) and a link to the Matchup screen. It is the ONE
  * place Today states the score and the win chance. Web twin: components/TodayMatchupCard.tsx.
  */
-export default function TodayMatchupCard({ line, matchup, onOpenMatchup }: { line: TeamStatusMatchup; matchup: MatchupResponse | null; onOpenMatchup: () => void }) {
+export default function TodayMatchupCard({ line, matchup, onOpenMatchup, move }: { line: TeamStatusMatchup; matchup: MatchupResponse | null; onOpenMatchup: () => void; /** The single best move for this matchup (lib/todayView.ts todayMatchupMove) and what its tap opens: the lineup planner on that swap. */ move?: { text: string; onPress: () => void } | null }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
@@ -52,6 +52,15 @@ export default function TodayMatchupCard({ line, matchup, onOpenMatchup }: { lin
           </View>
           <AppText style={styles.chevron}>{open ? '⌃' : '⌄'}</AppText>
         </Pressable>
+        {move ? (
+          <PressableScale accessibilityRole="link" accessibilityLabel={`Best move: ${move.text}. Open the lineup`} onPress={move.onPress} style={styles.move} testID="today-matchup-move">
+            <AppText style={styles.moveText} numberOfLines={2}>
+              <AppText style={styles.moveKicker}>BEST MOVE </AppText>
+              {move.text}
+            </AppText>
+            <AppText style={styles.linkText}>›</AppText>
+          </PressableScale>
+        ) : null}
         <Collapse open={open}>
           <View style={styles.body}>
             <SwingPlayers swing={swing} />
@@ -75,6 +84,9 @@ function createStyles(colors: ThemeColors) {
     caption: { fontSize: 12.5, color: colors.textTertiary },
     chevron: { fontSize: 14, color: colors.textTertiary },
     body: { gap: spacing.sm, paddingTop: spacing.xs },
+    move: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
+    moveText: { flex: 1, color: colors.accent, fontWeight: '700', fontSize: 14 },
+    moveKicker: { color: colors.textTertiary, fontWeight: '800', fontSize: 12, letterSpacing: 0.8 },
     link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
     linkText: { color: colors.accent, fontWeight: '700', fontSize: 14 },
   });

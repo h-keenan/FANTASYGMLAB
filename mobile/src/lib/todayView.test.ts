@@ -13,6 +13,11 @@ import {
   bestTradeIdea,
   tradeGainLabel,
   todayActionRow,
+  todayActions,
+  todayAlertRows,
+  todayMatchupMove,
+  todayStandingLine,
+  TODAY_ACTION_CAP,
   todayTradeIdea,
 } from './todayView.ts';
 import { slotsWithSwap } from './matchupPlanner.ts';
@@ -163,4 +168,66 @@ test('todayAlertsSummary: distinct avatars, newest headline, how many more', () 
   assert.deepEqual(s.avatars.map((a) => a.playerId), ['a', 'b']);
   assert.equal(s.lead, 'A out');
   assert.equal(s.more, 3);
+});
+
+const baseQueue = (moves: DecisionMove[], items: Parameters<typeof buildDecisionQueue>[0]['items'] = []) =>
+  buildDecisionQueue({ now: new Date('2026-11-18T12:00:00'), moves, thisWeek: null, items, tradeWindow: null });
+
+const tradeIdea = todayTradeIdea({
+  headline: 'Swap',
+  presentation: { trade_package: { send: [{ asset_type: 'player', player_id: '1', name: 'R. Walsh', position: 'RB' }], receive: [{ asset_type: 'player', player_id: '2', name: 'C. Murray', position: 'QB' }] }, partner_team_name: 'Team Iron', trade_gain: 300 },
+});
+
+test('todayMatchupMove: the biggest-gain swap as one line; null without a fix', () => {
+  const q = baseQueue([move({ out: 'o1', inn: 's1', gain: 4 }), move({ out: 'o2', inn: 's2', gain: 9 })]);
+  const best = todayMatchupMove(q.all.find((d) => d.kind === 'lineup')?.swaps);
+  assert.equal(best?.text, 'Start s2 over o2 (+9.0)');
+  assert.equal(best?.swap.out?.id, 'o2');
+  assert.equal(todayMatchupMove([]), null);
+});
+
+test('todayActions: each lineup fix is its own row, ranked by urgency, the best trade joins, capped with a total', () => {
+  const moves = Array.from({ length: 6 }, (_, i) => move({ out: `o${i}`, inn: `s${i}`, gain: 10 - i }));
+  const all = todayActions(baseQueue(moves), tradeIdea);
+  assert.equal(all.total, 7);
+  assert.equal(all.rows.length, TODAY_ACTION_CAP);
+  assert.deepEqual(all.rows.map((r) => r.kind), ['swap', 'swap', 'swap', 'swap', 'swap']);
+  assert.equal(all.rows[0].button, 'Swap');
+  assert.equal(all.rows[0].player?.id, 'o0');
+  const small = todayActions(baseQueue([move({ out: 'o1', inn: 's1' })]), tradeIdea);
+  assert.deepEqual(small.rows.map((r) => r.kind), ['swap', 'trade']);
+  const trade = small.rows[1];
+  assert.equal(trade.button, 'Send offer');
+  assert.equal(trade.player?.name, 'C. Murray');
+  assert.equal(trade.reason, 'Get a QB from Team Iron');
+  assert.equal(todayActions(baseQueue([]), null).total, 0);
+});
+
+test('todayActions: an empty slot reads Fill and a trade never outranks a hurt starter', () => {
+  const q = baseQueue([{ start: p('s9', 'Sam Nine'), over: null, over_reason: 'empty_slot', gain: 3, locked: false }]);
+  const { rows } = todayActions(q, tradeIdea);
+  assert.equal(rows[0].button, 'Fill');
+  assert.equal(rows[0].player, null);
+  assert.equal(rows[1].kind, 'trade');
+});
+
+const alertOf = (over: Partial<Parameters<typeof todayAlertRows>[0][number]>) => ({
+  alert_key: 'k', title: 'Reyes ejected', link: null, event_type: 'injury/status', read: false, matched_player: 'Jordan Reyes', matched_player_id: 'p1', matched_player_position: 'RB', matched_player_team: 'BUF', matched_player_tier: 'starter', roster_relationship: 'starter' as const, ...over,
+});
+
+test('todayAlertRows: only rostered players; starters get Swap / Lineup, bench news needs a story to Read', () => {
+  const { rows, total } = todayAlertRows([
+    alertOf({ alert_key: 'league', matched_player_id: null, roster_relationship: null }),
+    alertOf({ alert_key: 'bench-nolink', matched_player_id: 'p2', roster_relationship: 'bench' }),
+    alertOf({ alert_key: 'bench', matched_player_id: 'p3', roster_relationship: 'bench', link: 'https://x.test/s', read: true }),
+    alertOf({ alert_key: 'role', matched_player_id: 'p4', event_type: 'role/depth chart', read: true }),
+    alertOf({ alert_key: 'hurt', matched_player_id: 'p5' }),
+  ]);
+  assert.equal(total, 3);
+  assert.deepEqual(rows.map((r) => [r.alertKey, r.button, r.target]), [['hurt', 'Swap', 'matchup'], ['role', 'Lineup', 'matchup'], ['bench', 'Read', 'link']]);
+});
+
+test('todayStandingLine: the tiles on one line', () => {
+  const tiles = todayTiles({ standing: { place: '8th of 12', record: '6-4', playoffOdds: '72%', tone: 'neutral' } as never, teamRank: { value: '#3', of: 12 } });
+  assert.deepEqual(todayStandingLine(tiles).map((p) => p.text), ['8th of 12 · 6-4', 'Playoffs 72%', 'Rank #3']);
 });

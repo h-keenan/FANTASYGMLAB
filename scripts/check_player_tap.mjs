@@ -80,8 +80,6 @@ export const RAW_ALLOWLIST = {
   "web-next/src/components/GuessThePlayerNameMatchCard.tsx": "exempt: the guessing game hides the player identity until answered",
   "web-next/src/components/LeagueHistoryTab.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "web-next/src/components/MatchupLineup.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
-  "web-next/src/components/TodayGlance.tsx": "exempt: the trade idea card is ONE link that opens the idea in Trade Hub; its avatars and names are the card's content inside that single tap target (a picker row rule), not separate player taps",
-  "mobile/src/components/TodayGlance.tsx": "exempt: the trade idea card is ONE link that opens the idea in Trade Hub; its avatars and names are the card's content inside that single tap target (a picker row rule), not separate player taps",
   "web-next/src/components/NewsContent.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "web-next/src/components/PercentileExplorerSheet.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "web-next/src/components/PlayerCardKit.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",

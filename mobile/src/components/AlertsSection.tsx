@@ -7,17 +7,19 @@ import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
-import CompactModule from './CompactModule';
+import Button from './Button';
+import { ExpandRow, ExpandRowGroup } from './ExpandRow';
+import SectionHeading from './SectionHeading';
 import PlayerAvatarSlot from './PlayerAvatarSlot';
-import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import PressableScale from './PressableScale';
+import { Collapse } from './Presence';
 import RecapReadyCard from './RecapReadyCard';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship, type RoundupNotice } from '../lib/api';
 import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { toUserErrorMessage } from '../lib/errorMessages';
-import { todayAlertsSummary, type TodayAlertLine } from '../lib/todayView';
+import { todayAlertRows, type TodayAlertLine, type TodayAlertRow } from '../lib/todayView';
 import { queryKeys } from '../lib/queryKeys';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
@@ -128,9 +130,10 @@ function groupAlertsByType(items: AlertItem[]): AlertGroup[] {
 }
 
 /**
- * Alerts as a section of Today (it was its own screen): roster-tied news grouped by type, as a compact tap-to-expand
- * module whose collapsed line carries the unread count. Read state syncs through lib/alertReads (server + device).
- * `forceOpen` expands it (and the host scrolls to it) when the route asks for focus 'alerts'.
+ * Alerts on Today: news about YOUR rostered players only, as action rows (avatar, one line, ONE button: Swap / Lineup for a
+ * starter, Read for a bench player). League-wide headlines never appear. "All alerts" opens the grouped roster-news feed
+ * (and the watchlist). Read state syncs through lib/alertReads (server + device). `forceOpen` opens the full feed (and the
+ * host scrolls here) when the route asks for focus 'alerts'. Web twin: components/DashboardAlerts.tsx.
  */
 export default function AlertsSection({
   leagueId,
@@ -194,8 +197,10 @@ export default function AlertsSection({
     void load();
   }, [load]);
 
-  const groupedAlerts = useMemo(() => groupAlertsByType(items), [items]);
-  const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
+  // Only news tied to a player on this roster; the rest of the feed is not Today's business.
+  const rostered = useMemo(() => items.filter((item) => item.matched_player_id && item.roster_relationship), [items]);
+  const groupedAlerts = useMemo(() => groupAlertsByType(rostered), [rostered]);
+  const unread = useMemo(() => rostered.filter((item) => !item.read).length, [rostered]);
   useEffect(() => {
     unreadReported?.(unread);
   }, [unread, unreadReported]);
@@ -229,103 +234,90 @@ export default function AlertsSection({
     openQuickView(player, { leagueId, leagueName });
   };
 
-  // The collapsed row: avatars of the players behind the newest alerts / watch items, then the newest headline and how many more.
-  const summary = todayAlertsSummary([
-    ...items.map((item) => ({ playerId: item.matched_player_id, name: item.matched_player, position: item.matched_player_position, team: item.matched_player_team, tier: item.matched_player_tier, title: item.title ?? '' })),
-    ...watchLines,
-  ]);
-  const total = items.length + watchLines.length;
-  const summaryParts = notReadyReason
-    ? [{ key: 'setup', text: 'Needs your Sleeper link', tone: 'muted' as const }]
-    : error
-      ? [{ key: 'error', text: "Couldn't load", tone: 'warning' as const }]
-      : total > 0
-        ? [
-            unread > 0 ? { key: 'unread', text: `${unread} new`, tone: 'danger' as const, strong: true } : null,
-            summary.lead ? { key: 'lead', text: summary.lead } : null,
-            summary.more > 0 ? { key: 'more', text: `+${summary.more} more`, tone: 'muted' as const } : null,
-          ]
-        : [{ key: 'quiet', text: 'All quiet', tone: 'muted' as const }];
+  const { rows, total: rowTotal } = todayAlertRows(rostered);
+  const [showAll, setShowAll] = useState(false);
+  const open = showAll || forceOpen;
+  const hasMore = rowTotal > rows.length || watchLines.length > 0 || recapReadyWeek != null || roundupNotice != null;
+  const act = (row: TodayAlertRow) => {
+    const item = items.find((i) => i.alert_key === row.alertKey);
+    if (item) {
+      if (!item.read) {
+        setItems((prev) => prev.map((r) => (r.alert_key === item.alert_key ? { ...r, read: true } : r)));
+        void currentAlertReadUserId().then((userId) => alertReadSync.markRead(userId, leagueId, item.alert_key));
+      }
+    }
+    if (row.target === 'matchup') navigation.navigate('Matchup', { leagueId, leagueName, plan: 'all' });
+    else if (row.link) void Linking.openURL(row.link);
+  };
+
+  if (loading && items.length === 0 && !error && !notReadyReason) return null;
+  if (notReadyReason) return null;
+  if (error) return <ErrorState compact title="Couldn't load alerts" message={error} onRetry={() => void load()} />;
+  if (rows.length === 0 && !hasMore) return null;
 
   return (
-    <CompactModule
-      id={`dashboard.alerts.${leagueId}`}
-      title="Alerts"
-      parts={summaryParts}
-      tone={unread > 0 ? 'danger' : 'accent'}
-      forceOpen={forceOpen}
-      loading={loading && items.length === 0 && !error && !notReadyReason}
-      preview={
-        summary.avatars.length > 0 ? (
-          <View style={styles.avatarRow} testID="dashboard-alerts-avatars">
-            {summary.avatars.map((a) => (
-              <PlayerAvatarSlot key={a.playerId} player={{ id: a.playerId, name: a.name ?? 'this player', position: a.position, team: a.team, tier: a.tier }} tier="row" />
-            ))}
-          </View>
-        ) : undefined
-      }
-    >
-      {watchBody}
-      {notReadyReason ? (
-        <AppText style={styles.notReadyText}>
-          {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't load alerts for this league."}
-        </AppText>
+    <View style={styles.section} testID="dashboard-alerts">
+      <SectionHeading title={unread > 0 ? `Alerts · ${unread} new` : 'Alerts'} />
+      {rows.length > 0 ? (
+        <ExpandRowGroup accent={rows.some((r) => r.tone === 'danger') ? colors.danger : colors.accent} testID="alert-rows">
+          {rows.map((r) => (
+            <ExpandRow
+              key={r.key}
+              testID="alert-row"
+              label={`${r.player.name}: ${r.reason}`}
+              leading={<PlayerAvatarSlot player={{ id: r.player.id, name: r.player.name, position: r.player.position, team: r.player.team, tier: r.player.tier }} tier="row" nonInteractive="the row is the tap target" />}
+              title={r.reason}
+              caption={r.unread ? 'New' : undefined}
+              action={<Button label={r.button} size="sm" onPress={() => act(r)} />}
+            />
+          ))}
+        </ExpandRowGroup>
       ) : null}
-      {error ? <ErrorState compact title="Couldn't load alerts" message={error} onRetry={() => void load()} /> : null}
-      {recapReadyWeek != null ? (
-        <RecapReadyCard
-          week={recapReadyWeek}
-          onPress={() => navigation.navigate('News', { initialTab: 'league', leagueId, leagueName })}
-        />
+      {hasMore ? (
+        <PressableScale accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setShowAll((v) => !v)} style={styles.seeAll} testID="alerts-see-all">
+          <AppText style={styles.seeAllText}>{open ? 'Hide alerts' : `All alerts (${rowTotal + watchLines.length})`}</AppText>
+        </PressableScale>
       ) : null}
-      {roundupNotice ? (
-        <RecapReadyCard
-          week={roundupNotice.week}
-          title={roundupNotice.title}
-          subtitle={roundupNotice.body}
-          icon="stats-chart-outline"
-          onPress={() =>
-            navigation.navigate('News', {
-              initialTab: 'league',
-              leagueId,
-              leagueName,
-              recapsTab: 'roundup',
-              week: roundupNotice.week,
-            })
-          }
-        />
-      ) : null}
-      {!loading && !error && !notReadyReason && groupedAlerts.length === 0 ? (
-        <EmptyState icon="checkmark-circle-outline" title="All quiet" subtitle="No relevant news for your roster right now." />
-      ) : null}
-      {groupedAlerts.map((group) => {
-        const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
-        const icon = EVENT_BADGE_ICONS[group.eventType ?? ''] ?? 'information-circle-outline';
-        return (
-          <View key={`${group.eventType ?? 'other'}-${group.alerts[0]?.alert_key}`} style={styles.group}>
-            <View style={styles.groupHeaderRow}>
-              <View style={[styles.groupAccentBar, { backgroundColor: accentColor }]} />
-              <Ionicons name={icon} size={13} color={accentColor} style={styles.groupIcon} />
-              <AppText style={[styles.groupLabel, { color: accentColor }]} numberOfLines={1}>
-                {eventTypeLabel(group.eventType)}
-              </AppText>
-            </View>
-            <View style={styles.groupCards}>
-              {group.alerts.map((alert) => (
-                <AccentCard key={alert.alert_key} accent={alert.read ? colors.border : accentColor} compact>
-                  <AlertRow
-                    alert={alert}
-                    showDivider={false}
-                    onPress={() => openAndMarkRead(alert)}
-                    onPressPlayer={() => openPlayer(alert)}
-                  />
-                </AccentCard>
-              ))}
-            </View>
-          </View>
-        );
-      })}
-    </CompactModule>
+      <Collapse open={open}>
+        <View style={styles.fullFeed}>
+          {watchBody}
+          {recapReadyWeek != null ? (
+            <RecapReadyCard week={recapReadyWeek} onPress={() => navigation.navigate('News', { initialTab: 'league', leagueId, leagueName })} />
+          ) : null}
+          {roundupNotice ? (
+            <RecapReadyCard
+              week={roundupNotice.week}
+              title={roundupNotice.title}
+              subtitle={roundupNotice.body}
+              icon="stats-chart-outline"
+              onPress={() => navigation.navigate('News', { initialTab: 'league', leagueId, leagueName, recapsTab: 'roundup', week: roundupNotice.week })}
+            />
+          ) : null}
+          {groupedAlerts.map((group) => {
+            const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
+            const icon = EVENT_BADGE_ICONS[group.eventType ?? ''] ?? 'information-circle-outline';
+            return (
+              <View key={`${group.eventType ?? 'other'}-${group.alerts[0]?.alert_key}`} style={styles.group}>
+                <View style={styles.groupHeaderRow}>
+                  <View style={[styles.groupAccentBar, { backgroundColor: accentColor }]} />
+                  <Ionicons name={icon} size={13} color={accentColor} style={styles.groupIcon} />
+                  <AppText style={[styles.groupLabel, { color: accentColor }]} numberOfLines={1}>
+                    {eventTypeLabel(group.eventType)}
+                  </AppText>
+                </View>
+                <View style={styles.groupCards}>
+                  {group.alerts.map((alert) => (
+                    <AccentCard key={alert.alert_key} accent={alert.read ? colors.border : accentColor} compact>
+                      <AlertRow alert={alert} showDivider={false} onPress={() => openAndMarkRead(alert)} onPressPlayer={() => openPlayer(alert)} />
+                    </AccentCard>
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </Collapse>
+    </View>
   );
 }
 
@@ -434,8 +426,10 @@ function createRowStyles(colors: ThemeColors) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
+    section: { gap: spacing.sm },
+    seeAll: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+    seeAllText: { color: colors.accent, fontWeight: '700', fontSize: 14 },
+    fullFeed: { gap: spacing.md },
     group: { marginBottom: spacing.xs },
     groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
     groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
