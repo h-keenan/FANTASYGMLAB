@@ -541,3 +541,14 @@ captured_at,season,week,player_id,team,position,status,injury_status,body_part,p
 2026-11-23T03:01:34Z,2026,11,8527,LV,WR,Active,Questionable,Undisclosed,,,sleeper_live
 2026-11-23T13:32:09Z,2026,11,11786,JAX,K,Active,Questionable,Lower Body,,,sleeper_live
 2026-11-23T13:32:09Z,2026,11,12490,JAX,RB,Active,Questionable,Undisclosed,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,10859,DET,TE,Active,Questionable,Ankle,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,11577,PHI,RB,Active,Questionable,Illness,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,12048,SEA,RB,Active,IR,Knee - MCL,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,12062,CIN,TE,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,12533,WAS,RB,Active,,,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,13312,CIN,TE,Active,Questionable,Undisclosed,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,13418,WAS,RB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,13557,WAS,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,5022,PHI,TE,Active,Questionable,Shin,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,8136,WAS,RB,Active,,,,,sleeper_live
+2026-11-24T01:34:18Z,2026,11,9230,PHI,QB,Active,Questionable,Ribs,,,sleeper_live
