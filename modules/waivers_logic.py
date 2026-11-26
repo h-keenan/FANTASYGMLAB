@@ -13,6 +13,7 @@ from modules import player_quick_view
 from modules import player_state_authority
 from modules import league_value_settings
 from modules import rankings
+from modules import waiver_context
 from modules import redis_cache
 from modules import sleeper
 from modules import roster_value_model
@@ -364,7 +365,7 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
             parts.append(f"only #{rank} {pos} on the wire, so less competition")
         if posture and not lean:
             parts.append(f"fits a {posture.lower()} posture")
-        text = "; ".join(parts[:4])
+        text = "; ".join(parts[:5])
         return text[:1].upper() + text[1:] + "." if text else ""
 
     if bool(row.get("stale_free_agent")) or (computed and score <= 0):
@@ -397,10 +398,19 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
     availability_note = ""
     if p_play < 1.0 and injury_label:
         availability_note = f"listed {injury_label}, so he may not play this week"
+    # Real NFL schedule: a bye this week means no points until next week; a
+    # bye next week or a notably soft/tough fantasy-playoff run is named too.
+    schedule_note = _safe_text(row.get("schedule_note"))
+    on_bye_now = bool(row.get("on_bye_now"))
+    if schedule_note:
+        availability_note = "; ".join(p for p in (availability_note, schedule_note) if p)
+    cover_for = _safe_text(row.get("injury_cover_for"))
+    handcuff_of = _safe_text(row.get("handcuff_of"))
+    late = bool(row.get("late_season"))
 
     def softened(confidence: str) -> str:
         # An uncertain game-time status lowers a High add to Medium.
-        return "Medium" if (availability_note and confidence == "High") else confidence
+        return "Medium" if ((availability_note and confidence == "High") and (p_play < 1.0 or on_bye_now)) else confidence
 
     need_fit = bool(row.get("priority_need_fit")) or bool(row.get("injury_replacement_fit"))
     bigger = bool(row.get("priority_bigger_upgrade"))
@@ -416,7 +426,9 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
                 ctx("Bigger lineup upgrade than the best fix at your biggest need", availability_note, stance_note))
     if need_fit:
         lead = (
-            "Covers an injury hole in your lineup"
+            f"Direct backup to your injured {cover_for}, so he inherits the work"
+            if cover_for
+            else "Covers an injury hole in your lineup"
             if bool(row.get("injury_replacement_fit"))
             else f"Fills a real {pos or 'roster'} need".replace("  ", " ")
         )
@@ -425,6 +437,13 @@ def waiver_recommendation(row, position_rank: int) -> tuple[str, str, str, str]:
     if bool(row.get("priority_stash_for_need")):
         return ("Stash", "information", "Medium",
                 ctx("Best stash at your top need; nobody on the wire would start there", availability_note))
+    if bool(row.get("priority_insurance")) and handcuff_of:
+        if redraft:
+            tail = "insurance for the playoff run" if late else "insurance if he goes down"
+            lead = f"Handcuff to your {handcuff_of}: {tail}"
+        else:
+            lead = f"Handcuff to your {handcuff_of}: protects a dynasty asset you could not replace from the wire"
+        return ("Stash", "information", "Medium", ctx(lead, availability_note))
     if bool(row.get("priority_value_opportunity")):
         lead = "Elite value on the wire, but no roster need today"
         if lean == "contend":
@@ -498,6 +517,7 @@ def shared_waiver_adds(
     roster_id: Any = None,
     valued: pd.DataFrame | None = None,
     max_items: int = 6,
+    defense_strength: Mapping[str, Any] | None = None,
 ) -> pd.DataFrame:
     """THE waiver recommendation source: every screen that names a waiver add
     (Waivers page, Today tile, league glance, push reminder, trade-idea
@@ -539,6 +559,7 @@ def shared_waiver_adds(
         needs_model=needs_model,
         played_ids=played_ids,
         posture=posture,
+        defense_strength=defense_strength,
     )
 
 
@@ -706,6 +727,7 @@ def rank_priority_add_candidates(
     needs_model: Mapping[str, Any] | None = None,
     played_ids: set[str] | None = None,
     posture: str = "",
+    defense_strength: Mapping[str, Any] | None = None,
 ) -> pd.DataFrame:
     """Order Priority Adds for THIS roster — not bare dynasty-score tops.
 
@@ -760,6 +782,17 @@ def rank_priority_add_candidates(
     if candidates.empty:
         return candidates
     settings = league_settings or {}
+    # Context the lineup model cannot see: the player directly behind one of
+    # YOUR injured starters / studs, and the real NFL schedule (byes, playoff
+    # weeks). Pure additive columns; a missing input leaves them empty.
+    candidates = waiver_context.annotate_insurance(candidates, roster_df, score_field)
+    if league is not None:
+        try:
+            candidates = waiver_context.annotate_schedule(
+                candidates, league, season=sleeper.default_player_stats_season(), defense_strength=defense_strength
+            )
+        except Exception:
+            pass
     needed = {
         str(pos).upper()
         for pos in (needed_positions or [])
@@ -878,6 +911,8 @@ def rank_priority_add_candidates(
     overall_rank = pos_scores.rank(ascending=False, method="first")
 
     need_fit = []
+    insurance_flags: list[bool] = []
+    edge_values: list[int] = []
     stash_flags: list[bool] = []
     bigger_flags: list[bool] = []
     value_opportunity = []
@@ -929,17 +964,31 @@ def rank_priority_add_candidates(
         # The shared model's "bigger upgrade than your need" (roster_value_model.
         # outsized_adds): always actionable and ranked first, whatever its tag.
         is_bigger = bool(use_model and pid in bigger_ids)
+        cover_for = _safe_text(row.get("injury_cover_for"))
+        handcuff_of = _safe_text(row.get("handcuff_of"))
+        if cover_for and position in {"QB", "RB", "WR", "TE"}:
+            # The player directly behind one of YOUR ruled-out starters inherits
+            # his work: a real need regardless of what the wire-wide model priced.
+            is_need = True
+        is_insurance = bool(
+            handcuff_of
+            and not is_need
+            and not (posture_lean(posture) == "rebuild" and redraft)
+        )
         if candidate_availability(row)[0]:
             # He is out himself: he cannot fill a hole this week. Only a
             # long-term format keeps him on the board, as a value stash.
             is_need = is_bigger = is_stash = False
             injured = False
+            is_insurance = False
             is_elite_value = bool(is_elite_value and not redraft)
+        insurance_flags.append(is_insurance)
+        edge_values.append(int(_row_number(row, "playoff_edge") or 0))
         bigger_flags.append(is_bigger)
         stash_flags.append(is_stash)
         need_fit.append(is_need)
         value_opportunity.append(bool(is_elite_value and not is_need and not is_stash))
-        actionable.append(bool(is_need or is_elite_value or is_stash or is_bigger))
+        actionable.append(bool(is_need or is_elite_value or is_stash or is_bigger or is_insurance))
 
     positive = positive.copy()
     positive["priority_need_fit"] = need_fit
@@ -950,6 +999,8 @@ def rank_priority_add_candidates(
     positive["roster_posture"] = _safe_text(posture).strip()
     positive["league_format"] = league_format
     positive["priority_stash_for_need"] = stash_flags
+    positive["priority_insurance"] = insurance_flags
+    positive["_playoff_edge"] = edge_values
     positive["priority_bigger_upgrade"] = bigger_flags
     positive["priority_wire_ppw"] = [
         wire_ppw.get(str(pid)) for pid in positive["player_id"]
@@ -969,15 +1020,23 @@ def rank_priority_add_candidates(
         positive["_ppw"] = pd.to_numeric(positive["priority_wire_ppw"], errors="coerce").fillna(-1.0)
         # Bigger-than-the-need adds lead, among themselves by lineup points.
         positive["_bigger_ppw"] = positive["_ppw"].where(positive["priority_bigger_upgrade"], -2.0)
+        # Late season, a friendlier playoff stretch breaks a near-tie in lineup
+        # points (within half a point a week): the same pts/wk, a better path.
+        positive["_ppw_band"] = (positive["_ppw"] * 2).round() / 2
         positive = positive.sort_values(
-            ["_bigger_ppw", "priority_need_fit", "priority_stash_for_need", "_need_rank", "_ppw",
-             "priority_value_opportunity", "_priority_score"],
-            ascending=[False, False, False, True, False, False, False],
+            ["_bigger_ppw", "priority_need_fit", "priority_stash_for_need", "_need_rank", "_ppw_band",
+             "_playoff_edge", "_ppw", "priority_insurance", "priority_value_opportunity", "_priority_score"],
+            ascending=[False, False, False, True, False, False, False, False, False, False],
         )
     else:
+        # Scores within 5% of the best count as a tie, so a friendlier playoff
+        # stretch only breaks near-ties (never outranks a clearly better player).
+        top_score = max(float(positive["_priority_score"].max()), 1.0)
+        positive["_score_band"] = (positive["_priority_score"] / (0.05 * top_score)).round()
         positive = positive.sort_values(
-            ["_injury_fit", "priority_need_fit", "priority_value_opportunity", "_priority_score"],
-            ascending=[False, False, False, False],
+            ["_injury_fit", "priority_need_fit", "_score_band", "_playoff_edge", "priority_insurance",
+             "priority_value_opportunity", "_priority_score"],
+            ascending=[False, False, False, False, False, False, False],
         )
 
     # Soft diversity: prefer decision utility across rooms without a rigid 1-of-each rule.
@@ -1014,7 +1073,7 @@ def rank_priority_add_candidates(
                 break
 
     result = positive.loc[selected_indices].copy()
-    drop_cols = [col for col in ("_priority_score", "_injury_fit", "_need_rank", "_ppw") if col in result.columns]
+    drop_cols = [col for col in ("_priority_score", "_injury_fit", "_need_rank", "_ppw", "_ppw_band", "_playoff_edge", "_score_band") if col in result.columns]
     if drop_cols:
         result = result.drop(columns=drop_cols)
     return result.reset_index(drop=True)

@@ -1512,6 +1512,12 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
    * confidence language Trade Hub's cards already use. */
   confidence_label: string;
   confidence_reason: string;
+  /** Names the player of yours this add backs up (handcuff) or covers for (injured starter); "" when neither. */
+  handcuff_of?: string;
+  injury_cover_for?: string;
+  /** Real NFL schedule note (bye, playoff-week matchups); "" when nothing notable. */
+  schedule_note?: string;
+  bye_week?: number | null;
   /** One plain line from modules.waivers_logic.waiver_recommendation weighing need, upgrade size, age/upside, competition and posture; same text as confidence_reason when a badge shows. */
   recommendation_reason?: string;
   // Display-only role flag (modules/usage_trends.py); never feeds the score, rank or bid.

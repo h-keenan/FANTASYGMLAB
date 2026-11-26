@@ -255,6 +255,12 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
         </Button>
       </AccentCard>
       <CompactModule id="waivers.top.detail" title="Why and roster move" parts={moveParts}>
+        {player.recommendation_reason ? (
+          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="waiver-fit-reason">
+            <span className="font-bold">Fit: </span>
+            {player.recommendation_reason}
+          </p>
+        ) : null}
         {player.faab?.why ? (
           <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
             <span className="font-bold">Why: </span>
@@ -383,6 +389,12 @@ function RecommendedRow({
             <ValueWithRing player={player} />
             <FaabRange player={player} />
           </div>
+          {player.recommendation_reason ? (
+            <p className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="waiver-fit-reason">
+              <span className="font-bold">Fit: </span>
+              {player.recommendation_reason}
+            </p>
+          ) : null}
           {player.faab?.why ? (
             <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
               <span className="font-bold">Why: </span>

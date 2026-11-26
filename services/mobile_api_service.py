@@ -18046,6 +18046,11 @@ def _project_priority_add(
     projected["confidence_label"] = confidence_label
     projected["confidence_reason"] = reason if confidence_label else ""
     projected["recommendation_reason"] = reason
+    # Roster/schedule links behind the reason (additive; "" / null when absent).
+    projected["handcuff_of"] = _clean_json_value(row.get("handcuff_of")) or ""
+    projected["injury_cover_for"] = _clean_json_value(row.get("injury_cover_for")) or ""
+    projected["schedule_note"] = _clean_json_value(row.get("schedule_note")) or ""
+    projected["bye_week"] = _clean_json_value(row.get("bye_week"))
     # Always an object (never null) so installed app builds that read
     # faab.dollars_known unconditionally keep rendering; new clients check
     # `applicable` and show `why` / claim guidance instead of dollars.
@@ -18433,6 +18438,7 @@ def get_league_waivers(
         league=league,
         rosters=rosters,
         max_items=6,
+        defense_strength=defense_strength_by_position,
     )
     if needs_model is not None:
         needs_model["headline"] = waivers_logic.align_headline_with_adds(needs_model, priority_df)
@@ -18456,6 +18462,21 @@ def get_league_waivers(
         free_agents=free_agents,
         trending_adds=trending_adds,
     )
+    bid_history: dict[str, tuple[int, ...]] = {}
+    if faab_enabled and current_week > 0:
+        # This league's own completed waiver claims (real winning bids) so a bid
+        # is anchored to what managers here actually pay. Best effort: empty on failure.
+        try:
+            position_by_player = {
+                str(pid): str(pos or "")
+                for pid, pos in zip(valued["player_id"].astype(str), valued["position"].fillna("").astype(str))
+            }
+            bid_history = faab.build_bid_history(
+                [tx for week_no in range(1, current_week + 1) for tx in sleeper.get_transactions(league_id, week_no)],
+                position_by_player,
+            )
+        except Exception:
+            bid_history = {}
     faab_strategy = ""
     try:
         stance_strategy, stance_is_set = _fetch_gm_stance_with_set_flag(
@@ -18489,6 +18510,7 @@ def get_league_waivers(
             team_strategy=faab_strategy,
             season_stats=faab_season_stats,
             best_ball=league_calendar.is_best_ball(league),
+            bid_history=bid_history,
         )
         priority_adds.append(
             _project_priority_add(

@@ -668,6 +668,49 @@ def format_faab_block_html(guidance: FaabGuidance, *, compact: bool = False) -> 
     )
 
 
+# --- This league's own bid history -------------------------------------------
+#
+# What winning claims actually cost in THIS league is the best anchor for a bid:
+# a heuristic percent-of-budget says what a player is worth, history says what
+# this league's managers pay. Built only from Sleeper's completed waiver
+# transactions (``settings.waiver_bid``), so it is empty until claims exist.
+
+MIN_BID_HISTORY = 3
+# How far the history pulls the heuristic bid toward the league's median winning bid.
+BID_HISTORY_WEIGHT = 0.35
+
+
+def build_bid_history(
+    transactions: Sequence[Mapping] | None,
+    position_by_player: Mapping[str, str],
+) -> dict[str, tuple[int, ...]]:
+    """``position -> winning bids`` from completed Sleeper waiver transactions."""
+
+    out: dict[str, list[int]] = {}
+    for tx in transactions or ():
+        if not isinstance(tx, Mapping) or str(tx.get("type") or "") != "waiver" or str(tx.get("status") or "") != "complete":
+            continue
+        bid = (tx.get("settings") or {}).get("waiver_bid")
+        try:
+            bid_i = int(bid)
+        except (TypeError, ValueError):
+            continue
+        if bid_i < 0:
+            continue
+        for pid in (tx.get("adds") or {}):
+            pos = str(position_by_player.get(str(pid)) or "").upper()
+            if pos:
+                out.setdefault(pos, []).append(bid_i)
+    return {pos: tuple(sorted(bids)) for pos, bids in out.items()}
+
+
+def _quantile(sorted_values: Sequence[int], q: float) -> int:
+    if not sorted_values:
+        return 0
+    idx = max(0, min(len(sorted_values) - 1, int(round(q * (len(sorted_values) - 1)))))
+    return int(sorted_values[idx])
+
+
 # Weeks a Sleeper league plays (the same 17 the trade window uses). Unspent FAAB
 # is worth nothing once the season ends, so how many weeks are left changes
 # what a dollar is worth.
@@ -753,6 +796,7 @@ def recommend_faab_guidance(
     wire_scores: Sequence[float] | None = None,
     competition: FaabCompetition | None = None,
     catalysts: Sequence[WaiverCatalyst] = (),
+    bid_history: Sequence[int] | None = None,
 ) -> FaabGuidance:
     """Percent-of-pool heuristic. Does not invent projections or mutate value.
 
@@ -1007,6 +1051,17 @@ def recommend_faab_guidance(
     pct = min(pct, 0.60)
     faab = int(round(spend_pool * pct))
     faab = _clamp(faab, 0, spend_pool)
+    # This league's own winning bids at the position (>= MIN_BID_HISTORY claims):
+    # pull the heuristic toward what managers here actually pay, and say so.
+    history = sorted(int(b) for b in (bid_history or ()) if b is not None)
+    if len(history) >= MIN_BID_HISTORY and faab > 0:
+        median = _quantile(history, 0.5)
+        blended = int(round((1.0 - BID_HISTORY_WEIGHT) * faab + BID_HISTORY_WEIGHT * median))
+        faab = _clamp(blended, 0, spend_pool)
+        reasons.append(
+            f"Winning {pos or 'player'} bids in this league have run ${_quantile(history, 0.25)}-${_quantile(history, 0.75)} "
+            f"(median ${median}, {len(history)} claims)"
+        )
     if ceiling is not None and faab > ceiling:
         # Bid-to-win ceiling: no rival who needs him can pay more than this.
         faab = _clamp(max(ceiling, min_bid_i), 0, spend_pool)
@@ -1019,10 +1074,15 @@ def recommend_faab_guidance(
     # Honest ranges: widen when the market inputs were missing.
     market_inputs = sum(
         1
-        for present in (competition is not None and competition.rival_count > 0, bool(wire), dollars_known)
+        for present in (
+            competition is not None and competition.rival_count > 0,
+            bool(wire),
+            dollars_known,
+            len(history) >= MIN_BID_HISTORY,
+        )
         if present
     )
-    data_confidence = "high" if market_inputs == 3 else ("medium" if market_inputs == 2 else "low")
+    data_confidence = "high" if market_inputs >= 3 else ("medium" if market_inputs == 2 else "low")
     span = _range_span(confidence)
     if data_confidence == "low":
         span = min(0.45, span + 0.10)
@@ -1098,6 +1158,7 @@ def faab_guidance_for_free_agent(
     season_stats: Mapping[str, Mapping] | None = None,
     scoring_key: str = "fantasy_points_ppr",
     best_ball: bool = False,
+    bid_history: Mapping[str, Sequence[int]] | None = None,
 ) -> FaabGuidance:
     """Full-context FAAB guidance for one wire player.
 
@@ -1153,4 +1214,5 @@ def faab_guidance_for_free_agent(
         wire_scores=(market.wire_scores_by_position.get(position, ()) if market else None),
         competition=competition,
         catalysts=catalysts,
+        bid_history=(bid_history or {}).get(position),
     )
