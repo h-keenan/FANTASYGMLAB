@@ -15,6 +15,7 @@ from typing import Any, Mapping
 import pandas as pd
 
 from modules import injury_status
+from modules.coerce import float_nan_to_none
 
 # Positions where "the player directly behind my guy" is a real depth-chart idea.
 _BACKUP_POSITIONS = frozenset({"QB", "RB", "WR", "TE"})
@@ -43,14 +44,6 @@ def _text(value: Any) -> str:
     return str(value).strip()
 
 
-def _num(value: Any) -> float | None:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return None
-    return out if out == out else None
-
-
 def _is_out(row: Mapping[str, Any]) -> bool:
     cls = injury_status.classify(_text(row.get("status")), _text(row.get("injury_status")))
     return bool(cls.ruled_out or cls.p_play <= injury_status.LIKELY_OUT_P_PLAY)
@@ -63,11 +56,11 @@ def _studs(roster_rows: list[dict[str, Any]], score_field: str) -> set[int]:
     studs: set[int] = set()
     for i, row in enumerate(roster_rows):
         pos = _text(row.get("position")).upper()
-        score = _num(row.get(score_field)) or 0.0
+        score = float_nan_to_none(row.get(score_field)) or 0.0
         by_pos.setdefault(pos, []).append((score, i))
-        rating = _num(row.get("_overall_rating_col"))
+        rating = float_nan_to_none(row.get("_overall_rating_col"))
         if rating is None:
-            rating = _num(row.get("overall_rating"))
+            rating = float_nan_to_none(row.get("overall_rating"))
         if rating is not None and rating >= STUD_MIN_OVERALL_RATING and score > 0:
             studs.add(i)
     if not studs:
@@ -120,23 +113,23 @@ def insurance_links(
     top_wire: dict[tuple[str, str], float] = {}
     for row in cand_rows:
         key = (_text(row.get("team")).upper(), _text(row.get("position")).upper())
-        top_wire[key] = max(top_wire.get(key, 0.0), _num(row.get(score_field)) or 0.0)
+        top_wire[key] = max(top_wire.get(key, 0.0), float_nan_to_none(row.get(score_field)) or 0.0)
 
     out: dict[str, dict[str, str]] = {}
     for row in cand_rows:
         team = _text(row.get("team")).upper()
         pos = _text(row.get("position")).upper()
         pid = _text(row.get("player_id"))
-        score = _num(row.get(score_field)) or 0.0
+        score = float_nan_to_none(row.get(score_field)) or 0.0
         mine = by_team_pos.get((team, pos))
         if not mine or not pid or score <= 0:
             continue
-        ahead = [(i, r) for i, r in mine if (_num(r.get(score_field)) or 0.0) > score]
+        ahead = [(i, r) for i, r in mine if (float_nan_to_none(r.get(score_field)) or 0.0) > score]
         if not ahead:
             continue
         injured = [(i, r) for i, r in ahead if i in studs and _is_out(r)]
         if injured:
-            _i, r = max(injured, key=lambda e: _num(e[1].get(score_field)) or 0.0)
+            _i, r = max(injured, key=lambda e: float_nan_to_none(e[1].get(score_field)) or 0.0)
             out[pid] = {"kind": "injured_backup", "player": _text(r.get("name")), "position": pos}
             continue
         if pos in _HANDCUFF_POSITIONS:
@@ -144,7 +137,7 @@ def insurance_links(
             labelled = _text(row.get("opportunity_label")).casefold() in HANDCUFF_LABELS
             direct = score >= top_wire.get((team, pos), 0.0)
             if healthy_studs and (labelled or direct):
-                _i, r = max(healthy_studs, key=lambda e: _num(e[1].get(score_field)) or 0.0)
+                _i, r = max(healthy_studs, key=lambda e: float_nan_to_none(e[1].get(score_field)) or 0.0)
                 out[pid] = {"kind": "handcuff", "player": _text(r.get("name")), "position": pos}
     return out
 
