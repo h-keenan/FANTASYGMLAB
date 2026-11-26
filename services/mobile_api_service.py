@@ -280,6 +280,7 @@ from modules import (
     weekly_box_scores,
     weekly_roundup,
 )
+from modules import account_acquisition
 from modules import age_profile
 from modules import decision_log
 from modules import derived_cache
@@ -1556,7 +1557,8 @@ def record_analytics_event(
     """
 
     try:
-        if launch_analytics.is_bot_user_agent(request.headers.get("user-agent", "")):
+        claimed_platform = str((body.props or {}).get("platform") or "") if isinstance(body.props, dict) else ""
+        if launch_analytics.is_bot_user_agent_for_platform(request.headers.get("user-agent", ""), claimed_platform):
             return {"ok": False}
         event_name = launch_analytics.normalize_event_name(str(body.event or "").strip())
         if event_name not in launch_analytics.TRACKED_EVENTS:
@@ -1595,6 +1597,12 @@ def record_analytics_event(
                 entitlement_value = "free"
             state_shim["account_profile"] = {"entitlement": entitlement_value}
 
+        # Server-derived guest/registered split (a Supabase guest has a user id, so account_state alone
+        # calls it "authenticated"). Clients cannot spoof it: it is overwritten here, never read from props.
+        raw_props["account_kind"] = account_acquisition.account_kind_for(user)
+        # Per-account acquisition record (first/last touch + real signup method), best effort + deduped.
+        account_acquisition.record_account_acquisition(user, raw_props)
+
         if event_name == "page_view":
             route = str(raw_props.get("route") or "").strip()
             if not route:
@@ -1603,7 +1611,7 @@ def record_analytics_event(
                 launch_analytics.canonical_route_slug(route),
                 state=state_shim,
                 source_surface=str(raw_props.get("source_surface") or "navigation"),
-                extra={"platform": raw_props["platform"]},
+                extra={"platform": raw_props["platform"], "account_kind": raw_props["account_kind"]},
                 # Plain page_views are deduped per tab on the client; the
                 # server's in-memory marker resets on every deploy.
                 dedupe=False,

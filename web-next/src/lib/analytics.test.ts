@@ -292,4 +292,22 @@ describe("lib/analytics", () => {
       window.history.pushState({}, "", "/");
     }
   });
+
+  it("allows ONLY demo-flagged sample-league usage events on /sample-league", async () => {
+    const mockFetch = mockFetchOk();
+    window.history.pushState({}, "", "/sample-league");
+    try {
+      const { trackSampleLeague, trackPageView, trackFeatureUse } = await import("./analytics");
+      trackPageView("/sample-league");
+      trackFeatureUse("landing_viewed");
+      trackSampleLeague("tab", "roster");
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+      expect(body.event).toBe("feature_use");
+      expect(body.props).toMatchObject({ feature: "sample_league", action: "tab", item_kind: "roster", demo: true });
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+  });
 });

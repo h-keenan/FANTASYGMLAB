@@ -49,6 +49,8 @@ Unknown event names and non-allowlisted props are silently dropped server-side, 
 
 ## Gaps remaining
 
+> 2026-11 update: audience metric definitions (DAU/WAU/MAU, sessions, visitors, registered, guest, engaged), sign-up tracking, attribution and sample-league analytics are now specified in `docs/analytics-metric-definitions.md`.
+
 - Server-side `entitlement` prop is always `free` for these events (no profile in the request shim); use the client `tier` prop instead. A server-side lookup would be a follow-up.
 - `page_view` is de-duplicated per user+route for the life of the server process, so it counts distinct users per screen, not total views. Use `feature_use` for repeat interactions.
 - Mobile error/crash reporting is not added; mobile `Alerts`/`Waivers` have screen views only.

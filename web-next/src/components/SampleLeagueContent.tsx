@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { trackSampleLeague } from "@/lib/analytics";
 
 import { BottomDock } from "@/components/ui/BottomDock";
 import { DashboardContent } from "@/components/DashboardContent";
@@ -190,6 +192,16 @@ export function SampleLeagueContent() {
   }, []);
   useEffect(() => {
     window.dispatchEvent(new CustomEvent(SAMPLE_ACTIVE_EVENT, { detail: tab }));
+  }, [tab]);
+  // Demo usage analytics (demo=true; see lib/analytics.ts trackSampleLeague): one view per session, then tab changes.
+  const firstTab = useRef(true);
+  useEffect(() => {
+    if (firstTab.current) {
+      firstTab.current = false;
+      trackSampleLeague("viewed", tab);
+      return;
+    }
+    trackSampleLeague("tab", tab);
   }, [tab]);
   return (
     <>

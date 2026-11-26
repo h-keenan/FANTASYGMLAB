@@ -77,6 +77,8 @@ const ALLOWED_PROP_KEYS = new Set([
   'experience',
   // Push pre-prompt outcome (granted | denied | undetermined).
   'os_result',
+  // signup_completed: email | google | apple | other (account_kind etc. are derived server-side).
+  'signup_method',
   'league_id', // hashed server-side into league_key, never stored raw
 ]);
 

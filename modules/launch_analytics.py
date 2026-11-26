@@ -65,6 +65,7 @@ TRACKED_EVENTS: frozenset[str] = frozenset(
         "signup_completed",
         "onboarding_completed",
         "login_completed",
+        "guest_session_started",
         "guest_username_submitted",
         "guest_league_selected",
         "guest_first_useful",
@@ -250,6 +251,18 @@ ALLOWED_PROP_KEYS: frozenset[str] = frozenset(
         # The ad click id VALUE (gclid/fbclid/ttclid/...): an opaque, case-
         # sensitive token needed to attribute paid conversions to the ad.
         "click_id_value",
+        # Phase 1 (2026-11) analytics accuracy. account_kind is derived SERVER-side
+        # (visitor | guest | registered); signup_method is email|google|apple;
+        # demo marks the fictional /sample-league route; lt_* is LAST-touch
+        # attribution (first touch keeps the plain utm_* keys). No free text.
+        "account_kind",
+        "signup_method",
+        "demo",
+        "lt_utm_source",
+        "lt_utm_medium",
+        "lt_utm_campaign",
+        "lt_referrer_host",
+        "lt_click_id",
     }
 )
 
@@ -566,12 +579,34 @@ SUPABASE_PAGE_SIZE = 1000
 _WRITE_RETRY_DELAY_S = 0.5
 
 
-def _fetch_events_supabase(
+DEFAULT_MAX_READ_ROWS = 20_000
+MAX_READ_ROWS_ENV = "ANALYTICS_MAX_READ_ROWS"
+MAX_READ_ROWS_CEILING = 1_000_000
+
+
+def max_read_rows() -> int:
+    """Row cap for one durable-log read (env ``ANALYTICS_MAX_READ_ROWS``).
+
+    Was a hard-coded 20,000 that silently dropped the oldest rows of any larger
+    window (the 30-day MAU window is the first to exceed it). Default is now
+    200,000 and a capped read is always reported via ``truncated`` -- see
+    read_events_with_meta. Raise the env var, or move the aggregation to SQL, before
+    the log outgrows it.
+    """
+
+    try:
+        value = int(os.environ.get(MAX_READ_ROWS_ENV, "").strip() or 200_000)
+    except ValueError:
+        value = 200_000
+    return max(1_000, min(value, MAX_READ_ROWS_CEILING))
+
+
+def _fetch_events_supabase_meta(
     config: AnalyticsSupabaseConfig,
     *,
     since_ts: float | None = None,
-    limit: int = 20_000,
-) -> tuple[list[dict[str, Any]], bool]:
+    limit: int | None = None,
+) -> tuple[list[dict[str, Any]], bool, bool]:
     """Cross-instance read of the durable event log.
 
     Returns ``(rows, ok)`` — ``ok`` is False on any failure (network, HTTP,
@@ -587,8 +622,8 @@ def _fetch_events_supabase(
     """
 
     if not config.configured:
-        return [], False
-    cap = max(1, int(limit))
+        return [], False, False
+    cap = max(1, int(limit if limit is not None else max_read_rows()))
     base_params: dict[str, str] = {
         "select": "event,event_version,ts,build,environment,session_key,anon_id,user_key,account_hash,props",
         # id breaks ts ties so offset pages never skip/duplicate rows.
@@ -615,22 +650,38 @@ def _fetch_events_supabase(
                 timeout=15,
             )
         except Exception:
-            return [], False
+            return [], False, False
         if response.status_code >= 400:
-            return [], False
+            return [], False, False
         try:
             parsed = response.json()
         except Exception:
-            return [], False
+            return [], False, False
         if not isinstance(parsed, list):
-            return [], False
+            return [], False, False
         page = [dict(row) for row in parsed if isinstance(row, Mapping)]
         out.extend(page)
         if len(parsed) < page_size:
             break
         offset += len(parsed)
+    # Truncated = we stopped because of the cap while the source still had
+    # (or may have) more rows. Surfaced to reports so a capped window is never
+    # silently presented as complete (it used to drop the oldest rows quietly).
+    truncated = len(out) >= cap and offset > 0 and len(parsed) >= page_size
     out.reverse()
-    return out, True
+    return out, True, truncated
+
+
+def _fetch_events_supabase(
+    config: AnalyticsSupabaseConfig,
+    *,
+    since_ts: float | None = None,
+    limit: int | None = None,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Back-compat wrapper: ``(rows, ok)`` without the truncation flag."""
+
+    rows, ok, _truncated = _fetch_events_supabase_meta(config, since_ts=since_ts, limit=limit)
+    return rows, ok
 
 
 SESSION_ANON_KEY = "_launch_analytics_anon_id"
@@ -766,6 +817,26 @@ def is_bot_user_agent(user_agent: str) -> bool:
     if not ua:
         return False
     return any(marker in ua for marker in BOT_USER_AGENT_SUBSTRINGS)
+
+
+# The Android app's HTTP client (React Native fetch -> OkHttp) sends "okhttp/x.y" as its User-Agent unless the app
+# overrides it, and "okhttp" is on the generic scripted-client list above. A self-declared mobile-app event
+# (props.platform android|ios) from such a client is the app itself, not a crawler (a bot gains nothing by
+# spoofing this; it only lets in events the other filters still judge).
+_MOBILE_APP_HTTP_CLIENTS = ("okhttp", "cfnetwork", "darwin/")
+
+
+def is_bot_user_agent_for_platform(user_agent: str, platform: str = "") -> bool:
+    """is_bot_user_agent, except the mobile app's own HTTP-client UA is trusted when platform is ios/android."""
+
+    if not is_bot_user_agent(user_agent):
+        return False
+    ua = str(user_agent or "").strip().casefold()
+    if str(platform or "").strip().casefold() in {"ios", "android"} and any(
+        marker in ua for marker in _MOBILE_APP_HTTP_CLIENTS
+    ):
+        return False
+    return True
 
 
 def analytics_enabled(
@@ -1390,6 +1461,47 @@ def _iter_events(
     return rows
 
 
+def read_events_with_meta(
+    *,
+    path: Path | None = None,
+    since_ts: float | None = None,
+    environment: str | None = None,
+) -> tuple[list[dict[str, Any]], str, dict[str, Any]]:
+    """Like read_events_with_source plus ``meta`` = ``{"truncated": bool, "row_cap": int | None}``.
+
+    ``truncated`` is True only when the durable-log read hit the row cap (oldest rows dropped).
+    The JSONL fallback is never capped.
+    """
+
+    if path is None:
+        try:
+            config = load_analytics_supabase_config()
+        except Exception:
+            config = None
+        if config is not None and config.configured:
+            rows, ok, truncated = _fetch_events_supabase_meta(config, since_ts=since_ts)
+            if ok:
+                return rows, "supabase", {"truncated": truncated, "row_cap": max_read_rows()}
+    return (
+        _iter_events(path=path, since_ts=since_ts, environment=environment),
+        "local_jsonl",
+        {"truncated": False, "row_cap": None},
+    )
+
+
+_READ_META = threading.local()
+
+
+def reset_last_read_meta() -> None:
+    _READ_META.value = {"truncated": False, "row_cap": None}
+
+
+def last_read_meta() -> dict[str, Any]:
+    """Meta of the most recent read_events_with_source on this thread (``truncated``, ``row_cap``)."""
+
+    return dict(getattr(_READ_META, "value", None) or {"truncated": False, "row_cap": None})
+
+
 def read_events_with_source(
     *,
     path: Path | None = None,
@@ -1403,19 +1515,13 @@ def read_events_with_source(
     Passing an explicit ``path`` always reads that JSONL file only (used by
     tests and any caller that wants a specific host file rather than the
     cross-instance durable log); Supabase is only attempted when ``path`` is
-    left as the default ``None``.
+    left as the default ``None``. Truncation info for the read is available
+    from ``last_read_meta()`` (or call ``read_events_with_meta`` directly).
     """
 
-    if path is None:
-        try:
-            config = load_analytics_supabase_config()
-        except Exception:
-            config = None
-        if config is not None and config.configured:
-            rows, ok = _fetch_events_supabase(config, since_ts=since_ts)
-            if ok:
-                return rows, "supabase"
-    return _iter_events(path=path, since_ts=since_ts, environment=environment), "local_jsonl"
+    rows, source, meta = read_events_with_meta(path=path, since_ts=since_ts, environment=environment)
+    _READ_META.value = meta
+    return rows, source
 
 
 def read_events(
@@ -1430,13 +1536,20 @@ def read_events(
     return rows
 
 
-def _identity_key(row: Mapping[str, Any]) -> str:
-    return (
-        _safe_text(row.get("user_key"))
-        or _safe_text(row.get("account_hash"))
-        or _safe_text(row.get("session_key"))
-        or _safe_text(row.get("anon_id"))
-    )
+def _identity_key(row: Mapping[str, Any], links: Mapping[str, str] | None = None) -> str:
+    """Person id: account key, else anon_id resolved through ``links`` (anon->account stitching).
+
+    ``session_key`` is deliberately NOT used: it is a per-visit id, so preferring it counted every returning
+    anonymous visitor as a new user each session (Phase 1 audit, 2026-11).
+    """
+
+    account = _safe_text(row.get("user_key")) or _safe_text(row.get("account_hash"))
+    if account:
+        return account
+    anon = _safe_text(row.get("anon_id"))
+    if anon:
+        return (links or {}).get(anon) or anon
+    return _safe_text(row.get("session_key"))
 
 
 def read_event_counts(
@@ -1494,6 +1607,10 @@ def retention_summary(
     now_ts = float(now if now is not None else time.time())
     day = 86400.0
     rows = read_events(path=path)
+    from modules import analytics_metrics  # lazy: analytics_metrics imports this module
+
+    rows = [r for r in rows if _safe_text(r.get("environment")).casefold() != "test"]
+    links = analytics_metrics.build_identity_links(rows)
     by_day: dict[str, set[str]] = defaultdict(set)
     meaningful_day: dict[str, set[str]] = defaultdict(set)
     first_seen: dict[str, float] = {}
@@ -1501,7 +1618,7 @@ def retention_summary(
     meaningful_actions = 0
 
     for row in rows:
-        identity = _identity_key(row)
+        identity = _identity_key(row, links)
         if not identity:
             continue
         try:
@@ -1530,7 +1647,7 @@ def retention_summary(
             except (TypeError, ValueError):
                 continue
             if ts >= cutoff:
-                identity = _identity_key(row)
+                identity = _identity_key(row, links)
                 if identity:
                     users.add(identity)
         return users

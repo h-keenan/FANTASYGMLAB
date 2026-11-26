@@ -9,7 +9,9 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { trackEvent } from '../lib/analytics';
 import { api } from '../lib/api';
+import { detectAccountEvent } from '../lib/accountEvents';
 import { hasAppleIdentity, requestAccountDeletion } from '../lib/accountDeletion';
 import { getAppleAuthorizationCodeForRevocation } from '../lib/appleAuth';
 import { env } from '../lib/env';
@@ -187,6 +189,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (event === 'SIGNED_OUT') userSignOutRef.current = false;
           sessionRef.current = nextSession;
           setSession(nextSession);
+          // signup_completed / guest_session_started for every sign-up path, once per account (no-op while
+          // analytics is off). See lib/accountEvents.ts.
+          if (nextSession) {
+            void detectAccountEvent(nextSession.user, AsyncStorage).then((accountEvent) => {
+              if (!accountEvent) return;
+              if (accountEvent.event === 'signup_completed') {
+                trackEvent('signup_completed', { signup_method: accountEvent.method });
+              } else {
+                trackEvent('guest_session_started');
+              }
+            });
+          }
           // Signed out: drop the cached experience level so beginner copy
           // never carries over to whoever signs in next.
           if (!nextSession) {
