@@ -62,6 +62,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
   - GET  /v1/leagues/{id}/trade-ideas/multi — 3-team trade ideas, every team Fair or better (Pro; Free gets a locked count; docs/multi-team-trade-api.md)
   - POST /v1/leagues/{id}/trade-analyzer/multi — 3-6 team trade, per-team verdicts + league summary (free, not metered; docs/multi-team-trade-api.md)
+  - GET  /v1/leagues/{id}/commissioner/lineups — every team's set vs best lineup this week, flags, fixing swaps (Pro)
   - POST /v1/leagues/{id}/commissioner/veto-check — outrage read on a proposed trade, whole-roster (Pro)
   - GET  /v1/leagues/{id}/trade-target — 2-3 built offers to get a player off another roster (Pro)
   - GET  /v1/leagues/{id}/managers/tendencies — one-line, evidence-backed tendency per manager (Premium)
@@ -199,6 +200,7 @@ from modules import (
     league_glance,
     league_integrity_data,
     league_integrity,
+    commissioner_lineups,
     league_rankings,
     league_warmup,
     league_recaps,
@@ -15982,6 +15984,99 @@ def get_commissioner_integrity(
     except league_integrity_data.SleeperUnavailable:
         raise HTTPException(status_code=503, detail="Sleeper did not return this league's data. Try again in a minute.")
     return {**report, "is_premium": True, "upsell": None}
+
+
+@app.get("/v1/leagues/{league_id}/commissioner/lineups")
+def get_commissioner_lineups(
+    league_id: str = Depends(require_league_access),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Commissioner lineup check (modules.commissioner_lineups,
+    docs/commissioner-tools.md): each team's set lineup vs its best lineup for
+    the current week, with flags and the swaps that close the gap.
+
+    Same access as the integrity view (Pro, any Sleeper league the user can
+    open). Reuses the Matchup engine's real-lineup, suggested-lineup and
+    swap-planner code; a started player is locked and never suggested."""
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    base: dict[str, Any] = {"ok": True, "is_premium": True, "upsell": None, "reason": "", "week": None,
+                            "projection_ready": False, "teams": [], "limits": commissioner_lineups.LIMITS}
+    if not _is_pro_caller(user):
+        return {**base, "is_premium": False, "reason": "premium_required", "upsell": _COMMISSIONER_UPSELL}
+    if external_leagues.is_external_league_key(league_id):
+        return {**base, "reason": "unsupported_platform"}
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise _league_missing_error(league_id)
+    if league_calendar.is_best_ball(league):
+        return {**base, "reason": "best_ball"}
+    week = _league_current_lineup_week(league)
+    if week <= 0 or league_calendar.is_offseason(league):
+        return {**base, "reason": "no_current_week"}
+    base["week"] = week
+    matchups = sleeper.get_matchups(league_id, week) or []
+    entries = {str(m.get("roster_id") or ""): m for m in matchups}
+    if not entries:
+        return {**base, "reason": "no_matchup_data"}
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if valued.empty:
+        return {**base, "reason": "no_player_data"}
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    score_field = league_value_settings.valuation_score_field(lens)
+    positions = league.get("roster_positions") if isinstance(league.get("roster_positions"), list) else []
+    projection_context = _build_projection_context(week, league.get("scoring_settings"))
+    try:
+        players_lookup = sleeper.get_players()
+    except Exception:
+        players_lookup = {}
+    idp_result = _league_idp_result(league_id, league) if settings.get("idp_slots") else None
+    profiles = sleeper.get_league_roster_profiles(league_id) or {}
+    rows: list[dict[str, Any]] = []
+    for roster in sleeper.get_rosters(league_id) or []:
+        rid = str(roster.get("roster_id") or "")
+        entry = entries.get(rid)
+        if entry is None or not roster.get("players"):
+            continue
+        side = _matchup_side(
+            rid, roster, profiles.get(rid) or {}, valued, settings, score_field,
+            players_lookup=players_lookup, projection_context=projection_context,
+            matchup_entry=entry, idp_result=idp_result,
+        )
+        side.update(
+            _real_current_lineup(
+                entry, valued, score_field, projection_context=projection_context, settings=settings,
+                roster_positions=positions, idp_result=idp_result,
+            )
+        )
+        moves = _suggested_lineup_moves(side)
+        rows.append(
+            commissioner_lineups.build_team_row(
+                roster_id=rid,
+                team_name=side["team_name"],
+                owner_name=side.get("owner_name"),
+                avatar_url=side.get("avatar_url"),
+                real=side,
+                suggested_starters=side["starters"],
+                moves=moves,
+                projection_ready=projection_context is not None,
+            )
+        )
+    ready = projection_context is not None and any(
+        s["points"] is not None for r in rows for s in r["starters"]
+    )
+    if not ready:
+        for r in rows:
+            r.update(set_points=None, best_points=None, gap=None, gap_pct=None, possible_tanking=False)
+    return {**base, "projection_ready": ready, "teams": commissioner_lineups.sort_teams(rows),
+            "reason": "" if rows else "no_matchup_data"}
 
 
 class VetoCheckRequest(BaseModel):

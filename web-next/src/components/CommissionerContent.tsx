@@ -16,6 +16,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { SnapshotTile } from "@/components/SnapshotTile";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValueRing } from "@/components/ValueRing";
+import { LineupCheck } from "@/components/LineupCheck";
 import { VetoCalculator } from "@/components/VetoCalculator";
 import { api } from "@/lib/api";
 import {
@@ -446,6 +447,7 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
           <CommissionerView leagueId={leagueId} data={data} draftOrder={draftOrder ?? "unknown"} onDraftOrder={setDraftOrder} />
         </ModuleErrorBoundary>
       )}
+      {ready && data && data.is_premium !== false ? <LineupCheck leagueId={leagueId} leagueName={leagueName} lens={lens} /> : null}
       {ready && data && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}
     </main>
   );
