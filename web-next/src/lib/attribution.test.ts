@@ -4,6 +4,9 @@ import {
   captureAttribution,
   clearPendingReferralCode,
   getAttributionProps,
+  isStrongTouch,
+  nextFirstTouch,
+  nextLastTouch,
   getPendingReferralCode,
   parseAttribution,
   referrerHost,
@@ -56,5 +59,50 @@ describe("captureAttribution", () => {
     expect(getPendingReferralCode()).toBe("CODE9");
     clearPendingReferralCode();
     expect(getPendingReferralCode()).toBe("");
+  });
+});
+
+describe("first/last touch rules", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/");
+  });
+
+  it("classifies strong vs referrer-only touches", () => {
+    expect(isStrongTouch({ utm_source: "x" })).toBe(true);
+    expect(isStrongTouch({ click_id: "fbclid" })).toBe(true);
+    expect(isStrongTouch({ referrer_host: "instagram.com" })).toBe(false);
+    expect(isStrongTouch({ has_ref: true })).toBe(false);
+    expect(isStrongTouch(null)).toBe(false);
+  });
+
+  it("a referrer-only first touch is upgraded by a later UTM/click-id touch, never the reverse", () => {
+    const weak = { referrer_host: "instagram.com" };
+    const strong = { utm_source: "meta", utm_campaign: "fall", click_id: "fbclid", click_id_value: "Ab1" };
+    expect(nextFirstTouch(weak, strong)).toEqual(strong);
+    expect(nextFirstTouch(strong, weak)).toEqual(strong);
+    expect(nextFirstTouch({ utm_source: "a" }, { utm_source: "b" })).toEqual({ utm_source: "a" });
+  });
+
+  it("last touch keeps the latest campaign touch and ignores a later plain referrer", () => {
+    expect(nextLastTouch({ utm_source: "a" }, { utm_source: "b" })).toEqual({ utm_source: "b" });
+    expect(nextLastTouch({ utm_source: "a" }, { referrer_host: "x.com" })).toEqual({ utm_source: "a" });
+    expect(nextLastTouch({ referrer_host: "x.com" }, { referrer_host: "y.com" })).toEqual({ referrer_host: "y.com" });
+  });
+
+  it("persists both and exposes lt_* props without the click id value", () => {
+    window.history.replaceState({}, "", "/");
+    Object.defineProperty(document, "referrer", { value: "https://www.instagram.com/", configurable: true });
+    captureAttribution();
+    Object.defineProperty(document, "referrer", { value: "", configurable: true });
+    window.history.replaceState({}, "", "/?utm_source=meta&utm_campaign=fall&fbclid=Ab1");
+    captureAttribution();
+    window.history.replaceState({}, "", "/?utm_source=tiktok");
+    captureAttribution();
+    const props = getAttributionProps();
+    expect(props.utm_source).toBe("meta"); // first strong touch
+    expect(props.click_id).toBe("fbclid"); // upgraded from the referrer-only first touch
+    expect(props.lt_utm_source).toBe("tiktok"); // last touch
+    expect(props).not.toHaveProperty("lt_click_id_value");
   });
 });

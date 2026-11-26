@@ -167,13 +167,15 @@ export function resetSessionId(): void {
  * backend endpoint allows both (most TRACKED_EVENTS are guest/pre-auth
  * events).
  */
-function postEvent(input: AnalyticsEventBody): void {
+function postEvent(input: AnalyticsEventBody, options?: { demo?: boolean }): void {
   // The hidden /design reference page renders real components with static
   // sample data and must make no API calls (analytics included).
   if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/design")) return;
-  // The static /sample-league demo is fictional data: no analytics at all,
-  // so it can never pollute real usage metrics.
-  if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/sample-league")) return;
+  // The static /sample-league demo is fictional data: it makes no analytics calls EXCEPT the small allowlisted
+  // set sent through trackSampleLeague() (options.demo), which carries demo=true so it can never be mistaken for
+  // real product usage (the backend never counts demo events as engagement) but still lets us measure
+  // demo usage -> signup conversion. Everything else on that route stays silent.
+  if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/sample-league") && !options?.demo) return;
   // The founder's own visits to the analytics dashboard must never count as
   // product traffic -- the backend's internal-traffic exclusion
   // (modules.launch_analytics.is_internal_analytics_traffic) is the
@@ -187,7 +189,12 @@ function postEvent(input: AnalyticsEventBody): void {
   const body: AnalyticsEventBody = {
     ...input,
     session_id: getOrCreateSessionId(),
-    props: { platform: "web", ...getAttributionProps(), ...(input.props || {}) },
+    props: {
+      platform: "web",
+      ...getAttributionProps(),
+      ...(input.props || {}),
+      ...(options?.demo ? { demo: true } : {}),
+    },
   };
   void (async () => {
     try {
@@ -320,6 +327,33 @@ export function trackUse(
       ...(options?.tier ? { tier: options.tier } : {}),
     },
   });
+}
+
+export type SampleLeagueAction = "viewed" | "tab" | "connect_cta";
+
+/**
+ * Sample-league usage (the ONLY analytics allowed on /sample-league): feature_use feature=sample_league with
+ * demo=true. `viewed` is sent once per browser session; `tab` carries the tab id as item_kind; `connect_cta` is the
+ * "connect your league" click that leaves the demo. Conversion is measured server-side by joining these to a
+ * later signup_completed (modules.analytics_metrics.sample_league_funnel).
+ */
+export function trackSampleLeague(action: SampleLeagueAction, tab?: string): void {
+  try {
+    if (action === "viewed" && typeof sessionStorage !== "undefined") {
+      if (sessionStorage.getItem("fd_sample_viewed")) return;
+      sessionStorage.setItem("fd_sample_viewed", "1");
+    }
+  } catch {
+    // storage blocked: allow the event
+  }
+  postEvent(
+    {
+      event: "feature_use",
+      props: { feature: "sample_league", action, ...(tab ? { item_kind: tab } : {}) },
+      anon_id: getOrCreateAnonId(),
+    },
+    { demo: true },
+  );
 }
 
 /** Collapse id-like path segments so a route never identifies a league/user. */

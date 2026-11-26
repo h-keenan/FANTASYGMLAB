@@ -81,7 +81,7 @@ function AppContent() {
   useEffect(() => {
     scheduleRevenueCatConfigure(); // after the first frame; readers in lib/revenuecat wait for it
     void initAds();
-    // No-op unless the build sets EXPO_PUBLIC_ANALYTICS_ENABLED=1 (ships dark).
+    // Production builds default ON; EXPO_PUBLIC_ANALYTICS_ENABLED=0 is the kill switch (lib/analyticsCore.ts).
     const stopAnalytics = startAnalytics();
     const stopNotificationTap = registerNotificationTapHandler();
     const stopReferralCapture = startReferralCapture();

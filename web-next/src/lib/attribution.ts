@@ -1,7 +1,6 @@
 /**
- * First-party acquisition attribution (web only; the iOS/Android apps keep
- * analytics off). Reads utm_*, ?ref= and document.referrer once per browser,
- * keeps the FIRST touch in localStorage, and exposes it as a handful of
+ * First-party acquisition attribution (web only; mobile has no UTM capture). Reads utm_*, ?ref= and
+ * document.referrer, keeps the FIRST touch and the LAST touch in localStorage, and exposes them as a handful of
  * allowlisted analytics props (modules.launch_analytics.ALLOWED_PROP_KEYS)
  * plus a pending referral code to redeem when the visitor connects a league.
  * Also keeps utm_content/utm_term and the ad click id value (gclid, fbclid, ttclid, ...) so paid
@@ -9,6 +8,7 @@
  */
 
 const ATTR_KEY = "fd_attribution_v1";
+const LAST_ATTR_KEY = "fd_attribution_last_v1";
 const REF_KEY = "fd_pending_ref";
 
 export interface Attribution {
@@ -23,6 +23,15 @@ export interface Attribution {
   click_id?: string;
   /** The click id VALUE (case-sensitive, sanitized), needed to report conversions back to the ad network. */
   click_id_value?: string;
+}
+
+/** Last-touch props ride on events under these allowlisted keys (modules.launch_analytics.ALLOWED_PROP_KEYS). */
+export interface LastTouchProps {
+  lt_utm_source?: string;
+  lt_utm_medium?: string;
+  lt_utm_campaign?: string;
+  lt_referrer_host?: string;
+  lt_click_id?: string;
 }
 
 const CLICK_ID_PARAMS: [string, string][] = [
@@ -94,18 +103,49 @@ export function parseAttribution(search: string, referrer: string, ownHost: stri
   return out;
 }
 
-function readStored(): Attribution | null {
+function readKey(key: string): Attribution | null {
   try {
-    const raw = window.localStorage.getItem(ATTR_KEY);
+    const raw = window.localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as Attribution) : null;
   } catch {
     return null;
   }
 }
 
+function readStored(): Attribution | null {
+  return readKey(ATTR_KEY);
+}
+
+/**
+ * A "strong" touch names a campaign or an ad click (utm_* or a click id). A referrer-only touch (just the
+ * external referrer host and/or a ?ref= flag) is "weak": it must never block or displace a strong one. This was the
+ * bug where a first visit from e.g. instagram.com with no UTM froze attribution, so the later paid click
+ * (UTM + fbclid) was never recorded.
+ */
+export function isStrongTouch(a: Attribution | null | undefined): boolean {
+  if (!a) return false;
+  return Boolean(a.utm_source || a.utm_medium || a.utm_campaign || a.utm_content || a.utm_term || a.click_id);
+}
+
+/** Pure merge rule for the stored FIRST touch (exported for tests). */
+export function nextFirstTouch(stored: Attribution | null, incoming: Attribution): Attribution {
+  if (!stored || Object.keys(stored).length === 0) return incoming;
+  if (!isStrongTouch(stored) && isStrongTouch(incoming)) return incoming; // upgrade weak -> strong
+  return stored;
+}
+
+/** Pure rule for the stored LAST touch: latest strong touch wins; a weak referrer only replaces a weak/absent one. */
+export function nextLastTouch(stored: Attribution | null, incoming: Attribution): Attribution {
+  if (!stored || Object.keys(stored).length === 0) return incoming;
+  if (isStrongTouch(incoming)) return incoming;
+  if (isStrongTouch(stored)) return stored;
+  return incoming;
+}
+
 /**
  * Call once per page load (RouteAnalytics). Stores the first touch with any
- * signal, and always remembers a ?ref= code until it is redeemed.
+ * signal (a later UTM/click-id touch upgrades a referrer-only first touch), the last touch
+ * (latest campaign/ad touch), and always remembers a ?ref= code until it is redeemed.
  */
 export function captureAttribution(): void {
   if (typeof window === "undefined") return;
@@ -114,18 +154,33 @@ export function captureAttribution(): void {
     if (parsed.ref) window.localStorage.setItem(REF_KEY, parsed.ref);
     const { ref: _ref, ...signal } = parsed;
     void _ref;
-    if (Object.keys(signal).length > 0 && !readStored()) {
-      window.localStorage.setItem(ATTR_KEY, JSON.stringify(signal));
-    }
+    if (Object.keys(signal).length === 0) return;
+    const first = nextFirstTouch(readStored(), signal);
+    window.localStorage.setItem(ATTR_KEY, JSON.stringify(first));
+    window.localStorage.setItem(LAST_ATTR_KEY, JSON.stringify(nextLastTouch(readKey(LAST_ATTR_KEY), signal)));
   } catch {
     // storage blocked: attribution is best-effort only
   }
 }
 
-/** First-touch props to merge into analytics events ({} when none/blocked). */
-export function getAttributionProps(): Attribution {
+/** Last-touch props (lt_*) from the latest campaign/referrer touch; never carries the click id VALUE. */
+export function getLastTouchProps(): LastTouchProps {
   if (typeof window === "undefined") return {};
-  return readStored() ?? {};
+  const last = readKey(LAST_ATTR_KEY);
+  if (!last) return {};
+  const out: LastTouchProps = {};
+  if (last.utm_source) out.lt_utm_source = last.utm_source;
+  if (last.utm_medium) out.lt_utm_medium = last.utm_medium;
+  if (last.utm_campaign) out.lt_utm_campaign = last.utm_campaign;
+  if (last.referrer_host) out.lt_referrer_host = last.referrer_host;
+  if (last.click_id) out.lt_click_id = last.click_id;
+  return out;
+}
+
+/** First-touch props plus last-touch (lt_*) props to merge into analytics events ({} when none/blocked). */
+export function getAttributionProps(): Attribution & LastTouchProps {
+  if (typeof window === "undefined") return {};
+  return { ...(readStored() ?? {}), ...getLastTouchProps() };
 }
 
 export function getPendingReferralCode(): string {

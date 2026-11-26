@@ -94,7 +94,7 @@ describe("AuthContext analytics", () => {
       await auth.signUp("new@example.com", "hunter2");
     });
 
-    expect(trackFeatureUse).toHaveBeenCalledWith("signup_completed", { dedupe: false });
+    expect(trackFeatureUse).toHaveBeenCalledWith("signup_completed", { dedupe: false, props: { signup_method: "email" } });
   });
 
   it("tracks signup_started when signUp requires email confirmation", async () => {
@@ -108,7 +108,7 @@ describe("AuthContext analytics", () => {
       await auth.signUp("new@example.com", "hunter2");
     });
 
-    expect(trackFeatureUse).toHaveBeenCalledWith("signup_started", { dedupe: false });
+    expect(trackFeatureUse).toHaveBeenCalledWith("signup_started", { dedupe: false, props: { signup_method: "email" } });
   });
 
   it("does not track a signup event for the anti-enumeration 'already exists' path", async () => {

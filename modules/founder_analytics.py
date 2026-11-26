@@ -13,6 +13,8 @@ from typing import Any, Mapping
 
 import requests
 
+from modules import account_acquisition
+from modules import analytics_metrics
 from modules import launch_analytics as la
 
 WINDOWS: tuple[tuple[str, str, float | None], ...] = (
@@ -659,7 +661,9 @@ def build_report(
     # modules.launch_analytics.read_events_with_source. Fetch once and reuse
     # the same rows for adoption/health below rather than issuing a second
     # (and third) Supabase round trip for the same report.
+    la.reset_last_read_meta()
     rows, source = la.read_events_with_source(path=path, since_ts=since)
+    read_meta = la.last_read_meta()
     # Drop pytest/CI rows if a test run ever shared the durable table; legacy
     # rows with no environment stamp are kept.
     rows = [r for r in rows if str(r.get("environment") or "").strip().casefold() != "test"]
@@ -675,6 +679,25 @@ def build_report(
         event = la.normalize_event_name(str(row.get("event") or ""))
         if event:
             event_counts[event] = event_counts.get(event, 0) + 1
+
+    # Shared stitched audience definition (modules/analytics_metrics.py, docs/analytics-metric-definitions.md):
+    # DAU/WAU/MAU + separated sessions / visitors / registered / guest / engaged, recomputed from the SAME rows
+    # so history and today are like-for-like. Calendar windows need >=30 days of rows; shorter report windows
+    # simply see fewer days (flagged by window_key).
+    audience_now = float(now if now is not None else time.time())
+    # history: only for the full-retention window, where every historical MAU day has its 30 days of rows.
+    audience = analytics_metrics.compute_audience_metrics(
+        rows, now=audience_now, history_days=60 if window_key == "all" else 0
+    )
+    audience["window_note"] = (
+        "DAU/WAU/MAU are trailing calendar windows over the rows in THIS report window; use window_key=30d or all "
+        "for a full MAU."
+    )
+    sample_funnel = analytics_metrics.sample_league_funnel(rows)
+    accounts = None
+    if path is None and source == "supabase":
+        accounts = account_acquisition.fetch_accounts(since)
+    reconciliation = analytics_metrics.signup_reconciliation(rows, accounts)
 
     modules = []
     adoption = la.feature_adoption_summary(rows=rows)
@@ -699,6 +722,10 @@ def build_report(
         "window_label": window_label(window_key),
         "measured": True,
         "event_count": len(rows),
+        "audience": audience,
+        "sample_league_funnel": sample_funnel,
+        "signup_reconciliation": reconciliation,
+        "read_truncated": bool(read_meta.get("truncated")),
         "sessions": _unique_ids(rows, field="session_key") or _unique_ids(rows, field="anon_id"),
         "anonymous_users": _unique_ids(rows, field="anon_id"),
         "hashed_accounts": _unique_ids(rows, field="user_key")
@@ -723,7 +750,15 @@ def build_report(
             if rows or source == "supabase" or local_path.is_file()
             else ["No analytics file on this host yet."]
         ),
-        "partial_notes": [
+        "partial_notes": (
+            [
+                f"WARNING: the read hit the {read_meta.get('row_cap')}-row cap, so the OLDEST rows of this window "
+                "were dropped and every count below is a floor. Raise ANALYTICS_MAX_READ_ROWS or use a shorter window."
+            ]
+            if read_meta.get("truncated")
+            else []
+        )
+        + [
             "Counts are measured events" + (
                 " from the durable Supabase log." if source == "supabase"
                 else " on this instance's JSONL."

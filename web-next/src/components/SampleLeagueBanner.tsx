@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { trackFeatureUse } from "@/lib/analytics";
+import { trackFeatureUse, trackSampleLeague } from "@/lib/analytics";
 
 import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink } from "@/components/Button";
@@ -35,7 +35,7 @@ export function SampleLeagueBanner() {
       <span className="min-w-0 flex-1 break-words text-xs max-sm:sr-only" style={{ color: "var(--color-text-secondary)" }}>
         {SAMPLE_BANNER_BODY}
       </span>
-      <ButtonLink href={SAMPLE_CONNECT_ROUTE} size="sm" className="ml-auto shrink-0">
+      <ButtonLink href={SAMPLE_CONNECT_ROUTE} size="sm" className="ml-auto shrink-0" onClick={() => trackSampleLeague("connect_cta")}>
         {SAMPLE_CTA_LABEL}
       </ButtonLink>
     </aside>
@@ -50,7 +50,7 @@ export function SampleConnectModule() {
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         {SAMPLE_CONNECT_BODY}
       </p>
-      <ButtonLink href={SAMPLE_CONNECT_ROUTE} fullWidth>
+      <ButtonLink href={SAMPLE_CONNECT_ROUTE} fullWidth onClick={() => trackSampleLeague("connect_cta")}>
         {SAMPLE_CTA_LABEL}
       </ButtonLink>
     </AccentCard>

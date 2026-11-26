@@ -18,6 +18,7 @@ import {
   storeReturnPath,
   type GuestUpgradeFailure,
 } from "@/lib/guestUpgrade";
+import { claimSignup, detectAccountEvent } from "@/lib/signupTracking";
 import { clearPortfolioSnapshots } from "@/lib/portfolioSnapshot";
 import { storeCurrentPathForReturnAfterSignIn } from "@/lib/protectedRouteReturn";
 import { clearSessionEnded, isForcedSignOut, markSessionEnded, readSessionEnded } from "@/lib/sessionEnded";
@@ -198,6 +199,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionRef.current = nextSession;
       setSession(nextSession);
       setLoading(false);
+      // Account events for EVERY path (Google/Apple/email-confirmation/guest), deduped per account. Deferred a tick so
+      // the analytics call never runs inside the auth callback (supabase-js holds its lock there).
+      const accountEvent = detectAccountEvent(nextSession?.user, safeLocalStorage());
+      if (accountEvent) {
+        setTimeout(() => {
+          if (accountEvent.kind === "signup") {
+            trackFeatureUse("signup_completed", { dedupe: false, props: { signup_method: accountEvent.method } });
+          } else {
+            trackFeatureUse("guest_session_started", { dedupe: false });
+          }
+        }, 0);
+      }
       // Fired once the recovery link in the email is opened and Supabase
       // (via detectSessionInUrl) establishes a session from it. The user
       // must still prove a new password before using this session for
@@ -256,7 +269,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // signed in immediately (email auto-confirm on) vs. confirmation
         // email pending -- both are a genuinely new account, so both are
         // tracked, just as two different funnel steps.
-        trackFeatureUse(data.session ? "signup_completed" : "signup_started", { dedupe: false });
+        if (!data.session) {
+          trackFeatureUse("signup_started", { dedupe: false, props: { signup_method: "email" } });
+        } else if (claimSignup(data.user, safeLocalStorage())) {
+          trackFeatureUse("signup_completed", { dedupe: false, props: { signup_method: "email" } });
+        }
         return { error: null, signedIn: Boolean(data.session) };
       },
       signInWithOAuth: async (provider, options) => {
