@@ -13,14 +13,20 @@ import { ROOKIE_RANKINGS_PATH, rookieContentInSeason, seasonMoment } from "@/lib
 
 // Season-gated: only after the NFL draft through the start of the season, and only when the public value board
 // actually contains a rookie class. Otherwise the page renders a noindex notice instead of an empty ranking.
-export const revalidate = 3600;
+// Rendered per request (the value fetches are cached for a day by fetch itself): the build cannot reach the API,
+// and the season gate must follow the clock rather than freeze at build time.
+export const dynamic = "force-dynamic";
 
 async function load() {
   const moment = seasonMoment();
-  const [oneQb, superflex] = await Promise.all([fetchBoard("1qb"), fetchBoard("superflex")]);
-  const rookies = rookieRows(oneQb, superflex);
-  const live = rookieContentInSeason(moment) && rookies.length >= MIN_ROOKIES;
-  return { moment, oneQb, rookies, live };
+  if (!rookieContentInSeason(moment)) return { moment, oneQb: null, rookies: [], live: false as const };
+  try {
+    const [oneQb, superflex] = await Promise.all([fetchBoard("1qb"), fetchBoard("superflex")]);
+    const rookies = rookieRows(oneQb, superflex);
+    return { moment, oneQb, rookies, live: rookies.length >= MIN_ROOKIES };
+  } catch {
+    return { moment, oneQb: null, rookies: [], live: false as const };
+  }
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -49,7 +55,7 @@ export default async function DynastyRookieRankingsPage() {
     { name: "Rookie rankings", path: ROOKIE_RANKINGS_PATH },
   ];
 
-  if (!live) {
+  if (!live || !oneQb) {
     return (
       <SeoPageShell
         crumbs={crumbs}

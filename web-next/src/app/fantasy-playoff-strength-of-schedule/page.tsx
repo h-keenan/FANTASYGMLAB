@@ -10,7 +10,8 @@ import { playoffSosInSeason, PLAYOFF_SOS_PATH, seasonMoment } from "@/lib/season
 
 // Season-gated: indexable only while fantasy playoffs are the live question (weeks 9-17) AND the API returned
 // a rated schedule. Otherwise the page still renders (no 404 for linked visitors) but is noindex and says why.
-export const revalidate = 3600;
+// Rendered per request (fetchPlayoffSos caches for an hour): the build cannot reach the API and the gate follows the clock.
+export const dynamic = "force-dynamic";
 
 const ROWS = 10;
 
