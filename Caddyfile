@@ -41,6 +41,13 @@
 # Next.js frontend (web-next), same upstream as {$WEB_NEXT_DOMAIN} below.
 {$APP_DOMAIN} {
 	import encode_responses
+
+	# Next.js build output under /_next/static/ is content-hashed (a deploy
+	# ships new filenames), so it can be cached forever without serving
+	# stale code. Pages themselves are untouched. coridian_, 2026-11-26.
+	@next_static path /_next/static/*
+	header @next_static >Cache-Control "public, max-age=31536000, immutable"
+
 	reverse_proxy web-next:8080
 }
 
