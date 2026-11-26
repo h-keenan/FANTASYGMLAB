@@ -108,6 +108,11 @@ Deployment topology (Render):
                                                     the app's own evaluator, with a daily rotation — see
                                                     docs/external-trades-interesting.md
   - GET  /v1/external/trades/interesting/{id}/share-card.png — (static API key) branded PNG for one item
+  - GET  /v1/external/promo/plan, /playoff-sos, /waivers/replacements, /lineup/decisions,
+         /dynasty/value-changes, /rookies, /changes, /dynasty/roster-construction, /demo/scenarios
+                                                  — (static API key) adaptive advertising API: season-aware
+                                                    content plan + evidence-carrying feeds — see
+                                                    docs/external-api-contract.md ("Adaptive advertising API")
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -281,6 +286,7 @@ from modules import (
     weekly_roundup,
 )
 from modules import account_acquisition
+from modules import external_ad_api
 from modules import age_profile
 from modules import decision_log
 from modules import derived_cache
@@ -11537,6 +11543,99 @@ def get_external_week_recap(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# External (bot) adaptive advertising API: season-aware content plan plus
+# read-only evidence feeds for the desktop ad app. Business logic lives in
+# modules.external_ad_api; these handlers are thin wrappers behind the same
+# require_external_api_key dependency. Full contract: docs/external-api-contract.md
+# ("Adaptive advertising API"). No user, league or account data is read.
+# ---------------------------------------------------------------------------
+
+
+def _external_ad(call: Any, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    try:
+        return call(*args, **kwargs)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/v1/external/promo/plan", dependencies=[Depends(require_external_api_key)])
+def get_external_promo_plan(
+    league_type: str = "both",
+    as_of: str | None = None,
+    exclude_ids: str | None = None,
+    limit: int = 8,
+) -> dict[str, Any]:
+    if not 1 <= limit <= 20:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 20.")
+    excluded = [x.strip() for x in (exclude_ids or "").split(",") if x.strip()][:100]
+    return _external_ad(external_ad_api.endpoint_plan, as_of=as_of, league_type=league_type, exclude_ids=excluded, limit=limit)
+
+
+@app.get("/v1/external/playoff-sos", dependencies=[Depends(require_external_api_key)])
+def get_external_playoff_sos(
+    season: int | None = None,
+    start_week: int = 15,
+    end_week: int = 17,
+    position: str | None = None,
+    limit: int | None = None,
+) -> dict[str, Any]:
+    if limit is not None and not 1 <= limit <= 40:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 40.")
+    return _external_ad(
+        external_ad_api.endpoint_playoff_sos, season=season, start_week=start_week, end_week=end_week, position=position, limit=limit
+    )
+
+
+@app.get("/v1/external/waivers/replacements", dependencies=[Depends(require_external_api_key)])
+def get_external_waiver_replacements(format: str = "superflex", limit: int = 10) -> dict[str, Any]:
+    if not 1 <= limit <= 25:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 25.")
+    return _external_ad(external_ad_api.endpoint_waiver_replacements, db_path=PLAYERS_DB_PATH, fmt=format, limit=limit)
+
+
+@app.get("/v1/external/lineup/decisions", dependencies=[Depends(require_external_api_key)])
+def get_external_lineup_decisions(
+    format: str = "superflex", week: int | None = None, season: int | None = None, limit: int = 10
+) -> dict[str, Any]:
+    if not 1 <= limit <= 25:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 25.")
+    return _external_ad(
+        external_ad_api.endpoint_lineup_decisions, db_path=PLAYERS_DB_PATH, fmt=format, week=week, season=season, limit=limit
+    )
+
+
+@app.get("/v1/external/dynasty/value-changes", dependencies=[Depends(require_external_api_key)])
+def get_external_dynasty_value_changes(format: str = "superflex", days: int = 7, limit: int = 10) -> dict[str, Any]:
+    if not 1 <= limit <= 25:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 25.")
+    return _external_ad(external_ad_api.endpoint_value_changes, db_path=PLAYERS_DB_PATH, fmt=format, days=days, limit=limit)
+
+
+@app.get("/v1/external/rookies", dependencies=[Depends(require_external_api_key)])
+def get_external_rookies(format: str = "superflex", limit: int = 30) -> dict[str, Any]:
+    if not 1 <= limit <= 60:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 60.")
+    return _external_ad(external_ad_api.endpoint_rookies, db_path=PLAYERS_DB_PATH, fmt=format, limit=limit)
+
+
+@app.get("/v1/external/changes", dependencies=[Depends(require_external_api_key)])
+def get_external_changes(format: str = "superflex", limit: int = 15) -> dict[str, Any]:
+    if not 1 <= limit <= 50:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 50.")
+    return _external_ad(external_ad_api.endpoint_changes, db_path=PLAYERS_DB_PATH, fmt=format, limit=limit)
+
+
+@app.get("/v1/external/dynasty/roster-construction", dependencies=[Depends(require_external_api_key)])
+def get_external_roster_construction() -> dict[str, Any]:
+    return external_ad_api.endpoint_roster_construction()
+
+
+@app.get("/v1/external/demo/scenarios", dependencies=[Depends(require_external_api_key)])
+def get_external_demo_scenarios(type: str | None = None) -> dict[str, Any]:
+    return _external_ad(external_ad_api.endpoint_demo_scenarios, scenario_type=type)
 
 
 def _external_trades_args(format: str, lens: str) -> tuple[str, str]:
