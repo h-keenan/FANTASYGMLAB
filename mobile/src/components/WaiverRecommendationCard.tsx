@@ -278,6 +278,12 @@ export default function WaiverRecommendationCard({
         <CompactModule id="waivers.top.detail" title="Why and roster move" parts={moveParts}>
         {/* Evidence-backed "why" for the bid (or the claim guidance in
             non-FAAB leagues) — modules/faab.py FaabGuidance.why. */}
+        {player.recommendation_reason ? (
+          <AppText style={styles.faabWhy} testID="waiver-fit-reason">
+            <AppText style={{ fontWeight: '700' }}>Fit: </AppText>
+            {player.recommendation_reason}
+          </AppText>
+        ) : null}
         {player.faab?.why ? (
           <Money style={styles.faabWhy} numberOfLines={3}>
             {player.faab.why}
@@ -369,6 +375,12 @@ export default function WaiverRecommendationCard({
               <FAABGuidance faab={player.faab} size="compact" />
             </View>
           </View>
+          {player.recommendation_reason ? (
+            <AppText style={styles.faabWhy} testID="waiver-fit-reason">
+              <AppText style={{ fontWeight: '700' }}>Fit: </AppText>
+              {player.recommendation_reason}
+            </AppText>
+          ) : null}
           {player.faab?.why ? <Money style={styles.faabWhy}>{player.faab.why}</Money> : null}
           {flag ? (
             <AppText style={styles.faabWhy}>

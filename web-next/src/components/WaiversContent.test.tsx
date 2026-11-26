@@ -123,6 +123,14 @@ describe("WaiversContent", () => {
     expect(screen.getByTestId("freshness-label")).toHaveTextContent(/League data as of 2\dm ago \(may be behind\)/);
   });
 
+  it("shows the multi-factor fit reason (handcuff / injury cover / schedule) on the top add", () => {
+    const reason = "Handcuff to your Stud Back: protects a dynasty asset you could not replace from the wire; soft playoff-week matchups (AAA wk 15).";
+    renderOpen(
+      <WaiversContent leagueName="L" data={{ ...BASE_RESPONSE, priority_adds: [priorityAdd({ recommendation_reason: reason })] }} />,
+    );
+    expect(screen.getAllByTestId("waiver-fit-reason")[0]).toHaveTextContent(reason);
+  });
+
   it("shows one bigger-upgrade chip with the lineup gain on the flagged top add, and none otherwise", () => {
     const flagged = priorityAdd({ name: "Big Upgrade", bigger_upgrade: true, lineup_ppw: 1.84 });
     const { unmount } = render(
