@@ -298,7 +298,7 @@ from modules import prefetch
 from modules.frame_records import frame_records
 from modules import player_search
 from modules.admission import AdmissionControlMiddleware
-from modules import public_dynasty_values
+from modules import public_dynasty_values, public_playoff_sos
 from modules import model_status
 from modules import drop_candidates, roster_value_model
 from modules import usage_trends
@@ -11572,6 +11572,15 @@ def get_external_promo_plan(
         raise HTTPException(status_code=422, detail="limit must be between 1 and 20.")
     excluded = [x.strip() for x in (exclude_ids or "").split(",") if x.strip()][:100]
     return _external_ad(external_ad_api.endpoint_plan, as_of=as_of, league_type=league_type, exclude_ids=excluded, limit=limit)
+
+
+# Public, anonymous playoff strength of schedule for the SEO page (web-next /fantasy-playoff-strength-of-schedule).
+# Same verified inputs as /v1/external/playoff-sos; no user, league or roster data.
+@app.get("/v1/public/playoff-sos")
+def get_public_playoff_sos() -> JSONResponse:
+    # Current season and the default playoff weeks only: no caller-controlled cache keys on a public route.
+    payload = public_playoff_sos.get_public_playoff_sos()
+    return JSONResponse(content=payload, headers={"Cache-Control": "public, max-age=900"})
 
 
 @app.get("/v1/external/playoff-sos", dependencies=[Depends(require_external_api_key)])

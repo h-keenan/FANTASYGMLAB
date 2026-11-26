@@ -1,8 +1,18 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ButtonLink } from "@/components/Button";
+import { TrackedCtaLink } from "@/components/TrackedCtaLink";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import {
+  FANTASY_SIM_QUICKSTART_PATH,
+  playoffSosInSeason,
+  PLAYOFF_SOS_PATH,
+  ROOKIE_RANKINGS_PATH,
+  rookieContentInSeason,
+  SAMPLE_LEAGUE_PATH,
+  seasonMoment,
+  withUtm,
+} from "@/lib/seasonalLanding";
 import { breadcrumbLd, serializeLd, type Crumb } from "@/lib/seo/jsonld";
 import { CHART_PATH, HUB_PATH, POSITION_NAMES, RANKINGS_PATH, SEO_POSITIONS, TRADE_ANALYZER_PUBLIC_PATH } from "@/lib/seo/site";
 
@@ -40,7 +50,11 @@ export function Breadcrumbs({ crumbs }: { crumbs: readonly Crumb[] }) {
 
 /** Links to every spoke; rendered at the bottom of each SEO page. */
 export function SpokeNav({ className = "" }: { className?: string }) {
+  const moment = seasonMoment();
   const links = [
+    // Season-gated pages are linked only while they are timely (and have data).
+    ...(playoffSosInSeason(moment) ? [{ href: PLAYOFF_SOS_PATH, label: "Fantasy playoff strength of schedule" }] : []),
+    ...(rookieContentInSeason(moment) ? [{ href: ROOKIE_RANKINGS_PATH, label: "Dynasty rookie rankings" }] : []),
     ...SEO_POSITIONS.map((p) => ({ href: RANKINGS_PATH(p), label: `Dynasty ${POSITION_NAMES[p].upper} rankings` })),
     { href: TRADE_ANALYZER_PUBLIC_PATH, label: "Fantasy football trade analyzer" },
     { href: CHART_PATH, label: "Dynasty trade value chart" },
@@ -67,16 +81,44 @@ export function SpokeNav({ className = "" }: { className?: string }) {
   );
 }
 
-export function AppCta({ title, body }: { title: string; body: string }) {
+/**
+ * Conversion block for every public SEO page. The primary action is the no-account sample league
+ * (value before signup), then Fantasy Sim quickstart and the app itself. Links carry UTM tags
+ * (utm_medium=site_cta, utm_campaign=`campaign`, utm_content=`content`) and clicks are counted as
+ * `seo_cta_clicked`; site_cta tags never override a real acquisition touch (lib/attribution.ts).
+ */
+export function AppCta({
+  title,
+  body,
+  campaign = "seo_page",
+  content,
+}: {
+  title: string;
+  body: string;
+  campaign?: string;
+  content?: string;
+}) {
+  const link = (href: string) => withUtm(href, "seo", campaign, content);
   return (
     <section className="glass-surface flex flex-col gap-3 p-4" aria-label="Open FantasyDesk">
       <h2 style={{ font: "var(--type-section-title)" }}>{title}</h2>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         {body}
       </p>
-      <ButtonLink href="/" variant="primary" fullWidth>
-        Open FantasyDesk
-      </ButtonLink>
+      <TrackedCtaLink href={link(SAMPLE_LEAGUE_PATH)} surface={campaign} destination="sample_league" variant="primary" fullWidth>
+        Try a sample league
+      </TrackedCtaLink>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <TrackedCtaLink href={link(FANTASY_SIM_QUICKSTART_PATH)} surface={campaign} destination="fantasy_sim_quickstart" variant="secondary" fullWidth>
+          Play a quick Fantasy Sim game
+        </TrackedCtaLink>
+        <TrackedCtaLink href={link("/")} surface={campaign} destination="open_app" variant="secondary" fullWidth>
+          Open FantasyDesk
+        </TrackedCtaLink>
+      </div>
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        No account or card needed for the sample league or Fantasy Sim.
+      </p>
     </section>
   );
 }

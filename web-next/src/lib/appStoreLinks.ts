@@ -6,9 +6,12 @@
  * (never a dead or placeholder link). Going live is a one-line change: set
  * the real listing URL here and that slot becomes a real link.
  *
- * Status (2026-10-21): the Android app is live on Google Play. The iOS app
- * is still in App Store review with no public listing (the iTunes lookup
- * for com.fantasygmlab.app returns zero results), so appStoreUrl stays null.
+ * Status (verified 2026-11-26): the Android app is live on Google Play. The iOS app
+ * still has no public App Store listing: the iTunes lookup API
+ * (itunes.apple.com/lookup?bundleId=com.fantasygmlab.app, country=us) returns
+ * resultCount 0, so appStoreUrl stays null and the iPhone slot says "Coming soon"
+ * (which is accurate) while the landing page points iPhone visitors at the web app.
+ * Re-check with that lookup before flipping it.
  *
  * `*BadgeSrc` is the hook for the official "Download on the App Store" /
  * "Get it on Google Play" badge artwork. Apple's and Google's badge
@@ -27,7 +30,9 @@ export interface AppStoreLinks {
 
 export const APP_STORE_LINKS: AppStoreLinks = {
   appStoreUrl: null,
-  playStoreUrl: "https://play.google.com/store/apps/details?id=com.fantasygmlab.app",
+  // Play's install referrer carries the campaign into the store listing (Play Console acquisition reports).
+  playStoreUrl:
+    "https://play.google.com/store/apps/details?id=com.fantasygmlab.app&referrer=utm_source%3Dweb_landing%26utm_medium%3Dsite_cta%26utm_campaign%3Dapp_modules",
   appStoreBadgeSrc: null,
   playStoreBadgeSrc: null,
 };

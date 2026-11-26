@@ -127,9 +127,21 @@ export function isStrongTouch(a: Attribution | null | undefined): boolean {
   return Boolean(a.utm_source || a.utm_medium || a.utm_campaign || a.utm_content || a.utm_term || a.click_id);
 }
 
+/**
+ * Our own CTAs (public SEO pages, the seasonal landing strip) tag their links utm_medium=site_cta so
+ * a click can be counted. That is internal navigation, not acquisition: it may fill an empty slot but
+ * must never displace a real campaign, ad click or external referrer already stored.
+ */
+export const SITE_CTA_MEDIUM = "site_cta";
+
+export function isSiteCtaTouch(a: Attribution | null | undefined): boolean {
+  return a?.utm_medium === SITE_CTA_MEDIUM;
+}
+
 /** Pure merge rule for the stored FIRST touch (exported for tests). */
 export function nextFirstTouch(stored: Attribution | null, incoming: Attribution): Attribution {
   if (!stored || Object.keys(stored).length === 0) return incoming;
+  if (isSiteCtaTouch(incoming)) return stored;
   if (!isStrongTouch(stored) && isStrongTouch(incoming)) return incoming; // upgrade weak -> strong
   return stored;
 }
@@ -137,6 +149,7 @@ export function nextFirstTouch(stored: Attribution | null, incoming: Attribution
 /** Pure rule for the stored LAST touch: latest strong touch wins; a weak referrer only replaces a weak/absent one. */
 export function nextLastTouch(stored: Attribution | null, incoming: Attribution): Attribution {
   if (!stored || Object.keys(stored).length === 0) return incoming;
+  if (isSiteCtaTouch(incoming)) return stored;
   if (isStrongTouch(incoming)) return incoming;
   if (isStrongTouch(stored)) return stored;
   return incoming;

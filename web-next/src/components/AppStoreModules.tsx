@@ -53,6 +53,11 @@ export function AppStoreModules({ links = APP_STORE_LINKS }: { links?: AppStoreL
           />
         </li>
       </ul>
+      {links.appStoreUrl ? null : (
+        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="iphone-web-note">
+          On iPhone? FantasyDesk works in your browser today. Add it to your Home Screen from Safari&apos;s share menu.
+        </p>
+      )}
     </section>
   );
 }

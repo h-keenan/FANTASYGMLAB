@@ -90,6 +90,17 @@ describe("first/last touch rules", () => {
     expect(nextLastTouch({ referrer_host: "x.com" }, { referrer_host: "y.com" })).toEqual({ referrer_host: "y.com" });
   });
 
+  it("our own site_cta links fill an empty slot but never displace a real touch", () => {
+    const cta = { utm_source: "player_page", utm_medium: "site_cta", utm_campaign: "seo" };
+    const paid = { utm_source: "meta", utm_medium: "paid" };
+    expect(nextFirstTouch(null, cta)).toEqual(cta);
+    expect(nextLastTouch(null, cta)).toEqual(cta);
+    expect(nextFirstTouch(paid, cta)).toEqual(paid);
+    expect(nextLastTouch(paid, cta)).toEqual(paid);
+    expect(nextFirstTouch({ referrer_host: "google.com" }, cta)).toEqual({ referrer_host: "google.com" });
+    expect(nextLastTouch({ referrer_host: "google.com" }, cta)).toEqual({ referrer_host: "google.com" });
+  });
+
   it("persists both and exposes lt_* props without the click id value", () => {
     window.history.replaceState({}, "", "/");
     Object.defineProperty(document, "referrer", { value: "https://www.instagram.com/", configurable: true });
