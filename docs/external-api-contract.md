@@ -1806,6 +1806,1132 @@ nflverse data on 2026-10-22:
 }
 ```
 
+## Adaptive advertising API
+
+Read-only, season-aware endpoints for the desktop advertising app. Same auth as
+everything above (`Authorization: Bearer <FANTASYDESK_EXTERNAL_API_KEY>`; `401` generic,
+`503` when unconfigured). Code: `modules/external_ad_api.py`; routes in
+`services/mobile_api_service.py`. **No user, league, account, billing or analytics data is
+read**, and the existing endpoints above are unchanged (this release only adds routes).
+
+Built on the existing clocks: `modules.season_clock` (phase/week; Sleeper `/state/nfl` with a calendar
+fallback) and `modules.league_calendar` (deadline phase, applied to a *reference* league with
+trade deadline week 12 and fantasy playoffs weeks 15-17; real leagues vary, and the plan says so).
+
+### Envelope (every endpoint)
+
+| Field | Meaning |
+|---|---|
+| `contract_version` | `"ad-api-v1"`. |
+| `endpoint`, `generated_at` | Route and ISO UTC time of this response. |
+| `season`, `phase`, `week`, `clock_source` | From `season_clock` (`phase`: `offseason` / `preseason` / `regular` / `post`; `week` only in `regular`; `clock_source`: `sleeper` or `calendar`). |
+| `status` | `"ok"` (at least one item) or `"unavailable"`. |
+| `unavailable_reason` | `null` when `ok`; otherwise a specific reason. An empty feed is never returned silently and never padded. |
+| `methodology`, `freshness`, `count`, `items` | Endpoint-level method note, freshness block, item count, items. |
+
+### Item contract (every item)
+
+| Field | Meaning |
+|---|---|
+| `id`, `kind` | Stable id (use it for your own de-duplication) and item type. |
+| `timestamp` | ISO UTC time the item was produced. |
+| `headline` | A factual one-liner built from the evidence; null if none can be stated. |
+| `evidence[]` | `{source, label, value, as_of}`: every number the headline relies on. |
+| `methodology` | Plain-language rule that produced the item, including what it does not model. |
+| `confidence` | `low` / `medium` / `high`. A rule-based label (sample size, coverage, magnitude), not a probability. |
+| `freshness` | `{data_as_of, age_hours, stale, source}`; `stale` is true past 36 h; nulls mean the source gave no date. |
+| `relevance` | `{dynasty, redraft}` each `low`/`medium`/`high`: how much the item matters per league type. |
+| `unavailable_reason` | `null` on a real item (reserved so every item shape can say why data is missing). |
+
+### Routes
+
+| Route | Purpose | Notes |
+|---|---|---|
+| `GET /v1/external/promo/plan` | What to advertise now, ranked by phase and league type. | Params: `league_type=dynasty\|redraft\|both`, `as_of=YYYY-MM-DD` (preview a date with the calendar rule), `exclude_ids` (module ids already used), `limit`. Items add `module`, `endpoint`, `readiness` (`ready`/`prepared`), `relevance_score`, `relevance_dynasty`, `relevance_redraft`, `reason`; the envelope adds `sub_phase`. |
+| `GET /v1/external/playoff-sos` | Fantasy-playoff strength of schedule per team. | Params: `season`, `start_week=15`, `end_week=17` (span at most 4 weeks), `position`, `limit`. Opponent recency-weighted PPR points allowed per position vs the league mean; `rank_easiest` 1 = easiest. Unavailable until completed games exist. |
+| `GET /v1/external/waivers/replacements` | Injured starter-range players paired with trending healthy same-position adds. | Params: `format=superflex\|1qb`, `limit`. In-season only. League-agnostic (cannot know any one league's availability); `roster_pct` and `availability_verified` say when roster-percentage evidence exists, otherwise confidence is `low`. |
+| `GET /v1/external/lineup/decisions` | Matchup-driven start/sit for borderline starters. | Params: `format`, `week`, `season`, `limit`. Confidence never exceeds `medium`; weather and game script are not modeled. |
+| `GET /v1/external/dynasty/value-changes` | Risers and fallers from two stored daily 0-99 rating snapshots. | Params: `format`, `days=7..30`, `limit`. Unavailable while snapshot history is still building. |
+| `GET /v1/external/demo/scenarios` | Fixed product-demo scenarios (start/sit, waiver claim, trade). | Param: `type`. **Synthetic** fictional players, identical on every call, `synthetic: true`; links carry `utm_source=desktop_ad_app`. Not real advice. |
+| `GET /v1/external/rookies` | Rookie rankings, rookie ADP and landing spots (prepared). | Params: `format`, `limit`. Needs players with zero years of experience on a team; before the draft this is `unavailable`. `draft_capital` is always `null` with a reason (not in the verified data). |
+| `GET /v1/external/changes` | Depth-chart movement between the two latest weekly snapshots (prepared). | `sections.team_changes` is always `unavailable`: no team-affiliation history is retained. |
+| `GET /v1/external/dynasty/roster-construction` | Always a structured `unavailable` (prepared). | Needs a roster, which this API never reads. |
+
+### Example responses
+
+Generated from the real builders with synthetic fixtures (`tests/external_ad_fixtures.py`) by
+`python scripts/generate_external_ad_examples.py --write`; a test fails if they drift. Player and team
+names are fixtures, not real data. Lists are trimmed with `limit` only.
+
+#### `GET /v1/external/promo/plan?as_of=2026-12-15&limit=3`
+
+<!-- example:plan -->
+```json
+{
+  "ok": true,
+  "contract_version": "ad-api-v1",
+  "endpoint": "/v1/external/promo/plan",
+  "status": "ok",
+  "unavailable_reason": null,
+  "generated_at": "2026-12-08T15:00:00+00:00",
+  "season": 2026,
+  "phase": "regular",
+  "week": 15,
+  "clock_source": "sleeper",
+  "methodology": "Phase-aware ranking of the ad API's own content modules. See each item's methodology.",
+  "freshness": {
+    "data_as_of": "2026-12-08T15:00:00+00:00",
+    "age_hours": 0.0,
+    "stale": false,
+    "source": "season_clock:sleeper"
+  },
+  "count": 3,
+  "items": [
+    {
+      "id": "playoff_sos",
+      "kind": "content_module",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "Fantasy playoff strength of schedule",
+      "evidence": [
+        {
+          "source": "season_clock",
+          "label": "phase",
+          "value": "regular",
+          "as_of": null
+        },
+        {
+          "source": "season_clock",
+          "label": "week",
+          "value": 15,
+          "as_of": null
+        },
+        {
+          "source": "content_plan",
+          "label": "sub_phase",
+          "value": "fantasy_playoffs",
+          "as_of": null
+        },
+        {
+          "source": "league_calendar",
+          "label": "reference_trade_deadline_week",
+          "value": 12,
+          "as_of": null
+        }
+      ],
+      "methodology": "Relevance is a fixed product table keyed on the season-clock phase/week (and a reference league calendar for deadline timing), not a prediction of engagement.",
+      "confidence": "high",
+      "freshness": {
+        "data_as_of": "2026-12-08T15:00:00+00:00",
+        "age_hours": 0.0,
+        "stale": false,
+        "source": "season_clock:sleeper"
+      },
+      "relevance": {
+        "dynasty": "high",
+        "redraft": "high"
+      },
+      "unavailable_reason": null,
+      "module": "playoff_sos",
+      "endpoint": "/v1/external/playoff-sos",
+      "readiness": "ready",
+      "relevance_score": 0.925,
+      "relevance_dynasty": 0.9,
+      "relevance_redraft": 0.95,
+      "reason": "Fantasy playoffs are underway or one week away; schedule strength for weeks 15-17 decides lineups."
+    },
+    {
+      "id": "lineup_decisions",
+      "kind": "content_module",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "Matchup-driven start/sit calls",
+      "evidence": [
+        {
+          "source": "season_clock",
+          "label": "phase",
+          "value": "regular",
+          "as_of": null
+        },
+        {
+          "source": "season_clock",
+          "label": "week",
+          "value": 15,
+          "as_of": null
+        },
+        {
+          "source": "content_plan",
+          "label": "sub_phase",
+          "value": "fantasy_playoffs",
+          "as_of": null
+        },
+        {
+          "source": "league_calendar",
+          "label": "reference_trade_deadline_week",
+          "value": 12,
+          "as_of": null
+        }
+      ],
+      "methodology": "Relevance is a fixed product table keyed on the season-clock phase/week (and a reference league calendar for deadline timing), not a prediction of engagement.",
+      "confidence": "high",
+      "freshness": {
+        "data_as_of": "2026-12-08T15:00:00+00:00",
+        "age_hours": 0.0,
+        "stale": false,
+        "source": "season_clock:sleeper"
+      },
+      "relevance": {
+        "dynasty": "medium",
+        "redraft": "high"
+      },
+      "unavailable_reason": null,
+      "module": "lineup_decisions",
+      "endpoint": "/v1/external/lineup/decisions",
+      "readiness": "ready",
+      "relevance_score": 0.85,
+      "relevance_dynasty": 0.7,
+      "relevance_redraft": 1.0,
+      "reason": "Every start/sit call is elimination-week stakes."
+    },
+    {
+      "id": "waiver_replacements",
+      "kind": "content_module",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "Injury replacement opportunities",
+      "evidence": [
+        {
+          "source": "season_clock",
+          "label": "phase",
+          "value": "regular",
+          "as_of": null
+        },
+        {
+          "source": "season_clock",
+          "label": "week",
+          "value": 15,
+          "as_of": null
+        },
+        {
+          "source": "content_plan",
+          "label": "sub_phase",
+          "value": "fantasy_playoffs",
+          "as_of": null
+        },
+        {
+          "source": "league_calendar",
+          "label": "reference_trade_deadline_week",
+          "value": 12,
+          "as_of": null
+        }
+      ],
+      "methodology": "Relevance is a fixed product table keyed on the season-clock phase/week (and a reference league calendar for deadline timing), not a prediction of engagement.",
+      "confidence": "high",
+      "freshness": {
+        "data_as_of": "2026-12-08T15:00:00+00:00",
+        "age_hours": 0.0,
+        "stale": false,
+        "source": "season_clock:sleeper"
+      },
+      "relevance": {
+        "dynasty": "medium",
+        "redraft": "high"
+      },
+      "unavailable_reason": null,
+      "module": "waiver_replacements",
+      "endpoint": "/v1/external/waivers/replacements",
+      "readiness": "ready",
+      "relevance_score": 0.725,
+      "relevance_dynasty": 0.5,
+      "relevance_redraft": 0.95,
+      "reason": "Injury replacements matter most when a loss ends the season."
+    }
+  ],
+  "sub_phase": "fantasy_playoffs",
+  "league_type": "both",
+  "as_of_date": "2026-12-15",
+  "reference_calendar": {
+    "trade_deadline_week": 12,
+    "fantasy_playoff_weeks": [
+      15,
+      16,
+      17
+    ],
+    "note": "Reference assumptions for planning content. Real leagues set their own deadlines and playoff weeks."
+  }
+}
+```
+<!-- /example:plan -->
+
+#### `GET /v1/external/playoff-sos?season=2026&position=WR&limit=1`
+
+<!-- example:playoff_sos -->
+```json
+{
+  "ok": true,
+  "contract_version": "ad-api-v1",
+  "endpoint": "/v1/external/playoff-sos",
+  "status": "ok",
+  "unavailable_reason": null,
+  "generated_at": "2026-12-08T15:00:00+00:00",
+  "season": 2026,
+  "phase": "regular",
+  "week": 15,
+  "clock_source": "sleeper",
+  "methodology": "Opponent points-allowed by position across the requested fantasy-playoff weeks (default 15-17).",
+  "freshness": {
+    "data_as_of": "2026-12-08T15:00:00+00:00",
+    "age_hours": 0.0,
+    "stale": false,
+    "source": "nflverse_games+sleeper_weekly_stats"
+  },
+  "count": 1,
+  "items": [
+    {
+      "id": "playoff_sos:2026:AAA:15-17",
+      "kind": "playoff_sos",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "AAA has the #1 easiest QB playoff schedule",
+      "evidence": [
+        {
+          "source": "nflverse_games",
+          "label": "week 15 opponent",
+          "value": "CCC",
+          "as_of": null
+        },
+        {
+          "source": "nflverse_games",
+          "label": "week 16 opponent",
+          "value": "BBB",
+          "as_of": null
+        },
+        {
+          "source": "nflverse_games",
+          "label": "week 17 opponent",
+          "value": "BYE",
+          "as_of": null
+        },
+        {
+          "source": "sleeper_weekly_stats",
+          "label": "opponent points allowed by position (recency-weighted PPR)",
+          "value": {
+            "QB": 20.0,
+            "RB": 27.0,
+            "WR": 32.5,
+            "TE": 11.5
+          },
+          "as_of": "2026-12-08T15:00:00+00:00"
+        }
+      ],
+      "methodology": "Mean of the opponents' recency-weighted PPR points allowed per game to each position over the listed weeks, compared with the league mean; rank 1 is the easiest schedule. Opponents without a rated defense are skipped and counted in rated_opponents. Not a projection.",
+      "confidence": "high",
+      "freshness": {
+        "data_as_of": "2026-12-08T15:00:00+00:00",
+        "age_hours": 0.0,
+        "stale": false,
+        "source": "nflverse_games+sleeper_weekly_stats"
+      },
+      "relevance": {
+        "dynasty": "medium",
+        "redraft": "high"
+      },
+      "unavailable_reason": null,
+      "team": "AAA",
+      "season": 2026,
+      "weeks": [
+        15,
+        16,
+        17
+      ],
+      "opponents": [
+        {
+          "week": 15,
+          "opponent": "CCC",
+          "is_home": true
+        },
+        {
+          "week": 16,
+          "opponent": "BBB",
+          "is_home": false
+        },
+        {
+          "week": 17,
+          "opponent": null,
+          "is_home": null,
+          "bye": true
+        }
+      ],
+      "by_position": {
+        "QB": {
+          "avg_points_allowed": 20.0,
+          "vs_league_avg_pct": 9.1,
+          "rated_opponents": 2,
+          "scheduled_opponents": 2,
+          "unavailable_reason": null,
+          "rank_easiest": 1,
+          "of": 3
+        },
+        "RB": {
+          "avg_points_allowed": 27.0,
+          "vs_league_avg_pct": 12.5,
+          "rated_opponents": 2,
+          "scheduled_opponents": 2,
+          "unavailable_reason": null,
+          "rank_easiest": 1,
+          "of": 3
+        },
+        "WR": {
+          "avg_points_allowed": 32.5,
+          "vs_league_avg_pct": 12.1,
+          "rated_opponents": 2,
+          "scheduled_opponents": 2,
+          "unavailable_reason": null,
+          "rank_easiest": 1,
+          "of": 3
+        },
+        "TE": {
+          "avg_points_allowed": 11.5,
+          "vs_league_avg_pct": 11.3,
+          "rated_opponents": 2,
+          "scheduled_opponents": 2,
+          "unavailable_reason": null,
+          "rank_easiest": 1,
+          "of": 3
+        }
+      }
+    }
+  ],
+  "requested": {
+    "season": 2026,
+    "weeks": [
+      15,
+      16,
+      17
+    ],
+    "position": "WR"
+  }
+}
+```
+<!-- /example:playoff_sos -->
+
+#### `GET /v1/external/waivers/replacements?limit=1`
+
+<!-- example:waivers -->
+```json
+{
+  "ok": true,
+  "contract_version": "ad-api-v1",
+  "endpoint": "/v1/external/waivers/replacements",
+  "status": "ok",
+  "unavailable_reason": null,
+  "generated_at": "2026-12-08T15:00:00+00:00",
+  "season": 2026,
+  "phase": "regular",
+  "week": 15,
+  "clock_source": "sleeper",
+  "methodology": "Injured starter-range players paired with trending healthy same-position adds. See item methodology.",
+  "freshness": {
+    "data_as_of": "2026-12-08T09:00:00+00:00",
+    "age_hours": 6.0,
+    "stale": false,
+    "source": "public_dynasty_board"
+  },
+  "count": 1,
+  "items": [
+    {
+      "id": "waiver:100",
+      "kind": "injury_replacement",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "Alex Hurt (Out): 2 widely trending replacement(s) at WR",
+      "evidence": [
+        {
+          "source": "sleeper_player_directory",
+          "label": "injury_status",
+          "value": "Out",
+          "as_of": "2026-12-08T09:00:00+00:00"
+        },
+        {
+          "source": "public_dynasty_board",
+          "label": "WR rank of injured player",
+          "value": 12,
+          "as_of": "2026-12-08T09:00:00+00:00"
+        },
+        {
+          "source": "sleeper_trending_adds",
+          "label": "Bo Backup adds (24h) / rank",
+          "value": {
+            "adds": 5400,
+            "trend_rank": 1,
+            "roster_pct": 12.0
+          },
+          "as_of": "2026-12-08T15:00:00+00:00"
+        },
+        {
+          "source": "sleeper_trending_adds",
+          "label": "Cy Stream adds (24h) / rank",
+          "value": {
+            "adds": 3100,
+            "trend_rank": 2,
+            "roster_pct": 31.5
+          },
+          "as_of": "2026-12-08T15:00:00+00:00"
+        }
+      ],
+      "methodology": "Injured player: Sleeper injury designation in {Out, IR, PUP, Doubtful, Suspended} AND a starter-range rank on the public dynasty board. Replacements: same-position players on Sleeper's cross-league trending-add list, healthy, below 50% rostered when roster percentage is on record. League-agnostic: availability in any one league is not known. Starter range uses dynasty-board rank as the proxy.",
+      "confidence": "medium",
+      "freshness": {
+        "data_as_of": "2026-12-08T09:00:00+00:00",
+        "age_hours": 6.0,
+        "stale": false,
+        "source": "public_dynasty_board+sleeper_trending_adds"
+      },
+      "relevance": {
+        "dynasty": "medium",
+        "redraft": "high"
+      },
+      "unavailable_reason": null,
+      "injured_player": {
+        "player_id": "100",
+        "name": "Alex Hurt",
+        "position": "WR",
+        "team": "AAA",
+        "injury_status": "Out",
+        "position_rank": 12
+      },
+      "replacements": [
+        {
+          "player_id": "101",
+          "name": "Bo Backup",
+          "position": "WR",
+          "team": "AAA",
+          "trending_adds_24h": 5400,
+          "trending_rank": 1,
+          "roster_pct": 12.0,
+          "same_team": true,
+          "availability_verified": true
+        },
+        {
+          "player_id": "102",
+          "name": "Cy Stream",
+          "position": "WR",
+          "team": "CCC",
+          "trending_adds_24h": 3100,
+          "trending_rank": 2,
+          "roster_pct": 31.5,
+          "same_team": false,
+          "availability_verified": true
+        }
+      ],
+      "roster_pct_available": true
+    }
+  ]
+}
+```
+<!-- /example:waivers -->
+
+#### `GET /v1/external/lineup/decisions?week=16&limit=1`
+
+<!-- example:lineup -->
+```json
+{
+  "ok": true,
+  "contract_version": "ad-api-v1",
+  "endpoint": "/v1/external/lineup/decisions",
+  "status": "ok",
+  "unavailable_reason": null,
+  "generated_at": "2026-12-08T15:00:00+00:00",
+  "season": 2026,
+  "phase": "regular",
+  "week": 15,
+  "clock_source": "sleeper",
+  "methodology": "Matchup-driven start/sit for borderline starters from opponent points allowed by position.",
+  "freshness": {
+    "data_as_of": "2026-12-08T09:00:00+00:00",
+    "age_hours": 6.0,
+    "stale": false,
+    "source": "public_dynasty_board"
+  },
+  "count": 1,
+  "items": [
+    {
+      "id": "lineup:2026:16:103",
+      "kind": "lineup_decision",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "START: Dee Flex (RB20) vs BBB, a weak RB defense",
+      "evidence": [
+        {
+          "source": "nflverse_games",
+          "label": "opponent / home",
+          "value": {
+            "opponent": "BBB",
+            "is_home": false
+          },
+          "as_of": null
+        },
+        {
+          "source": "sleeper_weekly_stats",
+          "label": "BBB PPR allowed to RB per game (weighted)",
+          "value": 30.0,
+          "as_of": "2026-12-08T15:00:00+00:00"
+        },
+        {
+          "source": "sleeper_weekly_stats",
+          "label": "vs league average pct",
+          "value": 25.0,
+          "as_of": null
+        },
+        {
+          "source": "sleeper_weekly_stats",
+          "label": "defense rank vs RB (1 = toughest) / tier",
+          "value": {
+            "rank": 3,
+            "tier": "weak"
+          },
+          "as_of": null
+        },
+        {
+          "source": "public_dynasty_board",
+          "label": "RB position rank",
+          "value": 20,
+          "as_of": "2026-12-08T09:00:00+00:00"
+        },
+        {
+          "source": "sleeper_player_directory",
+          "label": "injury_status",
+          "value": null,
+          "as_of": null
+        }
+      ],
+      "methodology": "Borderline-starter band at each position only (clear starters are never flagged). Verdict follows the opponent's recency-weighted PPR points allowed to that position vs the league mean, requiring a gap of 8% or more and a non-average tier. Matchup context, not a player projection; confidence never exceeds medium, and weather, injuries to teammates and game script are not modeled.",
+      "confidence": "medium",
+      "freshness": {
+        "data_as_of": "2026-12-08T09:00:00+00:00",
+        "age_hours": 6.0,
+        "stale": false,
+        "source": "public_dynasty_board+nflverse_games+sleeper_weekly_stats"
+      },
+      "relevance": {
+        "dynasty": "low",
+        "redraft": "high"
+      },
+      "unavailable_reason": null,
+      "verdict": "start",
+      "player": {
+        "player_id": "103",
+        "name": "Dee Flex",
+        "position": "RB",
+        "team": "AAA",
+        "position_rank": 20
+      },
+      "opponent": "BBB",
+      "is_home": false,
+      "game_id": "2026_16_AAA_BBB",
+      "matchup_gap_pct": 25.0
+    }
+  ],
+  "requested": {
+    "season": 2026,
+    "week": 16
+  }
+}
+```
+<!-- /example:lineup -->
+
+#### `GET /v1/external/dynasty/value-changes?days=7&limit=1`
+
+<!-- example:value_changes -->
+```json
+{
+  "ok": true,
+  "contract_version": "ad-api-v1",
+  "endpoint": "/v1/external/dynasty/value-changes",
+  "status": "ok",
+  "unavailable_reason": null,
+  "generated_at": "2026-12-08T15:00:00+00:00",
+  "season": 2026,
+  "phase": "regular",
+  "week": 15,
+  "clock_source": "sleeper",
+  "methodology": "Risers and fallers from two stored daily rating snapshots.",
+  "freshness": {
+    "data_as_of": "2026-12-08T09:00:00+00:00",
+    "age_hours": 6.0,
+    "stale": false,
+    "source": "public_dynasty_board"
+  },
+  "count": 2,
+  "items": [
+    {
+      "id": "value:2026-12-07:7d:101",
+      "kind": "dynasty_value_change",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "Bo Backup (WR): rating 62 to 70 (+8) over 7 days",
+      "evidence": [
+        {
+          "source": "player_rating_snapshots",
+          "label": "overall rating on 2026-11-30",
+          "value": 62,
+          "as_of": "2026-11-30"
+        },
+        {
+          "source": "player_rating_snapshots",
+          "label": "overall rating on 2026-12-07",
+          "value": 70,
+          "as_of": "2026-12-07"
+        },
+        {
+          "source": "public_dynasty_board",
+          "label": "overall rank / position rank",
+          "value": {
+            "overall": 44,
+            "position": 44
+          },
+          "as_of": null
+        }
+      ],
+      "methodology": "Difference between two stored daily 0-99 overall-rating snapshots (same canonical pool as the rating-history endpoint), restricted to players on the current public board. Moves under 2 points are ignored. The cause of a move is not asserted.",
+      "confidence": "high",
+      "freshness": {
+        "data_as_of": "2026-12-07T00:00:00+00:00",
+        "age_hours": 39.0,
+        "stale": true,
+        "source": "player_rating_snapshots"
+      },
+      "relevance": {
+        "dynasty": "high",
+        "redraft": "low"
+      },
+      "unavailable_reason": null,
+      "direction": "riser",
+      "player": {
+        "player_id": "101",
+        "name": "Bo Backup",
+        "position": "WR",
+        "team": "AAA",
+        "age": 26.0
+      },
+      "rating_previous": 62,
+      "rating_current": 70,
+      "rating_delta": 8,
+      "window": {
+        "baseline_date": "2026-11-30",
+        "latest_date": "2026-12-07",
+        "span_days": 7
+      }
+    },
+    {
+      "id": "value:2026-12-07:7d:103",
+      "kind": "dynasty_value_change",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "Dee Flex (RB): rating 80 to 75 (-5) over 7 days",
+      "evidence": [
+        {
+          "source": "player_rating_snapshots",
+          "label": "overall rating on 2026-11-30",
+          "value": 80,
+          "as_of": "2026-11-30"
+        },
+        {
+          "source": "player_rating_snapshots",
+          "label": "overall rating on 2026-12-07",
+          "value": 75,
+          "as_of": "2026-12-07"
+        },
+        {
+          "source": "public_dynasty_board",
+          "label": "overall rank / position rank",
+          "value": {
+            "overall": 20,
+            "position": 20
+          },
+          "as_of": null
+        }
+      ],
+      "methodology": "Difference between two stored daily 0-99 overall-rating snapshots (same canonical pool as the rating-history endpoint), restricted to players on the current public board. Moves under 2 points are ignored. The cause of a move is not asserted.",
+      "confidence": "high",
+      "freshness": {
+        "data_as_of": "2026-12-07T00:00:00+00:00",
+        "age_hours": 39.0,
+        "stale": true,
+        "source": "player_rating_snapshots"
+      },
+      "relevance": {
+        "dynasty": "high",
+        "redraft": "low"
+      },
+      "unavailable_reason": null,
+      "direction": "faller",
+      "player": {
+        "player_id": "103",
+        "name": "Dee Flex",
+        "position": "RB",
+        "team": "AAA",
+        "age": 26.0
+      },
+      "rating_previous": 80,
+      "rating_current": 75,
+      "rating_delta": -5,
+      "window": {
+        "baseline_date": "2026-11-30",
+        "latest_date": "2026-12-07",
+        "span_days": 7
+      }
+    }
+  ],
+  "requested": {
+    "days": 7
+  }
+}
+```
+<!-- /example:value_changes -->
+
+#### `GET /v1/external/rookies?limit=1`
+
+<!-- example:rookies -->
+```json
+{
+  "ok": true,
+  "contract_version": "ad-api-v1",
+  "endpoint": "/v1/external/rookies",
+  "status": "ok",
+  "unavailable_reason": null,
+  "generated_at": "2026-12-08T15:00:00+00:00",
+  "season": 2026,
+  "phase": "regular",
+  "week": 15,
+  "clock_source": "sleeper",
+  "methodology": "Rookie rankings, ADP and landing spots from the public board, Sleeper depth chart and rookie ADP snapshot.",
+  "freshness": {
+    "data_as_of": "2026-12-08T09:00:00+00:00",
+    "age_hours": 6.0,
+    "stale": false,
+    "source": "public_dynasty_board"
+  },
+  "count": 1,
+  "items": [
+    {
+      "id": "rookie:105",
+      "kind": "rookie",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "Fox Rookie (RB, CCC): our rookie rank 1, ADP 4.5",
+      "evidence": [
+        {
+          "source": "public_dynasty_board",
+          "label": "dynasty score / position rank",
+          "value": {
+            "score": 3000,
+            "position_rank": 30
+          },
+          "as_of": "2026-12-08T09:00:00+00:00"
+        },
+        {
+          "source": "sleeper_player_directory",
+          "label": "depth_chart_order",
+          "value": 2,
+          "as_of": null
+        },
+        {
+          "source": "fantasy_football_calculator_adp",
+          "label": "rookie ADP",
+          "value": 4.5,
+          "as_of": "2026-12-07"
+        }
+      ],
+      "methodology": "Rookies = players with zero years of experience on a team, ranked by the public dynasty score. ADP is Fantasy Football Calculator's rookie-draft snapshot when available. Landing spot = team, depth-chart order and higher-valued same-position teammates; draft capital is not modeled here.",
+      "confidence": "medium",
+      "freshness": {
+        "data_as_of": "2026-12-08T09:00:00+00:00",
+        "age_hours": 6.0,
+        "stale": false,
+        "source": "public_dynasty_board"
+      },
+      "relevance": {
+        "dynasty": "high",
+        "redraft": "medium"
+      },
+      "unavailable_reason": null,
+      "player": {
+        "player_id": "105",
+        "name": "Fox Rookie",
+        "position": "RB",
+        "team": "CCC",
+        "age": 21.5
+      },
+      "our_rank": 1,
+      "adp": 4.5,
+      "adp_drafts": 40,
+      "adp_as_of": "2026-12-07",
+      "landing_spot": {
+        "team": "CCC",
+        "depth_chart_order": 2,
+        "higher_valued_teammates": []
+      },
+      "draft_capital": null,
+      "draft_capital_unavailable_reason": "Draft round/pick is not part of the verified player board."
+    }
+  ]
+}
+```
+<!-- /example:rookies -->
+
+#### `GET /v1/external/changes?limit=1`
+
+<!-- example:changes -->
+```json
+{
+  "ok": true,
+  "contract_version": "ad-api-v1",
+  "endpoint": "/v1/external/changes",
+  "status": "ok",
+  "unavailable_reason": null,
+  "generated_at": "2026-12-08T15:00:00+00:00",
+  "season": 2026,
+  "phase": "regular",
+  "week": 15,
+  "clock_source": "sleeper",
+  "methodology": "Depth-chart movement from stored weekly snapshots; team changes unavailable.",
+  "freshness": {
+    "data_as_of": "2026-12-08T09:00:00+00:00",
+    "age_hours": 6.0,
+    "stale": false,
+    "source": "public_dynasty_board"
+  },
+  "count": 1,
+  "items": [
+    {
+      "id": "depth:2026-W49:103",
+      "kind": "depth_chart_change",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "Dee Flex (RB, AAA): depth chart 2 to 1",
+      "evidence": [
+        {
+          "source": "depth_chart_snapshots",
+          "label": "depth_chart_order 2026-W48",
+          "value": 2,
+          "as_of": null
+        },
+        {
+          "source": "depth_chart_snapshots",
+          "label": "depth_chart_order 2026-W49",
+          "value": 1,
+          "as_of": null
+        }
+      ],
+      "methodology": "Difference between the two most recent weekly snapshots of Sleeper's depth_chart_order, for players on the current board. A move is not a confirmed role change.",
+      "confidence": "low",
+      "freshness": {
+        "data_as_of": null,
+        "age_hours": null,
+        "stale": null,
+        "source": "depth_chart_snapshots",
+        "snapshot_weeks": [
+          "2026-W48",
+          "2026-W49"
+        ]
+      },
+      "relevance": {
+        "dynasty": "medium",
+        "redraft": "high"
+      },
+      "unavailable_reason": null,
+      "player": {
+        "player_id": "103",
+        "name": "Dee Flex",
+        "position": "RB",
+        "team": "AAA"
+      },
+      "previous_order": 2,
+      "current_order": 1,
+      "direction": "up"
+    }
+  ],
+  "sections": {
+    "depth_chart": {
+      "status": "ok",
+      "unavailable_reason": null
+    },
+    "team_changes": {
+      "status": "unavailable",
+      "unavailable_reason": "No team-affiliation history is retained (only the current Sleeper team and weekly depth-chart order are stored), so free-agency and trade moves cannot be diffed without guessing.",
+      "items": []
+    }
+  }
+}
+```
+<!-- /example:changes -->
+
+#### `GET /v1/external/dynasty/roster-construction`
+
+<!-- example:roster_construction -->
+```json
+{
+  "ok": true,
+  "contract_version": "ad-api-v1",
+  "endpoint": "/v1/external/dynasty/roster-construction",
+  "status": "unavailable",
+  "unavailable_reason": "Rebuild and roster-construction analysis requires a specific roster, and this API reads no user or league data by design. For league-agnostic dynasty content use /v1/external/trades/interesting (sell-window and age-cliff trades) and /v1/external/dynasty/value-changes.",
+  "generated_at": "2026-12-08T15:00:00+00:00",
+  "season": 2026,
+  "phase": "regular",
+  "week": 15,
+  "clock_source": "sleeper",
+  "methodology": "Not available.",
+  "freshness": {
+    "data_as_of": null,
+    "age_hours": null,
+    "stale": null,
+    "source": "none"
+  },
+  "count": 0,
+  "items": []
+}
+```
+<!-- /example:roster_construction -->
+
+#### `GET /v1/external/demo/scenarios?type=trade`
+
+<!-- example:demo -->
+```json
+{
+  "ok": true,
+  "contract_version": "ad-api-v1",
+  "endpoint": "/v1/external/demo/scenarios",
+  "status": "ok",
+  "unavailable_reason": null,
+  "generated_at": "2026-12-08T15:00:00+00:00",
+  "season": 2026,
+  "phase": "regular",
+  "week": 15,
+  "clock_source": "sleeper",
+  "methodology": "Deterministic synthetic scenarios. Illustrative, synthetic scenarios with fictional players. They are fixed (identical on every call), are not current player values or advice, and must not be presented as real recommendations.",
+  "freshness": {
+    "data_as_of": null,
+    "age_hours": null,
+    "stale": false,
+    "source": "static_fixture"
+  },
+  "count": 1,
+  "items": [
+    {
+      "id": "demo-trade-1",
+      "kind": "demo_scenario",
+      "timestamp": "2026-12-08T15:00:00+00:00",
+      "headline": "Trade check: two mid assets for one star",
+      "evidence": [
+        {
+          "source": "demo_fixture",
+          "label": "scenario setup",
+          "value": "A consolidation offer in a dynasty league.",
+          "as_of": null
+        },
+        {
+          "source": "demo_fixture",
+          "label": "options",
+          "value": [
+            {
+              "side": "give",
+              "assets": [
+                {
+                  "name": "Demo Back C",
+                  "value": 4200
+                },
+                {
+                  "name": "Demo Wideout D",
+                  "value": 3900
+                }
+              ]
+            },
+            {
+              "side": "get",
+              "assets": [
+                {
+                  "name": "Demo Star E",
+                  "value": 8600
+                }
+              ]
+            }
+          ],
+          "as_of": null
+        },
+        {
+          "source": "demo_fixture",
+          "label": "rule",
+          "value": "Accept when the received total exceeds the given total by at least 5%.",
+          "as_of": null
+        }
+      ],
+      "methodology": "Fixed fixture evaluated by the stated rule; deterministic, no live data. Illustrative, synthetic scenarios with fictional players. They are fixed (identical on every call), are not current player values or advice, and must not be presented as real recommendations.",
+      "confidence": "high",
+      "freshness": {
+        "data_as_of": null,
+        "age_hours": null,
+        "stale": false,
+        "source": "static_fixture"
+      },
+      "relevance": {
+        "dynasty": "medium",
+        "redraft": "medium"
+      },
+      "unavailable_reason": null,
+      "scenario_type": "trade",
+      "setup": "A consolidation offer in a dynasty league.",
+      "options": [
+        {
+          "side": "give",
+          "assets": [
+            {
+              "name": "Demo Back C",
+              "value": 4200
+            },
+            {
+              "name": "Demo Wideout D",
+              "value": 3900
+            }
+          ]
+        },
+        {
+          "side": "get",
+          "assets": [
+            {
+              "name": "Demo Star E",
+              "value": 8600
+            }
+          ]
+        }
+      ],
+      "rule": "Accept when the received total exceeds the given total by at least 5%.",
+      "verdict": "Accept",
+      "verdict_basis": "Received total 8600 vs given 8100 (+6.2%).",
+      "synthetic": true,
+      "links": {
+        "sample_league": "https://fantasygmlab.com/sample-league?utm_source=desktop_ad_app&utm_medium=demo&utm_campaign=demo_scenarios&utm_content=demo-trade-1",
+        "quickstart_game": "https://fantasygmlab.com/gm-game?quickstart=1&utm_source=desktop_ad_app&utm_medium=demo&utm_campaign=demo_scenarios&utm_content=demo-trade-1"
+      }
+    }
+  ],
+  "disclaimer": "Illustrative, synthetic scenarios with fictional players. They are fixed (identical on every call), are not current player values or advice, and must not be presented as real recommendations."
+}
+```
+<!-- /example:demo -->
+
+### Using the season plan in the desktop ad app
+
+1. Once per posting cycle call `GET /v1/external/promo/plan?league_type=dynasty` and again with
+   `league_type=redraft` (or `both` for a mixed audience). Items come ranked; take the first.
+2. Read `reason` and `readiness`. `ready` modules have live feeds; `prepared` modules may be `unavailable`.
+3. Call the item's `endpoint`. If its `status` is `unavailable`, do not post: show `unavailable_reason` to the
+   operator and move to the next plan item. Never substitute your own copy.
+4. Build copy only from `headline` and `evidence`. Do not post items with `stale: true` or
+   `confidence: "low"` unless a person reviews them; always disclose that demo scenarios are illustrative.
+5. Keep a list of posted ids and send it back as `exclude_ids` (plan) so modules rotate; each endpoint's own
+   item `id` is stable for your item-level de-duplication.
+6. Send viewers to the `links` on demo scenarios (they carry `utm_source=desktop_ad_app`), which feeds the
+   existing first-touch attribution (`docs/ad-attribution.md`).
+7. The plan follows the real calendar. To rehearse a season, pass `as_of`; the live feeds still return only
+   what the data supports on the day you call them.
+
+Operational notes: data sources are shared with the app (public dynasty board, nflverse schedule, Sleeper
+directory/trending, daily rating snapshots, weekly depth-chart snapshots, rookie ADP snapshot). Value changes
+and roster-percentage evidence need the existing Supabase snapshot jobs to be running; no new migration,
+secret or dependency is introduced.
+
 ## Change history
 
 - `v1` (2026-10-19): initial release — single-player and full-week-slate
@@ -1900,3 +3026,4 @@ nflverse data on 2026-10-22:
   route now matches articles with team-aware identity (a name shared by two
   players needs a team mention) and reads `players.db` read-only. Corrected the
   "Evidence step" paragraph: no fetch-and-hash code exists. Additive otherwise.
+- `ad-api-v1` (2026-11-26): added the Adaptive advertising API section (`/v1/external/promo/plan`, `/playoff-sos`, `/waivers/replacements`, `/lineup/decisions`, `/dynasty/value-changes`, `/rookies`, `/changes`, `/dynasty/roster-construction`, `/demo/scenarios`). Purely additive: no existing route or field changed.
