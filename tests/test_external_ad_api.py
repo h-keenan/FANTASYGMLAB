@@ -328,3 +328,28 @@ def test_every_new_route_is_documented():
     doc = (REPO / "docs" / "external-api-contract.md").read_text()
     for path in ROUTES:
         assert path in doc
+
+
+# --- public playoff SOS projection -------------------------------------------
+
+
+def test_public_playoff_sos_is_a_trimmed_projection_and_never_caches_empty(monkeypatch):
+    from modules import public_playoff_sos as P
+
+    P._cache.clear()
+    monkeypatch.setattr(A, "load_games", lambda: F.games())
+    monkeypatch.setattr(A, "load_defense", lambda season: F.DEFENSE)
+    monkeypatch.setattr(A, "_team_aliases", lambda: {})
+    out = P.get_public_playoff_sos(season=2026, now=F.NOW)
+    assert out["status"] == "ok" and out["count"] == len(out["teams"]) > 0
+    team = out["teams"][0]
+    assert set(team) == {"team", "confidence", "opponents", "by_position"}
+    assert not {"evidence", "relevance", "freshness"} & set(team)
+    assert out["weeks"] == [15, 16, 17]
+    assert P._cache  # cached when it has teams
+
+    P._cache.clear()
+    monkeypatch.setattr(A, "load_defense", lambda season: {})
+    empty = P.get_public_playoff_sos(season=2026, now=F.NOW)
+    assert empty["status"] == "unavailable" and empty["teams"] == [] and empty["unavailable_reason"]
+    assert not P._cache

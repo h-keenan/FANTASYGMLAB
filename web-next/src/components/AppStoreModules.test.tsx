@@ -6,10 +6,14 @@ import { APP_STORE_LINKS } from "@/lib/appStoreLinks";
 
 const NONE = { appStoreUrl: null, playStoreUrl: null, appStoreBadgeSrc: null, playStoreBadgeSrc: null };
 
+// Play install referrer carries the web campaign into the Play Console acquisition reports.
+const PLAY_URL =
+  "https://play.google.com/store/apps/details?id=com.fantasygmlab.app&referrer=utm_source%3Dweb_landing%26utm_medium%3Dsite_cta%26utm_campaign%3Dapp_modules";
+
 describe("AppStoreModules", () => {
   it("ships with Google Play live and the App Store still unset (iOS is in review)", () => {
     expect(APP_STORE_LINKS.appStoreUrl).toBeNull();
-    expect(APP_STORE_LINKS.playStoreUrl).toBe("https://play.google.com/store/apps/details?id=com.fantasygmlab.app");
+    expect(APP_STORE_LINKS.playStoreUrl).toBe(PLAY_URL);
   });
 
   it("renders the shipped config as App Store coming soon + a real Google Play link", () => {
@@ -17,7 +21,7 @@ describe("AppStoreModules", () => {
     expect(screen.getByRole("group", { name: /App Store app for iPhone: coming soon/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Get it on Google Play" })).toHaveAttribute(
       "href",
-      "https://play.google.com/store/apps/details?id=com.fantasygmlab.app",
+      PLAY_URL,
     );
     expect(screen.getAllByRole("link")).toHaveLength(1);
   });

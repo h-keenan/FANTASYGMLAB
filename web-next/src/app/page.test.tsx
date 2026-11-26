@@ -342,8 +342,16 @@ describe("LandingPage app store modules", () => {
     expect(screen.getByRole("group", { name: /App Store app for iPhone: coming soon/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Get it on Google Play" })).toHaveAttribute(
       "href",
-      "https://play.google.com/store/apps/details?id=com.fantasygmlab.app",
+      "https://play.google.com/store/apps/details?id=com.fantasygmlab.app&referrer=utm_source%3Dweb_landing%26utm_medium%3Dsite_cta%26utm_campaign%3Dapp_modules",
     );
+  });
+
+  it("shows the season-aware strip with a Fantasy Sim quickstart link", async () => {
+    mockAuth(null);
+    render(<LandingPage />);
+    const strip = await screen.findByTestId("landing-seasonal");
+    expect(strip.querySelectorAll("a")).toHaveLength(2);
+    expect(strip.innerHTML).toContain("/gm-game?quickstart=1");
   });
 });
 

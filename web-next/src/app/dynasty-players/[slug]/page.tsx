@@ -133,6 +133,8 @@ export default async function DynastyPlayerPage({ params }: { params: Promise<{ 
       <AppCta
         title={`What is ${player.name} worth to your team?`}
         body="FantasyDesk values him for your league's settings and your roster, then tells you whether a trade offer or waiver move makes sense."
+        campaign="player_page"
+        content={slug}
       />
     </SeoPageShell>
   );

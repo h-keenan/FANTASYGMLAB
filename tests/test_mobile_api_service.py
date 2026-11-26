@@ -16622,6 +16622,26 @@ def test_public_dynasty_values_rejects_unknown_format_and_empty_data(monkeypatch
         assert client.get("/v1/public/dynasty-values?format=1qb").status_code == 503
 
 
+def test_public_playoff_sos_route_is_anonymous_and_trimmed(monkeypatch):
+    from modules import public_playoff_sos
+
+    public_playoff_sos._cache.clear()
+    client = _client(monkeypatch)
+    envelope = {
+        "status": "ok", "generated_at": "2026-11-26T00:00:00Z", "season": 2026, "phase": "regular", "week": 12,
+        "requested": {"weeks": [15, 16, 17]}, "methodology": "m",
+        "items": [{"team": "KC", "confidence": "high", "evidence": [{"x": 1}], "opponents": [{"week": 15, "opponent": "DEN", "is_home": True}],
+                   "by_position": {"QB": {"avg_points_allowed": 18.0, "vs_league_avg_pct": 2.0, "rank_easiest": 3, "of": 32}}}],
+    }
+    with patch("modules.external_ad_api.endpoint_playoff_sos", return_value=envelope):
+        res = client.get("/v1/public/playoff-sos")
+    public_playoff_sos._cache.clear()
+    assert res.status_code == 200
+    body = res.json()
+    assert body["teams"][0]["team"] == "KC" and "evidence" not in body["teams"][0]
+    assert res.headers["cache-control"].startswith("public")
+
+
 def _mv_noproj(pid, pos, slot):
     row = _mv(pid, pos, slot, 0)
     row["projection"] = {"status": "insufficient_player_data", "point_estimate": None}

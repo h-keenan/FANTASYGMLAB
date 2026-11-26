@@ -119,6 +119,8 @@ export default async function DynastyRankingsPage({ params }: { params: Promise<
       <AppCta
         title="Rankings for your league, not a generic one"
         body={`These are default-settings values. FantasyDesk re-values every ${names.singular} for your league's scoring and roster, then tells you which trades and waiver moves to make.`}
+        campaign="rankings_page"
+        content={key}
       />
     </SeoPageShell>
   );

@@ -72,7 +72,7 @@ export function parseBoard(value: unknown): PublicBoard | null {
   };
 }
 
-function apiBases(): string[] {
+export function apiBases(): string[] {
   // Server-side only. Prefer the Docker-network address (the public URL
   // can hang/block server fetches); the default keeps SEO pages working
   // even when the container was started without API_INTERNAL_URL.

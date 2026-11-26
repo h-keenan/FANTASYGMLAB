@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { AppStoreModules } from "@/components/AppStoreModules";
 import { InlineScript } from "@/components/InlineScript";
 import { LandingAuthIsland, LandingAuthSlotPlaceholder } from "@/components/LandingAuthIsland";
+import { LandingSeasonal } from "@/components/LandingSeasonal";
 import { LandingScreens } from "@/components/LandingScreens";
 import { LandingTrialHeadline } from "@/components/LandingTrialHeadline";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -35,6 +36,9 @@ import { LANDING_PENDING_SCRIPT, LANDING_ROOT_ID } from "@/lib/landingPending";
  * then keeps that flag in sync with the real auth result. See
  * lib/landingPending.ts.
  */
+// The seasonal strip reads the clock, so re-render hourly instead of freezing at build time.
+export const revalidate = 3600;
+
 const TITLE = "FantasyDesk: roster-aware dynasty trades, waivers and rankings";
 const DESCRIPTION =
   "Roster-aware dynasty trades, waivers and a weekly game plan built from your real league. Try a full sample league with no account or card.";
@@ -116,6 +120,7 @@ export default function LandingPage() {
               </a>
             </div>
             <p className="lp-note">Look around a full sample league free: no account or card needed.</p>
+            <LandingSeasonal />
             {/* Google Play is live; the App Store slot stays "Coming soon"
                 until lib/appStoreLinks.ts has a URL. */}
             <AppStoreModules />
