@@ -38,6 +38,7 @@ export const IDENTICAL = [
   "playerDepthInjury.ts",
   "playerTap.ts",
   "swipeTabs.ts",
+  "commissionerLineups.ts",
   "statusHeader.ts",
   "connectFlow.ts",
   "recapCard.ts",

@@ -6,9 +6,10 @@ import AppText from './AppText';
 import EmptyState from './EmptyState';
 import { ExpandRow, ExpandRowGroup } from './ExpandRow';
 import IconRow from './IconRow';
-import PlayerAvatar from './PlayerAvatar';
+import PlayerAvatarSlot from './PlayerAvatarSlot';
 import SectionHeading from './SectionHeading';
 import TeamAvatar from './TeamAvatar';
+import TeamNameLink from './TeamNameLink';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -39,12 +40,13 @@ function useToneColor(): (tone: LineupTone) => string {
   return (tone) => (tone === 'warning' ? colors.warning : tone === 'success' ? colors.success : tone === 'information' ? colors.accent : colors.textTertiary);
 }
 
-function TeamRow({ team, styles }: { team: LineupCheckTeam; styles: ReturnType<typeof createStyles> }) {
+function TeamRow({ team, leagueId, leagueName, styles }: { team: LineupCheckTeam; leagueId: string; leagueName: string; styles: ReturnType<typeof createStyles> }) {
   const toneColor = useToneColor();
   return (
     <ExpandRow
       testID={`lineup-team-${team.roster_id}`}
       label={`${team.team_name}, ${setVsBestLine(team)}`}
+      // team-tap-exempt: the whole row is one expand toggle; the team sheet opens from the team link inside it
       leading={<TeamAvatar avatarId={team.avatar_url} name={team.team_name} size={32} />}
       title={team.team_name}
       caption={setVsBestLine(team)}
@@ -59,6 +61,7 @@ function TeamRow({ team, styles }: { team: LineupCheckTeam; styles: ReturnType<t
       }
       action={<ToneBadge label={gapLabel(team)} color={toneColor(gapTone(team))} />}
     >
+      <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={team.roster_id} name={team.team_name} textStyle={styles.teamLink} />
       {team.swaps.length ? (
         <View style={styles.group}>
           <AppText style={styles.groupTitle}>Swaps that fix it</AppText>
@@ -80,7 +83,7 @@ function TeamRow({ team, styles }: { team: LineupCheckTeam; styles: ReturnType<t
           <AppText style={styles.groupTitle}>Starters they set</AppText>
           {team.starters.map((s, i) => (
             <View key={`${s.player_id}-${i}`} style={styles.starter}>
-              <PlayerAvatar playerId={s.player_id} name={s.name} position={s.position} team={s.team} size={24} />
+              <PlayerAvatarSlot player={{ id: s.player_id, name: s.name ?? 'Unknown player', position: s.position, team: s.team }} tier="row" />
               <AppText style={styles.starterName} numberOfLines={1}>
                 <AppText style={styles.muted}>{s.slot ? `${s.slot} ` : ''}</AppText>
                 {s.name ?? 'Unknown player'}
@@ -96,7 +99,7 @@ function TeamRow({ team, styles }: { team: LineupCheckTeam; styles: ReturnType<t
   );
 }
 
-function LineupCheckView({ data }: { data: CommissionerLineupsResponse }) {
+function LineupCheckView({ data, leagueId, leagueName }: { data: CommissionerLineupsResponse; leagueId: string; leagueName: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (data.reason) return <EmptyState icon="shield-checkmark-outline" title="Nothing to check yet" subtitle={lineupsReasonMessage(data.reason)} />;
@@ -105,7 +108,7 @@ function LineupCheckView({ data }: { data: CommissionerLineupsResponse }) {
       <AppText style={styles.body}>{lineupsSummaryLine(data)}</AppText>
       <ExpandRowGroup accent={colors.warning} testID="lineup-teams">
         {data.teams.map((t) => (
-          <TeamRow key={t.roster_id} team={t} styles={styles} />
+          <TeamRow key={t.roster_id} team={t} leagueId={leagueId} leagueName={leagueName} styles={styles} />
         ))}
       </ExpandRowGroup>
       {data.limits?.length ? (
@@ -123,7 +126,7 @@ function LineupCheckView({ data }: { data: CommissionerLineupsResponse }) {
 }
 
 /** Self-loading section for the Commissioner screen. Renders nothing while loading, on error, or for a Free user. */
-export default function LineupCheck({ leagueId, lens }: { leagueId: string; lens: string }) {
+export default function LineupCheck({ leagueId, leagueName, lens }: { leagueId: string; leagueName: string; lens: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const query = useQuery({
@@ -136,7 +139,7 @@ export default function LineupCheck({ leagueId, lens }: { leagueId: string; lens
   return (
     <View style={styles.stack}>
       <SectionHeading title="Lineup check" caption="Each team's set lineup vs its best lineup this week. A big gap is a prompt to look, not a verdict." />
-      <LineupCheckView data={data} />
+      <LineupCheckView data={data} leagueId={leagueId} leagueName={leagueName} />
     </View>
   );
 }
@@ -145,6 +148,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     stack: { gap: spacing.md, marginTop: spacing.lg },
     body: { fontSize: 15.5, color: colors.textSecondary },
+    teamLink: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
     muted: { fontSize: 13.5, color: colors.textTertiary },
     group: { gap: spacing.xs },
     groupTitle: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: colors.textTertiary },

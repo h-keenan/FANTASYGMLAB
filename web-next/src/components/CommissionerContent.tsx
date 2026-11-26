@@ -447,7 +447,7 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
           <CommissionerView leagueId={leagueId} data={data} draftOrder={draftOrder ?? "unknown"} onDraftOrder={setDraftOrder} />
         </ModuleErrorBoundary>
       )}
-      {ready && data && data.is_premium !== false ? <LineupCheck leagueId={leagueId} lens={lens} /> : null}
+      {ready && data && data.is_premium !== false ? <LineupCheck leagueId={leagueId} leagueName={leagueName} lens={lens} /> : null}
       {ready && data && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}
     </main>
   );

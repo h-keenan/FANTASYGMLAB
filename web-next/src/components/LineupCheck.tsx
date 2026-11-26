@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { IconRow } from "@/components/IconRow";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { TeamNameLink } from "@/components/TeamNameLink";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ExpandRow, ExpandRowGroup } from "@/components/ui/ExpandRow";
 import { api } from "@/lib/api";
@@ -39,13 +40,14 @@ const TONE_COLOR: Record<LineupTone, string> = {
   information: "var(--color-information)",
 };
 
-function TeamRow({ team }: { team: LineupCheckTeam }) {
+function TeamRow({ team, leagueId, leagueName }: { team: LineupCheckTeam; leagueId?: string; leagueName?: string }) {
   const tone = gapTone(team);
   const label = `${team.team_name}, ${setVsBestLine(team)}`;
   return (
     <ExpandRow
       testId={`lineup-team-${team.roster_id}`}
       label={label}
+      // team-tap-exempt: the whole row is one expand toggle; the team sheet opens from the "Open team" link inside it
       leading={<TeamAvatar avatarUrl={team.avatar_url} name={team.team_name} size={32} />}
       title={team.team_name}
       caption={setVsBestLine(team)}
@@ -60,6 +62,7 @@ function TeamRow({ team }: { team: LineupCheckTeam }) {
       }
       action={<ToneBadge label={gapLabel(team)} color={TONE_COLOR[tone]} />}
     >
+      <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={team.roster_id} name={team.team_name} showAvatar className="text-sm font-bold" />
       {team.swaps.length ? (
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
@@ -85,7 +88,7 @@ function TeamRow({ team }: { team: LineupCheckTeam }) {
           </span>
           {team.starters.map((s, i) => (
             <div key={`${s.player_id}-${i}`} className="flex items-center gap-2 text-sm">
-              <PlayerAvatar playerId={s.player_id} name={s.name} position={s.position} team={s.team} size={24} />
+              <PlayerAvatarSlot player={{ id: s.player_id, name: s.name ?? "Unknown player", position: s.position, team: s.team }} tier="row" />
               <span className="min-w-0 flex-1 truncate">
                 <span style={{ color: "var(--color-text-muted)" }}>{s.slot ? `${s.slot} ` : ""}</span>
                 {s.name ?? "Unknown player"}
@@ -103,7 +106,7 @@ function TeamRow({ team }: { team: LineupCheckTeam }) {
   );
 }
 
-export function LineupCheckView({ data }: { data: CommissionerLineupsResponse }) {
+export function LineupCheckView({ data, leagueId, leagueName }: { data: CommissionerLineupsResponse; leagueId?: string; leagueName?: string }) {
   if (data.reason) return <EmptyState title="Nothing to check yet" subtitle={lineupsReasonMessage(data.reason)} />;
   return (
     <>
@@ -112,7 +115,7 @@ export function LineupCheckView({ data }: { data: CommissionerLineupsResponse })
       </p>
       <ExpandRowGroup accent={TONE_COLOR.warning} testId="lineup-teams">
         {data.teams.map((t) => (
-          <TeamRow key={t.roster_id} team={t} />
+          <TeamRow key={t.roster_id} team={t} leagueId={leagueId} leagueName={leagueName} />
         ))}
       </ExpandRowGroup>
       {data.limits?.length ? (
@@ -134,7 +137,7 @@ export function LineupCheckView({ data }: { data: CommissionerLineupsResponse })
 }
 
 /** Self-loading section for the Commissioner page. Renders nothing for a Free user (the integrity upsell above covers it). */
-export function LineupCheck({ leagueId, lens }: { leagueId: string; lens?: string }) {
+export function LineupCheck({ leagueId, leagueName, lens }: { leagueId: string; leagueName?: string; lens?: string }) {
   const [state, setState] = useState<{ key: string; data: CommissionerLineupsResponse | null; error: boolean }>({ key: "", data: null, error: false });
   const key = `${leagueId}|${lens ?? ""}`;
   useEffect(() => {
@@ -153,7 +156,7 @@ export function LineupCheck({ leagueId, lens }: { leagueId: string; lens?: strin
   return (
     <section className="flex flex-col gap-3" aria-label="Lineup check" data-testid="lineup-check">
       <SectionHeading note="Each team's set lineup vs its best lineup this week. A big gap is a prompt to look, not a verdict.">Lineup check</SectionHeading>
-      <LineupCheckView data={state.data} />
+      <LineupCheckView data={state.data} leagueId={leagueId} leagueName={leagueName} />
     </section>
   );
 }

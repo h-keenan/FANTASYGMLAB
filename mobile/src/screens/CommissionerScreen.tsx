@@ -132,7 +132,7 @@ export default function CommissionerScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         {body}
-        {data && !query.isLoading && data.is_premium !== false ? <LineupCheck leagueId={leagueId} lens={lens} /> : null}
+        {data && !query.isLoading && data.is_premium !== false ? <LineupCheck leagueId={leagueId} leagueName={leagueName} lens={lens} /> : null}
         {data && !query.isLoading && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}
       </ScrollView>
     </View>
