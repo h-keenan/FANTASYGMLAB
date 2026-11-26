@@ -25,6 +25,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Mapping, Sequence
 
 from modules import brand_identity, league_calendar, season_clock
+from modules.coerce import float_nan_to_none as _num
 
 CONTRACT_VERSION = "ad-api-v1"
 CONFIDENCE_LEVELS = ("low", "medium", "high")
@@ -158,14 +159,6 @@ def finalize(
     if extra:
         payload.update(extra)
     return payload
-
-
-def _num(value: Any) -> float | None:
-    try:
-        out = float(value)
-    except (TypeError, ValueError):
-        return None
-    return out if out == out else None
 
 
 def _text(value: Any) -> str:
