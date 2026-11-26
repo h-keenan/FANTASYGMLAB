@@ -21,6 +21,7 @@ import type {
   VetoCheckRequest,
   VetoCheckResponse,
 } from "./commissionerIntegrity";
+import { normalizeCommissionerLineups, type CommissionerLineupsResponse } from "./commissionerLineups";
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap";
 import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
 import { billingRequest, type BillingFunction } from "./billingClient";
@@ -4771,6 +4772,12 @@ export const api = {
     authorizedRequest<CommissionerIntegrityResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
     ).then(normalizeCommissionerIntegrity),
+
+  // Lineup check: every team's set lineup vs best lineup this week (Pro).
+  getCommissionerLineups: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<CommissionerLineupsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/lineups?lens=${encodeURIComponent(lens)}`,
+    ).then(normalizeCommissionerLineups),
 
   // The caller's saved draft-order rule (stored per user + league beside Team Situation).
   getDraftOrderRule: (leagueId: string) =>

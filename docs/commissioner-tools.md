@@ -189,3 +189,23 @@ review before it processes. Weights, cutoffs and the 2,200 rung are judgment cal
 
 Estimates from projections and the market; a manager may have reasons the numbers cannot see; a signal to look at
 a trade, never proof of collusion; the league's rules decide. Lineup holes fill from the league's real free-agent pool (`trade_grade.league_waiver_pool`, the same one the Analyzer uses), falling back to market replacement level only when the pool cannot be read.
+
+## Lineup check (this week, before kickoff)
+
+Request (coridian_): "a current lineup calculator for checking tanking teams'
+lineups before the week even starts". `GET /v1/leagues/{id}/commissioner/lineups`
+(same Pro gate and Sleeper-only scope as the integrity view). Engine:
+`modules/commissioner_lineups.py`; it reads rows the Matchup endpoint already
+builds (`_real_current_lineup` for the lineup the manager set,
+`_suggested_lineup_split` for the best one, `_suggested_lineup_moves` for the
+swaps), so points are the same Matchup projections (the real score once a game
+starts). Per team: set points, best points, gap (never below 0), flags (out,
+IR, bye, empty slot, no lineup set), `possible_tanking` (gap >= 8 points AND
+>= 12% of best, never when a set starter has no projection) and the swaps.
+Started players are locked (`modules/lineup_lock.py`): the best lineup keeps
+them and no swap touches them. No projections yet: points and gap are null and
+only the availability flags show. Teams sort by gap, worst first. UI: a
+"Lineup check" section on the Commissioner page (web `LineupCheck.tsx`) and
+screen (app `LineupCheck.tsx`), one `ExpandRow` per team; shared presentation
+`lib/commissionerLineups.ts` (byte-identical on both, a mobile test checks it).
+Tones are warning/muted, never red.

@@ -14,6 +14,7 @@ export function ExpandRow({
   leading,
   title,
   caption,
+  chips,
   action,
   children,
   testId,
@@ -25,6 +26,8 @@ export function ExpandRow({
   title: ReactNode;
   /** Optional muted second part on the same line (a figure, a count). */
   caption?: ReactNode;
+  /** Optional wrapping chip strip (status pills) under the line. */
+  chips?: ReactNode;
   /** The row's one button / link; sits outside the toggle so it is usable collapsed. */
   action?: ReactNode;
   /** The detail behind the tap. Omit for a row that is only a line + action. */
@@ -47,6 +50,7 @@ export function ExpandRow({
             {caption}
           </span>
         ) : null}
+        {chips ? <span className="mt-1 flex flex-wrap gap-1">{chips}</span> : null}
       </span>
     </>
   );

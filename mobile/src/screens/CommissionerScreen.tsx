@@ -13,6 +13,7 @@ import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
+import LineupCheck from '../components/LineupCheck';
 import IconRow, { type IconRowIcon } from '../components/IconRow';
 import MetricCard from '../components/MetricCard';
 import PremiumLock from '../components/PremiumLock';
@@ -131,6 +132,7 @@ export default function CommissionerScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         {body}
+        {data && !query.isLoading && data.is_premium !== false ? <LineupCheck leagueId={leagueId} lens={lens} /> : null}
         {data && !query.isLoading && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}
       </ScrollView>
     </View>

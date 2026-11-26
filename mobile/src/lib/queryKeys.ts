@@ -62,6 +62,8 @@ export const queryKeys = {
   draftOrderRule: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'draft-order-rule'] as const,
   commissionerIntegrity: (leagueId: string, draftOrder: string) =>
     [...userScopeKey(), 'league', leagueId, 'commissioner-integrity', draftOrder] as const,
+  commissionerLineups: (leagueId: string, lens: string) =>
+    [...userScopeKey(), 'league', leagueId, 'commissioner-lineups', lens] as const,
   waivers: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'waivers'] as const,
   myRoster: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'my-roster'] as const,
   // GET .../rankings at the default lens: the GM orb's player-name search

@@ -17,6 +17,7 @@ export function ExpandRow({
   leading,
   title,
   caption,
+  chips,
   action,
   children,
   testID,
@@ -26,6 +27,8 @@ export function ExpandRow({
   leading?: ReactNode;
   title: string;
   caption?: string;
+  /** Optional wrapping chip strip (status pills) under the line. */
+  chips?: ReactNode;
   action?: ReactNode;
   children?: ReactNode;
   testID?: string;
@@ -42,6 +45,7 @@ export function ExpandRow({
       <View style={styles.text}>
         <AppText style={styles.title}>{title}</AppText>
         {caption ? <AppText style={styles.caption}>{caption}</AppText> : null}
+        {chips ? <View style={styles.chips}>{chips}</View> : null}
       </View>
     </>
   );
@@ -91,6 +95,7 @@ function createStyles(colors: ThemeColors) {
     toggle: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 48 },
     text: { flex: 1, minWidth: 0 },
     title: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
     caption: { fontSize: 12.5, color: colors.textTertiary },
     chevron: { fontSize: 14, color: colors.textTertiary },
     body: { gap: spacing.sm, paddingBottom: spacing.sm, paddingTop: spacing.xs },

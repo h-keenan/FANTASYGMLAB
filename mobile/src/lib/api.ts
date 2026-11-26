@@ -30,6 +30,7 @@ import type {
   VetoCheckRequest,
   VetoCheckResponse,
 } from './commissionerIntegrity';
+import { normalizeCommissionerLineups, type CommissionerLineupsResponse } from './commissionerLineups';
 import type { LeaguesGlanceResponse } from './leaguesGlance';
 import type {
   ManagerTendenciesDetailResponse,
@@ -4264,6 +4265,11 @@ export const api = {
     authorizedFetch<CommissionerIntegrityResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
     ).then(normalizeCommissionerIntegrity),
+  // Lineup check: every team's set lineup vs best lineup this week (Pro).
+  getCommissionerLineups: (leagueId: string, lens: string = 'Dynasty') =>
+    authorizedFetch<CommissionerLineupsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/lineups?lens=${encodeURIComponent(lens)}`,
+    ).then(normalizeCommissionerLineups),
   // The caller's saved draft-order rule (stored per user + league beside Team Situation).
   getDraftOrderRule: (leagueId: string) =>
     authorizedFetch<DraftOrderRuleResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/draft-order`),
