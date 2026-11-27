@@ -13,6 +13,7 @@ import {
   ctaHref,
   evaluateTrade,
   MAX_ASSETS_PER_SIDE,
+  normalizeName,
   parseTradeUrl,
   searchPlayers,
   TRADE_ANALYZER_PATH,
@@ -349,7 +350,33 @@ function RosterTeaser({
   );
 }
 
-export function PublicTradeAnalyzer() {
+/** Preset for the no-signup /try/trade page: player NAMES (resolved against the live board, so ids never go stale). */
+export interface TradePreset {
+  send: readonly string[];
+  get: readonly string[];
+  format?: TradeSettings["format"];
+}
+
+/** Resolve preset names to board ids: exact normalized-name match, highest value on a tie; unknown names are skipped. */
+export function resolvePresetIds(players: readonly TradeBoardPlayer[], names: readonly string[], format: TradeSettings["format"]): string[] {
+  const settings: TradeSettings = { format, tep: false };
+  const ids: string[] = [];
+  for (const name of names) {
+    const wanted = normalizeName(name);
+    const match = players
+      .filter((p) => normalizeName(p.name) === wanted && !ids.includes(p.id))
+      .sort((x, y) => valueOf(y, settings) - valueOf(x, settings))[0];
+    if (match) ids.push(match.id);
+  }
+  return ids;
+}
+
+/**
+ * `preset` turns this into the embedded no-signup ad landing (/try/trade): the same real tool, a realistic trade
+ * already loaded (an explicit ?a=&b= link still wins), its own roster-teaser/gate CTAs hidden (the page ends in ONE
+ * "Do this for your league" CTA instead), and the shareable URL kept on the current path.
+ */
+export function PublicTradeAnalyzer({ preset }: { preset?: TradePreset } = {}) {
   const [board, setBoard] = useState<TradeBoard | null>(null);
   const [error, setError] = useState(false);
   const [settings, setSettings] = useState<TradeSettings>({ format: "1qb", tep: false });
@@ -369,15 +396,22 @@ export function PublicTradeAnalyzer() {
         if (!restoredRef.current) {
           restoredRef.current = true;
           const initial = parseTradeUrl(window.location.search);
-          setSettings(initial.settings);
-          setIdsA(initial.a);
-          setIdsB(initial.b);
+          if (preset && initial.a.length === 0 && initial.b.length === 0) {
+            const format = preset.format ?? "1qb";
+            setSettings({ format, tep: false });
+            setIdsA(resolvePresetIds(data.players, preset.send, format));
+            setIdsB(resolvePresetIds(data.players, preset.get, format));
+          } else {
+            setSettings(initial.settings);
+            setIdsA(initial.a);
+            setIdsB(initial.b);
+          }
         }
         setBoard(data);
         setHydrated(true);
       })
       .catch(() => setError(true));
-  }, []);
+  }, [preset]);
 
   useEffect(() => {
     load();
@@ -398,11 +432,12 @@ export function PublicTradeAnalyzer() {
     if (!hydrated || !board) return;
     const next = buildTradeSearch({ a: sideA.map((p) => p.id), b: sideB.map((p) => p.id), settings: effective });
     try {
-      window.history.replaceState(null, "", `${TRADE_ANALYZER_PATH}${mergeSearch(window.location.search, next)}`);
+      const path = preset ? window.location.pathname : TRADE_ANALYZER_PATH;
+      window.history.replaceState(null, "", `${path}${mergeSearch(window.location.search, next)}`);
     } catch {
       // history API blocked: the tool still works, just not shareable.
     }
-  }, [hydrated, board, sideA, sideB, effective]);
+  }, [hydrated, board, sideA, sideB, effective, preset]);
 
   const hasResult = evaluation.band !== "empty";
   useEffect(() => {
@@ -569,7 +604,7 @@ export function PublicTradeAnalyzer() {
               </p>
             )}
           </section>
-          {hasResult ? <RosterTeaser sideA={sideA} sideB={sideB} onCta={onCta} /> : <GateCard onCta={onCta} />}
+          {preset ? null : hasResult ? <RosterTeaser sideA={sideA} sideB={sideB} onCta={onCta} /> : <GateCard onCta={onCta} />}
         </>
       )}
     </div>

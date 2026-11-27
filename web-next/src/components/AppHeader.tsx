@@ -73,6 +73,7 @@ const PUBLIC_PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   "dynasty-tools": "Dynasty tools",
   "dynasty-rankings": "Rankings",
   "dynasty-trade-value-chart": "Trade values",
+  try: "Try it",
 };
 
 function HeaderPageTitle() {

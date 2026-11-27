@@ -694,6 +694,7 @@ def build_report(
         "for a full MAU."
     )
     sample_funnel = analytics_metrics.sample_league_funnel(rows)
+    try_funnel = analytics_metrics.try_link_funnel(rows)
     accounts = None
     if path is None and source == "supabase":
         accounts = account_acquisition.fetch_accounts(since)
@@ -724,6 +725,7 @@ def build_report(
         "event_count": len(rows),
         "audience": audience,
         "sample_league_funnel": sample_funnel,
+        "try_link_funnel": try_funnel,
         "signup_reconciliation": reconciliation,
         "read_truncated": bool(read_meta.get("truncated")),
         "sessions": _unique_ids(rows, field="session_key") or _unique_ids(rows, field="anon_id"),

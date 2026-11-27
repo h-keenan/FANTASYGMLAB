@@ -172,4 +172,27 @@ describe("PublicTradeAnalyzer", () => {
     expect(mergeSearch("?utm_source=g&a=1&f=sf", "?b=2")).toBe("?utm_source=g&b=2");
     expect(mergeSearch("?a=1", "")).toBe("");
   });
+
+  it("preset (the /try/trade ad landing) loads a named trade, keeps the path and utm params, and hides the sign-up CTAs", async () => {
+    mockFetch();
+    window.history.pushState({}, "", "/try/trade?utm_source=ad_app&utm_campaign=hook");
+    render(<PublicTradeAnalyzer preset={{ send: ["josh allen", "Not A Player"], get: ["Ja'Marr Chase"] }} />);
+    await screen.findByLabelText("Search players for You send");
+    await waitFor(() => expect(screen.getByTestId("public-trade-analyzer")).toHaveTextContent("Josh Allen"));
+    expect(screen.getByTestId("public-trade-analyzer")).toHaveTextContent("Ja'Marr Chase");
+    expect(screen.queryByTestId("roster-teaser")).not.toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe("/try/trade"));
+    expect(window.location.search).toContain("utm_campaign=hook");
+    expect(window.location.search).toContain("a=2");
+    window.history.pushState({}, "", "/");
+  });
+
+  it("an explicit shared ?a=&b= link wins over the preset", async () => {
+    mockFetch();
+    window.history.pushState({}, "", "/try/trade?a=3&b=4");
+    render(<PublicTradeAnalyzer preset={{ send: ["Josh Allen"], get: ["Ja'Marr Chase"] }} />);
+    await waitFor(() => expect(screen.getByTestId("public-trade-analyzer")).toHaveTextContent("Brock Bowers"));
+    expect(screen.getByTestId("public-trade-analyzer")).not.toHaveTextContent("Ja'Marr Chase");
+    window.history.pushState({}, "", "/");
+  });
 });

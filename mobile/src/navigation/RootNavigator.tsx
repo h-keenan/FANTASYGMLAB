@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { InteractionManager, Linking, View } from 'react-native';
 import { isSimQuickStartUrl } from '../lib/simDeepLink';
+import { tryTabFromUrl } from '../lib/tryDeepLink';
+import type { SampleTab } from '../lib/sampleLeague';
 import PressableScale from '../components/PressableScale';
 import AppBackground from '../components/AppBackground';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
@@ -117,7 +119,8 @@ export type RootStackParamList = {
   /** Hidden design-system reference; reachable only by long-pressing the Legal heading on More. */
   Design: undefined;
   /** Static fictional demo league for users with no league connected yet. */
-  SampleLeague: undefined;
+  /** `tab`: open on that sample view (deep link fantasygmlab://try/<topic>, lib/tryDeepLink.ts). */
+  SampleLeague: { tab?: SampleTab } | undefined;
   LegalPage: { pageKey: string };
   HowWeEvaluate: undefined;
   Players: { leagueId: string; leagueName: string; tab?: 'players' | 'prospects' };
@@ -266,6 +269,28 @@ export default function RootNavigator() {
     const sub = Linking.addEventListener('url', (event) => take(event.url));
     return () => sub.remove();
   }, []);
+  // Ad deep link fantasygmlab://try/<topic> (web twin /try/<topic>): opens the no-account Sample league on the matching
+  // tab. The sample league is registered in BOTH stacks, so this works signed out and signed in.
+  const [pendingTryTab, setPendingTryTab] = useState<SampleTab | null>(null);
+  useEffect(() => {
+    const take = (url: string | null) => {
+      const tab = tryTabFromUrl(url);
+      if (tab) setPendingTryTab(tab);
+    };
+    Linking.getInitialURL().then(take).catch(() => {});
+    const sub = Linking.addEventListener('url', (event) => take(event.url));
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    if (!pendingTryTab || loading || (session && onboardingComplete !== true)) return;
+    const id = setInterval(() => {
+      if (!navigationRef.isReady()) return;
+      clearInterval(id);
+      setPendingTryTab(null);
+      navigationRef.navigate('SampleLeague', { tab: pendingTryTab });
+    }, 100);
+    return () => clearInterval(id);
+  }, [pendingTryTab, loading, session, onboardingComplete]);
   const guestTried = useRef(false);
   useEffect(() => {
     if (!pendingSimQuickStart || loading || session || guestTried.current) return;
