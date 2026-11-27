@@ -11830,8 +11830,16 @@ def get_external_roster_construction() -> dict[str, Any]:
 
 
 @app.get("/v1/external/demo/scenarios", dependencies=[Depends(require_external_api_key)])
-def get_external_demo_scenarios(type: str | None = None) -> dict[str, Any]:
-    return _external_ad(external_ad_api.endpoint_demo_scenarios, scenario_type=type)
+def get_external_demo_scenarios(
+    type: str | None = None,
+    utm_medium: str | None = None,
+    utm_campaign: str | None = None,
+    utm_content: str | None = None,
+    utm_term: str | None = None,
+) -> dict[str, Any]:
+    # utm_* are passed through onto each scenario's try_url (utm_source is always ad_app; see external_ad_api.try_url).
+    utm = {"utm_medium": utm_medium, "utm_campaign": utm_campaign, "utm_content": utm_content, "utm_term": utm_term}
+    return _external_ad(external_ad_api.endpoint_demo_scenarios, scenario_type=type, utm=utm)
 
 
 def _external_trades_args(format: str, lens: str) -> tuple[str, str]:

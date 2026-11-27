@@ -2,12 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AppCta, SeoPageShell } from "@/components/seo/SeoChrome";
-import { ValueTable, type ValueRow } from "@/components/seo/ValueTable";
-import { CHART_ROWS, isPageEligible } from "@/lib/seo/content";
+import { ValueTable } from "@/components/seo/ValueTable";
+import { loadChartRows } from "@/lib/seo/chartRows";
 import { itemListLd, webPageLd } from "@/lib/seo/jsonld";
-import { fetchBoard, formatUpdated } from "@/lib/seo/publicValues";
 import { absoluteUrl, CHART_PATH, PLAYER_PATH, OG_IMAGE } from "@/lib/seo/site";
-import { assignSlugs } from "@/lib/seo/slug";
 
 // Optional catch-all with no build-time params: lets the page be generated on
 // first request (the value API may not be reachable during `next build`) while
@@ -36,22 +34,9 @@ export async function generateMetadata({ params }: { params: Promise<{ view?: st
 
 export default async function TradeValueChartPage({ params }: { params: Promise<{ view?: string[] }> }) {
   if ((await params).view?.length) notFound();
-  const [oneQb, superflex] = await Promise.all([fetchBoard("1qb"), fetchBoard("superflex")]);
-  const top = oneQb.players.slice(0, CHART_ROWS);
-  if (top.length < CHART_ROWS / 2) notFound();
-
-  const slugs = assignSlugs(oneQb.players.filter(isPageEligible));
-  const sfById = new Map(superflex.players.map((p) => [p.player_id, p]));
-  const rows: ValueRow[] = top.map((player) => {
-    const sf = sfById.get(player.player_id);
-    return {
-      rank: player.overall_rank,
-      player,
-      slug: isPageEligible(player) ? (slugs.get(player.player_id) ?? null) : null,
-      extra: sf ? { value: sf.score, rank: sf.overall_rank } : null,
-    };
-  });
-  const updated = formatUpdated(oneQb.source_updated_at);
+  const chart = await loadChartRows();
+  if (!chart) notFound();
+  const { rows, updated, updatedAt } = chart;
 
   return (
     <SeoPageShell
@@ -65,7 +50,7 @@ export default async function TradeValueChartPage({ params }: { params: Promise<
       intro="Both formats side by side. The main value column is for 1QB leagues; the Superflex column re-values every player for leagues that start a second quarterback, so you can see how much quarterbacks move."
       updated={updated}
       jsonLd={[
-        webPageLd({ name: TITLE, description: DESCRIPTION, path: CHART_PATH, dateModified: oneQb.source_updated_at }),
+        webPageLd({ name: TITLE, description: DESCRIPTION, path: CHART_PATH, dateModified: updatedAt }),
         itemListLd({
           name: TITLE,
           path: CHART_PATH,

@@ -117,7 +117,8 @@ def _is_engaged(row: Mapping[str, Any]) -> bool:
     event = la.normalize_event_name(_text(row.get("event")))
     if event in la.MEANINGFUL_ENGAGEMENT_EVENTS:
         return True
-    return event == "feature_use" and _text(props.get("feature")) not in {"", "onboarding"}
+    # Demo surfaces (sample league, no-signup try links) are never engagement, even if a client forgot demo=true.
+    return event == "feature_use" and _text(props.get("feature")) not in {"", "onboarding", "sample_league", "try_link"}
 
 
 class _PersonDay:
@@ -305,6 +306,52 @@ def sample_league_funnel(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "signed_up_after_view": len(converted),
         "view_to_signup_pct": round(100.0 * len(converted) / n, 1) if n else None,
     }
+
+
+def try_link_funnel(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """No-signup try links (/try/<topic>) view -> signup, by stitched person and by topic.
+
+    viewers: persons with feature_use feature=try_link action=viewed (item_kind = topic); cta_clicked: action
+    cta_click ("Do this for your league"); signed_up_after_view: viewers with a LATER signup_completed. Each person is
+    attributed to the topic they viewed FIRST. Demo events are never engagement (see ``_is_engaged``).
+    """
+
+    links = build_identity_links(rows)
+    viewed: dict[str, tuple[float, str]] = {}
+    cta: set[str] = set()
+    signups: dict[str, float] = {}
+    for row in rows:
+        pid = person_id(row, links)
+        ts = _ts(row)
+        if not pid or ts <= 0:
+            continue
+        event = la.normalize_event_name(_text(row.get("event")))
+        props = _props(row)
+        if event == "feature_use" and _text(props.get("feature")) == "try_link":
+            action = _text(props.get("action"))
+            topic = _text(props.get("item_kind")) or "unknown"
+            if action == "viewed" and (pid not in viewed or ts < viewed[pid][0]):
+                viewed[pid] = (ts, topic)
+            elif action == "cta_click":
+                cta.add(pid)
+        elif event == "signup_completed" and (pid not in signups or ts < signups[pid]):
+            signups[pid] = ts
+
+    def summarize(pids: set[str]) -> dict[str, Any]:
+        converted = {p for p in pids if p in signups and signups[p] >= viewed[p][0]}
+        return {
+            "viewers": len(pids),
+            "cta_clicked": len(cta & pids),
+            "signed_up_after_view": len(converted),
+            "view_to_signup_pct": round(100.0 * len(converted) / len(pids), 1) if pids else None,
+        }
+
+    by_topic: dict[str, set[str]] = defaultdict(set)
+    for pid, (_, topic) in viewed.items():
+        by_topic[topic].add(pid)
+    out = summarize(set(viewed))
+    out["by_topic"] = {topic: summarize(pids) for topic, pids in sorted(by_topic.items())}
+    return out
 
 
 def signup_reconciliation(

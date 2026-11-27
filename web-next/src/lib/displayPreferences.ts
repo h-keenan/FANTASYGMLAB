@@ -66,7 +66,7 @@ export function themeAttribute(mode: ThemeMode): "light" | "dark" | null {
  * instead of flipping to the system's light theme. An explicit choice, Auto
  * included, always wins. Prefix match on the first path segment.
  */
-export const PUBLIC_DEFAULT_DARK_SEGMENTS = ["sample-league", "methodology", "dynasty-tools", "dynasty-rankings", "dynasty-trade-value-chart"] as const;
+export const PUBLIC_DEFAULT_DARK_SEGMENTS = ["sample-league", "methodology", "dynasty-tools", "dynasty-rankings", "dynasty-trade-value-chart", "try"] as const;
 
 export function publicPageDefaultsDark(pathname: string | null | undefined): boolean {
   const segment = (pathname || "").split("/").filter(Boolean)[0] ?? "";

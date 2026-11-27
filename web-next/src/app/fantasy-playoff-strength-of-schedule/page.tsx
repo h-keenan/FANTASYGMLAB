@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { PlayoffSosTables } from "@/components/seo/PlayoffSosTables";
 import { AppCta, SeoPageShell } from "@/components/seo/SeoChrome";
 import { itemListLd, webPageLd } from "@/lib/seo/jsonld";
-import { fetchPlayoffSos, hasUsableSos, rankedAt, scheduleLine, SOS_POSITIONS, type PlayoffSos } from "@/lib/seo/playoffSos";
+import { fetchPlayoffSos, hasUsableSos, rankedAt, SOS_POSITIONS, type PlayoffSos } from "@/lib/seo/playoffSos";
 import { formatUpdated } from "@/lib/seo/publicValues";
-import { absoluteUrl, OG_IMAGE, POSITION_NAMES, RANKINGS_PATH } from "@/lib/seo/site";
+import { absoluteUrl, OG_IMAGE, RANKINGS_PATH } from "@/lib/seo/site";
 import { playoffSosInSeason, PLAYOFF_SOS_PATH, seasonMoment } from "@/lib/seasonalLanding";
 
 // Season-gated: indexable only while fantasy playoffs are the live question (weeks 9-17) AND the API returned
@@ -92,62 +93,7 @@ export default async function PlayoffSosPage() {
         ),
       ]}
     >
-      {lists.map(({ pos, ranked }) => {
-        const names = POSITION_NAMES[pos.toLowerCase() as keyof typeof POSITION_NAMES];
-        const shown = [...ranked.slice(0, ROWS), ...ranked.slice(-5).filter((r) => !ranked.slice(0, ROWS).includes(r))];
-        return (
-          <section key={pos} className="flex flex-col gap-2" aria-label={`${names.upper} playoff schedules`}>
-            <h2 style={{ font: "var(--type-section-title)" }}>{names.upper} playoff schedules</h2>
-            <div className="glass-surface overflow-hidden">
-              <table className="w-full text-sm border-collapse">
-                <caption className="sr-only">{`${names.upper} fantasy playoff strength of schedule, easiest first`}</caption>
-                <thead>
-                  <tr className="text-xs text-left" style={{ color: "var(--color-text-muted)" }}>
-                    <th scope="col" className="px-3 py-2 w-10">
-                      #
-                    </th>
-                    <th scope="col" className="px-2 py-2">
-                      Team and opponents
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right">
-                      Pts allowed
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map(({ team, row }) => (
-                    <tr key={team.team} className="border-t" style={{ borderColor: "var(--color-border)" }}>
-                      <td className="px-3 py-2 font-bold">{row.rank_easiest}</td>
-                      <td className="px-2 py-2">
-                        <span className="font-bold">{team.team}</span>
-                        <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>
-                          {scheduleLine(team)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {row.avg_points_allowed.toFixed(1)}
-                        <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>
-                          {row.vs_league_avg_pct > 0 ? "+" : ""}
-                          {row.vs_league_avg_pct.toFixed(1)}% vs avg
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        );
-      })}
-
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        Rank 1 is the easiest schedule (opponents allow the most PPR points per game to the position, recency weighted). It is a measure of opponent
-        defenses, not a projection of your player. Byes and unrated opponents are skipped. Fantasy leagues set their own playoff weeks, so check yours.{" "}
-        <Link href="/methodology" className="underline">
-          How we evaluate
-        </Link>
-        .
-      </p>
+      <PlayoffSosTables sos={sos} />
       <AppCta
         title="See your own players' matchups"
         body="This page ranks every team. FantasyDesk reads your roster, weighs the opponent and the weather, and tells you who to start in the playoffs."

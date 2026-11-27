@@ -249,6 +249,27 @@ def test_demo_scenarios_are_deterministic_and_labelled_synthetic():
         A.endpoint_demo_scenarios(scenario_type="nope")
 
 
+def test_demo_scenarios_carry_matching_try_urls_with_utm_convention():
+    out = A.endpoint_demo_scenarios(scenario_type=None, now=F.NOW)
+    by_type = {i["scenario_type"]: i for i in out["items"]}
+    assert "/try/start-sit?" in by_type["start_sit"]["try_url"]
+    assert "/try/waivers?" in by_type["waiver_claim"]["try_url"] and "/try/trade?" in by_type["trade"]["try_url"]
+    for item in out["items"]:
+        assert "try" not in item["links"]  # links keep their original desktop_ad_app convention
+        assert "utm_source=ad_app" in item["try_url"] and f"utm_content={item['id']}" in item["try_url"]
+        # additive: the original links are untouched
+        assert "utm_source=desktop_ad_app" in item["links"]["sample_league"]
+    assert {t["topic"] for t in out["try_links"]} == {"start-sit", "trade", "waivers", "playoffs", "dynasty-values"}
+    custom = A.endpoint_demo_scenarios(
+        scenario_type="trade", now=F.NOW,
+        utm={"utm_medium": "paid_social", "utm_campaign": "Trade Check!", "utm_content": "vid_12", "utm_term": "", "utm_source": "evil"},
+    )
+    url = custom["items"][0]["try_url"]
+    assert "utm_source=ad_app" in url and "utm_medium=paid_social" in url and "utm_campaign=tradecheck" in url
+    assert "utm_content=vid_12" in url and "evil" not in url and "utm_term" not in url
+    assert all("utm_campaign=tradecheck" in t["url"] for t in custom["try_links"])
+
+
 # --- routes: auth, validation, byte-compat -----------------------------------
 
 
@@ -284,6 +305,8 @@ def test_route_validation_is_422_and_playoff_sos_serves_fixture(client):
     assert client.get("/v1/external/promo/plan", params={"league_type": "x"}, headers=h).status_code == 422
     assert client.get("/v1/external/waivers/replacements", params={"format": "x"}, headers=h).status_code == 422
     assert client.get("/v1/external/demo/scenarios", params={"type": "x"}, headers=h).status_code == 422
+    passthrough = client.get("/v1/external/demo/scenarios", params={"type": "trade", "utm_campaign": "spring_ads"}, headers=h).json()
+    assert "utm_campaign=spring_ads" in passthrough["items"][0]["try_url"]
     body = client.get("/v1/external/playoff-sos", params={"season": 2026}, headers=h).json()
     _assert_contract(body)
     assert body["status"] == "ok" and {i["team"] for i in body["items"]} == {"AAA", "BBB", "CCC"}

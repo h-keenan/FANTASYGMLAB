@@ -684,7 +684,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
   );
 }
 
-function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
+export function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
   const [expanded, setExpanded] = useState(false);
   const moves = matchup.suggested_moves ?? null;
   const actualStarters = matchup.my_team?.real_starters ?? [];

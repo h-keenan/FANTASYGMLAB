@@ -1852,7 +1852,7 @@ trade deadline week 12 and fantasy playoffs weeks 15-17; real leagues vary, and 
 | `GET /v1/external/waivers/replacements` | Injured starter-range players paired with trending healthy same-position adds. | Params: `format=superflex\|1qb`, `limit`. In-season only. League-agnostic (cannot know any one league's availability); `roster_pct` and `availability_verified` say when roster-percentage evidence exists, otherwise confidence is `low`. |
 | `GET /v1/external/lineup/decisions` | Matchup-driven start/sit for borderline starters. | Params: `format`, `week`, `season`, `limit`. Confidence never exceeds `medium`; weather and game script are not modeled. |
 | `GET /v1/external/dynasty/value-changes` | Risers and fallers from two stored daily 0-99 rating snapshots. | Params: `format`, `days=7..30`, `limit`. Unavailable while snapshot history is still building. |
-| `GET /v1/external/demo/scenarios` | Fixed product-demo scenarios (start/sit, waiver claim, trade). | Param: `type`. **Synthetic** fictional players, identical on every call, `synthetic: true`; links carry `utm_source=desktop_ad_app`. Not real advice. |
+| `GET /v1/external/demo/scenarios` | Fixed product-demo scenarios (start/sit, waiver claim, trade). | Params: `type`, optional `utm_medium`/`utm_campaign`/`utm_content`/`utm_term`. **Synthetic** fictional players, identical on every call, `synthetic: true`; links carry `utm_source=desktop_ad_app`. Each item also carries `try_topic` and `try_url` (the no-signup `/try/<topic>` page that opens the real feature on sample data; `utm_source=ad_app`, your `utm_*` passed through, `utm_content` defaults to the scenario id), and the response lists all five `try_links` (start-sit, trade, waivers, playoffs, dynasty-values; app deep link `fantasygmlab://try/<topic>`). Not real advice. |
 | `GET /v1/external/rookies` | Rookie rankings, rookie ADP and landing spots (prepared). | Params: `format`, `limit`. Needs players with zero years of experience on a team; before the draft this is `unavailable`. `draft_capital` is always `null` with a reason (not in the verified data). |
 | `GET /v1/external/changes` | Depth-chart movement between the two latest weekly snapshots (prepared). | `sections.team_changes` is always `unavailable`: no team-affiliation history is retained. |
 | `GET /v1/external/dynasty/roster-construction` | Always a structured `unavailable` (prepared). | Needs a roster, which this API never reads. |
@@ -2900,13 +2900,48 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
       "verdict": "Accept",
       "verdict_basis": "Received total 8600 vs given 8100 (+6.2%).",
       "synthetic": true,
+      "try_topic": "trade",
+      "try_url": "https://fantasygmlab.com/try/trade?utm_source=ad_app&utm_medium=demo&utm_campaign=demo_scenarios&utm_content=demo-trade-1",
       "links": {
         "sample_league": "https://fantasygmlab.com/sample-league?utm_source=desktop_ad_app&utm_medium=demo&utm_campaign=demo_scenarios&utm_content=demo-trade-1",
         "quickstart_game": "https://fantasygmlab.com/gm-game?quickstart=1&utm_source=desktop_ad_app&utm_medium=demo&utm_campaign=demo_scenarios&utm_content=demo-trade-1"
       }
     }
   ],
-  "disclaimer": "Illustrative, synthetic scenarios with fictional players. They are fixed (identical on every call), are not current player values or advice, and must not be presented as real recommendations."
+  "disclaimer": "Illustrative, synthetic scenarios with fictional players. They are fixed (identical on every call), are not current player values or advice, and must not be presented as real recommendations.",
+  "try_utm_convention": "utm_source=ad_app; utm_medium/utm_campaign/utm_content/utm_term are passed through from the request.",
+  "try_links": [
+    {
+      "topic": "start-sit",
+      "path": "/try/start-sit",
+      "shows": "Start/sit suggested move with weekly range, on the sample league",
+      "url": "https://fantasygmlab.com/try/start-sit?utm_source=ad_app&utm_medium=demo&utm_campaign=demo_scenarios"
+    },
+    {
+      "topic": "trade",
+      "path": "/try/trade",
+      "shows": "Trade analyzer with a preset realistic dynasty trade",
+      "url": "https://fantasygmlab.com/try/trade?utm_source=ad_app&utm_medium=demo&utm_campaign=demo_scenarios"
+    },
+    {
+      "topic": "waivers",
+      "path": "/try/waivers",
+      "shows": "Waiver board with priority adds, on the sample league",
+      "url": "https://fantasygmlab.com/try/waivers?utm_source=ad_app&utm_medium=demo&utm_campaign=demo_scenarios"
+    },
+    {
+      "topic": "playoffs",
+      "path": "/try/playoffs",
+      "shows": "Fantasy playoff strength of schedule by position",
+      "url": "https://fantasygmlab.com/try/playoffs?utm_source=ad_app&utm_medium=demo&utm_campaign=demo_scenarios"
+    },
+    {
+      "topic": "dynasty-values",
+      "path": "/try/dynasty-values",
+      "shows": "Dynasty trade value chart, 1QB and Superflex",
+      "url": "https://fantasygmlab.com/try/dynasty-values?utm_source=ad_app&utm_medium=demo&utm_campaign=demo_scenarios"
+    }
+  ]
 }
 ```
 <!-- /example:demo -->

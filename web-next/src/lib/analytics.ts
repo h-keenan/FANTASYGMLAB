@@ -175,7 +175,13 @@ function postEvent(input: AnalyticsEventBody, options?: { demo?: boolean }): voi
   // set sent through trackSampleLeague() (options.demo), which carries demo=true so it can never be mistaken for
   // real product usage (the backend never counts demo events as engagement) but still lets us measure
   // demo usage -> signup conversion. Everything else on that route stays silent.
-  if (typeof window !== "undefined" && window.location?.pathname?.startsWith("/sample-league") && !options?.demo) return;
+  // The no-signup /try/<topic> ad landing pages are demo surfaces of the same kind (sample data): same rule.
+  if (
+    typeof window !== "undefined" &&
+    (window.location?.pathname?.startsWith("/sample-league") || window.location?.pathname?.startsWith("/try/")) &&
+    !options?.demo
+  )
+    return;
   // The founder's own visits to the analytics dashboard must never count as
   // product traffic -- the backend's internal-traffic exclusion
   // (modules.launch_analytics.is_internal_analytics_traffic) is the
@@ -350,6 +356,33 @@ export function trackSampleLeague(action: SampleLeagueAction, tab?: string): voi
     {
       event: "feature_use",
       props: { feature: "sample_league", action, ...(tab ? { item_kind: tab } : {}) },
+      anon_id: getOrCreateAnonId(),
+    },
+    { demo: true },
+  );
+}
+
+export type TryLinkAction = "viewed" | "cta_click";
+
+/**
+ * No-signup ad try links (/try/<topic>, lib/tryLinks.ts): feature_use feature=try_link, item_kind=topic, demo=true so
+ * the backend never counts it as engagement. `viewed` fires once per topic per browser session; `cta_click` is the
+ * "Do this for your league" click. view -> signup is joined server-side (modules.analytics_metrics.try_link_funnel).
+ */
+export function trackTryLink(action: TryLinkAction, topic: string): void {
+  try {
+    if (action === "viewed" && typeof sessionStorage !== "undefined") {
+      const key = `fd_try_viewed_${topic}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    }
+  } catch {
+    // storage blocked: allow the event
+  }
+  postEvent(
+    {
+      event: "feature_use",
+      props: { feature: "try_link", action, item_kind: topic },
       anon_id: getOrCreateAnonId(),
     },
     { demo: true },

@@ -21,8 +21,10 @@ Contract rules, enforced by ``finalize`` and ``item``:
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import date, datetime, timezone
 from typing import Any, Mapping, Sequence
+from urllib.parse import urlencode
 
 from modules import brand_identity, league_calendar, season_clock
 from modules.coerce import float_nan_to_none as _num
@@ -1015,6 +1017,41 @@ DEMO_DISCLAIMER = (
 )
 _DEMO_UTM = "utm_source=desktop_ad_app&utm_medium=demo&utm_campaign=demo_scenarios"
 
+# No-signup "try" links (web-next /try/<topic>; app: fantasygmlab://try/<topic>). They open the real feature on the
+# shared sample data and end in one connect/signup CTA. UTM convention for these links: utm_source is ALWAYS "ad_app";
+# utm_medium / utm_campaign / utm_content / utm_term are the caller's values passed through (sanitized like
+# web-next/src/lib/attribution.ts cleanToken), defaulting to demo / demo_scenarios / <scenario id>.
+TRY_UTM_SOURCE = "ad_app"
+TRY_UTM_PASSTHROUGH = ("utm_medium", "utm_campaign", "utm_content", "utm_term")
+TRY_TOPICS: tuple[dict[str, str], ...] = (
+    {"topic": "start-sit", "path": "/try/start-sit", "shows": "Start/sit suggested move with weekly range, on the sample league"},
+    {"topic": "trade", "path": "/try/trade", "shows": "Trade analyzer with a preset realistic dynasty trade"},
+    {"topic": "waivers", "path": "/try/waivers", "shows": "Waiver board with priority adds, on the sample league"},
+    {"topic": "playoffs", "path": "/try/playoffs", "shows": "Fantasy playoff strength of schedule by position"},
+    {"topic": "dynasty-values", "path": "/try/dynasty-values", "shows": "Dynasty trade value chart, 1QB and Superflex"},
+)
+_SCENARIO_TRY_TOPIC = {"start_sit": "start-sit", "waiver_claim": "waivers", "trade": "trade"}
+
+
+def _clean_utm(value: Any) -> str:
+    return re.sub(r"[^a-z0-9_.-]", "", str(value or "").lower())[:40]
+
+
+def try_url(topic: str, *, utm: Mapping[str, Any] | None = None, default_content: str = "") -> str:
+    """Absolute try URL for a topic with the documented UTM convention (see TRY_UTM_SOURCE)."""
+
+    path = next((t["path"] for t in TRY_TOPICS if t["topic"] == topic), None)
+    if path is None:
+        raise ValueError("unknown try topic: " + topic)
+    params = {"utm_source": TRY_UTM_SOURCE, "utm_medium": "demo", "utm_campaign": "demo_scenarios"}
+    if default_content:
+        params["utm_content"] = _clean_utm(default_content)
+    for key in TRY_UTM_PASSTHROUGH:
+        value = _clean_utm((utm or {}).get(key))
+        if value:
+            params[key] = value
+    return f"{brand_identity.PRODUCT_URL}{path}?{urlencode(params)}"
+
 _SCENARIOS: tuple[dict[str, Any], ...] = (
     {
         "id": "demo-start-sit-1", "type": "start_sit", "title": "Start/sit: the borderline flex",
@@ -1059,13 +1096,17 @@ def _demo_verdict(s: Mapping[str, Any]) -> dict[str, Any]:
     return {"verdict": "Accept" if margin >= 5.0 else "Decline", "basis": f"Received total {get} vs given {give} ({margin:+.1f}%)."}
 
 
-def build_demo_scenarios(*, now: datetime, scenario_type: str | None = None) -> list[dict[str, Any]]:
+def build_demo_scenarios(
+    *, now: datetime, scenario_type: str | None = None, utm: Mapping[str, Any] | None = None
+) -> list[dict[str, Any]]:
     base = brand_identity.PRODUCT_URL
     items = []
     for s in _SCENARIOS:
         if scenario_type and s["type"] != scenario_type:
             continue
         verdict = _demo_verdict(s)
+        topic = _SCENARIO_TRY_TOPIC[s["type"]]
+        matching_try_url = try_url(topic, utm=utm, default_content=s["id"])
         items.append(
             item(
                 s["id"], "demo_scenario", now=now, headline=s["title"],
@@ -1075,6 +1116,7 @@ def build_demo_scenarios(*, now: datetime, scenario_type: str | None = None) -> 
                 relevance={"dynasty": "medium", "redraft": "medium"},
                 scenario_type=s["type"], setup=s["setup"], options=s["options"], rule=s["rule"], verdict=verdict["verdict"], verdict_basis=verdict["basis"],
                 synthetic=True,
+                try_topic=topic, try_url=matching_try_url,
                 links={
                     "sample_league": f"{base}/sample-league?{_DEMO_UTM}&utm_content={s['id']}",
                     "quickstart_game": f"{base}/gm-game?quickstart=1&{_DEMO_UTM}&utm_content={s['id']}",
@@ -1084,16 +1126,22 @@ def build_demo_scenarios(*, now: datetime, scenario_type: str | None = None) -> 
     return items
 
 
-def endpoint_demo_scenarios(*, scenario_type: str | None, now: datetime | None = None) -> dict[str, Any]:
+def endpoint_demo_scenarios(
+    *, scenario_type: str | None, now: datetime | None = None, utm: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
     if scenario_type and scenario_type not in {s["type"] for s in _SCENARIOS}:
         raise ValueError("type must be one of: " + ", ".join(sorted({s["type"] for s in _SCENARIOS})))
     now = now or datetime.now(timezone.utc)
     return finalize(
         "/v1/external/demo/scenarios", now=now, clock=clock_info(),
-        items=build_demo_scenarios(now=now, scenario_type=scenario_type),
+        items=build_demo_scenarios(now=now, scenario_type=scenario_type, utm=utm),
         methodology="Deterministic synthetic scenarios. " + DEMO_DISCLAIMER,
         fresh={"data_as_of": None, "age_hours": None, "stale": False, "source": "static_fixture"},
-        extra={"disclaimer": DEMO_DISCLAIMER},
+        extra={
+            "disclaimer": DEMO_DISCLAIMER,
+            "try_utm_convention": "utm_source=ad_app; utm_medium/utm_campaign/utm_content/utm_term are passed through from the request.",
+            "try_links": [{**t, "url": try_url(t["topic"], utm=utm)} for t in TRY_TOPICS],
+        },
     )
 
 

@@ -41,12 +41,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SampleLeague'>;
  * no auth requirement, no analytics beyond nothing (RootNavigator skips
  * screen tracking for this route). Web twin: SampleLeagueContent.tsx.
  */
-export default function SampleLeagueScreen({ navigation }: Props) {
+export default function SampleLeagueScreen({ navigation, route }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const headerHeight = useHeaderHeight();
   const orbClearance = useOrbClearance();
-  const [tab, setTab] = useState<SampleTab>('dashboard');
+  const [tab, setTab] = useState<SampleTab>(route.params?.tab ?? 'dashboard');
 
   // Home hosts the Add League sheet; openAddLeague opens it on arrival.
   // Signed out (reached from the sign-in screen) there is no Home yet: go back to sign in instead.

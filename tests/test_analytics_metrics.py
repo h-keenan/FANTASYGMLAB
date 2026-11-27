@@ -137,6 +137,25 @@ def test_sample_league_funnel_converts_only_after_view():
     assert f["view_to_signup_pct"] == 50.0
 
 
+def test_try_link_funnel_by_topic_and_demo_never_engaged():
+    rows = [
+        row("feature_use", D0 + 1, anon="a1", feature="try_link", action="viewed", item_kind="trade", demo=True),
+        row("feature_use", D0 + 2, anon="a1", feature="try_link", action="cta_click", item_kind="trade", demo=True),
+        row("signup_completed", D0 + 9, anon="a1", acct="acct_1"),
+        row("feature_use", D0 + 3, anon="a2", feature="try_link", action="viewed", item_kind="waivers", demo=True),
+        row("feature_use", D0 + 4, anon="a3", feature="try_link", action="viewed", item_kind="trade", demo=True),
+        row("signup_completed", D0 + 1, anon="a3", acct="acct_3"),  # signed up BEFORE viewing
+    ]
+    f = am.try_link_funnel(rows)
+    assert f["viewers"] == 3 and f["cta_clicked"] == 1 and f["signed_up_after_view"] == 1
+    assert f["by_topic"]["trade"] == {"viewers": 2, "cta_clicked": 1, "signed_up_after_view": 1, "view_to_signup_pct": 50.0}
+    assert f["by_topic"]["waivers"]["viewers"] == 1 and f["by_topic"]["waivers"]["signed_up_after_view"] == 0
+    assert am.try_link_funnel([])["view_to_signup_pct"] is None
+    # demo views never count as engaged, with or without the demo flag
+    assert not am._is_engaged(row("feature_use", D0, anon="x", feature="try_link", action="viewed", demo=True))
+    assert not am._is_engaged(row("feature_use", D0, anon="x", feature="try_link", action="viewed"))
+
+
 def test_fetch_reports_truncation_at_cap():
     cfg = la.AnalyticsSupabaseConfig(url="https://x.supabase.co", service_role_key="k")
     page = Mock(status_code=200)
