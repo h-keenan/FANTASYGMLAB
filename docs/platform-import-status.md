@@ -39,7 +39,7 @@ ownership). Not done: Fleaflicker/ESPN live per-player points are not used for E
 | Fleaflicker | built, public leagues | none | `modules/fleaflicker_leagues.py` |
 | MyFantasyLeague | built, public leagues | none | `modules/mfl_leagues.py` |
 | ESPN (private) | not built | needs user cookies | see below |
-| Yahoo | not built for import | needs OAuth client id/secret | see below |
+| Yahoo | built (OAuth), untested against live Yahoo | per-user OAuth tokens (encrypted) | `modules/yahoo_leagues.py`, see `docs/yahoo-import.md` |
 
 ## Fleaflicker
 
@@ -82,8 +82,6 @@ rotation/expiry UX) and acceptance of ESPN terms risk. Public ESPN leagues work 
 
 ## Yahoo
 
-Yahoo Fantasy needs OAuth 2.0. Required from the owner: register an app at
-https://developer.yahoo.com/apps/, then provide the client id and client secret (and approve
-the redirect URI). The adapter and OAuth scaffolding in `modules/platforms/yahoo.py` and
-`yahoo_oauth.py` already exist but are not wired into the API import flow; user refresh
-tokens would also need an encrypted token store. Not implemented here.
+Built: OAuth 2.0 connect, league list, import, Dashboard/Matchup, same feature set and
+"Not available for Yahoo leagues yet" refusals as ESPN. Full flow, token storage, owner test
+checklist and the honest "not yet run against live Yahoo" note: `docs/yahoo-import.md`.

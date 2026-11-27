@@ -70,10 +70,15 @@ def _load_mfl(league_key: str) -> dict[str, Any]:
     return {"week": live["week"], "pairs": pairs, "platform": "mfl", "mfl_starters": lineups}
 
 
-def _load_espn(league_key: str) -> dict[str, Any]:
-    snapshot = espn_leagues.get_league_snapshot(league_key)
+def _load_yahoo(league_key: str) -> dict[str, Any]:
+    return _load_espn(league_key, platform="yahoo")
+
+
+def _load_espn(league_key: str, platform: str = "espn") -> dict[str, Any]:
+    # ESPN and Yahoo read the week's pairings and lineups once, with the snapshot.
+    snapshot = external_leagues.get_league_snapshot(league_key)
     if not snapshot:
-        raise ExternalLeagueError("espn_unavailable", espn_leagues.ERROR_MESSAGES["espn_unavailable"])
+        raise ExternalLeagueError(f"{platform}_unavailable", f"Couldn't read this {platform} league right now.")
     state = snapshot.get("week_state") or {}
     pairs: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -93,18 +98,25 @@ def _load_espn(league_key: str) -> dict[str, Any]:
                     "b_points": other.get("points"),
                 }
             )
-    return {"week": safe_int(state.get("week")), "pairs": pairs, "platform": "espn"}
+    return {"week": safe_int(state.get("week")), "pairs": pairs, "platform": platform}
 
 
-_LOADERS = {"fleaflicker": _load_fleaflicker, "mfl": _load_mfl, "espn": _load_espn}
+_LOADERS = {"fleaflicker": _load_fleaflicker, "mfl": _load_mfl, "espn": _load_espn, "yahoo": _load_yahoo}
 
 
 def week_state(league_key: str, *, refresh: bool = False) -> dict[str, Any] | None:
     """``{week, pairs: [{a, b, a_points, b_points}], platform}`` or None when the platform can't be read."""
 
-    loader = _LOADERS.get(external_leagues.platform_of(league_key))
+    platform = external_leagues.platform_of(league_key)
+    loader = _LOADERS.get(platform)
     if loader is None:
         return None
+    if platform == "yahoo":
+        # Per-user data (the snapshot is cached per user): never share it through the league-keyed week cache.
+        try:
+            return loader(league_key)
+        except ExternalLeagueError:
+            return None
     return _week_cache.get(league_key, loader, refresh=refresh)
 
 
@@ -219,7 +231,7 @@ def lineup_for(league_key: str, roster_id: int, state: dict[str, Any]) -> dict[s
         starter_items = [
             item for item in starter_items if item["platform_id"] in id_map or item.get("position")
         ]
-    elif platform == "espn":
+    elif platform in ("espn", "yahoo"):
         stored = (snapshot.get("lineups") or {}).get(str(roster_id))
         if stored is None:
             return None

@@ -295,13 +295,48 @@ export interface EspnCredentialsResponse {
   message?: string;
 }
 
+export interface YahooStatusResponse {
+  ok: boolean;
+  /** Server has Yahoo app credentials + an encryption key. */
+  available?: boolean;
+  connected?: boolean;
+  reason?: string;
+  message?: string;
+}
+
+export interface YahooLeagueOption {
+  /** Our league key ('yahoo:461.l.12345:2026'); what the preview and save take. */
+  league_key: string;
+  yahoo_league_key: string;
+  name: string;
+  season: string;
+  team_count: number;
+  scoring_type?: string;
+  is_finished?: boolean;
+}
+
+export interface YahooLeaguesResponse {
+  ok: boolean;
+  leagues?: YahooLeagueOption[];
+  /** 'reconnect_needed' | 'not_connected' | 'yahoo_unavailable' | ... */
+  reason?: string;
+  message?: string;
+}
+
+export interface YahooOAuthStartResponse {
+  ok: boolean;
+  authorize_url?: string;
+  reason?: string;
+  message?: string;
+}
+
 export interface EspnLeaguePreviewResponse {
   ok: boolean;
   reason: string;
   message: string;
   /** reason 'private_league' only: true when the server can store an ESPN login. */
   can_connect?: boolean;
-  platform?: 'fleaflicker' | 'mfl';
+  platform?: 'fleaflicker' | 'mfl' | 'yahoo';
   platform_label?: string;
   league?: {
     league_key: string;
@@ -4690,6 +4725,14 @@ export const api = {
     ),
   previewImportedLeague: (platform: 'fleaflicker' | 'mfl', leagueId: string, season: number) =>
     authorizedPost<EspnLeaguePreviewResponse>('/v1/import/preview', { platform, league_id: leagueId, season }),
+  getYahooStatus: () => authorizedFetch<YahooStatusResponse>('/v1/yahoo/status'),
+  /** Yahoo's authorize URL for the signed-in user (signed state). 'app' returns to the fantasygmlab://yahoo deep link. */
+  startYahooOAuth: (returnTo: 'web' | 'app' = 'app') =>
+    authorizedPost<YahooOAuthStartResponse>('/v1/yahoo/oauth/start', { return_to: returnTo }),
+  disconnectYahoo: () => authorizedPost<YahooStatusResponse>('/v1/yahoo/disconnect', {}),
+  listYahooLeagues: () => authorizedFetch<YahooLeaguesResponse>('/v1/yahoo/leagues'),
+  previewYahooLeague: (leagueKey: string) =>
+    authorizedPost<EspnLeaguePreviewResponse>('/v1/yahoo/leagues/preview', { league_key: leagueKey }),
   getEspnCredentialStatus: () => authorizedFetch<EspnCredentialsResponse>('/v1/espn/credentials'),
   /** With leagueId + season the server first proves the login on that league and saves nothing if ESPN refuses it. */
   saveEspnCredentials: (input: { espnS2: string; swid: string; leagueId?: string; season?: number }) =>

@@ -7,11 +7,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import SegmentedTabBar from './SegmentedTabBar';
-import { ApiError, api, type EspnLeaguePreviewResponse } from '../lib/api';
+import { ApiError, api, type EspnLeaguePreviewResponse, type YahooLeagueOption } from '../lib/api';
+import YahooConnectStep from './YahooConnectStep';
+import { yahooReasonMessage } from '../lib/yahooConnect';
 import { trackUse } from '../lib/analytics';
 import { ESPN_PRIVATE_HELP_STEPS, ESPN_PRIVATE_LEAGUE_HINT, ESPN_SAVE_FAILURE_COPY, espnImportFailureResult, espnSeasonOptions } from '../lib/leaguePlatform';
 
-export type ImportPlatform = 'espn' | 'fleaflicker' | 'mfl';
+export type ImportPlatform = 'espn' | 'fleaflicker' | 'mfl' | 'yahoo';
 
 /** Per-platform copy; everything else about the flow is shared. */
 const PLATFORM_COPY: Record<ImportPlatform, { label: string; hint: string; notFound: string; placeholder: string }> = {
@@ -26,6 +28,12 @@ const PLATFORM_COPY: Record<ImportPlatform, { label: string; hint: string; notFo
     hint: "Your league ID is the number after /leagues/ in your Fleaflicker league's web address. Leagues that aren't viewable to the public can't be read.",
     notFound: "Enter your Fleaflicker league ID. It's the number after /leagues/ in your league's web address.",
     placeholder: 'e.g. 206154',
+  },
+  yahoo: {
+    label: 'Yahoo',
+    hint: 'Sign in with Yahoo and pick your league from your own list. No league ID needed. Read-only.',
+    notFound: 'Pick one of your Yahoo leagues.',
+    placeholder: '',
   },
   mfl: {
     label: 'MFL',
@@ -91,7 +99,29 @@ export default function EspnLeagueImport({
     };
   }, [platform]);
 
+  /** Yahoo: the user already picked a league from their own list (no league-ID field). */
+  const pickYahooLeague = async (league: YahooLeagueOption) => {
+    setBusy(true);
+    setMessage(null);
+    setPreview(null);
+    setRosterId('');
+    try {
+      const result = await api.previewYahooLeague(league.league_key);
+      if (!result.league) {
+        setMessage(yahooReasonMessage(result.reason, result.message));
+        return;
+      }
+      setPreview(result);
+      if (!result.ok) setMessage(result.message);
+    } catch (error) {
+      setMessage(error instanceof ApiError ? error.message : 'Could not reach the FantasyDesk API.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const findLeague = async () => {
+    if (platform === 'yahoo') return; // Yahoo has no ID form: pickYahooLeague handles it
     const clean = leagueId.trim();
     if (!/^\d{1,12}$/.test(clean)) {
       setMessage(copy.notFound);
@@ -264,6 +294,20 @@ export default function EspnLeagueImport({
         <View style={styles.actions}>
           <PressableScale style={styles.cancelButton} onPress={() => setCanConnect(false)}>
             <AppText style={styles.cancelText}>Use a different league</AppText>
+          </PressableScale>
+        </View>
+      </View>
+    );
+  }
+
+  if (platform === 'yahoo') {
+    return (
+      <View>
+        {message ? <AppText style={styles.error}>{message}</AppText> : null}
+        <YahooConnectStep onPick={(league) => void pickYahooLeague(league)} disabled={busy} />
+        <View style={styles.actions}>
+          <PressableScale style={styles.cancelButton} onPress={onCancel} disabled={busy}>
+            <AppText style={styles.cancelText}>Cancel</AppText>
           </PressableScale>
         </View>
       </View>

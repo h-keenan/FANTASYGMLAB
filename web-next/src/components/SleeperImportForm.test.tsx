@@ -457,10 +457,11 @@ describe("SleeperImportForm", () => {
     expect(onLeagueChosen).toHaveBeenCalledWith("league-a", "League A");
   });
 
-  it("keeps ESPN, Fleaflicker, MFL, the account and the sample league behind More ways to connect", async () => {
+  it("keeps Yahoo, ESPN, Fleaflicker, MFL, the account and the sample league behind More ways to connect", async () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} accountSlot={<p>account form</p>} />);
     expect(screen.queryByRole("link", { name: /try a sample league/i })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /more ways to connect/i }));
+    expect(screen.getByRole("button", { name: /^Yahoo/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^ESPN/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Fleaflicker/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^MFL/ })).toBeInTheDocument();

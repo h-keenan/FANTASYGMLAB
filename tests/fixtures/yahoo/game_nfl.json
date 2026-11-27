@@ -1,0 +1,18 @@
+{
+ "fantasy_content": {
+  "xml:lang": "en-US",
+  "game": [
+   {
+    "game_key": "461",
+    "game_id": "461",
+    "name": "Football",
+    "code": "nfl",
+    "type": "full",
+    "url": "https://football.fantasysports.yahoo.com/f1",
+    "season": "2026",
+    "is_game_over": 0
+   }
+  ],
+  "time": "5ms"
+ }
+}

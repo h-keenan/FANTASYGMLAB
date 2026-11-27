@@ -1,0 +1,413 @@
+{
+ "fantasy_content": {
+  "team": [
+   [
+    {
+     "team_key": "461.l.12345.t.1"
+    },
+    {
+     "team_id": "1"
+    }
+   ],
+   {
+    "roster": {
+     "coverage_type": "week",
+     "week": "9",
+     "is_editable": 0,
+     "0": {
+      "players": {
+       "0": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.30123"
+          },
+          {
+           "player_id": "30123"
+          },
+          {
+           "name": {
+            "full": "Josh Allen",
+            "first": "Josh",
+            "last": "Allen"
+           }
+          },
+          {
+           "editorial_team_abbr": "Buf"
+          },
+          {
+           "display_position": "QB"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "QB"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "QB"
+           }
+          ]
+         }
+        ]
+       },
+       "1": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.31001"
+          },
+          {
+           "player_id": "31001"
+          },
+          {
+           "name": {
+            "full": "Breece Hall",
+            "first": "Breece",
+            "last": "Hall"
+           }
+          },
+          {
+           "editorial_team_abbr": "NYJ"
+          },
+          {
+           "display_position": "RB"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "RB"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "RB"
+           }
+          ]
+         }
+        ]
+       },
+       "2": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.31002"
+          },
+          {
+           "player_id": "31002"
+          },
+          {
+           "name": {
+            "full": "Justin Jefferson",
+            "first": "Justin",
+            "last": "Jefferson"
+           }
+          },
+          {
+           "editorial_team_abbr": "Min"
+          },
+          {
+           "display_position": "WR"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "WR"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "WR"
+           }
+          ]
+         }
+        ]
+       },
+       "3": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.31003"
+          },
+          {
+           "player_id": "31003"
+          },
+          {
+           "name": {
+            "full": "Sam LaPorta",
+            "first": "Sam",
+            "last": "LaPorta"
+           }
+          },
+          {
+           "editorial_team_abbr": "Det"
+          },
+          {
+           "display_position": "TE"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "TE"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "TE"
+           }
+          ]
+         }
+        ]
+       },
+       "4": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.100022"
+          },
+          {
+           "player_id": "100022"
+          },
+          {
+           "name": {
+            "full": "Detroit",
+            "first": "Detroit",
+            "last": "Detroit"
+           }
+          },
+          {
+           "editorial_team_abbr": "Det"
+          },
+          {
+           "display_position": "DEF"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "DEF"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "DEF"
+           }
+          ]
+         }
+        ]
+       },
+       "5": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.39999"
+          },
+          {
+           "player_id": "39999"
+          },
+          {
+           "name": {
+            "full": "Unmatched Rookie",
+            "first": "Unmatched",
+            "last": "Rookie"
+           }
+          },
+          {
+           "editorial_team_abbr": "Jax"
+          },
+          {
+           "display_position": "WR"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "WR"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "W/R/T"
+           }
+          ]
+         }
+        ]
+       },
+       "6": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.31004"
+          },
+          {
+           "player_id": "31004"
+          },
+          {
+           "name": {
+            "full": "Chris Olave",
+            "first": "Chris",
+            "last": "Olave"
+           }
+          },
+          {
+           "editorial_team_abbr": "NO"
+          },
+          {
+           "display_position": "WR"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "WR"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "BN"
+           }
+          ]
+         }
+        ]
+       },
+       "7": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.31005"
+          },
+          {
+           "player_id": "31005"
+          },
+          {
+           "name": {
+            "full": "Kenneth Walker",
+            "first": "Kenneth",
+            "last": "Walker"
+           }
+          },
+          {
+           "editorial_team_abbr": "Sea"
+          },
+          {
+           "display_position": "RB"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "RB"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "IR"
+           }
+          ]
+         }
+        ]
+       },
+       "8": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.31006"
+          },
+          {
+           "player_id": "31006"
+          },
+          {
+           "name": {
+            "full": "Some Punter",
+            "first": "Some",
+            "last": "Punter"
+           }
+          },
+          {
+           "editorial_team_abbr": "Ten"
+          },
+          {
+           "display_position": "P"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "P"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "BN"
+           }
+          ]
+         }
+        ]
+       },
+       "count": 9
+      }
+     }
+    }
+   }
+  ]
+ }
+}

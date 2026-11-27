@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse, trackUse } from "@/lib/analytics";
-import { api, type EspnLeaguePreviewResponse } from "@/lib/api";
+import { api, type EspnLeaguePreviewResponse, type YahooLeagueOption } from "@/lib/api";
 import { ESPN_PRIVATE_HELP_STEPS, ESPN_PRIVATE_LEAGUE_HINT, espnImportFailureResult, espnSeasonOptions } from "@/lib/leaguePlatform";
 import { Button } from "@/components/Button";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -13,8 +13,10 @@ import { Input, Select } from "@/components/Input";
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { EspnLoginPanel, EspnLoginStatus } from "@/components/EspnLoginPanel";
 import { ErrorState } from "@/components/ErrorState";
+import { YahooConnectStep } from "@/components/YahooConnectStep";
+import { yahooReasonMessage } from "@/lib/yahooConnect";
 
-export type ImportPlatform = "espn" | "fleaflicker" | "mfl";
+export type ImportPlatform = "espn" | "fleaflicker" | "mfl" | "yahoo";
 
 /** Per-platform copy. Everything else about the flow is shared. */
 const PLATFORM_COPY: Record<
@@ -45,6 +47,14 @@ const PLATFORM_COPY: Record<
     notFound: "Enter your Fleaflicker league ID. It's the number after /leagues/ in your league's web address.",
     placeholder: "e.g. 206154",
     findLabel: "Find my Fleaflicker league",
+  },
+  yahoo: {
+    label: "Yahoo",
+    idHelp: <>Sign in with Yahoo and pick your league from your own list. No league ID needed.</>,
+    privateNote: "Read-only. Yahoo leagues are private, so FantasyDesk reads them with your Yahoo sign-in.",
+    notFound: "Pick one of your Yahoo leagues.",
+    placeholder: "",
+    findLabel: "Find my Yahoo league",
   },
   mfl: {
     label: "MFL",
@@ -108,8 +118,33 @@ export function EspnImportForm({
     };
   }, [platform, session]);
 
+  /** Yahoo: the user already picked a league from their own list (no league-ID field). */
+  const pickYahooLeague = async (league: YahooLeagueOption) => {
+    setStatus("loading");
+    setMessage(null);
+    setPreview(null);
+    setRosterId("");
+    trackFeatureUse("league_import_started", { props: { platform } });
+    try {
+      const result = await api.previewYahooLeague(league.league_key);
+      setStatus("idle");
+      if (!result.league) {
+        setMessage(yahooReasonMessage(result.reason, result.message));
+        trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: result.reason || "unavailable" } });
+        return;
+      }
+      setPreview(result);
+      if (!result.ok) setMessage(result.message);
+    } catch (error) {
+      setStatus("idle");
+      setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      trackFeatureUse("league_import_failed", { dedupe: false, props: { platform, reason: "exception" } });
+    }
+  };
+
   const handleSubmit = async (event?: React.FormEvent) => {
     event?.preventDefault();
+    if (platform === "yahoo") return; // Yahoo has no ID form: pickYahooLeague handles it
     const clean = leagueId.trim();
     if (!/^\d{1,12}$/.test(clean)) {
       setMessage(copy.notFound);
@@ -307,6 +342,19 @@ export function EspnImportForm({
         <button type="button" onClick={() => setCanConnect(false)} className="text-xs font-bold self-start" style={{ color: "var(--color-text-muted)" }}>
           Use a different league
         </button>
+      </div>
+    );
+  }
+
+  if (platform === "yahoo") {
+    return (
+      <div className="flex flex-col gap-3">
+        {message ? (
+          <p role="alert" className="m-0 text-xs" style={{ color: "var(--color-warning)" }}>
+            {message}
+          </p>
+        ) : null}
+        <YahooConnectStep onPick={(league) => void pickYahooLeague(league)} disabled={status === "loading"} />
       </div>
     );
   }

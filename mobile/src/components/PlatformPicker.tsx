@@ -6,14 +6,15 @@ import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 
-export type LeaguePlatformKey = 'sleeper' | 'espn' | 'fleaflicker' | 'mfl';
+export type LeaguePlatformKey = 'sleeper' | 'espn' | 'fleaflicker' | 'mfl' | 'yahoo';
 
-/** Sleeper and ESPN get cards with the same treatment; the smaller platforms are quiet links below. */
+/** Sleeper and ESPN get cards with the same treatment; Yahoo and the smaller platforms are quiet links below. */
 const MAIN_PLATFORMS: { key: LeaguePlatformKey; label: string; monogram: string; blurb: string }[] = [
   { key: 'sleeper', label: 'Sleeper', monogram: 'S', blurb: 'Use your username' },
   { key: 'espn', label: 'ESPN', monogram: 'E', blurb: 'League ID. Private leagues need 2 cookies' },
 ];
 const OTHER_PLATFORMS: { key: LeaguePlatformKey; label: string }[] = [
+  { key: 'yahoo', label: 'Yahoo' },
   { key: 'fleaflicker', label: 'Fleaflicker' },
   { key: 'mfl', label: 'MFL' },
 ];

@@ -1,6 +1,6 @@
 /**
  * The one-field connect flow (UI pass 3, sheet 1 topic 2 V1): a Sleeper username and one "Connect" button, an instant
- * league list with avatars and checkboxes, then optional steps. Secondary paths (ESPN / Fleaflicker / MFL, an account,
+ * league list with avatars and checkboxes, then optional steps. Secondary paths (Yahoo / ESPN / Fleaflicker / MFL, an account,
  * the sample league) sit behind "More ways to connect". Pure and import-free; byte-identical twin of
  * mobile/src/lib/connectFlow.ts so web and the app never disagree on copy, defaults or what a save outcome means.
  */
@@ -22,7 +22,7 @@ export function connectPlatformNotice(platformLabel: string): string {
   return `Waiver and trade suggestions aren't available for ${platformLabel} leagues yet, so you'll only see what your imported roster can support.`;
 }
 
-export type ConnectWayKey = "espn" | "fleaflicker" | "mfl" | "account" | "sample";
+export type ConnectWayKey = "yahoo" | "espn" | "fleaflicker" | "mfl" | "account" | "sample";
 
 export interface ConnectWay {
   key: ConnectWayKey;
@@ -31,6 +31,7 @@ export interface ConnectWay {
 }
 
 const WAYS: ConnectWay[] = [
+  { key: "yahoo", label: "Yahoo", blurb: "Sign in with Yahoo, pick your league" },
   { key: "espn", label: "ESPN", blurb: "League ID. Private leagues need 2 cookies" },
   { key: "fleaflicker", label: "Fleaflicker", blurb: "League ID" },
   { key: "mfl", label: "MFL", blurb: "League ID" },

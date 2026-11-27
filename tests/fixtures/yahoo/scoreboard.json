@@ -1,0 +1,88 @@
+{
+ "fantasy_content": {
+  "league": [
+   {
+    "league_key": "461.l.12345",
+    "league_id": "12345",
+    "name": "Sunday Funday",
+    "url": "x",
+    "draft_status": "postdraft",
+    "num_teams": 2,
+    "scoring_type": "head",
+    "league_type": "private",
+    "current_week": "9",
+    "start_week": "1",
+    "end_week": "17",
+    "is_finished": 0,
+    "season": "2026",
+    "game_code": "nfl"
+   },
+   {
+    "scoreboard": {
+     "week": "9",
+     "0": {
+      "matchups": {
+       "0": {
+        "matchup": {
+         "0": {
+          "teams": {
+           "0": {
+            "team": [
+             [
+              {
+               "team_key": "461.l.12345.t.1"
+              },
+              {
+               "team_id": "1"
+              },
+              {
+               "name": "A"
+              }
+             ],
+             {
+              "team_points": {
+               "coverage_type": "week",
+               "week": "9",
+               "total": "88.40"
+              }
+             }
+            ]
+           },
+           "1": {
+            "team": [
+             [
+              {
+               "team_key": "461.l.12345.t.2"
+              },
+              {
+               "team_id": "2"
+              },
+              {
+               "name": "B"
+              }
+             ],
+             {
+              "team_points": {
+               "coverage_type": "week",
+               "week": "9",
+               "total": "70.15"
+              }
+             }
+            ]
+           },
+           "count": 2
+          }
+         },
+         "week": "9",
+         "status": "midevent",
+         "is_playoffs": "0"
+        }
+       },
+       "count": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+}

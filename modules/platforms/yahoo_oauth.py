@@ -1,6 +1,8 @@
 """Yahoo Fantasy Sports OAuth2 client (spike scaffolding — see runbook).
 
-STATUS: NOT EXERCISED AGAINST THE LIVE YAHOO API.
+STATUS: request/response shapes re-checked against Yahoo's published docs
+(2026-11); NOT yet exercised against a live Yahoo account from this repo's
+test environment. The production wiring is modules/yahoo_connect.py.
 
 This module implements Yahoo's documented OAuth2 Authorization Code flow so a
 human with real Yahoo Developer credentials can finish the integration spike
@@ -59,7 +61,11 @@ class YahooOAuthError(RuntimeError):
     """Raised for OAuth configuration problems or a failed token request.
 
     Message text must never include the client secret or a real token value.
+    ``status_code`` is the token endpoint's HTTP status when there was one
+    (400/401 on a refresh means the user must reconnect).
     """
+
+    status_code: int | None = None
 
 
 @dataclass
@@ -201,9 +207,9 @@ def _parse_token_response(response: Any) -> YahooOAuthToken:
         response.raise_for_status()
     except Exception as exc:
         body = _safe_response_text(response)
-        raise YahooOAuthError(
-            f"Yahoo's token endpoint returned an error (status {status_code}): {body}"
-        ) from exc
+        error = YahooOAuthError(f"Yahoo's token endpoint returned an error (status {status_code}): {body}")
+        error.status_code = status_code if isinstance(status_code, int) else None
+        raise error from exc
     try:
         payload = response.json()
     except ValueError as exc:
@@ -256,11 +262,16 @@ def refresh_access_token(
     refresh_token: str,
     client_id: str | None = None,
     client_secret: str | None = None,
+    redirect_uri: str | None = None,
     environ: Mapping[str, Any] | None = None,
     session: Any = None,
     timeout: int = 20,
 ) -> YahooOAuthToken:
     """Exchange a refresh token for a new access token.
+
+    Yahoo may rotate the refresh token: the response's ``refresh_token`` must
+    replace the stored one. Yahoo's docs list ``redirect_uri`` on the refresh
+    request, so it is sent when given.
 
     Same endpoint as the initial exchange, with ``grant_type=refresh_token``
     and ``refresh_token`` in place of ``code``/``redirect_uri``, per Yahoo's
@@ -275,6 +286,8 @@ def refresh_access_token(
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
     }
+    if redirect_uri:
+        data["redirect_uri"] = redirect_uri
     return _post_token_request(data, client_id=cid, client_secret=secret, session=session, timeout=timeout)
 
 

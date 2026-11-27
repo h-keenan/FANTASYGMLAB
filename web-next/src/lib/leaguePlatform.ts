@@ -18,9 +18,9 @@ export const ESPN_NOT_AVAILABLE_MESSAGE = "Not available for ESPN leagues yet.";
  * supported pages. So `isEspnLeagueId` (kept under its old name for its many
  * callers) is true for every imported, non-Sleeper league.
  */
-const IMPORTED_PLATFORM_LABELS: Record<string, string> = { espn: "ESPN", fleaflicker: "Fleaflicker", mfl: "MFL" };
+const IMPORTED_PLATFORM_LABELS: Record<string, string> = { espn: "ESPN", fleaflicker: "Fleaflicker", mfl: "MFL", yahoo: "Yahoo" };
 
-/** "ESPN" | "Fleaflicker" | "MFL" for an imported league id, "" for Sleeper. */
+/** "ESPN" | "Fleaflicker" | "MFL" | "Yahoo" for an imported league id, "" for Sleeper. */
 export function importedPlatformLabel(leagueId: string | null | undefined): string {
   if (typeof leagueId !== "string") return "";
   const prefix = leagueId.split(":", 1)[0];

@@ -352,7 +352,7 @@ export interface SaveLeagueResponse {
   /** True when the server started warming this league's first-load data;
    * poll getLeagueWarmupStatus for real progress. */
   warming?: boolean;
-  league?: { league_id: string; league_name: string; is_default: boolean; platform?: "sleeper" | "espn" | "fleaflicker" | "mfl" };
+  league?: { league_id: string; league_name: string; is_default: boolean; platform?: "sleeper" | "espn" | "fleaflicker" | "mfl" | "yahoo" };
 }
 
 /** GET /v1/leagues/{id}/warmup-status: "none" means nothing to wait for. */
@@ -385,7 +385,7 @@ export interface EspnLeaguePreviewResponse {
   /** reason "private_league" only: true when the server can store an ESPN login (see EspnCredentialsResponse). */
   can_connect?: boolean;
   /** Fleaflicker / MFL previews (POST /v1/import/preview) only. */
-  platform?: "fleaflicker" | "mfl";
+  platform?: "fleaflicker" | "mfl" | "yahoo";
   platform_label?: string;
   league?: {
     league_key: string;
@@ -415,6 +415,41 @@ export interface EspnCredentialsResponse {
   ok: boolean;
   available?: boolean;
   saved?: boolean;
+  reason?: string;
+  message?: string;
+}
+
+export interface YahooStatusResponse {
+  ok: boolean;
+  /** Server has Yahoo app credentials + an encryption key. */
+  available?: boolean;
+  connected?: boolean;
+  reason?: string;
+  message?: string;
+}
+
+export interface YahooLeagueOption {
+  /** Our league key ("yahoo:461.l.12345:2026"); what the preview and save take. */
+  league_key: string;
+  yahoo_league_key: string;
+  name: string;
+  season: string;
+  team_count: number;
+  scoring_type?: string;
+  is_finished?: boolean;
+}
+
+export interface YahooLeaguesResponse {
+  ok: boolean;
+  leagues?: YahooLeagueOption[];
+  /** "reconnect_needed" | "not_connected" | "yahoo_unavailable" | ... */
+  reason?: string;
+  message?: string;
+}
+
+export interface YahooOAuthStartResponse {
+  ok: boolean;
+  authorize_url?: string;
   reason?: string;
   message?: string;
 }
@@ -4622,6 +4657,19 @@ export const api = {
       method: "POST",
       jsonBody: { platform, league_id: leagueId, season },
     }),
+
+  getYahooStatus: () => authorizedRequest<YahooStatusResponse>("/v1/yahoo/status"),
+
+  /** Yahoo's authorize URL for the signed-in user (signed state). "web" returns to /connect-league, "app" to the fantasygmlab:// deep link. */
+  startYahooOAuth: (returnTo: "web" | "app" = "web") =>
+    authorizedRequest<YahooOAuthStartResponse>("/v1/yahoo/oauth/start", { method: "POST", jsonBody: { return_to: returnTo } }),
+
+  disconnectYahoo: () => authorizedRequest<YahooStatusResponse>("/v1/yahoo/disconnect", { method: "POST" }),
+
+  listYahooLeagues: () => authorizedRequest<YahooLeaguesResponse>("/v1/yahoo/leagues"),
+
+  previewYahooLeague: (leagueKey: string) =>
+    authorizedRequest<EspnLeaguePreviewResponse>("/v1/yahoo/leagues/preview", { method: "POST", jsonBody: { league_key: leagueKey } }),
 
   getEspnCredentialStatus: () => authorizedRequest<EspnCredentialsResponse>("/v1/espn/credentials"),
 

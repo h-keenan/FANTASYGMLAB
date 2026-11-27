@@ -1,5 +1,8 @@
 """Yahoo Fantasy Sports platform adapter (spike scaffolding — see runbook).
 
+NOTE: the shipped league import does not use this adapter; it lives in
+modules/yahoo_leagues.py (see docs/yahoo-import.md). Kept for the Protocol tests.
+
 STATUS: UNEXERCISED AGAINST THE LIVE YAHOO API. DO NOT TREAT AS WORKING
 SUPPORT. This mirrors this codebase's existing honest-labeling practice for
 incomplete platform support (see ``modules/experimental_graduation.py``'s

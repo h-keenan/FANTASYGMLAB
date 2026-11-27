@@ -12,10 +12,15 @@ describe("leaguePlatform", () => {
     expect(isEspnLeagueId(null)).toBe(false);
   });
 
+  it("treats Yahoo leagues like other imported leagues, with their own label", () => {
+    expect(isEspnLeagueId("yahoo:461.l.12345:2026")).toBe(true);
+    expect(notAvailableMessage("yahoo:461.l.12345:2026")).toBe("Not available for Yahoo leagues yet.");
+  });
+
   it("treats Fleaflicker and MFL leagues like ESPN leagues, with their own label", () => {
     expect(isEspnLeagueId("fleaflicker:206154:2025")).toBe(true);
     expect(isEspnLeagueId("mfl:10015:2025")).toBe(true);
-    expect(isEspnLeagueId("yahoo:1:2025")).toBe(false);
+    expect(isEspnLeagueId("unknown:1:2025")).toBe(false);
     expect(importedPlatformLabel("mfl:10015:2025")).toBe("MFL");
     expect(notAvailableMessage("fleaflicker:206154:2025")).toBe("Not available for Fleaflicker leagues yet.");
     expect(espnUnavailableLeagueId(`/waivers/${encodeURIComponent("mfl:10015:2025")}`)).toBe("mfl:10015:2025");

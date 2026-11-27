@@ -74,7 +74,7 @@ LOOKUP_BATCH = 100
 # More than this share of attempted leagues failing is an outage, not noise.
 MAX_FAILED_FRACTION = 0.2
 
-EXTERNAL_PREFIXES = ("espn:", "fleaflicker:", "mfl:")
+EXTERNAL_PREFIXES = ("espn:", "fleaflicker:", "mfl:", "yahoo:")
 HASH_LEN = 32
 
 

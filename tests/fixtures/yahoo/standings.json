@@ -1,0 +1,111 @@
+{
+ "fantasy_content": {
+  "league": [
+   {
+    "league_key": "461.l.12345",
+    "league_id": "12345",
+    "name": "Sunday Funday",
+    "url": "x",
+    "draft_status": "postdraft",
+    "num_teams": 2,
+    "scoring_type": "head",
+    "league_type": "private",
+    "current_week": "9",
+    "start_week": "1",
+    "end_week": "17",
+    "is_finished": 0,
+    "season": "2026",
+    "game_code": "nfl"
+   },
+   {
+    "standings": [
+     {
+      "teams": {
+       "0": {
+        "team": [
+         [
+          {
+           "team_key": "461.l.12345.t.1"
+          },
+          {
+           "team_id": "1"
+          },
+          {
+           "name": "Gridiron Ghosts"
+          },
+          [],
+          {
+           "managers": [
+            {
+             "manager": {
+              "manager_id": "1",
+              "nickname": "alex",
+              "guid": "G1"
+             }
+            }
+           ]
+          }
+         ],
+         {
+          "team_standings": {
+           "rank": 1,
+           "outcome_totals": {
+            "wins": 6,
+            "losses": 2,
+            "ties": 0,
+            "percentage": ".500"
+           },
+           "points_for": "1012.40",
+           "points_against": "880.10"
+          }
+         }
+        ]
+       },
+       "1": {
+        "team": [
+         [
+          {
+           "team_key": "461.l.12345.t.2"
+          },
+          {
+           "team_id": "2"
+          },
+          {
+           "name": "Bye Week Bandits"
+          },
+          [],
+          {
+           "managers": [
+            {
+             "manager": {
+              "manager_id": "2",
+              "nickname": "--hidden--",
+              "guid": "G2"
+             }
+            }
+           ]
+          }
+         ],
+         {
+          "team_standings": {
+           "rank": 2,
+           "outcome_totals": {
+            "wins": 4,
+            "losses": 4,
+            "ties": 0,
+            "percentage": ".500"
+           },
+           "points_for": "950.00",
+           "points_against": "975.25"
+          }
+         }
+        ]
+       },
+       "count": 2
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

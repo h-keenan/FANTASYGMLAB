@@ -1,5 +1,7 @@
 # Yahoo Fantasy Sports integration spike — human runbook
 
+> Superseded for day-to-day use by `docs/yahoo-import.md` (the built import and owner test checklist). Kept as the raw-API spike reference.
+
 ## Why this document exists
 
 coridian_ approved a short technical spike, per the recommendation of an

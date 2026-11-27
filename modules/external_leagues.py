@@ -1,6 +1,6 @@
 """One entry point for every non-Sleeper league platform FantasyDesk imports.
 
-ESPN, Fleaflicker and MFL leagues are all saved under a prefixed key
+ESPN, Fleaflicker, MFL and Yahoo leagues are all saved under a prefixed key
 (``espn:`` / ``fleaflicker:`` / ``mfl:`` + ``{id}:{season}``) in the existing
 ``saved_leagues.league_id`` column, and all load into the same Sleeper-shaped
 snapshot. This module routes a key to its platform module so ``modules.sleeper``
@@ -14,13 +14,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from modules import espn_leagues, fleaflicker_leagues, mfl_leagues
+from modules import espn_leagues, fleaflicker_leagues, mfl_leagues, yahoo_leagues
 from modules.external_league_common import ExternalLeagueError
 
 PLATFORM_LABELS = {
     espn_leagues.ESPN_PLATFORM: "ESPN",
     fleaflicker_leagues.FLEAFLICKER_PLATFORM: fleaflicker_leagues.FLEAFLICKER_LABEL,
     mfl_leagues.MFL_PLATFORM: "MFL",
+    yahoo_leagues.YAHOO_PLATFORM: yahoo_leagues.YAHOO_LABEL,
 }
 PREFIXES = tuple(f"{platform}:" for platform in PLATFORM_LABELS)
 NOT_AVAILABLE_REASON = espn_leagues.ESPN_NOT_AVAILABLE_REASON
@@ -30,6 +31,8 @@ IMPORT_PLATFORMS = (fleaflicker_leagues.FLEAFLICKER_PLATFORM, mfl_leagues.MFL_PL
 _MODULES = {
     fleaflicker_leagues.FLEAFLICKER_PLATFORM: fleaflicker_leagues,
     mfl_leagues.MFL_PLATFORM: mfl_leagues,
+    # Yahoo needs the caller's OAuth login bound to the request (modules.yahoo_leagues.bind_request_login).
+    yahoo_leagues.YAHOO_PLATFORM: yahoo_leagues,
 }
 
 
@@ -101,7 +104,7 @@ def preview_league(platform: str, league_id: Any, season: Any) -> dict[str, Any]
     return module.preview_payload(snapshot)
 
 
-_LEAGUE_PATH_PATTERN = re.compile(r"^/v1/(?:leagues|portfolio/leagues)/((?:espn|fleaflicker|mfl):[^/]*)(/.*)?$")
+_LEAGUE_PATH_PATTERN = re.compile(r"^/v1/(?:leagues|portfolio/leagues)/((?:espn|fleaflicker|mfl|yahoo):[^/]*)(/.*)?$")
 
 
 def gated_league_path(path: str) -> bool:
