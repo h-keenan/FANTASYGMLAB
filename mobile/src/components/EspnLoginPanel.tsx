@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
 
 import AppText from './AppText';
+import InfoToggle from './InfoToggle';
 import Input from './Input';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { ApiError, api } from '../lib/api';
@@ -58,13 +59,14 @@ export function EspnLoginPanel({
 
   return (
     <View>
-      <AppText style={styles.title}>This league is private. Connect your ESPN login to read it.</AppText>
-      <AppText style={styles.hint}>{ESPN_LOGIN_WHY}</AppText>
-      <PressableScale onPress={() => setShowSteps((value) => !value)} accessibilityRole="button" hitSlop={8}>
-        <AppText style={styles.link}>{showSteps ? 'Hide steps' : 'How to find espn_s2 and SWID'}</AppText>
-      </PressableScale>
+      <View style={styles.titleRow}>
+        <AppText style={[styles.title, styles.titleText]}>This league is private. Connect your ESPN login to read it.</AppText>
+        <InfoToggle open={showSteps} onPress={() => setShowSteps((value) => !value)} label="How the ESPN login works" />
+      </View>
       {showSteps ? (
         <View style={styles.steps}>
+          <AppText style={styles.hint}>{ESPN_LOGIN_WHY}</AppText>
+          <AppText style={styles.link}>How to find espn_s2 and SWID</AppText>
           {ESPN_COOKIE_STEPS.map((step, index) => (
             <AppText key={step} style={styles.hint}>
               {index + 1}. {step}
@@ -150,6 +152,8 @@ export function EspnLoginStatus({ saved, onRemoved }: { saved: boolean; onRemove
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     title: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    titleText: { flex: 1 },
     hint: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.xs },
     link: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
     steps: { marginTop: spacing.sm },

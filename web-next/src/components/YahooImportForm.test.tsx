@@ -44,7 +44,6 @@ const onLeagueChosen = vi.fn();
 
 function openYahoo() {
   render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
-  fireEvent.click(screen.getByRole("button", { name: /more ways to connect/i }));
   fireEvent.click(screen.getByRole("button", { name: /^Yahoo/ }));
 }
 
@@ -62,6 +61,7 @@ describe("Yahoo import in the Connect League flow", () => {
     vi.mocked(api.getYahooStatus).mockResolvedValue({ ok: true, available: true, connected: false });
     vi.mocked(api.startYahooOAuth).mockResolvedValue({ ok: false, reason: "not_configured", message: "Connecting Yahoo isn't available right now." });
     openYahoo();
+    fireEvent.click(screen.getByRole("button", { name: /about yahoo/i }));
     expect(screen.getByText(/Waiver and trade suggestions aren't available for Yahoo leagues yet/)).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Connect Yahoo" }));
     await waitFor(() => expect(api.startYahooOAuth).toHaveBeenCalledWith("web"));

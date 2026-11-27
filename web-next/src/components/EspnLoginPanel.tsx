@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/Button";
+import { InfoToggle } from "@/components/InfoToggle";
 import { Input } from "@/components/Input";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { api } from "@/lib/api";
@@ -27,6 +28,7 @@ export function EspnLoginPanel({
   const [swid, setSwid] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -55,25 +57,29 @@ export function EspnLoginPanel({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3" aria-label="Connect your ESPN login">
-      <div
-        className="glass-input flex flex-col gap-2 px-3 py-3 text-xs"
-        style={{ borderLeft: "var(--border-width-semantic) solid var(--color-accent)", color: "var(--color-text-secondary)" }}
-      >
-        <p className="m-0 font-bold" style={{ color: "var(--color-text-primary)" }}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="m-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
           This league is private. Connect your ESPN login to read it.
         </p>
-        <p className="m-0">{ESPN_LOGIN_WHY}</p>
-        <details>
-          <summary className="cursor-pointer font-bold" style={{ color: "var(--color-accent)" }}>
+        <InfoToggle open={helpOpen} onToggle={() => setHelpOpen((v) => !v)} label="How the ESPN login works" />
+      </div>
+      {helpOpen ? (
+        <div
+          className="glass-input flex flex-col gap-2 px-3 py-3 text-xs motion-in"
+          data-motion="in"
+          style={{ borderLeft: "var(--border-width-semantic) solid var(--color-accent)", color: "var(--color-text-secondary)" }}
+        >
+          <p className="m-0">{ESPN_LOGIN_WHY}</p>
+          <p className="m-0 font-bold" style={{ color: "var(--color-text-primary)" }}>
             How to find espn_s2 and SWID
-          </summary>
-          <ol className="m-0 mt-2 pl-4 flex flex-col gap-1">
+          </p>
+          <ol className="m-0 pl-4 flex flex-col gap-1">
             {ESPN_COOKIE_STEPS.map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ol>
-        </details>
-      </div>
+        </div>
+      ) : null}
       <label className="flex flex-col gap-1 text-sm">
         espn_s2
         <Input type="password" value={espnS2} onChange={(e) => setEspnS2(e.target.value)} autoComplete="off" spellCheck={false} />

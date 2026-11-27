@@ -308,7 +308,7 @@ export function LandingAuthIsland() {
       <div className="onboarding-connect flex flex-col gap-3" data-testid="connect-hero">
         <header className="flex flex-col gap-1">
           <h1 className="onboarding-headline onboarding-headline--sm">Connect your league</h1>
-          <p className="onboarding-body">Type your Sleeper username. We read your real roster and build your first Today briefing. No account needed to start.</p>
+          <p className="onboarding-body">Pick where your league lives. We read your real roster and build your first Today briefing. No account needed to start.</p>
         </header>
         <ConnectModeTabs>
         <SleeperImportForm
@@ -352,7 +352,7 @@ export function LandingAuthIsland() {
         ) : null}
         <header className="flex flex-col gap-1">
           <h1 className="onboarding-headline onboarding-headline--sm">Connect your league</h1>
-          <p className="onboarding-body">Type your Sleeper username. We read your real roster and build your first Today briefing.</p>
+          <p className="onboarding-body">Pick where your league lives. We read your real roster and build your first Today briefing.</p>
         </header>
         <ConnectModeTabs>
           <SleeperImportForm onLeagueChosen={handleLeagueChosen} />

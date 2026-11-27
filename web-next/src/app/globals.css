@@ -124,6 +124,13 @@
   --color-opportunity-soft: rgba(20, 184, 166, 0.14);
   --color-action-soft: rgba(250, 204, 21, 0.14);
   --color-warning-soft: rgba(245, 158, 11, 0.14);
+  /* Platform monogram badges (PlatformBadge): fixed per-platform hues, identical in both themes, white ink (>=4.5:1). */
+  --color-platform-sleeper: #2b63e0;
+  --color-platform-yahoo: #6001d2;
+  --color-platform-espn: #c2410c;
+  --color-platform-fleaflicker: #0b7285;
+  --color-platform-mfl: #2b7a3e;
+  --color-platform-on: #ffffff;
   --color-danger-soft: rgba(239, 68, 68, 0.15);
   --color-information-soft: rgba(103, 232, 249, 0.12);
   --color-diagnostic-soft: rgba(139, 147, 255, 0.12);
@@ -339,6 +346,13 @@
     --color-opportunity-soft: rgba(0, 160, 145, 0.22);
     --color-action-soft: rgba(240, 170, 0, 0.28);
     --color-warning-soft: rgba(235, 110, 0, 0.22);
+  /* Platform monogram badges (PlatformBadge): fixed per-platform hues, identical in both themes, white ink (>=4.5:1). */
+  --color-platform-sleeper: #2b63e0;
+  --color-platform-yahoo: #6001d2;
+  --color-platform-espn: #c2410c;
+  --color-platform-fleaflicker: #0b7285;
+  --color-platform-mfl: #2b7a3e;
+  --color-platform-on: #ffffff;
     --color-danger-soft: rgba(225, 30, 50, 0.2);
     --color-information-soft: rgba(0, 150, 175, 0.22);
     --color-diagnostic-soft: rgba(90, 70, 240, 0.2);
@@ -430,6 +444,13 @@
   --color-opportunity-soft: rgba(0, 160, 145, 0.22);
   --color-action-soft: rgba(240, 170, 0, 0.28);
   --color-warning-soft: rgba(235, 110, 0, 0.22);
+  /* Platform monogram badges (PlatformBadge): fixed per-platform hues, identical in both themes, white ink (>=4.5:1). */
+  --color-platform-sleeper: #2b63e0;
+  --color-platform-yahoo: #6001d2;
+  --color-platform-espn: #c2410c;
+  --color-platform-fleaflicker: #0b7285;
+  --color-platform-mfl: #2b7a3e;
+  --color-platform-on: #ffffff;
   --color-danger-soft: rgba(225, 30, 50, 0.2);
   --color-information-soft: rgba(0, 150, 175, 0.22);
   --color-diagnostic-soft: rgba(90, 70, 240, 0.2);
@@ -2216,6 +2237,13 @@ body:has(.fd-landing-dark) {
   --color-opportunity-soft: rgba(20, 184, 166, 0.14);
   --color-action-soft: rgba(250, 204, 21, 0.14);
   --color-warning-soft: rgba(245, 158, 11, 0.14);
+  /* Platform monogram badges (PlatformBadge): fixed per-platform hues, identical in both themes, white ink (>=4.5:1). */
+  --color-platform-sleeper: #2b63e0;
+  --color-platform-yahoo: #6001d2;
+  --color-platform-espn: #c2410c;
+  --color-platform-fleaflicker: #0b7285;
+  --color-platform-mfl: #2b7a3e;
+  --color-platform-on: #ffffff;
   --color-danger-soft: rgba(239, 68, 68, 0.15);
   --color-information-soft: rgba(103, 232, 249, 0.12);
   --color-diagnostic-soft: rgba(139, 147, 255, 0.12);
