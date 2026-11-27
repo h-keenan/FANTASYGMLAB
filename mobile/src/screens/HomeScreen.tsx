@@ -37,7 +37,9 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import LeaguesGlanceSection from '../components/LeaguesGlanceSection';
 import PremiumLock from '../components/PremiumLock';
-import EspnLeagueImport from '../components/EspnLeagueImport';
+import EspnLeagueImport, { platformHelpText } from '../components/EspnLeagueImport';
+import InfoToggle from '../components/InfoToggle';
+import PlatformBadge from '../components/PlatformBadge';
 import { ConnectModePanel, ConnectModeTabs } from '../components/ConnectModeTabs';
 import PlatformPicker from '../components/PlatformPicker';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
@@ -49,12 +51,12 @@ import { getLastLeague } from '../lib/lastLeague';
 import { groupLeagueOptionsBySeason } from '../lib/leagueSeasonGroups';
 import TeamAvatar from '../components/TeamAvatar';
 import {
-  CONNECT_MORE_LABEL,
+  CONNECT_BACK_LABEL,
   CONNECT_TRUST_LINE,
   CONNECT_FIND_USERNAME,
   connectCtaLabel,
-  connectPlatformNotice,
-  connectWays,
+  connectPlatformLabel,
+  type ConnectPlatformKey,
   type ConnectMode,
   defaultLeagueSelection,
   leagueMeta,
@@ -85,7 +87,7 @@ import Input from '../components/Input';
 import HelpLink from '../components/HelpLink';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 import ErrorState from '../components/ErrorState';
-import { ESPN_SAVE_FAILURE_COPY, importedPlatformLabel } from '../lib/leaguePlatform';
+import { ESPN_SAVE_FAILURE_COPY } from '../lib/leaguePlatform';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -127,7 +129,7 @@ export default function HomeScreen({ navigation, route }: Props) {
   // default; ESPN is EspnLeagueImport (public leagues, a subset of
   // features — see lib/leaguePlatform.ts).
   const [connectMode, setConnectMode] = useState<ConnectMode>('connect');
-  const [addPlatform, setAddPlatform] = useState<'sleeper' | 'espn' | 'fleaflicker' | 'mfl' | 'yahoo'>('sleeper');
+  const [addPlatform, setAddPlatform] = useState<ConnectPlatformKey | null>(null);
   // Fix (welcome audit, tester feedback "I don't even know where to start"):
   // a brand-new user with no existing Sleeper account/league has no path
   // forward on this screen otherwise — this toggles the honest "we don't
@@ -138,7 +140,6 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [showNoLeagueHelp, setShowNoLeagueHelp] = useState(false);
   // One-field connect (lib/connectFlow.ts): checked leagues in the picker, and the "More ways to connect" disclosure.
   const [addSelected, setAddSelected] = useState<string[]>([]);
-  const [addMoreOpen, setAddMoreOpen] = useState(false);
   // Set only when the server refuses a save with reason "at_cap" — the copy
   // is derived from the cap the server sent, never a hardcoded number.
   const [addCapMessage, setAddCapMessage] = useState<string | null>(null);
@@ -178,7 +179,7 @@ export default function HomeScreen({ navigation, route }: Props) {
 
   const closeAddLeague = () => {
     setAddOpen(false);
-    setAddPlatform('sleeper');
+    setAddPlatform(null);
     setAddQuery('');
     setAddOptions(null);
     setAddMessage(null);
@@ -186,7 +187,14 @@ export default function HomeScreen({ navigation, route }: Props) {
     setAddCapMessage(null);
     setShowNoLeagueHelp(false);
     setAddSelected([]);
-    setAddMoreOpen(false);
+  };
+
+  // Tiles <-> one platform's step. Each switch clears the previous step's messages and closes its help.
+  const choosePlatform = (key: ConnectPlatformKey | null) => {
+    setAddPlatform(key);
+    setAddMessage(null);
+    setAddCapMessage(null);
+    setShowNoLeagueHelp(false);
   };
 
   // Renames only this account's saved_leagues row (RLS-scoped to
@@ -721,6 +729,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 ? () => {
                     setAddQuery(me?.sleeper_username ?? '');
                     setAddOpen(true);
+                    setAddPlatform('sleeper');
                     setShowNoLeagueHelp(true);
                   }
                 : undefined
@@ -787,6 +796,48 @@ export default function HomeScreen({ navigation, route }: Props) {
             ) : (
             <>
             <ModalFormTitle>Add a league</ModalFormTitle>
+            {addPlatform === null ? (
+              <>
+                <PlatformPicker onChange={choosePlatform} />
+                <ModalFormHint>{CONNECT_TRUST_LINE}</ModalFormHint>
+                <Button label={SAMPLE_TRY_LABEL} variant="secondary" onPress={openSampleLeague} style={styles.sampleLeagueButton} />
+                <PressableScale accessibilityRole="button" onPress={closeAddLeague} hitSlop={8} style={styles.noLeagueToggle}>
+                  <AppText style={styles.noLeagueToggleText}>Cancel</AppText>
+                </PressableScale>
+              </>
+            ) : (
+            <>
+            <View style={styles.stepHeader}>
+              <PressableScale accessibilityRole="button" accessibilityLabel={CONNECT_BACK_LABEL} onPress={() => choosePlatform(null)} hitSlop={8} style={styles.stepBack}>
+                <Ionicons name="chevron-back" size={18} color={colors.accent} />
+                <AppText style={styles.stepBackText}>Back</AppText>
+              </PressableScale>
+              <View style={styles.stepTitle}>
+                <PlatformBadge platform={addPlatform} size={28} />
+                <AppText style={styles.stepTitleText}>{connectPlatformLabel(addPlatform)}</AppText>
+              </View>
+              <InfoToggle open={showNoLeagueHelp} onPress={() => setShowNoLeagueHelp((value) => !value)} label={`About ${connectPlatformLabel(addPlatform)}`} />
+            </View>
+            {showNoLeagueHelp ? (
+              <View style={styles.noLeagueCard}>
+                {addPlatform === 'sleeper' ? (
+                  <>
+                    <AppText style={styles.noLeagueText}>{CONNECT_FIND_USERNAME}</AppText>
+                    <AppText style={styles.noLeagueText}>
+                      FantasyDesk is a GM assistant for a league you already have on Sleeper — it
+                      doesn&apos;t create or host leagues itself. Create a free league in the Sleeper app
+                      (or at sleeper.com), then come back here and search your Sleeper username.
+                    </AppText>
+                    <PressableScale accessibilityRole="button" style={styles.noLeagueButton} onPress={() => void Linking.openURL('https://sleeper.com')}>
+                      <AppText style={styles.noLeagueButtonText}>Open Sleeper</AppText>
+                      <Ionicons name="open-outline" size={14} color={colors.accent} />
+                    </PressableScale>
+                  </>
+                ) : (
+                  <AppText style={styles.noLeagueText}>{platformHelpText(addPlatform)}</AppText>
+                )}
+              </View>
+            ) : null}
             {addPlatform !== 'sleeper' ? (
               addCapMessage ? (
                 <View style={styles.capLockInModal}>
@@ -794,10 +845,6 @@ export default function HomeScreen({ navigation, route }: Props) {
                 </View>
               ) : (
                 <>
-                <PressableScale accessibilityRole="button" onPress={() => setAddPlatform('sleeper')} hitSlop={8} style={styles.noLeagueToggle}>
-                  <AppText style={styles.noLeagueToggleText}>← Use my Sleeper username</AppText>
-                </PressableScale>
-                <ModalFormHint>{connectPlatformNotice(importedPlatformLabel(`${addPlatform}:`))}</ModalFormHint>
                 <EspnLeagueImport
                   key={addPlatform}
                   platform={addPlatform}
@@ -816,7 +863,6 @@ export default function HomeScreen({ navigation, route }: Props) {
             ) : (
             <>
             <ModalFormHint>{CONNECT_TRUST_LINE}</ModalFormHint>
-            <ModalFormHint>{CONNECT_FIND_USERNAME}</ModalFormHint>
             <Input
               value={addQuery}
               onChangeText={setAddQuery}
@@ -828,40 +874,6 @@ export default function HomeScreen({ navigation, route }: Props) {
               returnKeyType="search"
               maxLength={64}
             />
-
-            {/* Fix (welcome audit): a persistent, always-available affordance
-                for a brand-new user who has no Sleeper account/league at
-                all — not only shown reactively after a failed search (see
-                findLeagues' auto-expand above), since someone might never
-                attempt a search in the first place without this nudge. */}
-            <PressableScale accessibilityRole="button"
-              onPress={() => setShowNoLeagueHelp((value) => !value)}
-              hitSlop={8}
-              style={styles.noLeagueToggle}
-            >
-              <AppText style={styles.noLeagueToggleText}>Don't have a Sleeper league yet?</AppText>
-              <Ionicons
-                name={showNoLeagueHelp ? 'chevron-up' : 'chevron-down'}
-                size={14}
-                color={colors.textSecondary}
-              />
-            </PressableScale>
-            {showNoLeagueHelp ? (
-              <View style={styles.noLeagueCard}>
-                <AppText style={styles.noLeagueText}>
-                  FantasyDesk is a GM assistant for a league you already have on Sleeper — it
-                  doesn't create or host leagues itself. Create a free league in the Sleeper app
-                  (or at sleeper.com), then come back here and search your Sleeper username.
-                </AppText>
-                <PressableScale accessibilityRole="button"
-                  style={styles.noLeagueButton}
-                  onPress={() => void Linking.openURL('https://sleeper.com')}
-                >
-                  <AppText style={styles.noLeagueButtonText}>Open Sleeper</AppText>
-                  <Ionicons name="open-outline" size={14} color={colors.accent} />
-                </PressableScale>
-              </View>
-            ) : null}
 
             {addCapMessage ? (
               <View style={styles.capLockInModal}>
@@ -943,40 +955,8 @@ export default function HomeScreen({ navigation, route }: Props) {
               confirmLoading={addBusy}
             />
 
-            {/* Secondary paths, compact: every other platform and the sample league stay one tap away. */}
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityState={{ expanded: addMoreOpen }}
-              onPress={() => setAddMoreOpen((open) => !open)}
-              style={styles.noLeagueToggle}
-              testID="more-ways-toggle"
-            >
-              <AppText style={styles.noLeagueToggleText}>{CONNECT_MORE_LABEL}</AppText>
-              <Ionicons name={addMoreOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
-            </PressableScale>
-            {addMoreOpen ? (
-              <View style={styles.moreWays}>
-                {connectWays({ hasAccount: true }).map((way) => (
-                  <PressableScale
-                    key={way.key}
-                    accessibilityRole="button"
-                    style={styles.moreWayRow}
-                    onPress={() => {
-                      if (way.key === 'sample') {
-                        openSampleLeague();
-                        return;
-                      }
-                      setAddPlatform(way.key as 'yahoo' | 'espn' | 'fleaflicker' | 'mfl');
-                      setAddMessage(null);
-                      setAddCapMessage(null);
-                    }}
-                  >
-                    <AppText style={styles.addOptionName}>{way.label}</AppText>
-                    <AppText style={styles.addOptionMeta}>{way.blurb}</AppText>
-                  </PressableScale>
-                ))}
-              </View>
-            ) : null}
+            </>
+            )}
             </>
             )}
             </>
@@ -1128,8 +1108,11 @@ function createStyles(colors: ThemeColors) {
   },
   addOptionText: { flex: 1, marginHorizontal: spacing.sm },
   addOptionRowOn: { borderColor: colors.accent },
-  moreWays: { gap: spacing.sm, marginTop: spacing.xs },
-  moreWayRow: { minHeight: 44, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  stepHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  stepBack: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+  stepBackText: { fontSize: 15.5, fontWeight: '700', color: colors.accent },
+  stepTitle: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  stepTitleText: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
   addOptionName: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary },
   addOptionMeta: { fontSize: 13.5, color: colors.textSecondary, marginTop: 2 },
   listContent: {

@@ -7,6 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import SegmentedTabBar from './SegmentedTabBar';
+import TeamAvatar from './TeamAvatar';
+import Button from './Button';
+import { IMPORT_STEP_ORDER, importStepProgress, importStepTitle, connectPlatformNotice, type ImportStepKey } from '../lib/connectFlow';
 import { ApiError, api, type EspnLeaguePreviewResponse, type YahooLeagueOption } from '../lib/api';
 import YahooConnectStep from './YahooConnectStep';
 import { yahooReasonMessage } from '../lib/yahooConnect';
@@ -42,6 +45,11 @@ const PLATFORM_COPY: Record<ImportPlatform, { label: string; hint: string; notFo
     placeholder: 'e.g. 10015',
   },
 };
+/** The platform's help copy (platform limits + where to find the ID), shown behind the step header's info icon. */
+export function platformHelpText(platform: ImportPlatform): string {
+  return `${connectPlatformNotice(PLATFORM_COPY[platform].label)}\n\n${PLATFORM_COPY[platform].hint}`;
+}
+
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors } from '../theme';
 import Input from './Input';
@@ -83,6 +91,8 @@ export default function EspnLeagueImport({
   const [isPrivate, setIsPrivate] = useState(false);
   const [canConnect, setCanConnect] = useState(false);
   const [loginSaved, setLoginSaved] = useState(false);
+  // The ID step comes first; the season step runs the lookup; the team step is the preview.
+  const [formStep, setFormStep] = useState<'id' | 'season'>('id');
 
   // Whether an ESPN login is already saved, so the user sees (and can remove) it.
   useEffect(() => {
@@ -190,6 +200,7 @@ export default function EspnLeagueImport({
     const unavailable = (preview.features ?? []).filter((item) => item.status !== 'available');
     return (
       <View>
+        {platform !== 'yahoo' ? <StepProgress step="team" styles={styles} accent={colors.accent} border={colors.border} /> : null}
         <AppText style={styles.leagueName}>{preview.league.name}</AppText>
         <AppText style={styles.meta}>
           {copy.label} · {preview.league.season} season · {preview.league.team_count} teams
@@ -213,7 +224,7 @@ export default function EspnLeagueImport({
         ) : null}
         {preview.ok ? (
           <>
-            <AppText style={styles.kicker}>Which team is yours?</AppText>
+            <AppText style={styles.kicker}>{importStepTitle('team', copy.label)}</AppText>
             <ScrollView style={styles.teamList} keyboardShouldPersistTaps="handled">
               {(preview.teams ?? []).map((team) => {
                 const selected = team.roster_id === rosterId;
@@ -225,6 +236,7 @@ export default function EspnLeagueImport({
                     accessibilityRole="radio"
                     accessibilityState={{ checked: selected }}
                   >
+                    <TeamAvatar avatarId={null} name={team.team_name} size={36} style={styles.teamAvatar} />
                     <View style={styles.teamText}>
                       <AppText style={styles.teamName}>
                         {team.team_name}
@@ -314,27 +326,53 @@ export default function EspnLeagueImport({
     );
   }
 
+  const goToSeason = () => {
+    if (!/^\d{1,12}$/.test(leagueId.trim())) {
+      setMessage(copy.notFound);
+      return;
+    }
+    setMessage(null);
+    setFormStep('season');
+  };
+
+  if (formStep === 'id') {
+    return (
+      <View>
+        <StepProgress step="id" styles={styles} accent={colors.accent} border={colors.border} />
+        <AppText style={styles.kicker}>{importStepTitle('id', copy.label)}</AppText>
+        <Input
+          style={styles.input}
+          value={leagueId}
+          onChangeText={setLeagueId}
+          placeholder={copy.placeholder}
+          keyboardType="number-pad"
+          autoCorrect={false}
+          editable={!busy}
+          onSubmitEditing={goToSeason}
+          returnKeyType="next"
+          maxLength={12}
+        />
+        {message ? <AppText style={styles.error}>{message}</AppText> : null}
+        <Button label="Next" onPress={goToSeason} />
+        <View style={styles.actions}>
+          <PressableScale style={styles.cancelButton} onPress={onCancel}>
+            <AppText style={styles.cancelText}>Cancel</AppText>
+          </PressableScale>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View>
-      <AppText style={styles.hint}>{copy.hint}</AppText>
-      {platform === 'espn' ? <EspnLoginStatus saved={loginSaved} onRemoved={() => setLoginSaved(false)} /> : null}
-      <Input
-        style={styles.input}
-        value={leagueId}
-        onChangeText={setLeagueId}
-        placeholder={`${copy.label} league ID`}
-        keyboardType="number-pad"
-        autoCorrect={false}
-        editable={!busy}
-        onSubmitEditing={() => void findLeague()}
-        maxLength={12}
-      />
-      <AppText style={styles.kicker}>Season</AppText>
+      <StepProgress step="season" styles={styles} accent={colors.accent} border={colors.border} />
+      <AppText style={styles.kicker}>{importStepTitle('season', copy.label)}</AppText>
       <SegmentedTabBar<string>
         options={seasons.map((option) => ({ key: String(option), label: String(option) }))}
         active={season}
         onChange={setSeason}
       />
+      {platform === 'espn' ? <EspnLoginStatus saved={loginSaved} onRemoved={() => setLoginSaved(false)} /> : null}
       {message ? <AppText style={styles.error}>{message}</AppText> : null}
       {isPrivate && !canConnect ? (
         <View testID="espn-private-help">
@@ -354,13 +392,32 @@ export default function EspnLeagueImport({
         </PressableScale>
       ) : null}
       <View style={styles.actions}>
-        <PressableScale style={styles.cancelButton} onPress={onCancel} disabled={busy}>
-          <AppText style={styles.cancelText}>Cancel</AppText>
+        <PressableScale
+          style={styles.cancelButton}
+          onPress={() => {
+            setFormStep('id');
+            setMessage(null);
+          }}
+          disabled={busy}
+        >
+          <AppText style={styles.cancelText}>Change league ID</AppText>
         </PressableScale>
         <PressableScale style={styles.primaryButton} onPress={() => void findLeague()} disabled={busy}>
           {busy ? <ActivityIndicator size="small" color={colors.onAccent} /> : <AppText style={styles.primaryText}>Find league</AppText>}
         </PressableScale>
       </View>
+    </View>
+  );
+}
+
+/** "Step 2 of 3" with three dots: the platform stepper's position. */
+function StepProgress({ step, styles, accent, border }: { step: ImportStepKey; styles: ReturnType<typeof createStyles>; accent: string; border: string }) {
+  return (
+    <View style={styles.progress} testID="import-step-progress">
+      <AppText style={styles.kicker}>{importStepProgress(step)}</AppText>
+      {IMPORT_STEP_ORDER.map((key) => (
+        <View key={key} style={[styles.dot, { backgroundColor: key === step ? accent : border }]} />
+      ))}
     </View>
   );
 }
@@ -388,6 +445,9 @@ function createStyles(colors: ThemeColors) {
       borderBottomColor: colors.border,
     },
     teamText: { flex: 1, marginRight: spacing.sm },
+    teamAvatar: { marginRight: spacing.sm },
+    progress: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+    dot: { width: 6, height: 6, borderRadius: 3 },
     teamName: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary },
     featureCard: {
       marginTop: spacing.md,
@@ -401,7 +461,7 @@ function createStyles(colors: ThemeColors) {
     featureText: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 19 },
     featureStrong: { fontSize: 13.5, fontWeight: '700', color: colors.textPrimary },
     retryText: { fontSize: 14.5, fontWeight: '700', color: colors.accent, marginTop: spacing.sm },
-    error: { fontSize: 13.5, color: colors.danger, marginTop: spacing.sm, lineHeight: 18 },
+    error: { fontSize: 13.5, color: colors.warning, marginTop: spacing.sm, lineHeight: 18 },
     actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.md },
     cancelButton: { paddingHorizontal: spacing.md, paddingVertical: 10 },
     cancelText: { fontSize: 15.5, fontWeight: '600', color: colors.textSecondary },

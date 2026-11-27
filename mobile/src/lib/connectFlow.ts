@@ -1,7 +1,7 @@
 /**
  * The one-field connect flow (UI pass 3, sheet 1 topic 2 V1): a Sleeper username and one "Connect" button, an instant
- * league list with avatars and checkboxes, then optional steps. Secondary paths (Yahoo / ESPN / Fleaflicker / MFL, an account,
- * the sample league) sit behind "More ways to connect". Pure and import-free; byte-identical twin of
+ * league list with avatars and checkboxes, then optional steps. Add-a-league is now one screen of five equal platform tiles
+ * (Sleeper, Yahoo, ESPN, Fleaflicker, MFL); tapping a tile shows only that platform's step. Pure and import-free; byte-identical twin of
  * mobile/src/lib/connectFlow.ts so web and the app never disagree on copy, defaults or what a save outcome means.
  */
 
@@ -10,7 +10,6 @@ export const CONNECT_FIELD_LABEL = "Sleeper username";
 export const CONNECT_PLACEHOLDER = "e.g. gridiron_gm";
 /** The one trust line (the longer explanation stays one tap away under "What is Sleeper?"). */
 export const CONNECT_TRUST_LINE = "Read-only. We never ask for your Sleeper password or change your lineup.";
-export const CONNECT_MORE_LABEL = "More ways to connect";
 export const CONNECT_WHAT_IS_SLEEPER =
   "FantasyDesk connects to your existing Sleeper fantasy league: it reads your real roster, matchups and league settings to build recommendations. Sleeper is a free app and website for running a fantasy league.";
 
@@ -22,26 +21,42 @@ export function connectPlatformNotice(platformLabel: string): string {
   return `Waiver and trade suggestions aren't available for ${platformLabel} leagues yet, so you'll only see what your imported roster can support.`;
 }
 
-export type ConnectWayKey = "yahoo" | "espn" | "fleaflicker" | "mfl" | "account" | "sample";
+export type ConnectPlatformKey = "sleeper" | "yahoo" | "espn" | "fleaflicker" | "mfl";
 
-export interface ConnectWay {
-  key: ConnectWayKey;
+export interface ConnectPlatform {
+  key: ConnectPlatformKey;
   label: string;
-  blurb: string;
+  /** One word under the name on the tile. */
+  hint: string;
 }
 
-const WAYS: ConnectWay[] = [
-  { key: "yahoo", label: "Yahoo", blurb: "Sign in with Yahoo, pick your league" },
-  { key: "espn", label: "ESPN", blurb: "League ID. Private leagues need 2 cookies" },
-  { key: "fleaflicker", label: "Fleaflicker", blurb: "League ID" },
-  { key: "mfl", label: "MFL", blurb: "League ID" },
-  { key: "account", label: "Sign in or create an account", blurb: "Email, Google or Apple. Your leagues follow you across devices" },
-  { key: "sample", label: "Try the sample league", blurb: "No sign-up, 20 seconds" },
+/** The five equal tiles of Add a league (grid order). */
+export const CONNECT_PLATFORMS: ReadonlyArray<ConnectPlatform> = [
+  { key: "sleeper", label: "Sleeper", hint: "Username" },
+  { key: "yahoo", label: "Yahoo", hint: "Sign in" },
+  { key: "espn", label: "ESPN", hint: "League ID" },
+  { key: "fleaflicker", label: "Fleaflicker", hint: "League ID" },
+  { key: "mfl", label: "MFL", hint: "League ID" },
 ];
 
-/** The compact secondary rows. `account` is hidden when already signed in with a real account. */
-export function connectWays(opts: { hasAccount: boolean }): ConnectWay[] {
-  return WAYS.filter((way) => !(way.key === "account" && opts.hasAccount));
+export const CONNECT_ACCOUNT_LABEL = "Sign in or create an account";
+export const CONNECT_SAMPLE_LABEL = "Try a sample league";
+export const CONNECT_BACK_LABEL = "All platforms";
+
+export function connectPlatformLabel(key: ConnectPlatformKey): string {
+  return CONNECT_PLATFORMS.find((p) => p.key === key)?.label ?? key;
+}
+
+/** The steps of the ID-based platforms (ESPN / Fleaflicker / MFL): one input per step, then the team pick. */
+export type ImportStepKey = "id" | "season" | "team";
+export const IMPORT_STEP_ORDER: ReadonlyArray<ImportStepKey> = ["id", "season", "team"];
+export function importStepTitle(step: ImportStepKey, label: string): string {
+  if (step === "id") return `${label} league ID`;
+  if (step === "season") return "Season";
+  return "Which team is yours?";
+}
+export function importStepProgress(step: ImportStepKey): string {
+  return `Step ${IMPORT_STEP_ORDER.indexOf(step) + 1} of ${IMPORT_STEP_ORDER.length}`;
 }
 
 export interface ConnectLeague {

@@ -11,7 +11,9 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { clearPendingReferralCode, getPendingReferralCode } from "@/lib/attribution";
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { describeSleeperConnectError, isConnectivityFailure, type SleeperConnectError } from "@/lib/sleeperConnectErrors";
-import { EspnImportForm } from "@/components/EspnImportForm";
+import { EspnImportForm, PlatformHelp } from "@/components/EspnImportForm";
+import { InfoToggle } from "@/components/InfoToggle";
+import { PlatformBadge } from "@/components/PlatformBadge";
 import { parseYahooReturn } from "@/lib/yahooConnect";
 import { LeagueWarmupProgress } from "@/components/LeagueWarmupProgress";
 import { Button } from "@/components/Button";
@@ -21,16 +23,18 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonRows } from "@/components/Skeleton";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import {
+  CONNECT_ACCOUNT_LABEL,
+  CONNECT_BACK_LABEL,
   CONNECT_FIELD_LABEL,
-  CONNECT_MORE_LABEL,
+  CONNECT_PLATFORMS,
   CONNECT_PLACEHOLDER,
   CONNECT_PRIMARY_LABEL,
   CONNECT_TRUST_LINE,
   CONNECT_FIND_USERNAME,
   CONNECT_WHAT_IS_SLEEPER,
   connectCtaLabel,
-  connectPlatformNotice,
-  connectWays,
+  connectPlatformLabel,
+  type ConnectPlatformKey,
   defaultLeagueSelection,
   groupLeaguesBySeason,
   leagueMeta,
@@ -62,16 +66,13 @@ import {
  * exactly, so Founder Analytics' funnel keeps the same semantics it
  * already has for the legacy surface.
  */
-type LeaguePlatform = "sleeper" | "espn" | "fleaflicker" | "mfl" | "yahoo";
-
 /**
- * The Connect League flow, one field first (UI pass 3, sheet 1 topic 2 V1; copy and rules in lib/connectFlow.ts):
- * a Sleeper username and one "Connect" button, an instant league list with avatars and checkboxes, then optional
- * steps. Yahoo / ESPN / Fleaflicker / MFL, an account and the sample league are compact rows under "More ways to connect",
- * so every previous capability is still one tap away. Mobile twin: the Add league sheet in screens/HomeScreen.tsx.
+ * The Connect League flow (redesign 2026-11): one screen of five equal platform tiles (Sleeper, Yahoo, ESPN, Fleaflicker,
+ * MFL). Tapping a tile shows only that platform's step (a username field, the Yahoo sign-in, or the ID stepper); Back returns
+ * to the tiles. The sample league is a secondary button under the tiles and the account sign-in a small text row, so every
+ * previous capability is still one tap away. Copy and rules live in lib/connectFlow.ts. Mobile twin: the Add league sheet
+ * in screens/HomeScreen.tsx.
  */
-const PLATFORM_LABELS = { espn: "ESPN", fleaflicker: "Fleaflicker", mfl: "MFL", yahoo: "Yahoo" } as const;
-
 export function SleeperImportForm({
   onLeagueChosen,
   sampleCtaBelow = false,
@@ -84,76 +85,119 @@ export function SleeperImportForm({
   sampleCtaBelow?: boolean;
   /** Fires right before a disposable guest session is created by Connect (the landing keeps the form mounted). */
   onStartSession?: () => void;
-  /** Rendered under "More ways to connect" > account (sign in / create an account). Omitted: no account row. */
+  /** Rendered under the account row (sign in / create an account). Omitted: no account row. */
   accountSlot?: ReactNode;
 }) {
   // Back from Yahoo's sign-in (the API callback redirects to /connect-league?yahoo=connected|error): reopen the Yahoo step.
   // This form is only rendered client-side behind the session gate, so reading the URL here cannot mismatch hydration.
-  const [platform, setPlatform] = useState<LeaguePlatform>(() =>
-    typeof window !== "undefined" && parseYahooReturn(window.location.search) ? "yahoo" : "sleeper",
+  const [platform, setPlatform] = useState<ConnectPlatformKey | null>(() =>
+    typeof window !== "undefined" && parseYahooReturn(window.location.search) ? "yahoo" : null,
   );
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const ways = connectWays({ hasAccount: !accountSlot });
-  const onWay = (key: string) => {
-    if (key === "yahoo" || key === "espn" || key === "fleaflicker" || key === "mfl") setPlatform(key);
-    if (key === "account") setAccountOpen((open) => !open);
+  const choose = (key: ConnectPlatformKey | null) => {
+    setPlatform(key);
+    setHelpOpen(false);
   };
-  return (
-    <div className="flex flex-col gap-3">
-      {platform !== "sleeper" ? (
-        <div className="flex flex-col gap-2">
-          <button type="button" onClick={() => setPlatform("sleeper")} className="tap-link self-start text-sm font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}>
-            ← Use my Sleeper username
+
+  if (platform) {
+    const label = connectPlatformLabel(platform);
+    return (
+      <div className="flex flex-col gap-3" data-testid="connect-step">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => choose(null)}
+            aria-label={CONNECT_BACK_LABEL}
+            className="tap-link flex shrink-0 items-center text-sm font-bold"
+            style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}
+          >
+            <span aria-hidden="true">←</span>&nbsp;Back
           </button>
-          {/* State the limit before they type anything (same sentence Today shows as platform_notice). */}
-          <p className="m-0 text-xs" data-testid="platform-notice" style={{ color: "var(--color-text-secondary)" }}>
-            {connectPlatformNotice(PLATFORM_LABELS[platform])}
-          </p>
-          {/* key: switching platform resets the form (league id, preview, team pick). */}
-          <EspnImportForm key={platform} platform={platform} onLeagueChosen={onLeagueChosen} />
+          <span className="flex min-w-0 flex-1 items-center justify-center gap-2">
+            <PlatformBadge platform={platform} size={28} />
+            <span className="truncate font-bold" style={{ color: "var(--color-text-primary)" }}>
+              {label}
+            </span>
+          </span>
+          <InfoToggle open={helpOpen} onToggle={() => setHelpOpen((v) => !v)} label={`About ${label}`} />
         </div>
-      ) : (
-        <SleeperUsernameImport onLeagueChosen={onLeagueChosen} sampleCtaBelow={sampleCtaBelow} onStartSession={onStartSession} />
-      )}
-      <div className="flex flex-col gap-2" data-testid="more-ways">
-        <button
-          type="button"
-          aria-expanded={moreOpen}
-          onClick={() => setMoreOpen(!moreOpen)}
-          className="tap-link flex items-center justify-between text-sm font-bold"
-          style={{ minHeight: "var(--touch-target-min)", color: "var(--color-text-secondary)" }}
-        >
-          <span>{CONNECT_MORE_LABEL}</span>
-          <span aria-hidden="true">{moreOpen ? "−" : "+"}</span>
-        </button>
-        {moreOpen ? (
-          <ul className="m-0 flex list-none flex-col gap-2 p-0 motion-in" data-motion="in">
-            {ways.map((way) => (
-              <li key={way.key}>
-                {way.key === "sample" ? (
-                  <SampleLeagueButton surface="connect_step" variant="secondary" />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onWay(way.key)}
-                    aria-expanded={way.key === "account" ? accountOpen : undefined}
-                    className="glass-surface flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left"
-                    style={{ minHeight: "var(--touch-target-min)", color: "var(--color-text-primary)" }}
-                  >
-                    <span className="text-sm font-bold">{way.label}</span>
-                    <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                      {way.blurb}
-                    </span>
-                  </button>
-                )}
-                {way.key === "account" && accountOpen ? <div className="mt-2">{accountSlot}</div> : null}
-              </li>
-            ))}
-          </ul>
+        {helpOpen ? (
+          <div
+            className="glass-input flex flex-col gap-1 px-3 py-3 text-xs motion-in"
+            data-motion="in"
+            style={{ borderLeft: "var(--border-width-semantic) solid var(--color-accent)", color: "var(--color-text-secondary)" }}
+          >
+            {platform === "sleeper" ? <SleeperHelp /> : <PlatformHelp platform={platform} />}
+          </div>
         ) : null}
+        {platform === "sleeper" ? (
+          <SleeperUsernameImport onLeagueChosen={onLeagueChosen} sampleCtaBelow={sampleCtaBelow} onStartSession={onStartSession} />
+        ) : (
+          // key: switching platform resets the form (league id, preview, team pick).
+          <EspnImportForm key={platform} platform={platform} onLeagueChosen={onLeagueChosen} />
+        )}
       </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3" data-testid="connect-tiles">
+      <ul className="m-0 grid list-none grid-cols-3 gap-2 p-0">
+        {CONNECT_PLATFORMS.map((p) => (
+          <li key={p.key} className="flex">
+            <button
+              type="button"
+              onClick={() => choose(p.key)}
+              aria-label={`${p.label}, ${p.hint}`}
+              className="glass-surface flex w-full flex-col items-center gap-1 px-2 py-3 text-center"
+              style={{ minHeight: "var(--touch-target-min)", color: "var(--color-text-primary)" }}
+            >
+              <PlatformBadge platform={p.key} size={40} />
+              <span className="text-sm font-bold">{p.label}</span>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                {p.hint}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="m-0 text-center text-xs" style={{ color: "var(--color-text-muted)" }}>
+        {CONNECT_TRUST_LINE}
+      </p>
+      <SampleLeagueButton surface="connect_step" variant="secondary" />
+      {accountSlot ? (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            aria-expanded={accountOpen}
+            onClick={() => setAccountOpen(!accountOpen)}
+            className="tap-link self-center text-sm font-bold"
+            style={{ minHeight: "var(--touch-target-min)", color: "var(--color-text-secondary)" }}
+          >
+            {CONNECT_ACCOUNT_LABEL}
+          </button>
+          {accountOpen ? accountSlot : null}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/** Sleeper's help (behind the info icon): what it is, where the username lives, and the free-signup link. */
+function SleeperHelp() {
+  return (
+    <>
+      <p className="m-0">{CONNECT_WHAT_IS_SLEEPER}</p>
+      <p className="m-0">{CONNECT_FIND_USERNAME}</p>
+      <p className="m-0">
+        Don&apos;t have a Sleeper league yet?{" "}
+        <a href="https://sleeper.com" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: "var(--color-accent)" }}>
+          Create a free one at sleeper.com
+        </a>
+        .
+      </p>
+    </>
   );
 }
 
@@ -177,7 +221,6 @@ function SleeperUsernameImport({
   const [connectError, setConnectError] = useState<SleeperConnectError | null>(null);
   const [leagues, setLeagues] = useState<SleeperLeagueSummary[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [whatIsOpen, setWhatIsOpen] = useState(false);
   // The last lookup answered for only one of the two seasons: offer "Check again" beside the note.
   const [partial, setPartial] = useState(false);
   // Set once a save reports the server is warming the league's first-load
@@ -475,24 +518,6 @@ function SleeperUsernameImport({
           <p className="m-0">{message}</p>
         </div>
       ) : null}
-      <div className="flex flex-col gap-1">
-        <button type="button" aria-expanded={whatIsOpen} onClick={() => setWhatIsOpen(!whatIsOpen)} className="tap-link self-start text-xs font-bold" style={{ color: "var(--color-text-secondary)", minHeight: "var(--touch-target-min)" }}>
-          What is Sleeper? {whatIsOpen ? "−" : "+"}
-        </button>
-        {whatIsOpen ? (
-          <div className="glass-input flex flex-col gap-1 px-3 py-3 text-xs motion-in" data-motion="in" style={{ borderLeft: "var(--border-width-semantic) solid var(--color-accent)", color: "var(--color-text-secondary)" }}>
-            <p className="m-0">{CONNECT_WHAT_IS_SLEEPER}</p>
-            <p className="m-0">{CONNECT_FIND_USERNAME}</p>
-            <p className="m-0">
-              Don&apos;t have a Sleeper league yet?{" "}
-              <a href="https://sleeper.com" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: "var(--color-accent)" }}>
-                Create a free one at sleeper.com
-              </a>
-              .
-            </p>
-          </div>
-        ) : null}
-      </div>
     </form>
   );
 }

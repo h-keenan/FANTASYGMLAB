@@ -100,6 +100,7 @@ describe("SleeperImportForm warm-up hand-off", () => {
     vi.mocked(api.getLeagueWarmupStatus).mockResolvedValue({ ok: true, state: "done", stages: stages(true, true, true) });
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    fireEvent.click(screen.getByRole("button", { name: /^sleeper/i }));
     connect();
     await waitFor(() => expect(screen.getByTestId("league-warmup-progress")).toBeInTheDocument());
     await waitFor(() => expect(onLeagueChosen).toHaveBeenCalledWith("solo", "Solo"));
@@ -109,6 +110,7 @@ describe("SleeperImportForm warm-up hand-off", () => {
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: true, reason: "", cap: 3, warming: false });
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    fireEvent.click(screen.getByRole("button", { name: /^sleeper/i }));
     connect();
     await waitFor(() => expect(onLeagueChosen).toHaveBeenCalledWith("solo", "Solo"));
     expect(screen.queryByTestId("league-warmup-progress")).not.toBeInTheDocument();

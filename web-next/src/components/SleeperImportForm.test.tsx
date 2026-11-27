@@ -29,6 +29,10 @@ vi.mock("@/lib/api", async () => {
   };
 });
 
+function openSleeper() {
+  fireEvent.click(screen.getByRole("button", { name: /^sleeper/i }));
+}
+
 describe("SleeperImportForm", () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue({
@@ -52,10 +56,11 @@ describe("SleeperImportForm", () => {
 
   it("always shows an explanation of what Sleeper is, with a link to sleeper.com", () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
 
     // One trust line up front; the longer explanation is one tap away.
     expect(screen.getByText(/never ask for your sleeper password/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /what is sleeper/i }));
+    fireEvent.click(screen.getByRole("button", { name: /about sleeper/i }));
     expect(screen.getByText(/connects to your existing/i)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /create a free one at sleeper\.com/i })[0]).toHaveAttribute(
       "href",
@@ -72,6 +77,7 @@ describe("SleeperImportForm", () => {
       message: "No Sleeper account matched that username. Check spelling and try again.",
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "nobody" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -94,6 +100,7 @@ describe("SleeperImportForm", () => {
       message: "server text",
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "empty" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
@@ -106,6 +113,7 @@ describe("SleeperImportForm", () => {
   it("shows a retry message on a network failure and keeps the username", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockRejectedValue(new ApiError(0, "Could not reach the server."));
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
@@ -123,6 +131,7 @@ describe("SleeperImportForm", () => {
       message: "Sleeper is limiting requests right now. Wait a minute and try again.",
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/limiting requests/i));
@@ -144,6 +153,7 @@ describe("SleeperImportForm", () => {
       partial_message: "Sleeper did not answer for one season, so this list may be missing leagues. Try again to check.",
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/may be missing leagues/i));
@@ -163,6 +173,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "provider_unavailable", cap: 0 });
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    openSleeper();
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/sleeper is temporarily unreachable/i));
@@ -172,6 +183,7 @@ describe("SleeperImportForm", () => {
   it("tracks a click on the sample league button", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({ ok: false, status: "user_not_found", username: "x", leagues: [], message: "" });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     const link = await screen.findByRole("link", { name: /try a sample league/i });
@@ -185,6 +197,7 @@ describe("SleeperImportForm", () => {
   it("skips its own sample button when the page already renders one below", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({ ok: false, status: "user_not_found", username: "x", leagues: [], message: "" });
     render(<SleeperImportForm sampleCtaBelow onLeagueChosen={vi.fn()} />);
+    openSleeper();
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await screen.findByRole("alert");
@@ -200,6 +213,7 @@ describe("SleeperImportForm", () => {
       message: "No eligible leagues found for that username.",
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -215,6 +229,7 @@ describe("SleeperImportForm", () => {
   it("fires league_import_started on every submit, before the lookup resolves", () => {
     vi.mocked(api.lookupSleeperLeagues).mockReturnValue(new Promise(() => {})); // never resolves
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -231,6 +246,7 @@ describe("SleeperImportForm", () => {
       message: "No eligible leagues found for that username.",
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -249,6 +265,7 @@ describe("SleeperImportForm", () => {
       message: "No Sleeper account matched that username.",
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "nobody" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -273,6 +290,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: true, reason: "", cap: 3 });
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -296,6 +314,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: true, reason: "", cap: 3 });
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -329,6 +348,7 @@ describe("SleeperImportForm", () => {
       message: "",
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -352,6 +372,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.linkSleeperUsername).mockResolvedValue({ ok: true } as never);
     vi.mocked(api.saveLeague).mockRejectedValue(new Error("network down"));
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -376,6 +397,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "at_cap", cap: 1 });
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -401,6 +423,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "at_cap", cap: 1 });
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -423,6 +446,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: false, reason: "league_not_found", cap: 0 });
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    openSleeper();
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
@@ -446,6 +470,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.saveLeague).mockResolvedValueOnce({ ok: true, reason: "", cap: 1 }).mockResolvedValueOnce({ ok: false, reason: "at_cap", cap: 1 });
     const onLeagueChosen = vi.fn();
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    openSleeper();
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await waitFor(() => expect(screen.getByRole("checkbox", { name: /League B/ })).toBeInTheDocument());
@@ -457,24 +482,34 @@ describe("SleeperImportForm", () => {
     expect(onLeagueChosen).toHaveBeenCalledWith("league-a", "League A");
   });
 
-  it("keeps Yahoo, ESPN, Fleaflicker, MFL, the account and the sample league behind More ways to connect", async () => {
+  it("shows five equal platform tiles, the sample league and the account row on one screen, with no More ways collapse", async () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} accountSlot={<p>account form</p>} />);
-    expect(screen.queryByRole("link", { name: /try a sample league/i })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /more ways to connect/i }));
-    expect(screen.getByRole("button", { name: /^Yahoo/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^ESPN/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Fleaflicker/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^MFL/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /more ways to connect/i })).toBeNull();
+    for (const name of [/^Sleeper/, /^Yahoo/, /^ESPN/, /^Fleaflicker/, /^MFL/]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByTestId("platform-badge-sleeper")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /try a sample league/i })).toHaveAttribute("href", "/sample-league");
+    expect(screen.getByText(/never ask for your sleeper password/i)).toBeInTheDocument();
+    expect(screen.queryByText("account form")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /sign in or create an account/i }));
     expect(screen.getByText("account form")).toBeInTheDocument();
+  });
+
+  it("shows only the tapped platform's step and Back returns to the tiles", async () => {
+    render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: /^ESPN/ }));
-    expect(screen.getByRole("button", { name: /use my sleeper username/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/espn league id/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("e.g. gridiron_gm")).toBeNull();
+    expect(screen.queryByRole("link", { name: /try a sample league/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /all platforms/i }));
+    expect(screen.getByRole("button", { name: /^Sleeper/ })).toBeInTheDocument();
   });
 
   it("shows a skeleton, not a Loading line, while the leagues are being looked up", async () => {
     vi.mocked(api.lookupSleeperLeagues).mockReturnValue(new Promise(() => {}));
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    openSleeper();
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
     fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     expect(await screen.findByTestId("connect-skeleton")).toBeInTheDocument();

@@ -46,11 +46,8 @@ export default function ConnectLeaguePage() {
 
   return (
     <main className="flex-1 flex flex-col items-center px-4 py-12 gap-6">
-      <div className="w-full max-w-sm flex flex-col gap-1 text-center">
+      <div className="w-full max-w-sm text-center">
         <h1 style={{ font: "var(--font-page-title)" }}>Add a league</h1>
-        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Type your Sleeper username, or use More ways to connect for Yahoo, ESPN, Fleaflicker or MFL.
-        </p>
       </div>
       <div className="w-full max-w-sm flex flex-col gap-3">
         <FreeLeagueLimitNote />

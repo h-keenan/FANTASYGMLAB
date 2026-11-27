@@ -56,7 +56,6 @@ const PREVIEW: EspnLeaguePreviewResponse = {
 
 function openEspn() {
   render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
-  fireEvent.click(screen.getByRole("button", { name: /more ways to connect/i }));
   fireEvent.click(screen.getByRole("button", { name: /^ESPN/ }));
 }
 
@@ -73,21 +72,21 @@ describe("ESPN import in the Connect League flow", () => {
     onLeagueChosen.mockReset();
   });
 
-  it("defaults to Sleeper and switches to the ESPN form, which asks for no private-league cookies", () => {
+  it("starts on the platform tiles and opens the ESPN step, which asks for no private-league cookies", () => {
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
-    expect(screen.getByPlaceholderText("e.g. gridiron_gm")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("e.g. gridiron_gm")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /more ways to connect/i }));
     fireEvent.click(screen.getByRole("button", { name: /^ESPN/ }));
     expect(screen.getByLabelText(/espn league id/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/swid|espn_s2/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /about espn/i }));
     expect(screen.getByText(/private league: we'll ask you to connect your espn login/i)).toBeInTheDocument();
   });
 
   it("rejects a non-numeric league id without calling the API", () => {
     openEspn();
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "my league" } });
-    fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByRole("alert")).toHaveTextContent(/leagueId=/);
     expect(api.previewEspnLeague).not.toHaveBeenCalled();
   });
@@ -98,6 +97,8 @@ describe("ESPN import in the Connect League flow", () => {
     openEspn();
 
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "42654852" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
 
     await waitFor(() => expect(screen.getByText("FFLR Test League")).toBeInTheDocument());
@@ -134,9 +135,9 @@ describe("ESPN import in the Connect League flow", () => {
     });
     vi.mocked(api.saveLeague).mockResolvedValue({ ok: true, reason: "", cap: 1 });
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
-    fireEvent.click(screen.getByRole("button", { name: /more ways to connect/i }));
     fireEvent.click(screen.getByRole("button", { name: /^MFL/ }));
     fireEvent.change(screen.getByLabelText(/mfl league id/i), { target: { value: "10015" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /find my mfl league/i }));
 
     await waitFor(() => expect(screen.getByText("Dynasty Pioneer")).toBeInTheDocument());
@@ -156,6 +157,7 @@ describe("ESPN import in the Connect League flow", () => {
     });
     openEspn();
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/private/i));
@@ -167,6 +169,7 @@ describe("ESPN import in the Connect League flow", () => {
     vi.mocked(api.previewEspnLeague).mockResolvedValue({ ok: false, reason: "private_league", message: "x" });
     openEspn();
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "99887766" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Make League Viewable to Public/));
@@ -182,6 +185,7 @@ describe("ESPN import in the Connect League flow", () => {
     vi.mocked(api.previewEspnLeague).mockResolvedValueOnce({ ok: false, reason: "league_not_found", message: "Not found." });
     openEspn();
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Not found."));
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
@@ -198,6 +202,8 @@ describe("ESPN import in the Connect League flow", () => {
     openEspn();
 
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "42654852" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
     await waitFor(() => expect(screen.getByText("FFLR Test League")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("radio", { name: /boston buzzards/i }));
@@ -214,6 +220,8 @@ describe("ESPN import in the Connect League flow", () => {
     openEspn();
 
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "42654852" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
     await waitFor(() => expect(screen.getByText("FFLR Test League")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("radio", { name: /boston buzzards/i }));
@@ -230,9 +238,12 @@ describe("ESPN import in the Connect League flow", () => {
     vi.mocked(api.saveEspnCredentials).mockResolvedValue({ ok: true, saved: true });
     openEspn();
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "42654852" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
 
     await waitFor(() => expect(screen.getByText(/connect your espn login to read it/i)).toBeInTheDocument());
+    expect(screen.queryByText("How to find espn_s2 and SWID")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /how the espn login works/i }));
     expect(screen.getByText("How to find espn_s2 and SWID")).toBeInTheDocument();
     expect(screen.getByText(/never shown back/i)).toBeInTheDocument();
 
@@ -255,6 +266,7 @@ describe("ESPN import in the Connect League flow", () => {
     vi.mocked(api.saveEspnCredentials).mockResolvedValue({ ok: false, reason: "espn_login_rejected", message: "ESPN didn't accept your saved login." });
     openEspn();
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
     await waitFor(() => screen.getByLabelText("espn_s2"));
     fireEvent.change(screen.getByLabelText("espn_s2"), { target: { value: "abc" } });
@@ -268,6 +280,8 @@ describe("ESPN import in the Connect League flow", () => {
     vi.mocked(api.getEspnCredentialStatus).mockResolvedValueOnce({ ok: true, available: true, saved: true });
     vi.mocked(api.deleteEspnCredentials).mockResolvedValue({ ok: true, saved: false });
     openEspn();
+    fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => expect(screen.getByText(/espn login connected/i)).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(api.deleteEspnCredentials).not.toHaveBeenCalled(); // asks first, in place

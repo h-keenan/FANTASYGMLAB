@@ -118,6 +118,13 @@ const darkColors = {
   successMuted: 'rgba(34,197,94,0.15)',
   warning: '#f59e0b',
   warningMuted: 'rgba(245,158,11,0.14)',
+  // Platform monogram badges (PlatformBadge): fixed per-platform hues, identical in both themes; synced to web --color-platform-*.
+  platformSleeper: '#2b63e0',
+  platformYahoo: '#6001d2',
+  platformEspn: '#c2410c',
+  platformFleaflicker: '#0b7285',
+  platformMfl: '#2b7a3e',
+  onPlatform: '#FFFFFF',
   premium: '#E8B13A',
   premiumMuted: 'rgba(255,196,61,0.14)',
   // Premium gold button set (owner 2026-10-23: anything premium is ALWAYS gold with a glow).
@@ -203,6 +210,13 @@ const lightColors = {
   successMuted: 'rgba(10,150,60,0.22)',
   warning: '#8f4200',
   warningMuted: 'rgba(235,110,0,0.22)',
+  // Platform monogram badges (PlatformBadge): fixed per-platform hues, identical in both themes; synced to web --color-platform-*.
+  platformSleeper: '#2b63e0',
+  platformYahoo: '#6001d2',
+  platformEspn: '#c2410c',
+  platformFleaflicker: '#0b7285',
+  platformMfl: '#2b7a3e',
+  onPlatform: '#FFFFFF',
   // Color-system audit (2026-09-25): darkened from #B8860B, which measured
   // only 3.25:1 on a plain white surface (fails AA's 4.5:1) and a
   // near-invisible 2.86:1 when used as chip text directly on its own

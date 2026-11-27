@@ -6,7 +6,9 @@ import {
   CONNECT_PRIMARY_LABEL,
   CONNECT_TRUST_LINE,
   connectCtaLabel,
-  connectWays,
+  CONNECT_PLATFORMS,
+  IMPORT_STEP_ORDER,
+  importStepProgress,
   defaultLeagueSelection,
   groupLeaguesBySeason,
   leagueMeta,
@@ -25,9 +27,14 @@ describe("connect flow", () => {
     expect(CONNECT_TRUST_LINE.length).toBeLessThan(90);
   });
 
-  it("keeps every capability reachable: other platforms, account, sample; account hides once signed in", () => {
-    expect(connectWays({ hasAccount: false }).map((w) => w.key)).toEqual(["yahoo", "espn", "fleaflicker", "mfl", "account", "sample"]);
-    expect(connectWays({ hasAccount: true }).map((w) => w.key)).toEqual(["yahoo", "espn", "fleaflicker", "mfl", "sample"]);
+  it("offers five equal platform tiles, each with a one-word hint", () => {
+    expect(CONNECT_PLATFORMS.map((p) => p.key)).toEqual(["sleeper", "yahoo", "espn", "fleaflicker", "mfl"]);
+    for (const p of CONNECT_PLATFORMS) expect(p.hint.split(" ").length).toBeLessThanOrEqual(2);
+  });
+
+  it("steps the ID-based platforms through id, season, team", () => {
+    expect(IMPORT_STEP_ORDER).toEqual(["id", "season", "team"]);
+    expect(importStepProgress("season")).toBe("Step 2 of 3");
   });
 
   it("groups by season newest first", () => {

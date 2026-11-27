@@ -3,103 +3,57 @@ import { StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
 
 import AppText from './AppText';
+import PlatformBadge from './PlatformBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { CONNECT_PLATFORMS, type ConnectPlatformKey } from '../lib/connectFlow';
 import { radii, spacing, type ThemeColors } from '../theme';
 
-export type LeaguePlatformKey = 'sleeper' | 'espn' | 'fleaflicker' | 'mfl' | 'yahoo';
+export type LeaguePlatformKey = ConnectPlatformKey;
 
-/** Sleeper and ESPN get cards with the same treatment; Yahoo and the smaller platforms are quiet links below. */
-const MAIN_PLATFORMS: { key: LeaguePlatformKey; label: string; monogram: string; blurb: string }[] = [
-  { key: 'sleeper', label: 'Sleeper', monogram: 'S', blurb: 'Use your username' },
-  { key: 'espn', label: 'ESPN', monogram: 'E', blurb: 'League ID. Private leagues need 2 cookies' },
-];
-const OTHER_PLATFORMS: { key: LeaguePlatformKey; label: string }[] = [
-  { key: 'yahoo', label: 'Yahoo' },
-  { key: 'fleaflicker', label: 'Fleaflicker' },
-  { key: 'mfl', label: 'MFL' },
-];
-
-/** Mirrors web-next's platform cards in SleeperImportForm. */
-export default function PlatformPicker({
-  active,
-  onChange,
-}: {
-  active: LeaguePlatformKey;
-  onChange: (platform: LeaguePlatformKey) => void;
-}) {
+/**
+ * The five equal platform tiles of Add a league (Sleeper, Yahoo, ESPN, Fleaflicker, MFL), each a brand-color monogram badge,
+ * the name and a one-word hint. Tapping a tile hands the platform to the screen, which then shows only that platform's step.
+ * Mirrors web-next's tile grid in SleeperImportForm.
+ */
+export default function PlatformPicker({ onChange }: { onChange: (platform: LeaguePlatformKey) => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View>
-      <View style={styles.cards} accessibilityRole="radiogroup">
-        {MAIN_PLATFORMS.map((option) => {
-          const selected = active === option.key;
-          return (
-            <PressableScale
-              key={option.key}
-              style={[styles.card, selected && styles.cardSelected]}
-              onPress={() => onChange(option.key)}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: selected }}
-              accessibilityLabel={option.label}
-            >
-              <View style={[styles.monogram, selected && styles.monogramSelected]}>
-                <AppText style={[styles.monogramText, selected && styles.monogramTextSelected]}>{option.monogram}</AppText>
-              </View>
-              <AppText style={styles.cardTitle}>{option.label}</AppText>
-              <AppText style={styles.cardBlurb}>{option.blurb}</AppText>
-            </PressableScale>
-          );
-        })}
-      </View>
-      <View style={styles.otherRow}>
-        <AppText style={styles.otherLabel}>Also:</AppText>
-        {OTHER_PLATFORMS.map((option) => (
-          <PressableScale
-            key={option.key}
-            onPress={() => onChange(option.key)}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={option.label}
-          >
-            <AppText style={[styles.otherLink, active === option.key && styles.otherLinkActive]}>{option.label}</AppText>
-          </PressableScale>
-        ))}
-      </View>
+    <View style={styles.grid}>
+      {CONNECT_PLATFORMS.map((option) => (
+        <PressableScale
+          key={option.key}
+          style={styles.tile}
+          onPress={() => onChange(option.key)}
+          accessibilityRole="button"
+          accessibilityLabel={`${option.label}, ${option.hint}`}
+          testID={`platform-tile-${option.key}`}
+        >
+          <PlatformBadge platform={option.key} size={44} />
+          <AppText style={styles.title}>{option.label}</AppText>
+          <AppText style={styles.hint}>{option.hint}</AppText>
+        </PressableScale>
+      ))}
     </View>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    cards: { flexDirection: 'row', gap: spacing.sm },
-    card: {
-      flex: 1,
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    // Equal tiles, three per row (the last row holds two; no stretching).
+    tile: {
+      width: '31.5%',
+      alignItems: 'center',
       gap: 4,
-      padding: spacing.md,
-      borderRadius: radii.sm,
-      borderWidth: 1,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+      borderRadius: radii.md,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
       backgroundColor: colors.surface,
     },
-    cardSelected: { borderColor: colors.accent },
-    monogram: {
-      width: 28,
-      height: 28,
-      borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    monogramSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
-    monogramText: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
-    monogramTextSelected: { color: colors.onAccent },
-    cardTitle: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
-    cardBlurb: { fontSize: 13.5, color: colors.textTertiary },
-    otherRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
-    otherLabel: { fontSize: 13.5, color: colors.textTertiary },
-    otherLink: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary },
-    otherLinkActive: { color: colors.accent },
+    title: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+    hint: { fontSize: 13, color: colors.textTertiary },
   });
 }
