@@ -709,3 +709,20 @@ captured_at,season,week,player_id,team,position,status,injury_status,body_part,p
 2026-11-27T02:05:29Z,2026,12,9997,BAL,WR,Active,,,,,sleeper_live
 2026-11-27T11:16:55Z,2026,12,12505,KC,WR,Active,Out,Ankle,,,sleeper_live
 2026-11-27T11:16:55Z,2026,12,7525,PHI,WR,Active,Questionable,Back,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,10220,IND,TE,Active,Out,Hamstring,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,13272,ARI,QB,Active,Out,Back,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,13276,NYJ,WR,Active,Out,Ankle,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,13289,PIT,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,13320,ATL,WR,Active,Out,Hamstring,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,13423,PIT,RB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,13491,PIT,WR,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,13577,DEN,TE,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,5857,NO,TE,Active,Questionable,Calf,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,5859,NE,WR,Active,Out,Hamstring,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,5938,DEN,WR,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,7002,NO,TE,Active,Out,Hamstring,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,7583,DEN,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,8119,ATL,WR,Active,Out,Hamstring,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,8208,DEN,RB,Active,,,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,9487,JAX,WR,Active,Out,Shoulder,,,sleeper_live
+2026-11-27T20:12:15Z,2026,12,9756,MIN,WR,Active,Out,Thumb,,,sleeper_live
