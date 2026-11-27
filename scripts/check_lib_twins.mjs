@@ -40,6 +40,7 @@ export const IDENTICAL = [
   "swipeTabs.ts",
   "commissionerLineups.ts",
   "statusHeader.ts",
+  "lineupLock.ts",
   "connectFlow.ts",
   "recapCard.ts",
   "recapPage.ts",
