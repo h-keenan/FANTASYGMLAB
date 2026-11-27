@@ -1,0 +1,241 @@
+{
+ "fantasy_content": {
+  "team": [
+   [
+    {
+     "team_key": "461.l.12345.t.2"
+    },
+    {
+     "team_id": "2"
+    }
+   ],
+   {
+    "roster": {
+     "coverage_type": "week",
+     "week": "9",
+     "is_editable": 0,
+     "0": {
+      "players": {
+       "0": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.30124"
+          },
+          {
+           "player_id": "30124"
+          },
+          {
+           "name": {
+            "full": "Lamar Jackson",
+            "first": "Lamar",
+            "last": "Jackson"
+           }
+          },
+          {
+           "editorial_team_abbr": "Bal"
+          },
+          {
+           "display_position": "QB"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "QB"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "QB"
+           }
+          ]
+         }
+        ]
+       },
+       "1": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.31007"
+          },
+          {
+           "player_id": "31007"
+          },
+          {
+           "name": {
+            "full": "Saquon Barkley",
+            "first": "Saquon",
+            "last": "Barkley"
+           }
+          },
+          {
+           "editorial_team_abbr": "Phi"
+          },
+          {
+           "display_position": "RB"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "RB"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "RB"
+           }
+          ]
+         }
+        ]
+       },
+       "2": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.31008"
+          },
+          {
+           "player_id": "31008"
+          },
+          {
+           "name": {
+            "full": "CeeDee Lamb",
+            "first": "CeeDee",
+            "last": "Lamb"
+           }
+          },
+          {
+           "editorial_team_abbr": "Dal"
+          },
+          {
+           "display_position": "WR"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "WR"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "WR"
+           }
+          ]
+         }
+        ]
+       },
+       "3": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.31009"
+          },
+          {
+           "player_id": "31009"
+          },
+          {
+           "name": {
+            "full": "Trey McBride",
+            "first": "Trey",
+            "last": "McBride"
+           }
+          },
+          {
+           "editorial_team_abbr": "Ari"
+          },
+          {
+           "display_position": "TE"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "TE"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "TE"
+           }
+          ]
+         }
+        ]
+       },
+       "4": {
+        "player": [
+         [
+          {
+           "player_key": "461.p.100003"
+          },
+          {
+           "player_id": "100003"
+          },
+          {
+           "name": {
+            "full": "Baltimore",
+            "first": "Baltimore",
+            "last": "Baltimore"
+           }
+          },
+          {
+           "editorial_team_abbr": "Bal"
+          },
+          {
+           "display_position": "DEF"
+          },
+          {
+           "eligible_positions": [
+            {
+             "position": "DEF"
+            }
+           ]
+          }
+         ],
+         {
+          "selected_position": [
+           {
+            "coverage_type": "week",
+            "week": "9"
+           },
+           {
+            "position": "DEF"
+           }
+          ]
+         }
+        ]
+       },
+       "count": 5
+      }
+     }
+    }
+   }
+  ]
+ }
+}

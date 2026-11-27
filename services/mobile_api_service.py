@@ -160,7 +160,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
@@ -171,6 +171,9 @@ import requests
 from modules import (
     provider_errors,
     espn_credentials,
+    yahoo_connect,
+    yahoo_credentials,
+    yahoo_leagues,
     free_tier_ledger,
     trade_eval_usage,
     account_store,
@@ -1195,6 +1198,50 @@ async def _bind_espn_login(authorization: str | None = Header(default=None)) -> 
 
 
 app.router.dependencies.append(Depends(_bind_espn_login))
+
+
+_YAHOO_LOGIN_MEMO: dict[str, tuple[float, tuple[str, str] | None]] = {}
+_YAHOO_LOGIN_MEMO_SECONDS = 60.0
+
+
+def _resolve_yahoo_login(token: str) -> tuple[str, str] | None:
+    """Bearer token -> (user_id, Yahoo access token) or None. Refreshes the
+    Yahoo token when needed. Memoized briefly (keyed by a hash of the token,
+    never the token) because one page load fires several league requests."""
+
+    memo_key = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    cached = _YAHOO_LOGIN_MEMO.get(memo_key)
+    if cached and time.time() - cached[0] < _YAHOO_LOGIN_MEMO_SECONDS:
+        return cached[1]
+    config = auth_supabase.get_supabase_config()
+    found: tuple[str, str] | None = None
+    if auth_supabase.is_configured(config):
+        user, _error = auth_supabase.fetch_auth_user_cached(config, token)
+        user_id = str((user or {}).get("id") or "")
+        if user_id:
+            yahoo_token, _reason = yahoo_connect.get_access_token(config, token, user_id=user_id)
+            if yahoo_token:
+                found = (user_id, yahoo_token)
+    if len(_YAHOO_LOGIN_MEMO) > 512:
+        _YAHOO_LOGIN_MEMO.clear()
+    _YAHOO_LOGIN_MEMO[memo_key] = (time.time(), found)
+    return found
+
+
+async def _bind_yahoo_login(authorization: str | None = Header(default=None)) -> None:
+    """Make the caller's Yahoo access available to this request, lazily (no
+    network work until a Yahoo league is actually read)."""
+
+    if not yahoo_connect.available():
+        return
+    scheme, _, token = (authorization or "").strip().partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return
+    clean = token.strip()
+    yahoo_leagues.bind_request_login(yahoo_leagues.RequestLogin(lambda: _resolve_yahoo_login(clean)))
+
+
+app.router.dependencies.append(Depends(_bind_yahoo_login))
 
 
 def optional_user(
@@ -2364,6 +2411,146 @@ def delete_espn_credentials(user: dict[str, Any] = Depends(require_user)) -> dic
     except espn_credentials.EspnCredentialError as exc:
         return {"ok": False, "reason": exc.reason, "message": exc.message}
     return {"ok": True, "saved": False}
+
+
+# --- Yahoo Fantasy (OAuth 2.0; docs/yahoo-import.md) -------------------------------------
+
+
+def _yahoo_status_payload(user: dict[str, Any]) -> dict[str, Any]:
+    available = yahoo_connect.available()
+    connected = False
+    if available:
+        config = auth_supabase.get_supabase_config()
+        connected = yahoo_credentials.has_saved(
+            config, str(user.get("_access_token") or ""), user_id=str(user.get("id") or "")
+        )
+    return {"ok": True, "available": available, "connected": connected}
+
+
+@app.get("/v1/yahoo/status")
+def get_yahoo_status(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Whether Connect Yahoo is available on this server and whether the caller is connected. Never returns a token."""
+
+    return _yahoo_status_payload(user)
+
+
+class YahooOAuthStartRequest(BaseModel):
+    return_to: str = Field(default="web", max_length=8)
+
+
+@app.post("/v1/yahoo/oauth/start")
+def start_yahoo_oauth(
+    body: YahooOAuthStartRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Yahoo's authorize URL for the signed-in user, carrying a signed, 10 minute state.
+
+    `return_to` is "web" (back to /connect-league) or "app" (the fantasygmlab://yahoo deep link)."""
+
+    if not yahoo_connect.available():
+        return {"ok": False, "reason": "not_configured", "message": yahoo_connect.ERROR_MESSAGES["not_configured"]}
+    return_to = body.return_to if body.return_to in yahoo_connect.RETURN_TARGETS else "web"
+    try:
+        url = yahoo_connect.build_start_url(str(user.get("id") or ""), return_to)
+    except Exception:
+        return {"ok": False, "reason": "not_configured", "message": yahoo_connect.ERROR_MESSAGES["not_configured"]}
+    return {"ok": True, "authorize_url": url}
+
+
+@app.get("/v1/yahoo/oauth/callback", include_in_schema=False)
+def yahoo_oauth_callback(
+    code: str = "",
+    state: str = "",
+    error: str = "",
+) -> RedirectResponse:
+    """Yahoo redirects the browser here (the URI registered on the Yahoo app).
+
+    No FantasyDesk session exists on this request: the signed `state` names the
+    user. Exchanges the code, stores the encrypted tokens, then redirects back to
+    the web app or the mobile deep link. The code and tokens are never logged."""
+
+    config = auth_supabase.get_supabase_config()
+    target = yahoo_connect.complete_callback(config, code=code, state=state, error=error)
+    return RedirectResponse(target, status_code=302, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+@app.post("/v1/yahoo/refresh")
+def refresh_yahoo_token(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Force a token refresh (checks the connection still works). Returns no token."""
+
+    config = auth_supabase.get_supabase_config()
+    token, reason = yahoo_connect.get_access_token(
+        config, str(user.get("_access_token") or ""), user_id=str(user.get("id") or ""), force_refresh=True
+    )
+    if not token:
+        return {"ok": False, "reason": reason, "message": yahoo_connect.ERROR_MESSAGES.get(reason) or yahoo_leagues.ERROR_MESSAGES.get(reason, "")}
+    return {"ok": True, "connected": True}
+
+
+@app.post("/v1/yahoo/disconnect")
+def disconnect_yahoo(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Forget the caller's Yahoo tokens. Saved Yahoo leagues stay listed but stop loading until reconnected."""
+
+    config = auth_supabase.get_supabase_config()
+    try:
+        yahoo_credentials.delete(config, str(user.get("_access_token") or ""), user_id=str(user.get("id") or ""))
+    except yahoo_credentials.YahooCredentialError as exc:
+        return {"ok": False, "reason": exc.reason, "message": exc.message}
+    _YAHOO_LOGIN_MEMO.clear()
+    return {"ok": True, "connected": False}
+
+
+def _yahoo_token_or_error(user: dict[str, Any]) -> tuple[str | None, dict[str, Any] | None]:
+    config = auth_supabase.get_supabase_config()
+    token, reason = yahoo_connect.get_access_token(
+        config, str(user.get("_access_token") or ""), user_id=str(user.get("id") or "")
+    )
+    if token:
+        return token, None
+    message = yahoo_connect.ERROR_MESSAGES.get(reason) or yahoo_leagues.ERROR_MESSAGES.get(reason) or yahoo_leagues.ERROR_MESSAGES["yahoo_unavailable"]
+    return None, {"ok": False, "reason": reason, "message": message}
+
+
+@app.get("/v1/yahoo/leagues")
+def list_yahoo_leagues(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """The caller's Yahoo NFL leagues for the current game key."""
+
+    token, failure = _yahoo_token_or_error(user)
+    if failure:
+        return failure
+    try:
+        leagues = yahoo_leagues.list_user_leagues(token or "")
+    except yahoo_leagues.ExternalLeagueError as exc:
+        return {"ok": False, "reason": exc.reason, "message": exc.message}
+    return {"ok": True, "leagues": leagues}
+
+
+class YahooLeaguePreviewRequest(BaseModel):
+    league_key: str = Field(max_length=64)
+
+
+@app.post("/v1/yahoo/leagues/preview")
+def preview_yahoo_league(
+    body: YahooLeaguePreviewRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Load one of the caller's Yahoo leagues and show what importing would give
+    (teams, player match rate, which features work). Saves nothing; the returned
+    `league.league_key` is what POST /v1/leagues/save takes."""
+
+    league_key = body.league_key.strip()
+    if not yahoo_leagues.parse_league_key(league_key):
+        return {"ok": False, "reason": "invalid_input", "message": yahoo_leagues.ERROR_MESSAGES["invalid_input"]}
+    token, failure = _yahoo_token_or_error(user)
+    if failure:
+        return failure
+    user_id = str(user.get("id") or "")
+    try:
+        snapshot = yahoo_leagues.load_league_snapshot(league_key, token or "", owner_user_id=user_id)
+    except yahoo_leagues.ExternalLeagueError as exc:
+        return {"ok": False, "reason": exc.reason, "message": exc.message}
+    yahoo_leagues.store_snapshot(league_key, snapshot)
+    return yahoo_leagues.preview_payload(snapshot)
 
 
 class ImportLeaguePreviewRequest(BaseModel):

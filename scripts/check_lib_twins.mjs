@@ -42,6 +42,7 @@ export const IDENTICAL = [
   "statusHeader.ts",
   "lineupLock.ts",
   "connectFlow.ts",
+  "yahooConnect.ts",
   "recapCard.ts",
   "recapPage.ts",
   "simTeamIdentity.ts",

@@ -1937,7 +1937,7 @@ def _is_espn_league(league_id: Any) -> bool:
     return empty for an ESPN key instead of sending it to Sleeper's API;
     the API refuses the features that depend on them for ESPN leagues."""
 
-    return isinstance(league_id, str) and league_id.startswith(("espn:", "fleaflicker:", "mfl:"))
+    return isinstance(league_id, str) and league_id.startswith(("espn:", "fleaflicker:", "mfl:", "yahoo:"))
 
 
 def _espn_leagues():

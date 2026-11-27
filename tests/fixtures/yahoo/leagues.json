@@ -1,0 +1,69 @@
+{
+ "fantasy_content": {
+  "users": {
+   "0": {
+    "user": [
+     {
+      "guid": "GUIDXXXX"
+     },
+     {
+      "games": {
+       "0": {
+        "game": [
+         {
+          "game_key": "461",
+          "code": "nfl",
+          "season": "2026"
+         },
+         {
+          "leagues": {
+           "0": {
+            "league": {
+             "league_key": "461.l.12345",
+             "league_id": "12345",
+             "name": "Sunday Funday",
+             "url": "x",
+             "draft_status": "postdraft",
+             "num_teams": 2,
+             "scoring_type": "head",
+             "league_type": "private",
+             "current_week": "9",
+             "start_week": "1",
+             "end_week": "17",
+             "is_finished": 0,
+             "season": "2026",
+             "game_code": "nfl"
+            }
+           },
+           "1": {
+            "league": {
+             "league_key": "461.l.777",
+             "league_id": "777",
+             "name": "Office League",
+             "url": "x",
+             "draft_status": "postdraft",
+             "num_teams": 10,
+             "scoring_type": "head",
+             "league_type": "private",
+             "current_week": "9",
+             "start_week": "1",
+             "end_week": "17",
+             "is_finished": 0,
+             "season": "2026",
+             "game_code": "nfl"
+            }
+           },
+           "count": 2
+          }
+         }
+        ]
+       },
+       "count": 1
+      }
+     }
+    ]
+   },
+   "count": 1
+  }
+ }
+}

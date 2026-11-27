@@ -26,8 +26,8 @@ describe("connect flow", () => {
   });
 
   it("keeps every capability reachable: other platforms, account, sample; account hides once signed in", () => {
-    expect(connectWays({ hasAccount: false }).map((w) => w.key)).toEqual(["espn", "fleaflicker", "mfl", "account", "sample"]);
-    expect(connectWays({ hasAccount: true }).map((w) => w.key)).toEqual(["espn", "fleaflicker", "mfl", "sample"]);
+    expect(connectWays({ hasAccount: false }).map((w) => w.key)).toEqual(["yahoo", "espn", "fleaflicker", "mfl", "account", "sample"]);
+    expect(connectWays({ hasAccount: true }).map((w) => w.key)).toEqual(["yahoo", "espn", "fleaflicker", "mfl", "sample"]);
   });
 
   it("groups by season newest first", () => {

@@ -12,6 +12,7 @@ import { clearPendingReferralCode, getPendingReferralCode } from "@/lib/attribut
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { describeSleeperConnectError, isConnectivityFailure, type SleeperConnectError } from "@/lib/sleeperConnectErrors";
 import { EspnImportForm } from "@/components/EspnImportForm";
+import { parseYahooReturn } from "@/lib/yahooConnect";
 import { LeagueWarmupProgress } from "@/components/LeagueWarmupProgress";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
@@ -61,15 +62,15 @@ import {
  * exactly, so Founder Analytics' funnel keeps the same semantics it
  * already has for the legacy surface.
  */
-type LeaguePlatform = "sleeper" | "espn" | "fleaflicker" | "mfl";
+type LeaguePlatform = "sleeper" | "espn" | "fleaflicker" | "mfl" | "yahoo";
 
 /**
  * The Connect League flow, one field first (UI pass 3, sheet 1 topic 2 V1; copy and rules in lib/connectFlow.ts):
  * a Sleeper username and one "Connect" button, an instant league list with avatars and checkboxes, then optional
- * steps. ESPN / Fleaflicker / MFL, an account and the sample league are compact rows under "More ways to connect",
+ * steps. Yahoo / ESPN / Fleaflicker / MFL, an account and the sample league are compact rows under "More ways to connect",
  * so every previous capability is still one tap away. Mobile twin: the Add league sheet in screens/HomeScreen.tsx.
  */
-const PLATFORM_LABELS = { espn: "ESPN", fleaflicker: "Fleaflicker", mfl: "MFL" } as const;
+const PLATFORM_LABELS = { espn: "ESPN", fleaflicker: "Fleaflicker", mfl: "MFL", yahoo: "Yahoo" } as const;
 
 export function SleeperImportForm({
   onLeagueChosen,
@@ -86,12 +87,16 @@ export function SleeperImportForm({
   /** Rendered under "More ways to connect" > account (sign in / create an account). Omitted: no account row. */
   accountSlot?: ReactNode;
 }) {
-  const [platform, setPlatform] = useState<LeaguePlatform>("sleeper");
+  // Back from Yahoo's sign-in (the API callback redirects to /connect-league?yahoo=connected|error): reopen the Yahoo step.
+  // This form is only rendered client-side behind the session gate, so reading the URL here cannot mismatch hydration.
+  const [platform, setPlatform] = useState<LeaguePlatform>(() =>
+    typeof window !== "undefined" && parseYahooReturn(window.location.search) ? "yahoo" : "sleeper",
+  );
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const ways = connectWays({ hasAccount: !accountSlot });
   const onWay = (key: string) => {
-    if (key === "espn" || key === "fleaflicker" || key === "mfl") setPlatform(key);
+    if (key === "yahoo" || key === "espn" || key === "fleaflicker" || key === "mfl") setPlatform(key);
     if (key === "account") setAccountOpen((open) => !open);
   };
   return (

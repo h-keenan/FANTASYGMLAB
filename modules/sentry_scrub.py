@@ -24,7 +24,7 @@ _SENSITIVE_KEY = re.compile(
 _JWT = re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")
 _BEARER = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{8,}")
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-_URL_SECRET_PARAM = re.compile(r"(?i)([?&](?:access_token|refresh_token|token|apikey|api_key|key|code)=)[^&\s]+")
+_URL_SECRET_PARAM = re.compile(r"(?i)([?&](?:access_token|refresh_token|token|apikey|api_key|key|code|state)=)[^&\s]+")
 
 # Request members that can carry user content: never forwarded.
 _DROPPED_REQUEST_KEYS = ("data", "cookies", "query_string", "env")

@@ -85,7 +85,7 @@ import Input from '../components/Input';
 import HelpLink from '../components/HelpLink';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 import ErrorState from '../components/ErrorState';
-import { ESPN_SAVE_FAILURE_COPY } from '../lib/leaguePlatform';
+import { ESPN_SAVE_FAILURE_COPY, importedPlatformLabel } from '../lib/leaguePlatform';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -127,7 +127,7 @@ export default function HomeScreen({ navigation, route }: Props) {
   // default; ESPN is EspnLeagueImport (public leagues, a subset of
   // features — see lib/leaguePlatform.ts).
   const [connectMode, setConnectMode] = useState<ConnectMode>('connect');
-  const [addPlatform, setAddPlatform] = useState<'sleeper' | 'espn' | 'fleaflicker' | 'mfl'>('sleeper');
+  const [addPlatform, setAddPlatform] = useState<'sleeper' | 'espn' | 'fleaflicker' | 'mfl' | 'yahoo'>('sleeper');
   // Fix (welcome audit, tester feedback "I don't even know where to start"):
   // a brand-new user with no existing Sleeper account/league has no path
   // forward on this screen otherwise — this toggles the honest "we don't
@@ -797,7 +797,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 <PressableScale accessibilityRole="button" onPress={() => setAddPlatform('sleeper')} hitSlop={8} style={styles.noLeagueToggle}>
                   <AppText style={styles.noLeagueToggleText}>← Use my Sleeper username</AppText>
                 </PressableScale>
-                <ModalFormHint>{connectPlatformNotice(addPlatform === 'espn' ? 'ESPN' : addPlatform === 'fleaflicker' ? 'Fleaflicker' : 'MFL')}</ModalFormHint>
+                <ModalFormHint>{connectPlatformNotice(importedPlatformLabel(`${addPlatform}:`))}</ModalFormHint>
                 <EspnLeagueImport
                   key={addPlatform}
                   platform={addPlatform}
@@ -966,7 +966,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                         openSampleLeague();
                         return;
                       }
-                      setAddPlatform(way.key as 'espn' | 'fleaflicker' | 'mfl');
+                      setAddPlatform(way.key as 'yahoo' | 'espn' | 'fleaflicker' | 'mfl');
                       setAddMessage(null);
                       setAddCapMessage(null);
                     }}
