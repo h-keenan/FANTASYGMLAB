@@ -449,7 +449,6 @@ function TeamHero({
   );
 }
 
-
 /** The six rank tiles as a StatStripModule: collapsed "Record 3-5 · This season #3 · Long term #5 · Starters #2". */
 function TeamSnapshotModule({ team, open, leagueSize }: { team: TeamRanking | null; open: (key: InsightKey) => () => void; leagueSize: number }) {
   const copy = useExperienceCopy();

@@ -56,7 +56,6 @@ import { FreshnessLabel } from "@/components/ui/FreshnessLabel";
  * scope cut.
  */
 
-
 function positionRoomText(room: string): ReactNode {
   const cls = positionTextClass(room);
   return (
@@ -429,4 +428,3 @@ export function MyTeamContent({
     </main>
   );
 }
-
