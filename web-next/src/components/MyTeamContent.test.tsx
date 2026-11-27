@@ -284,8 +284,9 @@ describe("MyTeamContent", () => {
     expect(screen.getByText("Win-Now Contender")).toBeInTheDocument();
     // 4 players x 2000
     expect(screen.getByTestId("team-hero")).toHaveTextContent("Team Value 8,000");
-    // The ring is the league percentile, with its sentence as the accessible name.
-    expect(within(screen.getByTestId("team-hero")).getByTestId("status-ring")).toHaveAttribute("aria-label", expect.stringContaining("Team value percentile"));
+    // The ring is the value rank, with its sentence as the accessible name ("rank 8th of 10 teams", never "percentile 22 of 10").
+    const label = within(screen.getByTestId("team-hero")).getByTestId("status-ring").getAttribute("aria-label");
+    expect(label).toMatch(/^Team value rank \d+(st|nd|rd|th) of 10 teams$/);
   });
 
   it("builds Roster Composition from real values and omits Taxi when there is none", () => {

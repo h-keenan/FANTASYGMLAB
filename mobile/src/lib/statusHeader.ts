@@ -8,6 +8,8 @@
  */
 
 import { bandSimTone, percentBand } from "./verdictTone.ts";
+import { isActionableLineupIssue, isLineupLocked, LEFT_GAME_LABEL } from "./lineupLock.ts";
+import type { LockAwareStarter } from "./lineupLock.ts";
 
 export type StatusTone = "success" | "danger" | "warning" | "accent" | "muted";
 
@@ -192,7 +194,7 @@ export function briefingAttentionItems(items: ReadonlyArray<StatusBriefingInput>
   return out;
 }
 
-export interface StatusRosterPlayerInput {
+export interface StatusRosterPlayerInput extends LockAwareStarter {
   player_id: string;
   name: string | null;
   position: string | null;
@@ -201,16 +203,19 @@ export interface StatusRosterPlayerInput {
   injury_label: string;
   injury_status: string | null;
   ruled_out: boolean;
-  start_ineligible_reason?: string | null;
   slot: string | null;
   lineup_points?: number | null;
 }
 
-/** My Team: starters who cannot play this week (out, bye, IR) or carry an injury tag, worst first. */
+/**
+ * My Team: starters who cannot play this week (out, bye, IR) or carry an injury tag, worst first. Lock-aware
+ * (lib/lineupLock.ts): a starter whose game has kicked off can no longer be swapped, so he is never listed here
+ * (a hurt one is shown as the information line "Left game (injury)" by the header, not as a problem to fix).
+ */
 export function rosterAttentionItems(starters: ReadonlyArray<StatusRosterPlayerInput> | null | undefined, limit: number = STATUS_ATTENTION_LIMIT, href?: string): StatusAttentionItem[] {
   const flagged = (starters ?? [])
-    .filter((p) => p.name && (p.ruled_out || p.start_ineligible_reason || (p.injury_label && p.injury_label.trim())))
-    .sort((a, b) => Number(Boolean(b.ruled_out || b.start_ineligible_reason)) - Number(Boolean(a.ruled_out || a.start_ineligible_reason)));
+    .filter((p) => p.name && !isLineupLocked(p) && (isActionableLineupIssue(p) || (p.injury_label && p.injury_label.trim())))
+    .sort((a, b) => Number(isActionableLineupIssue(b)) - Number(isActionableLineupIssue(a)));
   return flagged.slice(0, limit).map((p) => {
     const reason = p.start_ineligible_reason || (p.ruled_out ? "Out" : p.injury_label);
     return {
@@ -223,7 +228,7 @@ export function rosterAttentionItems(starters: ReadonlyArray<StatusRosterPlayerI
       injuryStatus: p.injury_status,
       meta: [p.slot ? `Starting ${p.slot}` : null, reason].filter(Boolean).join(" · "),
       stat: p.lineup_points != null ? { value: (Math.round(p.lineup_points * 10) / 10).toFixed(1), label: "PROJ" } : null,
-      detail: `${p.name} ${p.ruled_out || p.start_ineligible_reason ? "cannot start" : "is flagged"} this week: ${reason}.`,
+      detail: `${p.name} ${isActionableLineupIssue(p) ? "cannot start" : "is flagged"} this week: ${reason}.`,
       href,
     };
   });
@@ -336,15 +341,33 @@ export function buildTodayStatusHeader(input: TodayStatusInput): StatusHeaderMod
   });
 }
 
+/** "8th of 10 teams": rank wording, the same as the rest of the app ("8th of 12"). */
+export function ordinalRank(n: number): string {
+  const v = n % 100;
+  const suffix = v >= 11 && v <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  return `${n}${suffix}`;
+}
+
+/** Spoken name of the Team Value ring: a rank of N teams when known, else a proper percentile ("ahead of 22% of the league"). */
+export function teamValueRingLabel(percentile: number, rank: number | null, leagueSize: number | null): string {
+  if (rank != null && leagueSize != null && leagueSize > 0) return `Team value rank ${ordinalRank(rank)} of ${leagueSize} teams`;
+  return `Team value ahead of ${Math.round(percentile)}% of the league`;
+}
+
 export interface TeamStatusInput {
   teamValue: string;
   /** 0-100 league percentile of team value, or null. */
   valuePercentile: number | null;
+  /** The team's 1-based value rank in the league (1 = best); the ring reads "#8", never a bare percentile. */
+  valueRank?: number | null;
   leagueSize: number | null;
   context: string | null;
   openSlots: number;
+  /** Starters a manager can still fix (lib/lineupLock.ts isActionableLineupIssue): never one whose game has started. */
   flaggedStarters: number;
   injuredStarters: number;
+  /** Surnames of starters who got hurt after kickoff: locked, shown as information only. */
+  leftGameNames?: ReadonlyArray<string>;
   attention: StatusAttentionItem[];
   hrefs: { lineup: string };
 }
@@ -356,14 +379,15 @@ export interface TeamStatusInput {
 export function buildTeamStatusHeader(input: TeamStatusInput): StatusHeaderModel {
   const holes = input.openSlots + input.flaggedStarters;
   const pct = input.valuePercentile;
-  const ring = pct != null ? statusRing(pct, `${Math.round(pct)}`, `Team value percentile ${Math.round(pct)}${input.leagueSize ? ` of ${input.leagueSize} teams` : ""}`, "accent") : null;
+  const ring = pct != null ? statusRing(pct, input.valueRank != null ? `#${input.valueRank}` : `${Math.round(pct)}`, teamValueRingLabel(pct, input.valueRank ?? null, input.leagueSize), "accent") : null;
+  const leftGameLine = (input.leftGameNames?.length ?? 0) > 0 ? `${input.leftGameNames!.join(", ")} ${LEFT_GAME_LABEL.toLowerCase()}` : null;
   const stats: StatusMiniStat[] = [];
   stats.push({ key: "holes", label: "Holes", value: String(holes), tone: holes > 0 ? "danger" : "success", href: holes > 0 ? input.hrefs.lineup : undefined });
   stats.push({ key: "injured", label: "Injured", value: String(input.injuredStarters), tone: input.injuredStarters > 0 ? "warning" : "success" });
   return statusHeaderModel({
     kicker: "YOUR TEAM",
     headline: holes > 0 ? `${holes} ${holes === 1 ? "hole" : "holes"} in your lineup` : `Team Value ${input.teamValue}`,
-    context: holes > 0 ? [`Team Value ${input.teamValue}`, input.context].filter(Boolean).join(" · ") : input.context,
+    context: (holes > 0 ? [`Team Value ${input.teamValue}`, input.context, leftGameLine] : [input.context, leftGameLine]).filter(Boolean).join(" · ") || null,
     ring,
     stats,
     attention: input.attention,

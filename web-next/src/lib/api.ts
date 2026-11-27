@@ -733,6 +733,11 @@ export interface LineupPlayer {
    * from older API builds. */
   start_ineligible_reason?: string | null;
   on_bye?: boolean;
+  /** His own NFL game has kicked off: locked, cannot be swapped (lib/lineupLock.ts). */
+  game_locked?: boolean;
+  /** Server verdicts from modules/lineup_lock.py: a fixable Out/bye starter, vs hurt after kickoff (info only). */
+  lineup_issue?: boolean;
+  left_game?: boolean;
   /** The points figure this week's lineup ranked him on, and its source. */
   lineup_points?: number | null;
   lineup_points_basis?: "projection" | "value_estimate" | "value" | null;

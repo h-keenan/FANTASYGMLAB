@@ -111,10 +111,15 @@ def build_team_row(
     best = list(suggested_starters)
 
     flags: list[dict[str, Any]] = []
+    info: list[dict[str, Any]] = []
     if not has_lineup:
         flags.append({"kind": "no_lineup", "label": "No lineup set", "player": None, "slot": None})
     for row in starters:
-        if row["availability"]:
+        # A starter who got hurt after kickoff is locked: nothing to fix, so it is information
+        # ("left_game"), never a flag that makes the lineup look broken.
+        if row["availability"] and row["locked"]:
+            info.append({"kind": "left_game", "label": "Left game (injury)", "player": row["name"], "slot": row["slot"]})
+        elif row["availability"]:
             flags.append(
                 {"kind": row["availability"], "label": _FLAG_LABEL[row["availability"]], "player": row["name"], "slot": row["slot"]}
             )
@@ -156,6 +161,7 @@ def build_team_row(
         "partial": partial,
         "possible_tanking": tanking,
         "flags": flags,
+        "info": info,
         "locked_count": locked_count,
         # Moves the engine already drops when either player is locked, so these are all still doable.
         "swaps": [_swap_row(m) for m in (moves or [])],

@@ -15197,6 +15197,12 @@ def _project_lineup_row(
             # True when this player's own NFL game has kicked off, so Sleeper
             # has locked him (a started player on the bench cannot be started).
             "game_locked": bool(row.get("game_locked") or False),
+            # The shared lock-aware verdicts (modules/lineup_lock.py), so no
+            # client re-derives "is this a lineup problem?": an Out/bye
+            # starter who can still be swapped, vs a starter who got hurt
+            # after kickoff (information only, never a hole or a swap).
+            "lineup_issue": lineup_lock.is_actionable_issue(row),
+            "left_game": lineup_lock.left_game(row),
             # The points figure this week's lineup was ranked on, and where
             # it came from: "projection" (this week's real projection),
             # "value_estimate" (no projection — matched to the projected

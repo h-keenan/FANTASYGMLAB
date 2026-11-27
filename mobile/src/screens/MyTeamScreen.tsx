@@ -21,7 +21,8 @@ import GridBackground from '../components/GridBackground';
 import CompactModule from '../components/CompactModule';
 import { StatStripModule } from '../components/ModuleTemplates';
 import StatusHeader from '../components/StatusHeader';
-import { buildTeamStatusHeader, rosterAttentionItems } from '../lib/statusHeader';
+import { buildTeamStatusHeader, ordinalRank, rosterAttentionItems } from '../lib/statusHeader';
+import { isActionableLineupIssue, leftGame } from '../lib/lineupLock';
 import { listSummaryParts } from '../lib/moduleTemplates';
 import PositionBadge from '../components/PositionBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
@@ -420,7 +421,7 @@ function TeamHero({
   const valuePercentile = team && leagueSize >= 4 ? percentileFromRank(team.power_rank, leagueSize) : null;
   const outlook = team ? team.archetype_label || team.strategy_label : null;
   const context = [
-    valuePercentile != null ? `${ordinal(valuePercentile)} percentile of ${leagueSize} teams` : null,
+    valuePercentile != null && team ? `${ordinalRank(team.power_rank ?? 0)} of ${leagueSize} teams` : null,
     startersValue > 0 ? `Starters ${Math.round(startersValue).toLocaleString()}` : null,
   ]
     .filter(Boolean)
@@ -428,11 +429,13 @@ function TeamHero({
   const model = buildTeamStatusHeader({
     teamValue: teamValue > 0 ? Math.round(teamValue).toLocaleString() : '\u2014',
     valuePercentile,
+    valueRank: team?.power_rank ?? null,
     leagueSize: leagueSize > 0 ? leagueSize : null,
     context: context || null,
     openSlots: openSlotCount,
-    flaggedStarters: bestBall ? 0 : starters.filter((p) => p.ruled_out || p.start_ineligible_reason).length,
+    flaggedStarters: bestBall ? 0 : starters.filter((p) => isActionableLineupIssue(p)).length,
     injuredStarters: bestBall ? 0 : starters.filter((p) => p.injury_label && p.injury_label.trim()).length,
+    leftGameNames: bestBall ? [] : starters.filter((p) => leftGame(p) && p.name).map((p) => playerSurname(p.name as string)),
     attention: bestBall ? [] : rosterAttentionItems(starters, 3, 'Matchup'),
     hrefs: { lineup: 'Matchup' },
   });
@@ -444,12 +447,6 @@ function TeamHero({
       testID="team-hero"
     />
   );
-}
-
-function ordinal(n: number): string {
-  const v = n % 100;
-  const suffix = v >= 11 && v <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
-  return `${n}${suffix}`;
 }
 
 /** The six rank tiles as a StatStripModule: collapsed "Record 3-5 · This season #3 · Long term #5 · Starters #2". */
