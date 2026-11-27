@@ -13,7 +13,9 @@ import { buildTeamStatusPositions } from "@/lib/teamStatus";
 import { todayRoomChips } from "@/lib/todayView";
 import { StatStripModule } from "@/components/ui/ModuleTemplates";
 import { StatusHeader } from "@/components/ui/StatusHeader";
-import { buildTeamStatusHeader, rosterAttentionItems } from "@/lib/statusHeader";
+import { buildTeamStatusHeader, ordinalRank, rosterAttentionItems } from "@/lib/statusHeader";
+import { isActionableLineupIssue, leftGame } from "@/lib/lineupLock";
+import { playerSurname } from "@/lib/playerNameDisplay";
 import { listSummaryParts } from "@/lib/moduleTemplates";
 import { buildRosterComposition, buildTeamAnalysisRows } from "@/lib/myTeamAnalysis";
 import type { ReactNode } from "react";
@@ -229,20 +231,22 @@ export function MyTeamContent({
   // The status header: ring = how high the roster's value sits in the league, holes and injuries as mini stats, the
   // starters who cannot play as player rows. A best-ball roster has no lineup to fix, so no holes or rows.
   const lineupHref = `/matchup/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`;
-  const flaggedStarters = bestBall ? 0 : starters.filter((p) => p.ruled_out || p.start_ineligible_reason).length;
+  const flaggedStarters = bestBall ? 0 : starters.filter((p) => isActionableLineupIssue(p)).length;
   const teamStatusModel = buildTeamStatusHeader({
     teamValue: formatScore(teamTotalValue),
     valuePercentile,
+    valueRank: teamRanking?.power_rank ?? null,
     leagueSize: leagueSize > 0 ? leagueSize : null,
     context:
       valuePercentile !== null
-        ? `${ordinal(Math.round(valuePercentile))} percentile of ${leagueSize} teams${!bestBall && starters.length > 0 ? ` · Starters ${formatScore(startersTotalValue)}` : ""}`
+        ? `${ordinalRank(teamRanking?.power_rank ?? 0)} of ${leagueSize} teams${!bestBall && starters.length > 0 ? ` · Starters ${formatScore(startersTotalValue)}` : ""}`
         : !bestBall && starters.length > 0
           ? `Starters ${formatScore(startersTotalValue)}`
           : null,
     openSlots: bestBall ? 0 : (myTeam.open_slots ?? []).length,
     flaggedStarters,
     injuredStarters: bestBall ? 0 : starters.filter((p) => p.injury_label && p.injury_label.trim()).length,
+    leftGameNames: bestBall ? [] : starters.filter((p) => leftGame(p) && p.name).map((p) => playerSurname(p.name as string)),
     attention: bestBall || !leagueId ? [] : rosterAttentionItems(starters, 3, lineupHref),
     hrefs: { lineup: lineupHref },
   });
@@ -426,8 +430,3 @@ export function MyTeamContent({
   );
 }
 
-function ordinal(n: number): string {
-  const v = n % 100;
-  const suffix = v >= 11 && v <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
-  return `${n}${suffix}`;
-}

@@ -6,6 +6,8 @@ import {
   buildSimStatusHeader,
   buildTeamStatusHeader,
   buildTodayStatusHeader,
+  ordinalRank,
+  teamValueRingLabel,
   lineupAttentionItems,
   rankPercentile,
   rosterAttentionItems,
@@ -16,6 +18,7 @@ import {
   type StatusMoveInput,
   type StatusSimPlayerInput,
 } from "./statusHeader";
+import { isActionableLineupIssue, isLineupLocked, leftGame } from "./lineupLock";
 
 const player = (name: string, id: string | null = "1") => ({ player_id: id, name, position: "RB", team: "HOU", tier: null, injury_label: "" });
 const move = (over: string, start: string, gain: number | null, reason: StatusMoveInput["over_reason"] = "ruled_out"): StatusMoveInput => ({ start: player(start, "9"), over: player(over, "8"), over_reason: reason, gain, locked: false });
@@ -136,5 +139,69 @@ describe("Fantasy Sim adapters", () => {
     const bye = buildSimStatusHeader({ ...base, bye: true, next: null });
     expect(bye.ring).toBeNull();
     expect(bye.primary).toBeNull();
+  });
+});
+
+describe("lock-aware lineup issues (one rule: lib/lineupLock.ts)", () => {
+  const base = { player_id: "a", name: "A", position: "TE", team: "LV", tier: null, injury_label: "", injury_status: null, ruled_out: false, slot: "FLEX" };
+  const out = { ...base, player_id: "l", name: "Loveland", ruled_out: true, injury_label: "Out" };
+
+  it("a starter hurt mid-game is not an attention row, a hole or a Fix lineup", () => {
+    const hurt = { ...out, game_locked: true, game_started: true };
+    expect(rosterAttentionItems([hurt])).toEqual([]);
+    expect(isActionableLineupIssue(hurt)).toBe(false);
+    expect(leftGame(hurt)).toBe(true);
+    const model = buildTeamStatusHeader({ teamValue: "8,000", valuePercentile: 22, valueRank: 8, leagueSize: 10, context: "8th of 10 teams", openSlots: 0, flaggedStarters: [hurt].filter((p) => isActionableLineupIssue(p)).length, injuredStarters: 1, leftGameNames: ["Loveland"], attention: [], hrefs: { lineup: "/l" } });
+    expect(model.primary).toBeNull();
+    expect(model.headline).toBe("Team Value 8,000");
+    expect(model.context).toBe("8th of 10 teams · Loveland left game (injury)");
+    expect(model.stats.find((st) => st.key === "holes")?.value).toBe("0");
+    expect(JSON.stringify(model)).not.toMatch(/Fix lineup|in your lineup/);
+  });
+  it("Out before kickoff is flagged", () => {
+    const pre = { ...out, game_started: false, game_locked: false };
+    expect(rosterAttentionItems([pre]).map((r) => r.name)).toEqual(["Loveland"]);
+    expect(isActionableLineupIssue(pre)).toBe(true);
+    expect(leftGame(pre)).toBe(false);
+  });
+  it("a finished game is locked and not flagged", () => {
+    const fin = { ...out, game_started: true };
+    expect(rosterAttentionItems([fin])).toEqual([]);
+    expect(isActionableLineupIssue(fin)).toBe(false);
+  });
+  it("a missing kickoff time never invents a lock", () => {
+    const unknown = { ...out, game_started: null };
+    expect(isLineupLocked(unknown)).toBe(false);
+    expect(isActionableLineupIssue(unknown)).toBe(true);
+  });
+  it("a bye starter is flagged even though he has no game", () => {
+    const bye = { ...base, name: "Bye", on_bye: true, start_ineligible_reason: "Bye", game_started: null };
+    expect(isActionableLineupIssue(bye)).toBe(true);
+  });
+  it("mixed lineup: only the unstarted players are flagged", () => {
+    const rows = rosterAttentionItems([
+      { ...out, player_id: "1", name: "Locked", game_started: true },
+      { ...out, player_id: "2", name: "Open", game_started: false },
+      { ...base, player_id: "3", name: "Q", injury_label: "Q", game_started: true },
+    ]);
+    expect(rows.map((r) => r.name)).toEqual(["Open"]);
+  });
+  it("the server verdict wins over the raw fields", () => {
+    expect(isActionableLineupIssue({ ...out, lineup_issue: false })).toBe(false);
+    expect(leftGame({ left_game: true })).toBe(true);
+  });
+});
+
+describe("team value label", () => {
+  it("is a rank of N teams, never 'percentile 22 of 10 teams'", () => {
+    expect(ordinalRank(8)).toBe("8th");
+    expect(ordinalRank(11)).toBe("11th");
+    expect(ordinalRank(22)).toBe("22nd");
+    expect(teamValueRingLabel(22.2, 8, 10)).toBe("Team value rank 8th of 10 teams");
+    expect(teamValueRingLabel(22.2, null, 10)).toBe("Team value ahead of 22% of the league");
+    const ring = buildTeamStatusHeader({ teamValue: "1", valuePercentile: 22.2, valueRank: 8, leagueSize: 10, context: null, openSlots: 0, flaggedStarters: 0, injuredStarters: 0, attention: [], hrefs: { lineup: "/l" } }).ring;
+    expect(ring?.label).toBe("Team value rank 8th of 10 teams");
+    expect(ring?.center).toBe("#8");
+    expect(ring?.label).not.toMatch(/percentile/);
   });
 });

@@ -97,3 +97,72 @@ def test_lineup_lock_push_skips_an_out_starter_whose_game_started():
 
     assert run(now + timedelta(minutes=30))
     assert run(now - timedelta(minutes=30)) == []
+
+
+# --- lock-aware lineup issues: modules/lineup_lock.py is the one rule --------------------------------------------
+
+
+def _starter(**kw):
+    return {"ruled_out": True, "injury_label": "Out", "game_started": False, "game_locked": False, **kw}
+
+
+def test_out_before_kickoff_is_an_actionable_issue_not_left_game():
+    p = _starter()
+    assert lineup_lock.is_actionable_issue(p) is True
+    assert lineup_lock.left_game(p) is False
+
+
+def test_injured_mid_game_is_locked_information_not_an_issue():
+    p = _starter(game_started=True, game_locked=True)
+    assert lineup_lock.is_actionable_issue(p) is False
+    assert lineup_lock.left_game(p) is True
+
+
+def test_final_game_is_not_an_issue():
+    # game_has_started is True once the game is played, so a final game is locked too.
+    assert lineup_lock.is_actionable_issue(_starter(game_started=True)) is False
+
+
+def test_missing_kickoff_never_invents_a_lock():
+    p = _starter(game_started=None)
+    assert lineup_lock.is_locked(p) is False
+    assert lineup_lock.is_actionable_issue(p) is True
+
+
+def test_bye_is_actionable_and_never_locked():
+    p = {"on_bye": True, "start_ineligible_reason": "Bye", "game_started": True}
+    assert lineup_lock.is_locked(p) is False
+    assert lineup_lock.is_actionable_issue(p) is True
+
+
+def test_game_started_reason_is_a_lock_not_a_problem():
+    assert lineup_lock.is_actionable_issue({"start_ineligible_reason": "Game started", "game_locked": True}) is False
+
+
+def test_lineup_rows_carry_the_shared_verdicts_for_a_mixed_lineup():
+    import pandas as pd
+    from services import mobile_api_service as svc
+
+    def row(pid, started):
+        return pd.Series({"player_id": pid, "name": pid, "ruled_out": True, "injury_status": "Out", "status": "Active",
+                          "game_locked": started, "slot": "FLEX", "suggested_starter": True})
+
+    locked = svc._project_lineup_row(row("hurt_mid_game", True), "score", reserve_ids=set(), taxi_ids=set())
+    open_ = svc._project_lineup_row(row("out_pre_kickoff", False), "score", reserve_ids=set(), taxi_ids=set())
+    assert (locked["lineup_issue"], locked["left_game"]) == (False, True)
+    assert (open_["lineup_issue"], open_["left_game"]) == (True, False)
+
+
+def test_commissioner_lineup_does_not_flag_a_locked_hurt_starter():
+    from modules import commissioner_lineups
+
+    def player(pid, started):
+        return {"player_id": pid, "name": pid, "slot": "FLEX", "status": "Active", "injury_status": "Out", "game_started": started}
+
+    row = commissioner_lineups.build_team_row(
+        roster_id="1", team_name="T", owner_name=None, avatar_url=None,
+        real={"real_starters": [player("locked", True), player("open", False)], "real_empty_slots": [], "has_live_data": True},
+        suggested_starters=[], moves=[], projection_ready=False,
+    )
+    assert [f["player"] for f in row["flags"]] == ["open"]
+    assert [i["player"] for i in row["info"]] == ["locked"]
