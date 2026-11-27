@@ -301,7 +301,7 @@ from modules import prefetch
 from modules.frame_records import frame_records
 from modules import player_search
 from modules.admission import AdmissionControlMiddleware
-from modules import public_dynasty_values, public_playoff_sos
+from modules import public_dynasty_values, public_playoff_sos, public_try_examples
 from modules import model_status
 from modules import drop_candidates, roster_value_model
 from modules import usage_trends
@@ -11767,6 +11767,14 @@ def get_external_promo_plan(
 def get_public_playoff_sos() -> JSONResponse:
     # Current season and the default playoff weeks only: no caller-controlled cache keys on a public route.
     payload = public_playoff_sos.get_public_playoff_sos()
+    return JSONResponse(content=payload, headers={"Cache-Control": "public, max-age=900"})
+
+
+# Public, anonymous real-player examples for the no-signup /try/start-sit and /try/waivers pages. Built from the
+# same verified inputs as /v1/external/lineup/decisions and /waivers/replacements; no user, league or roster data.
+@app.get("/v1/public/try-examples")
+def get_public_try_examples() -> JSONResponse:
+    payload = public_try_examples.get_public_try_examples(PLAYERS_DB_PATH)
     return JSONResponse(content=payload, headers={"Cache-Control": "public, max-age=900"})
 
 

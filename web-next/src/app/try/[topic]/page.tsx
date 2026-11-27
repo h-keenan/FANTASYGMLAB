@@ -7,6 +7,7 @@ import { TryCta } from "@/components/try/TryCta";
 import { TryTracker } from "@/components/try/TryTracker";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { fetchTryExamples, REAL_EXAMPLE_LABEL, type TryExamples } from "@/lib/tryExamples";
 import { isTryTopic, tryTopicInfo, TRY_TOPICS, type TryTopic } from "@/lib/tryLinks";
 
 // No-signup ad landing pages (lib/tryLinks.ts). Rendered per request: playoffs follows the season clock and the live
@@ -30,14 +31,14 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   };
 }
 
-function Demo({ topic }: { topic: TryTopic }) {
+function Demo({ topic, real }: { topic: TryTopic; real: TryExamples | null }) {
   switch (topic) {
     case "start-sit":
-      return <StartSitDemo />;
+      return <StartSitDemo real={real?.startSit} />;
     case "trade":
       return <TradeDemo />;
     case "waivers":
-      return <WaiversDemo />;
+      return <WaiversDemo real={real?.waivers} />;
     case "playoffs":
       return <Playoffs />;
     case "dynasty-values":
@@ -51,6 +52,8 @@ export default async function TryPage({ params }: { params: Params }) {
   const { topic } = await params;
   if (!isTryTopic(topic)) notFound();
   const info = tryTopicInfo(topic);
+  const real = EXAMPLE_LEAGUE_TOPICS.includes(topic) ? await fetchTryExamples() : null;
+  const isReal = topic === "start-sit" ? !!real?.startSit : topic === "waivers" ? !!real?.waivers : false;
   return (
     <main className="page-shell page-shell-prose" data-testid={`try-page-${topic}`}>
       <TryTracker topic={topic} />
@@ -61,11 +64,11 @@ export default async function TryPage({ params }: { params: Params }) {
         </p>
         {EXAMPLE_LEAGUE_TOPICS.includes(topic) ? (
           <span className="self-start">
-            <ToneBadge label="Example league: made-up players" color="var(--color-accent)" />
+            <ToneBadge label={isReal ? REAL_EXAMPLE_LABEL : "Example league: made-up players"} color="var(--color-accent)" />
           </span>
         ) : null}
       </div>
-      <Demo topic={topic} />
+      <Demo topic={topic} real={real} />
       <TryCta topic={topic} />
       {topic === "trade" || topic === "dynasty-values" ? <ValuesCredit /> : null}
     </main>

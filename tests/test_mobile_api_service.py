@@ -16642,6 +16642,15 @@ def test_public_playoff_sos_route_is_anonymous_and_trimmed(monkeypatch):
     assert res.headers["cache-control"].startswith("public")
 
 
+def test_public_try_examples_route_is_anonymous_and_cacheable(monkeypatch):
+    client = _client(monkeypatch)
+    body = {"ok": True, "season": 2026, "week": 12, "start_sit": None, "waivers": None, "unavailable_reason": "x"}
+    with patch("modules.public_try_examples.get_public_try_examples", return_value=body):
+        res = client.get("/v1/public/try-examples")
+    assert res.status_code == 200 and res.json() == body
+    assert res.headers["cache-control"].startswith("public")
+
+
 def _mv_noproj(pid, pos, slot):
     row = _mv(pid, pos, slot, 0)
     row["projection"] = {"status": "insufficient_player_data", "point_estimate": None}
