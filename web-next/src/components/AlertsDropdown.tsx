@@ -1,5 +1,6 @@
 "use client";
 
+import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -150,6 +151,7 @@ export function AlertsBell({
         ) : null}
       </button>
       {open ? (
+        <OverlayPortal>
         <div className="fixed inset-0" style={{ zIndex: overlay.zIndex }} hidden={overlay.hidden}>
           <div
             data-testid="alerts-backdrop"
@@ -201,6 +203,7 @@ export function AlertsBell({
             <SheetHandle />
           </div>
         </div>
+        </OverlayPortal>
       ) : null}
     </>
   );

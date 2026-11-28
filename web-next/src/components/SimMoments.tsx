@@ -1,5 +1,6 @@
 "use client";
 
+import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { Button } from "@/components/Button";
@@ -43,6 +44,7 @@ export function SimPickReveal({ pick, board, onDone }: { pick: SimDraftPick; boa
   const rows = simBoardRows(board, pick, phase === "front");
   const turn: CSSProperties = { transform: phase === "flip" ? "rotateY(90deg)" : "rotateY(0deg)", transition: "transform 240ms ease-in-out" };
   return (
+    <OverlayPortal lockScroll>
     <div role="dialog" aria-modal="true" aria-label="Your pick" className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ background: "rgba(0, 0, 0, 0.72)" }} data-testid="pick-reveal">
       <div className="flex w-full max-w-sm flex-col gap-4">
         <p className="text-xs font-extrabold uppercase" style={eyebrow}>Draft room · Round {pick.round}</p>
@@ -90,6 +92,7 @@ export function SimPickReveal({ pick, board, onDone }: { pick: SimDraftPick; boa
         <Button fullWidth variant={phase === "front" ? "primary" : "ghost"} onClick={onDone}>{phase === "front" ? "Continue" : "Skip"}</Button>
       </div>
     </div>
+    </OverlayPortal>
   );
 }
 

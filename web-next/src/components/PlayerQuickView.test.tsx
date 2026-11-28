@@ -156,19 +156,19 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerQuickView).mockReturnValue(new Promise(() => {}));
     vi.mocked(api.getPlayerAwards).mockReturnValue(new Promise(() => {}));
 
-    const { container } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
 
     // Chart-height placeholder, reserving WeeklyPointsChart's own
     // CHART_HEIGHT footprint ahead of time.
-    const chartSkeleton = Array.from(container.querySelectorAll<HTMLElement>(".pqv-skeleton-line")).find((el) => el.style.height === "160px") ?? null;
+    const chartSkeleton = Array.from(document.body.querySelectorAll<HTMLElement>(".pqv-skeleton-line")).find((el) => el.style.height === "160px") ?? null;
     expect(chartSkeleton).toBeInTheDocument();
     expect(chartSkeleton?.style.height).toBe("160px");
     // Stat-tile skeletons reuse the real tile classes so the grid is
     // already the right shape/height before real data lands.
-    expect(container.querySelectorAll(".pqv-stat-row.pqv-skeleton-tile").length).toBeGreaterThan(0);
+    expect(document.body.querySelectorAll(".pqv-stat-row.pqv-skeleton-tile").length).toBeGreaterThan(0);
     // Decorative — never double-announced to assistive tech alongside the
     // one real sr-only status line.
-    expect(container.querySelector('[aria-hidden="true"] .pqv-skeleton-line')).toBeInTheDocument();
+    expect(document.body.querySelector('[aria-hidden="true"] .pqv-skeleton-line')).toBeInTheDocument();
   });
 
   // coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt make
@@ -201,7 +201,7 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
 
-    const { container } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
 
     await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalledWith("p1"));
     await waitFor(() => expect(api.getPlayerAwards).toHaveBeenCalledWith("p1"));
@@ -279,12 +279,12 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
     vi.mocked(api.getPlayerWeeklyStats).mockReturnValue(new Promise(() => {}));
 
-    const { container } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
     fireEvent.click(await screen.findByRole("tab", { name: "Outlook" }));
 
     await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
 
-    const trendsChartSkeleton = Array.from(container.querySelectorAll<HTMLElement>(".pqv-skeleton-line")).find((el) => el.style.height === "160px") ?? null;
+    const trendsChartSkeleton = Array.from(document.body.querySelectorAll<HTMLElement>(".pqv-skeleton-line")).find((el) => el.style.height === "160px") ?? null;
     expect(trendsChartSkeleton).toBeInTheDocument();
     expect(trendsChartSkeleton?.style.height).toBe("160px");
     expect(screen.getByRole("status", { name: /Loading weekly trends/ })).toBeInTheDocument();

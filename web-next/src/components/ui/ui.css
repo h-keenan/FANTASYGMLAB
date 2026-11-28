@@ -6,6 +6,7 @@
 .ui-sheet-backdrop {
   position: fixed;
   inset: 0;
+  overscroll-behavior: contain; /* a scroll that hits the sheet's end never chains to the page */
   z-index: 70; /* above the PQV modal (50) so a Sheet opened from it is visible */
   display: flex;
   align-items: flex-end;

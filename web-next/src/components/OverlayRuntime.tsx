@@ -6,6 +6,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import { isEditableFocus, keyboardInset, shouldScrollIntoView } from "@/lib/keyboardInset";
 import { installOverlayHistory } from "@/lib/overlayHistory";
 import { overlayStack } from "@/lib/overlayStack";
+import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 
 /**
  * Mounted once in the root layout. Owns the three global side effects of the overlay stack so no pop-up has to:
@@ -22,16 +23,11 @@ export function OverlayRuntime() {
     return () => history.current?.dispose();
   }, []);
 
-  // One scroll lock for every pop-up, restored exactly.
+  // One scroll lock for every pop-up (lib/scrollLock.ts: body pinned with position: fixed, exact scroll restored).
   useEffect(() => {
     if (size === 0) return;
-    const saved = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.body.setAttribute("data-overlay-open", "");
-    return () => {
-      document.body.style.overflow = saved;
-      document.body.removeAttribute("data-overlay-open");
-    };
+    lockScroll();
+    return () => unlockScroll();
   }, [size > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The on-screen keyboard: publish its height as --kb-inset (sheets lift above it) and scroll a focused text input in a

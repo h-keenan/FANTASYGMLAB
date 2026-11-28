@@ -1,5 +1,6 @@
 "use client";
 
+import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import { useEffect, useMemo } from "react";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
@@ -63,6 +64,7 @@ export function EmbeddedCheckoutModal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose, overlay.isTop]);
   return (
+    <OverlayPortal lockScroll>
     <div
       // Bottom-aligned on phones, centered from sm up. Sized in dvh (not
       // vh, which on iOS Safari includes the area under the browser bar
@@ -117,5 +119,6 @@ export function EmbeddedCheckoutModal({
         </div>
       </div>
     </div>
+    </OverlayPortal>
   );
 }

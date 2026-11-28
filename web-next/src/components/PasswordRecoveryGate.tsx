@@ -1,5 +1,6 @@
 "use client";
 
+import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import { useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -46,6 +47,7 @@ export function PasswordRecoveryGate() {
   };
 
   return (
+    <OverlayPortal lockScroll>
     <div
       className="fixed inset-0 flex items-center justify-center p-4"
       style={{ background: "var(--color-scrim)", zIndex: "var(--z-overlay-dialog, 90)" }}
@@ -103,5 +105,6 @@ export function PasswordRecoveryGate() {
         </form>
       </div>
     </div>
+    </OverlayPortal>
   );
 }
