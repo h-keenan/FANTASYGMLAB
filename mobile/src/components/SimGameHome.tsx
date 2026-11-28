@@ -8,6 +8,8 @@ import Button from './Button';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
+import { SimMoreNote } from './SimMoreNote';
+import { SimTeamLogo } from './SimTeamIdentity';
 import StatusHeader from './StatusHeader';
 import { MatchupHeroCard } from './MatchupModule';
 import { matchupTickerParts, simMatchupCardModel } from '../lib/matchupModules';
@@ -132,7 +134,7 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   return (
     <View style={common.stack} testID="sim-home">
       <SimRealismBanner ctx={ctx} />
-      <SimStatusHeader home={home} onTab={onTab} />
+      <SimStatusHeader home={home} onTab={onTab} teamName={ctx.game.you?.name} />
       {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
       <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
       <SimReservesStrip home={home} onTab={onTab} />
@@ -173,7 +175,7 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
     return (
       <AccentCard accent={colors.warning}>
         <SimSectionTitle glyph="bye" tone="warning" title={`Week ${matchup.week} bye`} />
-        <AppText style={common.small}>You do not play this week. Use it to work the wire and your trades.</AppText>
+        <SimMoreNote>You do not play this week. Use it to work the wire and your trades.</SimMoreNote>
       </AccentCard>
     );
   }
@@ -237,7 +239,7 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
             );
           })}
         </View>
-        <AppText style={common.muted}>Their lineup is what their manager will start. Projections update when injuries or byes change.</AppText>
+        <SimMoreNote>Their lineup is what their manager will start. Projections update when injuries or byes change.</SimMoreNote>
         </View>
       ) : null}
     </MatchupHeroCard>
@@ -271,7 +273,7 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
  * targets that need you as player rows, the first unfinished checklist step as the one action). The cards below keep
  * every detail. Projection and ADP only; the sim never shows its internal rating. Mirrors web SimStatusHeader.
  */
-function SimStatusHeader({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
+function SimStatusHeader({ home, onTab, teamName }: { home: SimHomeResponse; onTab: (tab: SimTab) => void; teamName?: string }) {
   const mine = home.standings?.rows.find((r) => r.is_you);
   const record = home.matchup?.you_record ?? (mine ? { wins: mine.wins, losses: mine.losses, ties: mine.ties } : null);
   const next = (home.checklist ?? []).find((item) => !item.done && simChecklistTarget(item));
@@ -291,7 +293,7 @@ function SimStatusHeader({ home, onTab }: { home: SimHomeResponse; onTab: (tab: 
     attention: simHomeAttentionItems(home),
     next: next ? { label: next.label, actionKey: simChecklistTarget(next) as string } : null,
   });
-  return <StatusHeader model={model} onAction={(key) => onTab(key as SimTab)} testID="sim-status-header" />;
+  return <StatusHeader model={model} lead={teamName ? <SimTeamLogo name={teamName} size="card" /> : undefined} onAction={(key) => onTab(key as SimTab)} testID="sim-status-header" />;
 }
 
 /** One tappable line for dynasty / IR games (season, picks, IR and taxi use); nothing in redraft. */
@@ -328,7 +330,7 @@ function SimChecklistCard({ home, onTab, onAuto, autoBusy = false, optimal = fal
         <View style={[styles.thinFill, { width: total ? `${(done / total) * 100}%` : '0%', backgroundColor: accent }]} />
       </View>
       {onAuto ? (
-        <Button label={optimal ? 'Lineup is optimal' : 'Auto-set best lineup'} variant="secondary" loading={autoBusy} disabled={optimal} onPress={onAuto} />
+        <Button label={optimal ? 'Lineup is optimal' : 'Auto-set best lineup'} variant="secondary" size="sm" loading={autoBusy} disabled={optimal} onPress={onAuto} />
       ) : null}
       {items.map((item, index) => {
         const color = simToneColor(simChecklistTone(item.severity), colors);

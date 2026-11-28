@@ -3,10 +3,11 @@
 import type { ReactNode } from "react";
 
 import { MotionIn } from "@/components/Motion";
+import { SimMoreNote } from "@/components/SimMoreNote";
 import { SimGlyph } from "@/components/SimGlyph";
 import { Toggle } from "@/components/Toggle";
 import { SIM_DIFFICULTY_COPY, type SimDifficulty } from "@/lib/simGame";
-import { SIM_DIFFICULTY_CARDS, SIM_SETUP_CARDS, type SimSetupCardId } from "@/lib/simSetupView";
+import { SIM_DIFFICULTY_CARDS, SIM_SETUP_CARDS, SIM_SETUP_STEPS, simSetupStepLabel, type SimSetupCardId } from "@/lib/simSetupView";
 
 /**
  * Building blocks of the Fantasy Sim "New game" form: glass section cards (icon + title + live one-line summary),
@@ -55,14 +56,14 @@ export function SetupField({ label, note, children, id }: { label: string; note?
     <div className="flex flex-col gap-2 min-w-0">
       <span className="text-sm font-bold" id={id}>{label}</span>
       {children}
-      {note ? <p className="text-[13px] leading-snug" style={HELP_STYLE}>{note}</p> : null}
+      {note ? <SimMoreNote>{note}</SimMoreNote> : null}
     </div>
   );
 }
 
 /** A quiet helper paragraph inside a card. */
 export function SetupNote({ children, testId }: { children: ReactNode; testId?: string }) {
-  return <p className="text-[13px] leading-snug" style={HELP_STYLE} data-testid={testId}>{children}</p>;
+  return <SimMoreNote testId={testId}>{children}</SimMoreNote>;
 }
 
 /** Switch rows grouped in one inset tile with hairline dividers, so toggles never float loose. */
@@ -79,7 +80,7 @@ export function SetupToggleRow({ label, note, checked, onChange, first = false }
     <div className="flex items-center justify-between gap-3 py-2" style={first ? undefined : { borderTop: "1px solid var(--glass-input-border)" }}>
       <div className="flex flex-col min-w-0">
         <span className="text-sm font-bold">{label}</span>
-        <span className="text-[13px] leading-snug" style={HELP_STYLE}>{note}</span>
+        <SimMoreNote>{note}</SimMoreNote>
       </div>
       <Toggle checked={checked} onChange={onChange} label={label} />
     </div>
@@ -168,9 +169,41 @@ export function SetupSummaryCard({ headline, chips, detail, testId }: { headline
             </li>
           ))}
         </ul>
-        <p className="text-[13px] leading-snug" style={HELP_STYLE} data-testid={testId}>{detail}</p>
+        <SimMoreNote testId={testId}>{detail}</SimMoreNote>
       </section>
     </MotionIn>
+  );
+}
+
+/** The 3-step setup header (Team, Difficulty, League): numbered glass pills, the lit one is the current step. Every step is tappable. */
+export function SetupStepper({ active, onSelect }: { active: number; onSelect: (index: number) => void }) {
+  return (
+    <ol className="m-0 flex list-none gap-2 p-0" aria-label="Setup steps" data-testid="sim-setup-stepper">
+      {SIM_SETUP_STEPS.map((step, index) => {
+        const on = index === active;
+        return (
+          <li key={step.id} className="min-w-0 flex-1">
+            <button
+              type="button"
+              aria-current={on ? "step" : undefined}
+              aria-label={simSetupStepLabel(index)}
+              onClick={() => onSelect(index)}
+              className="flex w-full min-w-0 items-center justify-center gap-2 text-[13px] font-extrabold"
+              style={{
+                minHeight: "var(--touch-target-min)",
+                borderRadius: "var(--radius-pill)",
+                border: `1px solid ${on ? "var(--color-accent)" : "var(--glass-input-border)"}`,
+                background: on ? "color-mix(in srgb, var(--color-accent) 14%, var(--glass-input-bg))" : "var(--glass-input-bg)",
+                color: on ? "var(--color-accent)" : "var(--color-text-secondary)",
+              }}
+            >
+              <span aria-hidden="true">{index + 1}</span>
+              <span className="truncate" aria-hidden="true">{step.title}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

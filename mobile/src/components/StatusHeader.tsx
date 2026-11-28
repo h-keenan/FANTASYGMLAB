@@ -165,6 +165,7 @@ export default function StatusHeader({
   model: raw,
   attentionTitle = 'Needs your attention',
   badge,
+  lead,
   headerHref,
   onOpen,
   onAction,
@@ -176,6 +177,8 @@ export default function StatusHeader({
   attentionTitle?: string;
   /** A small pill beside the kicker (archetype, status). */
   badge?: ReactNode;
+  /** Team identity shown before the headline (Fantasy Sim Home: the user's team logo). */
+  lead?: ReactNode;
   /** Makes the ring + headline block tappable (Today: the matchup). */
   headerHref?: string;
   /** Opens an `href` (a route name on the app). */
@@ -193,6 +196,7 @@ export default function StatusHeader({
   const primary = model.primary;
   const top = (
     <>
+      {lead}
       {model.ring ? <StatusRingMark ring={model.ring} /> : null}
       <View style={styles.topText}>
         <View style={styles.kickerRow}>

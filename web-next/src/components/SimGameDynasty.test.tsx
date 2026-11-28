@@ -78,6 +78,7 @@ describe("dynasty setup", () => {
   it("Customize picks Dynasty, seasons and rookie rounds, and sends them", async () => {
     await openSetup();
     fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
+    fireEvent.click(screen.getByRole("button", { name: "Step 3 of 3: League" }));
     expect(screen.queryByRole("tablist", { name: "Seasons" })).not.toBeInTheDocument();
     fireEvent.click(within(screen.getByRole("tablist", { name: "Game mode" })).getByRole("tab", { name: "Dynasty" }));
     expect(within(screen.getByRole("tablist", { name: "Seasons" })).getByRole("tab", { name: "5" })).toHaveAttribute("aria-selected", "true");
@@ -97,9 +98,11 @@ describe("dynasty setup", () => {
     await openSetup();
     fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
     fireEvent.click(screen.getByRole("tab", { name: "Use my league" }));
+    fireEvent.click(screen.getByRole("button", { name: "Step 3 of 3: League" }));
     fireEvent.click(within(screen.getByRole("tablist", { name: "Game mode" })).getByRole("tab", { name: "Dynasty" }));
     expect(screen.getByTestId("sim-dynasty-note")).toHaveTextContent("picks, taxi squad and IR");
     mocked.getSimLeagueTeams.mockResolvedValue({ ok: true, reason: "", league_id: "111", you_roster_id: "2", teams: [{ roster_id: "2", team_name: "Me", owner_name: "me", wins: 0, losses: 0, ties: 0, points_for: 0, rank: 1, is_you: true }] });
+    fireEvent.click(screen.getByRole("button", { name: "Step 1 of 3: Team" }));
     fireEvent.change(await screen.findByRole("combobox", { name: "League to start from" }), { target: { value: "111" } });
     const submit = screen.getByRole("button", { name: "Start the season" });
     await waitFor(() => expect(submit).not.toBeDisabled());
