@@ -2,9 +2,8 @@
 
 import { TeamNameLink } from "@/components/TeamNameLink";
 import { PageTitle } from "@/components/PageTitle";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-import { AccentCard } from "@/components/AccentCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
@@ -15,7 +14,10 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SnapshotTile } from "@/components/SnapshotTile";
 import { ToneBadge } from "@/components/ToneBadge";
-import { ValueRing } from "@/components/ValueRing";
+import { TeamAvatar } from "@/components/TeamAvatar";
+import { InfoMark } from "@/components/ui/InfoMark";
+import { Collapse } from "@/components/ui/Presence";
+import { ExpandRow, ExpandRowGroup } from "@/components/ui/ExpandRow";
 import { LineupCheck } from "@/components/LineupCheck";
 import { VetoCalculator } from "@/components/VetoCalculator";
 import { api } from "@/lib/api";
@@ -28,6 +30,8 @@ import {
   integrityReasonMessage,
   calendarLines,
   integritySummaryLine,
+  INTEGRITY_CAVEAT,
+  weeksFlaggedLine,
   restSummary,
   splitTeams,
   type CommissionerIntegrityResponse,
@@ -38,7 +42,6 @@ import {
   type IntegrityInactiveManager,
   type IntegrityTeam,
 } from "@/lib/commissionerIntegrity";
-import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Commissioner: league integrity for any Pro user who can open the league
@@ -126,84 +129,105 @@ function Bullets({ title, items, icon, color }: { title: string; items: string[]
 
 const INNOCENT_COLOR = "var(--color-information)";
 
-export function IntegrityTeamCard({ team, leagueId }: { team: IntegrityTeam; leagueId?: string }) {
-  const [open, setOpen] = useState(team.band === "strong");
-  const expandable = team.band === "strong" || team.band === "worth_a_look";
+/** The grouped surface every flagged-item list shares (one glass card, hairline dividers, one row per team or pair). */
+function IntegrityRows({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <AccentCard accent={bandColor(team.band)} as="article">
-      <div className="flex items-center gap-3">
-        {team.weeks.evaluated ? (
-          <ValueRing
-            percent={Math.round((team.weeks.flagged / team.weeks.evaluated) * 100)}
-            tint={bandColor(team.band)}
-            display={`${team.weeks.flagged}/${team.weeks.evaluated}`}
-            ariaLabel={`${team.weeks.flagged} of ${team.weeks.evaluated} weeks flagged`}
-            size="md"
-          />
-        ) : null}
-        <div className="flex flex-col min-w-0 flex-1">
-          <TeamNameLink leagueId={leagueId} rosterId={team.roster_id} name={team.team_name} className="text-base font-extrabold" />
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {team.owner_name}
-            {team.weeks.evaluated ? ` · ${team.weeks.flagged} of ${team.weeks.evaluated} weeks flagged` : ""}
-          </span>
-        </div>
-        <ToneBadge label={BAND_LABEL[team.band]} color={bandColor(team.band)} />
-      </div>
+    <ExpandRowGroup accent="var(--color-warning)" testId={testId}>
+      {children}
+    </ExpandRowGroup>
+  );
+}
+
+/** One team: avatar, name, "n of m weeks flagged", a band badge; tapping opens the evidence, the weekly bars and the innocent explanations. */
+export function IntegrityTeamRow({ team, leagueId }: { team: IntegrityTeam; leagueId?: string }) {
+  const expandable = team.band === "strong" || team.band === "worth_a_look";
+  const interpretation = INTERPRETATION_LABEL[team.interpretation];
+  const caption = [team.owner_name, weeksFlaggedLine(team)].filter(Boolean).join(" · ");
+  return (
+    <ExpandRow
+      testId={`integrity-team-${team.roster_id}`}
+      label={`${team.team_name}, ${BAND_LABEL[team.band]}`}
+      // team-tap-exempt: the whole row is one expand toggle; the team sheet opens from the "Open team" link inside it
+      leading={<TeamAvatar avatarUrl={team.avatar_url} name={team.team_name} size={32} />}
+      title={team.team_name}
+      caption={caption || undefined}
+      chips={
+        expandable && interpretation ? (
+          <ToneBadge label={`${interpretation} · ${CONFIDENCE_LABEL[team.confidence]}`} color="var(--color-text-muted)" size="xs" />
+        ) : undefined
+      }
+      action={<ToneBadge label={BAND_LABEL[team.band]} color={bandColor(team.band)} />}
+      defaultOpen={team.band === "strong"}
+    >
       {expandable ? (
         <>
-          {INTERPRETATION_LABEL[team.interpretation] ? (
-            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              {INTERPRETATION_LABEL[team.interpretation]} · {CONFIDENCE_LABEL[team.confidence]}
-            </p>
-          ) : null}
-          <button
-            type="button"
-            className="text-xs font-bold self-start"
-            style={{ color: "var(--color-accent)" }}
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? "Hide the evidence" : "Show the evidence"}
-          </button>
-          <Collapse open={open}>
-            <>
-              <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} icon="alert" color={bandColor(team.band)} />
-              <EfficiencyBars team={team} />
-              <Bullets title="Could be innocent" items={team.innocent_explanations} icon="info" color={INNOCENT_COLOR} />
-            </>
-          </Collapse>
+          <TeamNameLink leagueId={leagueId} rosterId={team.roster_id} name={team.team_name} ownerName={team.owner_name} avatarUrl={team.avatar_url} className="text-sm font-bold">
+            Open team
+          </TeamNameLink>
+          <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} icon="alert" color={bandColor(team.band)} />
+          <EfficiencyBars team={team} />
+          <Bullets title="Could be innocent" items={team.innocent_explanations} icon="info" color={INNOCENT_COLOR} />
         </>
       ) : null}
-    </AccentCard>
+    </ExpandRow>
   );
 }
 
-function CollusionCard({ pair }: { pair: IntegrityCollusionPair }) {
+/** Both teams of a repeated-trade pair, overlapped (a team missing from the list falls back to initials). */
+function PairAvatars({ pair, teams }: { pair: IntegrityCollusionPair; teams: IntegrityTeam[] }) {
+  const names = [pair.beneficiary_name, pair.giver_name];
   return (
-    <AccentCard accent={bandColor(pair.band)} as="article">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-          {pair.headline}
-        </span>
-        <ToneBadge label={BAND_LABEL[pair.band]} color={bandColor(pair.band)} />
-      </div>
-      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-        {pair.summary} · {CONFIDENCE_LABEL[pair.confidence]}
-      </p>
+    <span className="flex shrink-0 items-center">
+      {pair.roster_ids.slice(0, 2).map((rid, i) => {
+        const t = teams.find((x) => x.roster_id === rid);
+        return (
+          <span key={rid} style={{ marginLeft: i ? -10 : 0 }}>
+            {/* team-tap-exempt: decorative mark inside the row's expand toggle */}
+            <TeamAvatar avatarUrl={t?.avatar_url} name={t?.team_name ?? names[i]} size={28} />
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function CollusionRow({ pair, teams }: { pair: IntegrityCollusionPair; teams: IntegrityTeam[] }) {
+  return (
+    <ExpandRow
+      testId={`integrity-pair-${pair.roster_ids.join("-")}`}
+      label={`${pair.headline}, repeated trades`}
+      // team-tap-exempt: the whole row is one expand toggle; the pair's teams open from the Teams tab
+      leading={<PairAvatars pair={pair} teams={teams} />}
+      title={pair.headline}
+      caption={`${pair.summary} · ${CONFIDENCE_LABEL[pair.confidence]}`}
+      action={<ToneBadge label={BAND_LABEL[pair.band]} color={bandColor(pair.band)} />}
+      defaultOpen
+    >
       <Bullets title="Evidence" items={pair.evidence} icon="alert" color={bandColor(pair.band)} />
       <Bullets title="Could be innocent" items={pair.innocent_explanations} icon="info" color={INNOCENT_COLOR} />
-    </AccentCard>
+    </ExpandRow>
   );
 }
 
-function InactiveCard({ manager, leagueId }: { manager: IntegrityInactiveManager; leagueId?: string }) {
+function InactiveRow({ manager, teams, leagueId }: { manager: IntegrityInactiveManager; teams: IntegrityTeam[]; leagueId?: string }) {
+  const avatarUrl = manager.avatar_url ?? teams.find((t) => t.roster_id === manager.roster_id)?.avatar_url;
   return (
-    <AccentCard accent="var(--color-warning)" as="article">
-      <TeamNameLink leagueId={leagueId} rosterId={manager.roster_id} name={manager.team_name} className="text-base font-extrabold" />
+    <ExpandRow
+      testId={`integrity-inactive-${manager.roster_id}`}
+      label={`${manager.team_name}, possibly inactive`}
+      // team-tap-exempt: the whole row is one expand toggle; the team sheet opens from the "Open team" link inside it
+      leading={<TeamAvatar avatarUrl={avatarUrl} name={manager.team_name} size={32} />}
+      title={manager.team_name}
+      caption={manager.owner_name || undefined}
+      action={<ToneBadge label="Possibly inactive" color="var(--color-warning)" />}
+      defaultOpen
+    >
+      <TeamNameLink leagueId={leagueId} rosterId={manager.roster_id} name={manager.team_name} ownerName={manager.owner_name} avatarUrl={avatarUrl} className="text-sm font-bold">
+        Open team
+      </TeamNameLink>
       <Bullets title="Evidence" items={manager.evidence} icon="clock" color="var(--color-warning)" />
       <Bullets title="Could be innocent" items={manager.innocent_explanations} icon="info" color={INNOCENT_COLOR} />
-    </AccentCard>
+    </ExpandRow>
   );
 }
 
@@ -276,14 +300,23 @@ export function CommissionerView({
   const [showRest, setShowRest] = useState(false);
   return (
     <>
-      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="integrity-summary">
-        {integritySummaryLine(data)}
-      </p>
+      <div className="flex items-center">
+        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="integrity-summary">
+          {integritySummaryLine(data)}
+        </p>
+        <InfoMark label="what this can and can't tell you" lines={[INTEGRITY_CAVEAT, ...(data.limits ?? [])]} />
+      </div>
       <CalendarCard calendar={data.calendar} />
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-          How is your draft order set?
-        </span>
+        <div className="flex items-center">
+          <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            How is your draft order set?
+          </span>
+          <InfoMark
+            label="the draft order rule"
+            lines={["Worst record means the worst team picks first; Lottery covers any other order. Sleeper does not publish this, so it changes how a flagged team is described, not the lineup math."]}
+          />
+        </div>
         <PillRow
           options={DRAFT_ORDER_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
           active={draftOrder}
@@ -291,37 +324,47 @@ export function CommissionerView({
           variant="fill"
           ariaLabel="Draft order rule"
         />
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Worst record means the worst team picks first; Lottery covers any other order. Sleeper does not publish this, so it changes how a flagged team is described, not the lineup math.
-        </span>
       </div>
 
       {flagged.length ? (
         <section className="flex flex-col gap-3">
           <SectionHeading>Worth a look</SectionHeading>
-          {flagged.map((team) => (
-            <IntegrityTeamCard key={team.roster_id} team={team} leagueId={leagueId} />
-          ))}
+          <IntegrityRows testId="integrity-flagged">
+            {flagged.map((team) => (
+              <IntegrityTeamRow key={team.roster_id} team={team} leagueId={leagueId} />
+            ))}
+          </IntegrityRows>
         </section>
       ) : null}
 
       {data.collusion.length ? (
         <section className="flex flex-col gap-3">
-          <SectionHeading note="Same two managers, repeated trades: one-sided on value (picks priced like the Trade Analyzer), assets going back and forth, or several trades in one week. A prompt to look, not a verdict.">
+          <SectionHeading
+            help={
+              <InfoMark
+                label="repeated trades"
+                lines={["Same two managers, repeated trades: one-sided on value (picks priced like the Trade Analyzer), assets going back and forth, or several trades in one week. A prompt to look, not a verdict."]}
+              />
+            }
+          >
             Repeated trades worth a look
           </SectionHeading>
-          {data.collusion.map((pair) => (
-            <CollusionCard key={pair.roster_ids.join("-")} pair={pair} />
-          ))}
+          <IntegrityRows testId="integrity-collusion">
+            {data.collusion.map((pair) => (
+              <CollusionRow key={pair.roster_ids.join("-")} pair={pair} teams={data.teams} />
+            ))}
+          </IntegrityRows>
         </section>
       ) : null}
 
       {data.inactive.length ? (
         <section className="flex flex-col gap-3">
           <SectionHeading>Possibly inactive</SectionHeading>
-          {data.inactive.map((m) => (
-            <InactiveCard key={m.roster_id} manager={m} leagueId={leagueId} />
-          ))}
+          <IntegrityRows testId="integrity-inactive">
+            {data.inactive.map((m) => (
+              <InactiveRow key={m.roster_id} manager={m} teams={data.teams} leagueId={leagueId} />
+            ))}
+          </IntegrityRows>
         </section>
       ) : null}
 
@@ -342,23 +385,14 @@ export function CommissionerView({
               {showRest ? "Hide teams" : `Show ${rest.length} team${rest.length === 1 ? "" : "s"}`}
             </button>
           </div>
-          {showRest ? rest.map((team) => <IntegrityTeamCard key={team.roster_id} team={team} leagueId={leagueId} />) : null}
+          <Collapse open={showRest}>
+            <IntegrityRows testId="integrity-rest">
+              {rest.map((team) => (
+                <IntegrityTeamRow key={team.roster_id} team={team} leagueId={leagueId} />
+              ))}
+            </IntegrityRows>
+          </Collapse>
         </section>
-      ) : null}
-
-      {data.limits?.length ? (
-        <details className="glass-surface p-4">
-          <summary className="text-sm font-bold cursor-pointer" style={{ color: "var(--color-text-primary)" }}>
-            What this can and can&rsquo;t tell you
-          </summary>
-          <div className="flex flex-col gap-2 mt-3">
-            {data.limits.map((limit) => (
-              <IconRow key={limit} icon="info" color="var(--color-text-muted)" textClassName="text-xs">
-                {limit}
-              </IconRow>
-            ))}
-          </div>
-        </details>
       ) : null}
     </>
   );

@@ -6,6 +6,7 @@ import AppText from './AppText';
 import EmptyState from './EmptyState';
 import { ExpandRow, ExpandRowGroup } from './ExpandRow';
 import IconRow from './IconRow';
+import InfoMark from './InfoMark';
 import PlayerAvatarSlot from './PlayerAvatarSlot';
 import SectionHeading from './SectionHeading';
 import TeamAvatar from './TeamAvatar';
@@ -19,6 +20,7 @@ import {
   formatPoints,
   gapLabel,
   gapTone,
+  infoText,
   lineupsReasonMessage,
   lineupsSummaryLine,
   setVsBestLine,
@@ -35,6 +37,8 @@ import { spacing, type ThemeColors } from '../theme';
  * best lineup this week, worst gap first, one ExpandRow per team that opens to the swaps that would fix it. Numbers come
  * from modules/commissioner_lineups.py. A big gap is a prompt to look, never a verdict: warning/muted tones, never red.
  */
+const LINEUP_CAVEAT = "Each team's set lineup vs its best lineup this week. A big gap is a prompt to look, not a verdict.";
+
 function useToneColor(): (tone: LineupTone) => string {
   const { colors } = useThemeMode();
   return (tone) => (tone === 'warning' ? colors.warning : tone === 'success' ? colors.success : tone === 'information' ? colors.accent : colors.textTertiary);
@@ -55,6 +59,9 @@ function TeamRow({ team, leagueId, leagueName, styles }: { team: LineupCheckTeam
           {team.possible_tanking ? <ToneBadge label="Possible tanking" color={toneColor('warning')} /> : null}
           {team.flags.map((f, i) => (
             <ToneBadge key={`${f.kind}-${i}`} label={flagText(f)} color={toneColor(flagTone(f.kind))} />
+          ))}
+          {(team.info ?? []).map((n, i) => (
+            <ToneBadge key={`${n.kind}-${i}`} label={infoText(n)} color={toneColor('muted')} />
           ))}
           {team.locked_count ? <ToneBadge label={`${team.locked_count} locked`} color={toneColor('muted')} /> : null}
         </>
@@ -105,22 +112,15 @@ function LineupCheckView({ data, leagueId, leagueName }: { data: CommissionerLin
   if (data.reason) return <EmptyState icon="shield-checkmark-outline" title="Nothing to check yet" subtitle={lineupsReasonMessage(data.reason)} />;
   return (
     <View style={styles.stack}>
-      <AppText style={styles.body}>{lineupsSummaryLine(data)}</AppText>
+      <View style={styles.summaryRow}>
+        <AppText style={[styles.body, styles.flex]}>{lineupsSummaryLine(data)}</AppText>
+        <InfoMark label="what this can and can't tell you" lines={[LINEUP_CAVEAT, ...(data.limits ?? [])]} />
+      </View>
       <ExpandRowGroup accent={colors.warning} testID="lineup-teams">
         {data.teams.map((t) => (
           <TeamRow key={t.roster_id} team={t} leagueId={leagueId} leagueName={leagueName} styles={styles} />
         ))}
       </ExpandRowGroup>
-      {data.limits?.length ? (
-        <View style={styles.group}>
-          <AppText style={styles.groupTitle}>What this can and can&rsquo;t tell you</AppText>
-          {data.limits.map((limit) => (
-            <IconRow key={limit} icon="info" color={colors.textTertiary}>
-              {limit}
-            </IconRow>
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -138,7 +138,7 @@ export default function LineupCheck({ leagueId, leagueName, lens }: { leagueId: 
   if (!data || data.is_premium === false) return null;
   return (
     <View style={styles.stack}>
-      <SectionHeading title="Lineup check" caption="Each team's set lineup vs its best lineup this week. A big gap is a prompt to look, not a verdict." />
+      <SectionHeading title="Lineup check" />
       <LineupCheckView data={data} leagueId={leagueId} leagueName={leagueName} />
     </View>
   );
@@ -146,6 +146,8 @@ export default function LineupCheck({ leagueId, leagueName, lens }: { leagueId: 
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    summaryRow: { flexDirection: 'row', alignItems: 'center' },
+    flex: { flex: 1 },
     stack: { gap: spacing.md, marginTop: spacing.lg },
     body: { fontSize: 15.5, color: colors.textSecondary },
     teamLink: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },

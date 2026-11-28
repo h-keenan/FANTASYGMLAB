@@ -24,6 +24,14 @@ describe("LineupCheckView", () => {
     expect(screen.getByText(/Start Bench Guy over an empty slot/)).toBeTruthy();
   });
 
+  it("shows a locked hurt starter as an info note, and keeps the caveat behind the info mark", () => {
+    const info = [{ kind: "left_game", label: "Left game (injury)", player: "J. Smith", slot: "WR" }];
+    render(<LineupCheckView data={{ ...base, limits: ["Projections are estimates."], teams: [team({ flags: [], info })] }} />);
+    expect(screen.getByText("Left game (injury): J. Smith")).toBeTruthy();
+    expect(screen.queryByText("Projections are estimates.")).toBeNull();
+    expect(screen.getByRole("button", { name: /About what this can and can't tell you/i })).toBeTruthy();
+  });
+
   it("explains an empty state when there are no projections or no week", () => {
     render(<LineupCheckView data={{ ...base, reason: "no_current_week", teams: [] }} />);
     expect(screen.getByText(/no live week yet/i)).toBeTruthy();

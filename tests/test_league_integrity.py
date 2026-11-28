@@ -407,3 +407,11 @@ def test_best_lineup_flex_and_superflex_nesting():
     chosen, total = li.best_lineup(["QB", "SUPER_FLEX", "FLEX"], cands)
     assert total == 20 + 18 + 12
     assert set(chosen.values()) == {"a", "b", "d"}
+
+
+def test_teams_carry_the_profile_avatar():
+    data = build(_tank_lineups())
+    data["profiles"]["6"]["avatar_url"] = "https://example.test/a6.png"
+    report = li.build_league_integrity(**data, transactions=tank_transactions(), current_week=7)
+    assert team(report, 6)["avatar_url"] == "https://example.test/a6.png"
+    assert team(report, 1)["avatar_url"] is None

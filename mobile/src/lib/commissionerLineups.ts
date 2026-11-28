@@ -13,6 +13,14 @@ export interface LineupFlag {
   slot: string | null;
 }
 
+/** A locked, hurt starter (got hurt after kickoff): nothing to fix, so it is information, never a flag. */
+export interface LineupInfo {
+  kind: string;
+  label: string;
+  player: string | null;
+  slot: string | null;
+}
+
 export interface LineupStarter {
   slot: string | null;
   player_id: string | null;
@@ -55,6 +63,7 @@ export interface LineupCheckTeam {
   partial: boolean;
   possible_tanking: boolean;
   flags: LineupFlag[];
+  info?: LineupInfo[];
   locked_count: number;
   swaps: LineupSwap[];
 }
@@ -84,6 +93,7 @@ export function normalizeCommissionerLineups(raw: unknown): CommissionerLineupsR
       ...t,
       starters: Array.isArray(t.starters) ? t.starters : [],
       flags: Array.isArray(t.flags) ? t.flags : [],
+      info: Array.isArray(t.info) ? t.info : [],
       swaps: Array.isArray(t.swaps) ? t.swaps : [],
       locked_count: typeof t.locked_count === "number" ? t.locked_count : 0,
     })) as unknown as LineupCheckTeam[],
@@ -134,6 +144,11 @@ export function flagTone(kind: LineupFlagKind): LineupTone {
 export function flagText(flag: LineupFlag): string {
   if (flag.kind === "empty") return flag.slot ? `Empty ${flag.slot}` : flag.label;
   return flag.player ? `${flag.label}: ${flag.player}` : flag.label;
+}
+
+/** Chip text for an info note, with the player: "Left game (injury): J. Smith". */
+export function infoText(note: LineupInfo): string {
+  return note.player ? `${note.label}: ${note.player}` : note.label;
 }
 
 /** One-line numbers under a team name: "Set 98.2 · Best 112.4". */

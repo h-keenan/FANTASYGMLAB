@@ -34,6 +34,8 @@ export interface IntegrityTeam {
   roster_id: number;
   team_name: string;
   owner_name: string;
+  /** Sleeper team picture URL (or null); the row falls back to initials. */
+  avatar_url?: string | null;
   band: IntegrityBand;
   band_label: string;
   score: number;
@@ -68,6 +70,7 @@ export interface IntegrityInactiveManager {
   roster_id: number;
   team_name: string;
   owner_name: string;
+  avatar_url?: string | null;
   evidence: string[];
   innocent_explanations: string[];
 }
@@ -108,9 +111,9 @@ export const DRAFT_ORDER_OPTIONS: { value: DraftOrderRule; label: string }[] = [
 
 export type IntegrityTone = "success" | "warning" | "danger" | "muted";
 
-/** Semantic tone per band: green fine, amber look, red strong, grey not enough. */
+/** Semantic tone per band: green fine, amber look and strong, grey not enough. A signal is a prompt to look, never a verdict, so nothing here is red. */
 export function bandTone(band: IntegrityBand): IntegrityTone {
-  if (band === "strong") return "danger";
+  if (band === "strong") return "warning";
   if (band === "worth_a_look") return "warning";
   if (band === "fine") return "success";
   return "muted";
@@ -158,7 +161,10 @@ export function splitTeams(teams: IntegrityTeam[]): { flagged: IntegrityTeam[]; 
   return { flagged, rest };
 }
 
-/** One calm sentence for the top of the page. */
+/** The caveat that used to trail the summary sentence; it now sits behind the page's one "?". */
+export const INTEGRITY_CAVEAT = "These are prompts to check, not conclusions.";
+
+/** One calm, short line for the top of the page. */
 export function integritySummaryLine(resp: CommissionerIntegrityResponse): string {
   const weeks = resp.weeks_evaluated ?? 0;
   const { flagged } = splitTeams(resp.teams);
@@ -170,8 +176,13 @@ export function integritySummaryLine(resp: CommissionerIntegrityResponse): strin
   if (flagged.length) parts.push(`${flagged.length} team${flagged.length === 1 ? "" : "s"} worth a look`);
   if (resp.collusion.length) parts.push(`${resp.collusion.length} trade pair${resp.collusion.length === 1 ? "" : "s"} worth a look`);
   if (resp.inactive.length) parts.push(`${resp.inactive.length} possibly inactive manager${resp.inactive.length === 1 ? "" : "s"}`);
-  return `After ${weeks} week${weeks === 1 ? "" : "s"}: ${parts.join(", ")}. These are prompts to check, not conclusions.`;
+  return `After ${weeks} week${weeks === 1 ? "" : "s"}: ${parts.join(", ")}.`;
 }
+/** The muted line under a team name: "5 of 6 weeks flagged" (empty until a week has been evaluated). */
+export function weeksFlaggedLine(team: Pick<IntegrityTeam, "weeks">): string {
+  return team.weeks.evaluated ? `${team.weeks.flagged} of ${team.weeks.evaluated} weeks flagged` : "";
+}
+
 /** Short summary for the teams with no flag, so a clean league is one line, not a wall of identical cards. */
 export function restSummary(teams: IntegrityTeam[], flaggedCount: number): string {
   const { rest } = splitTeams(teams);

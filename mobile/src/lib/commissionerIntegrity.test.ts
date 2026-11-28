@@ -18,6 +18,8 @@ import {
   vetoStatusMessage,
   vetoWorstPositionLine,
   bandTone,
+  INTEGRITY_CAVEAT,
+  weeksFlaggedLine,
   integrityReasonMessage,
   calendarLines,
   integritySummaryLine,
@@ -57,14 +59,16 @@ test('web and app share one league-integrity presentation block', () => {
 test('bands map to fixed semantic tones', () => {
   assert.equal(bandTone('fine'), 'success');
   assert.equal(bandTone('worth_a_look'), 'warning');
-  assert.equal(bandTone('strong'), 'danger');
+  // A signal is a prompt to look, never a red verdict.
+  assert.equal(bandTone('strong'), 'warning');
   assert.equal(bandTone('not_enough_data'), 'muted');
 });
 
 test('summary is calm and flagged teams come first', () => {
   const teams = [team('strong', 1), team('fine', 2), team('worth_a_look', 3)];
   assert.deepEqual(splitTeams(teams).flagged.map((t) => t.roster_id), [1, 3]);
-  assert.match(integritySummaryLine(resp(teams)), /not conclusions/);
+  assert.equal(integritySummaryLine(resp(teams)), 'After 5 weeks: 2 teams worth a look.');
+  assert.equal(INTEGRITY_CAVEAT, 'These are prompts to check, not conclusions.');
   assert.match(integritySummaryLine(resp([team('fine')])), /No team stands out/);
 });
 
@@ -138,4 +142,9 @@ test('vetoAssetLabel drops the owner from a pick label only when it matches', ()
   assert.equal(vetoAssetLabel('2027 Round 1 (Blitz Bureau)', 'Blitz Bureau'), '2027 Round 1');
   assert.equal(vetoAssetLabel('2027 Round 1 (Other Team)', 'Blitz Bureau'), '2027 Round 1 (Other Team)');
   assert.equal(vetoAssetLabel('Saquon Barkley', 'Blitz Bureau'), 'Saquon Barkley');
+});
+
+test('weeks-flagged caption', () => {
+  assert.equal(weeksFlaggedLine(team('strong')), '0 of 5 weeks flagged');
+  assert.equal(weeksFlaggedLine({ weeks: { evaluated: 0, flagged: 0, longest_streak: 0, latest_streak: 0 } }), '');
 });
