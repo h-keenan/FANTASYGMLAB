@@ -319,6 +319,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
       <Button
         type="button"
         fullWidth
+        aria-label={oauthBusy === provider ? undefined : `Continue with ${name}`}
         onClick={() => handleOAuth(provider)}
         disabled={oauthBusy !== null}
       >
