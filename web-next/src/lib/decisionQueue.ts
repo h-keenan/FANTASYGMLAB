@@ -121,6 +121,33 @@ export interface DecisionInput<T extends DecisionItem = DecisionItem> {
   nextGame?: { week: number | null; opponentName: string } | null;
   /** The snapshot's injured-starter count: an empty queue never claims "nothing needs you" over injured starters. */
   injuredStarters?: number | null;
+  /** The cut the waivers read suggests for `addId` (waiverCutFor); the waiver decision carries it when `addId` is its lead add. */
+  waiverCut?: { addId: string; drop: DecisionPlayer } | null;
+}
+
+/** The slice of a waivers response the cut lookup reads (web WaiversResponse and mobile WaiversResponse both satisfy it). */
+export interface WaiverCutSource {
+  priority_adds: ReadonlyArray<{
+    player_id: string;
+    drop_suggestion?: { drop: { player_id: string; name: string; position: string; team?: string | null; tier?: string | null; action?: string } | null } | null;
+  }>;
+}
+
+/** The player the waiver decision leads with (its first named add), so the caller knows whose cut to look up; null when no waiver add is named. */
+export function waiverLeadId(items: ReadonlyArray<DecisionItem>): string | null {
+  const lead = items.find((i) => i.category === "top_priority" && i.destination === "waivers" && !isTrade(i) && i.route_player_id && i.route_player_name);
+  return lead ? lead.route_player_id : null;
+}
+
+/** The suggested cut for the add `addId` (the Today waiver row's lead player), as a DecisionPlayer; null when there is none. */
+export function waiverCutFor(waivers: WaiverCutSource | null | undefined, addId: string | null | undefined): { addId: string; drop: DecisionPlayer } | null {
+  if (!waivers || !addId) return null;
+  const drop = waivers.priority_adds.find((p) => p.player_id === addId)?.drop_suggestion?.drop;
+  if (!drop) return null;
+  return {
+    addId,
+    drop: { id: drop.player_id, name: drop.name, position: drop.position, team: drop.team ?? null, tier: drop.tier ?? null, injuryStatus: null, note: drop.action === "move_to_ir" ? "To IR" : "Drop", stat: null },
+  };
 }
 
 export interface DecisionPlayer {
@@ -181,6 +208,11 @@ export interface Decision<T extends DecisionItem = DecisionItem> {
   facts: string[];
   /** The lineup decision's one-tap fixes (empty on every other decision). Locked moves are never in here. */
   swaps: DecisionSwap[];
+  /**
+   * The waiver decision's cut for its lead add, when the waivers read has one (see waiverCutFor): Today's top-add row shows
+   * it as the add -> drop pair. Absent / null on every other decision, and when the league has no cut to name.
+   */
+  drop?: DecisionPlayer | null;
 }
 
 export interface DecisionQueue<T extends DecisionItem = DecisionItem> {
@@ -404,6 +436,7 @@ function waiverDecision(input: DecisionInput, taken: Set<string>): Decision | nu
     item: top,
     facts: named.length > 1 ? [`${named.length} recommended adds`] : [],
     swaps: [],
+    drop: input.waiverCut && first?.id === input.waiverCut.addId ? input.waiverCut.drop : null,
   };
 }
 

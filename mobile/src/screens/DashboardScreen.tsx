@@ -83,7 +83,7 @@ import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import { DashboardMore } from '../components/DashboardBlocks';
 import DecisionQueue from '../components/DecisionQueue';
-import { buildDecisionQueue } from '../lib/decisionQueue';
+import { buildDecisionQueue, waiverCutFor, waiverLeadId } from '../lib/decisionQueue';
 import { isTradeItem } from '../lib/dashboardLayout';
 import InfoMark from '../components/InfoMark';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -269,6 +269,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
     enabled: !isRestoring && firstPaintDone,
   });
 
+  // The cut for Today's lead waiver add (the add -> drop pair); shares the waivers cache the quick view reads.
+  const waiverLead = waiverLeadId(dashboardQuery.data?.items ?? []);
+  const waiversQuery = useQuery({
+    queryKey: queryKeys.waivers(leagueId),
+    queryFn: () => api.getLeagueWaivers(leagueId),
+    enabled: !isRestoring && firstPaintDone && waiverLead != null,
+  });
+
   const dashboardData = dashboardQuery.data;
   const items: DashboardItem[] | null = dashboardData?.items ?? null;
   const teamSnapshot: TeamSnapshot | null = dashboardData?.team_snapshot ?? null;
@@ -438,6 +446,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const matchupLine = buildTeamStatusMatchup(matchup);
   const queue = buildDecisionQueue<DashboardItem>({
     now: new Date(),
+    waiverCut: waiverCutFor(waiversQuery.data, waiverLead),
     moves: matchup?.suggested_moves,
     openSlots: matchup?.open_slots?.length ?? 0,
     thisWeek: dashboardData?.this_week,

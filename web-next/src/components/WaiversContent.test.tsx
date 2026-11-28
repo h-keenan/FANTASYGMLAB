@@ -273,7 +273,7 @@ describe("WaiversContent", () => {
     expect(within(details).queryByTestId("suggested-drop-compact")).not.toBeInTheDocument();
   });
 
-  it("a row whose cut differs from the group's says so on its own line", () => {
+  it("every row shows its own add -> drop pair, so a row whose cut differs names that cut", () => {
     const other = { ...DROP_SUGGESTION.drop!, player_id: "d9", name: "Other Cut" };
     const data: WaiversResponse = {
       ...BASE_RESPONSE,
@@ -286,8 +286,8 @@ describe("WaiversContent", () => {
     };
     renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
     const rows = screen.getAllByTestId("waiver-rec-row");
-    expect(rows[0]).not.toHaveTextContent("Drop ");
-    expect(rows[2]).toHaveTextContent("Drop Other Cut");
+    expect(within(rows[0]).getByTestId("add-drop-pair")).toHaveTextContent("Dead Weight");
+    expect(within(rows[2]).getByTestId("add-drop-pair")).toHaveTextContent("Drop Other Cut");
   });
 
   it("lists the same cut the cards name, with the adds it is the cut for", () => {

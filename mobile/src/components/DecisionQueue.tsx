@@ -8,6 +8,7 @@ import Button from './Button';
 import { ExpandRow, ExpandRowGroup } from './ExpandRow';
 import PlayerAvatarSlot from './PlayerAvatarSlot';
 import CompactPlayerCard from './CompactPlayerCard';
+import { AddDropPair } from './SuggestedDrop';
 import EmptyState from './EmptyState';
 import FreeLimitNote from './FreeLimitNote';
 import PressableScale from './PressableScale';
@@ -120,7 +121,7 @@ export default function DecisionQueue({
                 label={`${a.kind === 'swap' ? 'LINEUP' : (d?.label ?? 'TRADE')}: ${a.reason}`}
                 leading={a.player ? <PlayerAvatarSlot player={playerRef(a.player)} tier="row" nonInteractive="the row's toggle is the tap target" /> : <View style={[styles.dot, { backgroundColor: a.tone === 'danger' ? colors.danger : colors.warning }]} />}
                 title={a.reason}
-                caption={gain ? `${gain} projected` : undefined}
+                caption={gain ? `${gain} projected` : d?.kind === 'waiver' && d.drop && first ? <AddDropPair add={{ player_id: first.id ?? '', name: first.name, position: first.position ?? '' }} drop={{ player_id: d.drop.id ?? '', name: d.drop.name, position: d.drop.position ?? '', team: d.drop.team, action: d.drop.note === 'To IR' ? 'move_to_ir' : 'drop' }} showAdd={false} /> : undefined}
                 action={<Button label={a.button} size="sm" onPress={() => press(a)} />}
               >
                 {a.swap ? (

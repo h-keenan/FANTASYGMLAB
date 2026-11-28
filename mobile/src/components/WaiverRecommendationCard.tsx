@@ -17,8 +17,8 @@ import OverallRatingBadge from './OverallRatingBadge';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { WaiverPriorityAdd } from '../lib/api';
-import { SuggestedDrop } from './SuggestedDrop';
-import { waiverReasonChips } from '../lib/waiverChips';
+import { SuggestedDrop, SuggestedDropPair } from './SuggestedDrop';
+import { waiverReasonChips, waiverReasonLine } from '../lib/waiverChips';
 import { faabDisplayText } from '../lib/faabDisplay';
 import PositionBadge from './PositionBadge';
 import { injuryTone } from '../lib/injuryDisplay';
@@ -262,6 +262,7 @@ export default function WaiverRecommendationCard({
           />
         </View>
         <View style={styles.identityWrap}>{identity}</View>
+        {player.drop_suggestion ? <SuggestedDropPair suggestion={player.drop_suggestion} showAdd={false} /> : null}
         <ReasonChips player={player} />
         <UsageFlagChip player={player} />
         <View style={styles.metricsRow}>
@@ -327,10 +328,10 @@ export default function WaiverRecommendationCard({
   }
 
   const { isBid, primary, secondary } = faabDisplayText(player.faab);
-  const chips = waiverReasonChips(player);
+  const chips = waiverReasonChips(player, 6);
+  const reasonLine = waiverReasonLine(player);
   const flag = player.usage_flag;
   const ownDrop = player.drop_suggestion?.drop ?? null;
-  const differentDrop = sharedDropId != null && ownDrop != null && ownDrop.player_id !== sharedDropId ? ownDrop : null;
   const pill = (key: string, label: string, tint: string, icon: 'flash' | 'trending-up' | 'trending-down') => (
     <View key={key} style={[chipStyles.chip, compactChip.chip, { backgroundColor: `${tint}1F` }]} testID="waiver-reason">
       <Ionicons name={icon} size={10} color={tint} />
@@ -352,18 +353,28 @@ export default function WaiverRecommendationCard({
       >
         <View style={styles.compactTop}>
           <View style={styles.compactIdentity}>{identity}</View>
-          <Money all={isBid} style={[styles.compactBid, !isBid && { color: colors.textSecondary }]} numberOfLines={1} testID="waiver-bid">
-            {primary}
-          </Money>
+          <View style={styles.bidChip}>
+            <Money all={isBid} style={[styles.compactBid, !isBid && { color: colors.textSecondary }]} numberOfLines={1} testID="waiver-bid">
+              {primary}
+            </Money>
+          </View>
         </View>
-        <View style={chipStyles.row}>
-          {chips.map((chip) => pill(chip, chip, colors.accent, 'flash'))}
-          {flag ? pill('flag', flag.label, flag.tone === 'positive' ? colors.success : toneColor(colors, 'negative'), flag.tone === 'positive' ? 'trending-up' : 'trending-down') : null}
-          {differentDrop ? pill('drop', `Drop ${differentDrop.name}`, colors.danger, 'trending-down') : null}
-        </View>
+        {player.drop_suggestion ? <SuggestedDropPair suggestion={player.drop_suggestion} showAdd={false} /> : null}
+        {reasonLine.line ? (
+          <View style={chipStyles.row}>
+            {flag && reasonLine.line === flag.label
+              ? pill('line', reasonLine.line, flag.tone === 'positive' ? colors.success : toneColor(colors, 'negative'), flag.tone === 'positive' ? 'trending-up' : 'trending-down')
+              : pill('line', reasonLine.line, colors.accent, 'flash')}
+            {reasonLine.more > 0 ? <AppText style={styles.moreText}>{`+${reasonLine.more} more`}</AppText> : null}
+          </View>
+        ) : null}
       </PressableScale>
       <Collapse open={open}>
         <View style={styles.compactDetails} testID="waiver-rec-details">
+          <View style={chipStyles.row}>
+            {chips.map((chip) => pill(`d-${chip}`, chip, colors.accent, 'flash'))}
+            {flag ? pill('d-flag', flag.label, flag.tone === 'positive' ? colors.success : toneColor(colors, 'negative'), flag.tone === 'positive' ? 'trending-up' : 'trending-down') : null}
+          </View>
           <View style={styles.compactMetaRow}>
             <View style={styles.scoreBlock}>
               <AppText style={styles.scoreLabel}>VALUE</AppText>
@@ -388,7 +399,7 @@ export default function WaiverRecommendationCard({
               {flag.explanation}
             </AppText>
           ) : null}
-          {player.drop_suggestion && !(sharedDropId != null && ownDrop?.player_id === sharedDropId) ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
+          {player.drop_suggestion && !(sharedDropId != null && ownDrop?.player_id === sharedDropId) ? <SuggestedDrop suggestion={player.drop_suggestion} bare /> : null}
           <PressableScale
             style={styles.detailsButton}
             onPress={onPress}
@@ -472,6 +483,8 @@ function createStyles(colors: ThemeColors) {
     },
     compactTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     compactBid: { fontSize: 14.5, fontWeight: '800' },
+    bidChip: { borderRadius: radii.pill, backgroundColor: colors.backgroundElevated, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+    moreText: { fontSize: 12.5, fontWeight: '700', color: colors.textTertiary },
     compactDetails: { gap: spacing.sm, paddingBottom: spacing.sm },
     compactSpacer: { flex: 1, alignItems: 'flex-end' },
     compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },

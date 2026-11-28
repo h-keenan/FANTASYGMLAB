@@ -13,6 +13,7 @@ import { TodayStandingLine } from "@/components/TodayGlance";
 import { GAME_PLAN_INTERNAL_ROUTES, gamePlanTileHref, resolveGamePlanTargetPlayerId } from "@/lib/gamePlanPresentation";
 import { DecisionQueue } from "@/components/DecisionQueue";
 import { buildDecisionQueue } from "@/lib/decisionQueue";
+import { useWaiverCut } from "@/lib/useWaiverCut";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
 import { isTradeItem } from "@/lib/dashboardLayout";
 import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusStanding } from "@/lib/teamStatus";
@@ -100,8 +101,10 @@ export function DashboardContent({
   // deadline, injuries, draft events). Until the matchup read has settled the queue is a skeleton, so nothing moves when
   // the lineup problems land.
   const matchupLine = buildTeamStatusMatchup(teamStatus.matchup);
+  const waiverCut = useWaiverCut(leagueId, lens ?? "Dynasty", !sample, data.items);
   const queue = buildDecisionQueue({
     now: new Date(),
+    waiverCut,
     moves: teamStatus.matchup?.suggested_moves,
     openSlots: teamStatus.matchup?.open_slots?.length ?? 0,
     thisWeek: data.this_week,

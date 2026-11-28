@@ -185,7 +185,7 @@ function SwapArrow() {
  * pills; at most two icon reason chips (full reasons one tap away); and the
  * alternative cuts as avatar chips that swap the selection.
  */
-function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggestion; drop: DropPlayer; alternatives: DropPlayer[] }) {
+function SwapBody({ suggestion, drop, alternatives, hideTiles = false }: { suggestion: DropSuggestion; drop: DropPlayer; alternatives: DropPlayer[]; hideTiles?: boolean }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showWhy, setShowWhy] = useState(false);
   const pool: DropPlayer[] = [drop, ...alternatives];
@@ -199,11 +199,13 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
       <p className="sr-only">
         {`Add ${suggestion.add.name}, ${selected.action === "move_to_ir" ? "move" : "drop"} ${selected.name}${selected.action === "move_to_ir" ? " to IR" : ""}`}
       </p>
+      {hideTiles ? null : (
       <div className="flex items-stretch gap-1.5">
         <SwapTile side="add" name={suggestion.add.name} playerId={suggestion.add.player_id} position={suggestion.add.position} />
         <SwapArrow />
         <SwapTile side="drop" player={selected} name={selected.name} playerId={selected.player_id} position={selected.position} team={selected.team} />
       </div>
+      )}
       <div className="flex items-center gap-1.5 flex-wrap" data-testid="swap-effect" aria-label={`Whole swap: ${effectSentence}`}>
         <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
           Swap
@@ -331,9 +333,55 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
   );
 }
 
-export function SuggestedDrop({ suggestion, compact = false }: { suggestion: DropSuggestion; compact?: boolean }) {
+/**
+ * ADD -> DROP at a glance: the add's avatar, an arrow, the cut's own small avatar and short name, in one line. This is the
+ * row-level picture of a roster move (Waivers rows, Today's top add); the effect, the why and the alternative cuts sit one tap
+ * away in the row's expansion (SuggestedDrop `bare`). Drop reads amber ("To IR" / "Drop"), never red.
+ */
+export function AddDropPair({ add, drop, noDropText, showAdd = true }: { showAdd?: boolean; add: { player_id: string; name: string; position: string }; drop: { player_id: string; name: string; position: string; team?: string | null; action?: string } | null; noDropText?: string | null }) {
+  const dropLabel = drop?.action === "move_to_ir" ? "To IR" : "Drop";
+  return (
+    <span className="flex items-center gap-1.5 min-w-0" data-testid="add-drop-pair">
+      {showAdd ? <PlayerAvatar playerId={add.player_id} name={add.name} position={add.position} size={24} /> : null}
+      <span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>&rarr;</span>
+      {drop ? (
+        <PlayerTap player={{ id: drop.player_id, name: drop.name, position: drop.position, team: drop.team ?? undefined }} className="pointer-events-auto flex items-center gap-1.5 min-w-0 text-left">
+          <PlayerAvatar playerId={drop.player_id} name={drop.name} position={drop.position} size={24} />
+          <span className="text-xs font-semibold shrink-0" style={{ color: "var(--color-warning)" }}>{dropLabel} </span>
+          <PlayerName name={drop.name} className="text-xs font-bold" style={{ color: "var(--color-text-primary)" }} />
+        </PlayerTap>
+      ) : noDropText ? (
+        <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>{noDropText}</span>
+      ) : null}
+    </span>
+  );
+}
+
+/** The pair for a suggestion, or null when the server had nothing to say about a cut. */
+export function SuggestedDropPair({ suggestion, showAdd = true }: { suggestion: DropSuggestion; /** False when the add's own avatar already sits just above (a list row's identity). */ showAdd?: boolean }) {
+  const noDropText = suggestion.drop ? null : suggestion.drop_required === false ? "Spot open, no drop" : suggestion.no_good_drop ? "No good drop" : null;
+  return <AddDropPair add={suggestion.add} drop={suggestion.drop} noDropText={noDropText} showAdd={showAdd} />;
+}
+
+export function SuggestedDrop({ suggestion, compact = false, bare = false }: { suggestion: DropSuggestion; compact?: boolean; /** Details only: the pair above already shows the add and the cut, so no tiles, no card, no second collapse. */ bare?: boolean }) {
   if (compact) return <CompactSuggestedDrop suggestion={suggestion} />;
   const { drop, alternatives } = suggestion;
+  if (bare) {
+    return (
+      <div className="flex flex-col gap-2" data-testid="suggested-drop-bare">
+        {drop ? (
+          <SwapBody suggestion={suggestion} drop={drop} alternatives={alternatives} hideTiles />
+        ) : (
+          <>
+            <p className="text-xs font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+              {suggestion.why}
+            </p>
+            {suggestion.no_good_drop && suggestion.cheapest ? <DropPlayerLine player={suggestion.cheapest} lead="Cheapest cut:" /> : null}
+          </>
+        )}
+      </div>
+    );
+  }
   const badge = dropBadge(suggestion);
   return (
     <div

@@ -26,7 +26,8 @@ export function ExpandRow({
 }: {
   leading?: ReactNode;
   title: string;
-  caption?: string;
+  /** A short line (string) or a node (Today's add -> drop pair). */
+  caption?: ReactNode;
   /** Optional wrapping chip strip (status pills) under the line. */
   chips?: ReactNode;
   action?: ReactNode;
@@ -44,7 +45,7 @@ export function ExpandRow({
       {leading}
       <View style={styles.text}>
         <AppText style={styles.title}>{title}</AppText>
-        {caption ? <AppText style={styles.caption}>{caption}</AppText> : null}
+        {caption ? (typeof caption === 'string' ? <AppText style={styles.caption}>{caption}</AppText> : caption) : null}
         {chips ? <View style={styles.chips}>{chips}</View> : null}
       </View>
     </>

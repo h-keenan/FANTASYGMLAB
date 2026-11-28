@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildDecisionQueue, seeAllLabel, type DecisionInput, type DecisionItem } from './decisionQueue.ts';
+import { buildDecisionQueue, seeAllLabel, waiverCutFor, type DecisionInput, type DecisionItem } from './decisionQueue.ts';
 
 const mon = new Date(2026, 10, 9, 12);
 const p = (id: string, name: string) => ({ player_id: id, name, position: 'RB', team: 'BUF', tier: 'starter', injury_label: '' });
@@ -44,4 +44,14 @@ test('caps at 3 with See all (N); free gating and empty state', () => {
   assert.deepEqual(q.proUpsell, { hidden: 2 });
   const empty = buildDecisionQueue(base({ nextGame: { week: 7, opponentName: 'Mock Mavericks' } }));
   assert.deepEqual(empty.empty, { title: 'Nothing needs you this week', detail: 'Next up: Week 7 vs Mock Mavericks' });
+});
+
+test('the waiver add carries its suggested cut only for its lead add', () => {
+  const waivers = { priority_adds: [{ player_id: 'moo', drop_suggestion: { drop: { player_id: 'dw', name: 'Dead Weight', position: 'RB', team: 'BUF', action: 'drop' } } }, { player_id: 'x', drop_suggestion: null }] };
+  const moo = item({ headline: 'Claim D. Mooney', destination: 'waivers', route_player_id: 'moo', route_player_name: 'Dee Mooney', route_player_position: 'WR' });
+  const input = (cut: ReturnType<typeof waiverCutFor>): DecisionInput => ({ now: mon, moves: [], thisWeek: null, items: [moo], tradeWindow: null, waiverCut: cut });
+  assert.equal(waiverCutFor(waivers, 'moo')?.drop.name, 'Dead Weight');
+  assert.equal(waiverCutFor(waivers, 'x'), null);
+  assert.equal(buildDecisionQueue(input(waiverCutFor(waivers, 'moo'))).all[0].drop?.name, 'Dead Weight');
+  assert.equal(buildDecisionQueue(input(waiverCutFor(waivers, 'other'))).all[0].drop, null);
 });
