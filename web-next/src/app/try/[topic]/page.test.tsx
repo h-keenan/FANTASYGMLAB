@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DynastyValues, Playoffs } from "@/components/try/TryServerDemos";
+import { REAL_PAYLOAD } from "@/lib/tryExamples.fixture";
+import { parseTryExamples } from "@/lib/tryExamples";
 import TryPage, { generateMetadata, generateStaticParams } from "./page";
 
 const trackTryLink = vi.fn();
@@ -15,7 +17,11 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("@/lib/seo/playoffSos", async (orig) => ({ ...(await orig<object>()), fetchPlayoffSos: vi.fn().mockResolvedValue(null) }));
+const fetchTryExamples = vi.fn();
+vi.mock("@/lib/tryExamples", async (orig) => ({ ...(await orig<object>()), fetchTryExamples: (...a: unknown[]) => fetchTryExamples(...a) }));
 vi.mock("@/lib/seo/chartRows", () => ({ loadChartRows: vi.fn().mockResolvedValue(null) }));
+
+const REAL = parseTryExamples(REAL_PAYLOAD);
 
 async function renderTopic(topic: string) {
   const ui = await TryPage({ params: Promise.resolve({ topic }) });
@@ -25,6 +31,7 @@ async function renderTopic(topic: string) {
 describe("/try/[topic]", () => {
   beforeEach(() => {
     trackTryLink.mockClear();
+    fetchTryExamples.mockReset().mockResolvedValue(null);
     window.history.pushState({}, "", "/try/start-sit?utm_source=ad_app&utm_campaign=hook&gclid=G1");
     vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
   });
@@ -58,6 +65,32 @@ describe("/try/[topic]", () => {
     expect(screen.getAllByText(/Reese Wirewell/).length).toBeGreaterThan(0);
     expect(screen.getAllByTestId("try-cta-link")).toHaveLength(1);
     expect(trackTryLink).toHaveBeenCalledWith("viewed", "waivers");
+  });
+
+  it("start-sit and waivers use this week's real players, with the real-example label, when the data is there", async () => {
+    fetchTryExamples.mockResolvedValue(REAL);
+    await renderTopic("start-sit");
+    expect(screen.getAllByText(/Real Alpha/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Taylor Exampleton/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Example decision using this week's real players/)).toBeInTheDocument();
+    expect(screen.queryByText(/made-up players/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("try-matchup-note")).toHaveTextContent("allow 38.0 PPR");
+    document.body.innerHTML = "";
+    await renderTopic("waivers");
+    expect(screen.getAllByText(/Wire Echo/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Reese Wirewell/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Example decision using this week's real players/)).toBeInTheDocument();
+  });
+
+  it("falls back to the labelled made-up sample league when a section has no real data", async () => {
+    fetchTryExamples.mockResolvedValue({ season: 2026, week: 12, startSit: null, waivers: null });
+    await renderTopic("start-sit");
+    expect(screen.getAllByText(/Taylor Exampleton/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Example league: made-up players/)).toBeInTheDocument();
+    document.body.innerHTML = "";
+    await renderTopic("waivers");
+    expect(screen.getAllByText(/Reese Wirewell/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Example league: made-up players/)).toBeInTheDocument();
   });
 
   it("trade mounts the real public trade analyzer with the preset and no competing CTAs", async () => {

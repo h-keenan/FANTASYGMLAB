@@ -63,7 +63,7 @@ export const SAMPLE_START_SIT_MATCHUP: MatchupResponse = {
   reason: "",
 };
 
-function waiverPlayer(overrides: Partial<WaiverPlayer> & Pick<WaiverPlayer, "player_id" | "name" | "position">): WaiverPlayer {
+export function waiverPlayer(overrides: Partial<WaiverPlayer> & Pick<WaiverPlayer, "player_id" | "name" | "position">): WaiverPlayer {
   return {
     team: "KC",
     age: 24,
@@ -88,11 +88,11 @@ function waiverPlayer(overrides: Partial<WaiverPlayer> & Pick<WaiverPlayer, "pla
   };
 }
 
-function bid(low: number, high: number): WaiverPriorityAdd["faab"] {
+export function bid(low: number, high: number): WaiverPriorityAdd["faab"] {
   return { low_bid: low, high_bid: high, pct_low: low, pct_high: high, remaining: 100, dollars_known: true, label: `${formatMoneyRange(low, high)} of ${formatMoney(100)} remaining` };
 }
 
-function priorityAdd(base: WaiverPlayer, overrides: Partial<WaiverPriorityAdd>): WaiverPriorityAdd {
+export function priorityAdd(base: WaiverPlayer, overrides: Partial<WaiverPriorityAdd>): WaiverPriorityAdd {
   return {
     ...base,
     recommendation_label: "Add",
