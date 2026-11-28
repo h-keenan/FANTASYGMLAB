@@ -8,6 +8,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimAchievementsModule } from "@/components/SimAchievements";
 import { SimGlyph } from "@/components/SimGlyph";
+import { SimMoreNote } from "@/components/SimMoreNote";
+import { SimTeamLogo } from "@/components/SimTeamIdentity";
 import {
   SimByeCard,
   SimHotColdCard,
@@ -135,7 +137,7 @@ export function SimHomeTab({
     <ClaimSheet ctx={ctx} player={claiming.player} roster={claiming.roster} onClose={() => setClaiming(null)} onClaimed={(next) => { setClaims(next); ctx.bump(); }} />
   ) : null;
 
-  const header = <SimStatusHeader home={home} onTab={onTab} />;
+  const header = <SimStatusHeader home={home} onTab={onTab} teamName={ctx.game.you?.name} />;
 
   // Phones: one scrolling column. This week's cards first, then a collapsed "League" section (standings, hot/cold,
   // league moves), so there is no second tab strip under the bottom bar's tabs. Desktop keeps one two-column page.
@@ -192,7 +194,7 @@ export function SimHomeTab({
  * targets that need you as player rows, the first unfinished checklist step as the one action). The cards below keep
  * every detail. Projection and ADP only; the sim never shows its internal rating.
  */
-function SimStatusHeader({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
+function SimStatusHeader({ home, onTab, teamName }: { home: SimHomeResponse; onTab: (tab: SimTab) => void; teamName?: string }) {
   const mine = home.standings?.rows.find((r) => r.is_you);
   const record = home.matchup?.you_record ?? (mine ? { wins: mine.wins, losses: mine.losses, ties: mine.ties } : null);
   const next = (home.checklist ?? []).find((item) => !item.done && simChecklistTarget(item));
@@ -212,7 +214,7 @@ function SimStatusHeader({ home, onTab }: { home: SimHomeResponse; onTab: (tab: 
     attention: simHomeAttentionItems(home),
     next: next ? { label: next.label, actionKey: simChecklistTarget(next) as string } : null,
   });
-  return <StatusHeader model={model} attentionTitle="Needs your attention" onAction={(key) => onTab(key as SimTab)} testId="sim-status-header" />;
+  return <StatusHeader model={model} lead={teamName ? <SimTeamLogo name={teamName} size="card" /> : undefined} attentionTitle="Needs your attention" onAction={(key) => onTab(key as SimTab)} testId="sim-status-header" />;
 }
 
 function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHomeMatchup; onTab: (tab: SimTab) => void }) {
@@ -222,7 +224,7 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
     return (
       <AccentCard accent="var(--color-warning)" as="section">
         <SimSectionTitle glyph="bye" tone="warning">Week {week} bye</SimSectionTitle>
-        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>You do not play this week. Use it to work the wire and your trades.</p>
+        <SimMoreNote className="text-sm">You do not play this week. Use it to work the wire and your trades.</SimMoreNote>
       </AccentCard>
     );
   }
@@ -294,7 +296,7 @@ function MatchupBody({ ctx, matchup, onTab, prob, youProj, oppProj, labels, flag
               );
             })}
           </ol>
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Their lineup is what their manager will start. Projections update when injuries or byes change.</p>
+          <SimMoreNote className="text-xs">Their lineup is what their manager will start. Projections update when injuries or byes change.</SimMoreNote>
         </div>
       ) : null}
     </MatchupHeroCard>
@@ -351,7 +353,7 @@ function SimChecklistCard({ home, onTab, onAuto, autoBusy = false, optimal = fal
         <div className="h-full" style={{ width: total ? `${(done / total) * 100}%` : 0, background: allDone ? "var(--color-success)" : "var(--color-warning)" }} />
       </div>
       {onAuto ? (
-        <Button variant="secondary" loading={autoBusy} disabled={optimal} onClick={onAuto} data-testid="auto-lineup">
+        <Button variant="secondary" size="sm" loading={autoBusy} disabled={optimal} onClick={onAuto} data-testid="auto-lineup">
           <SimGlyph name={optimal ? "check" : "spark"} size={16} />
           <span className="ml-2">{optimal ? "Lineup is optimal" : "Auto-set best lineup"}</span>
         </Button>

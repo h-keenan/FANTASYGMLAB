@@ -56,10 +56,10 @@ import {
   useSimWarmChunks,
 } from "@/components/simLazy";
 import { SkeletonCard } from "@/components/Skeleton";
-import { DifficultyTiles, SetupCard, SetupField, SetupNote, SetupStickyBar, SetupSummaryCard, SetupToggleGroup, SetupToggleRow } from "@/components/SimSetupParts";
+import { DifficultyTiles, SetupCard, SetupField, SetupNote, SetupStepper, SetupStickyBar, SetupSummaryCard, SetupToggleGroup, SetupToggleRow } from "@/components/SimSetupParts";
 import { MotionIn } from "@/components/Motion";
 import { simHubPresets } from "@/lib/simHubPresets";
-import { SIM_DIFFICULTY_FOOTNOTE, SIM_SETUP_TABS, simSetupCardSummaries, simSetupChips, simSetupHeadline, type SimSetupTab } from "@/lib/simSetupView";
+import { SIM_DIFFICULTY_FOOTNOTE, SIM_SETUP_STEPS, SIM_SETUP_TABS, simSetupCardSummaries, simSetupChips, simSetupHeadline, type SimSetupTab } from "@/lib/simSetupView";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { overlayStack } from "@/lib/overlayStack";
 import { api } from "@/lib/api";
@@ -694,6 +694,9 @@ function SetupForm({
   const custom = tab === "custom";
   const detail = `${simSetupSummary(state, options?.layout)} ${options?.season ? `${options.season.regular_weeks}-week season, then ${options.season.playoff_teams}-team playoffs. Trade deadline week ${options.season.trade_deadline_week}.` : ""}`.trim();
   const cardCount = custom ? 6 : 3;
+  // Three steps, one choice each (Team, Difficulty, League rules). Quick start stays one tap: Start is always in the bar.
+  const [step, setStep] = useState(0);
+  const lastStep = SIM_SETUP_STEPS.length - 1;
   return (
     <form
       className="flex flex-col gap-4"
@@ -711,6 +714,8 @@ function SetupForm({
         onSelect={(value) => setTab(value as SimSetupTab)}
       />
       <SetupSummaryCard headline={simSetupHeadline(state)} chips={simSetupChips(state)} detail={detail} testId="sim-setup-summary" />
+      <SetupStepper active={step} onSelect={setStep} />
+      {step === 0 ? (
       <SetupCard id="start" summary={summaries.start} index={0} count={cardCount}>
         {canImport && (custom || league) ? (
           <SetupField label="Starting point" note={league ? SIM_START_LEAGUE_NOTE : undefined}>
@@ -795,11 +800,14 @@ function SetupForm({
           </div>
         ) : null}
       </SetupCard>
+      ) : null}
+      {step === 1 ? (
       <SetupCard id="difficulty" summary={summaries.difficulty} index={1} count={cardCount}>
         <DifficultyTiles values={(opts?.difficulty.values ?? ["easy", "normal", "hard"]) as SimDifficulty[]} active={state.difficulty} onSelect={(value) => set("difficulty", value)} />
         <SetupNote>{SIM_DIFFICULTY_FOOTNOTE}</SetupNote>
       </SetupCard>
-      {custom ? (
+      ) : null}
+      {step === 2 && custom ? (
         <>
           <SetupCard id="format" summary={summaries.format} index={2} count={cardCount}>
             {modes.length > 1 ? (
@@ -944,6 +952,7 @@ function SetupForm({
           </SetupCard>
         </>
       ) : null}
+      {step === 2 ? (
       <MotionIn index={custom ? 5 : 2} count={cardCount}>
         <section className="glass-surface p-4 min-w-0 flex flex-col gap-3" aria-label="Lineup management">
           <SetupToggleGroup>
@@ -953,8 +962,10 @@ function SetupForm({
           {watching ? <SimWatchSliders waivers={state.watchWaivers} trades={state.watchTrades} onWaivers={(v) => set("watchWaivers", v)} onTrades={(v) => set("watchTrades", v)} /> : null}
         </section>
       </MotionIn>
+      ) : null}
       <SetupStickyBar warning={block}>
-        <Button type="button" variant="ghost" onClick={onBack}>Back</Button>
+        <Button type="button" variant="ghost" onClick={step > 0 ? () => setStep(step - 1) : onBack}>Back</Button>
+        {step < lastStep ? <Button type="button" variant="secondary" onClick={() => setStep(step + 1)}>Next: {SIM_SETUP_STEPS[step + 1].title}</Button> : null}
         <Button type="submit" className="flex-1 glass-start" fullWidth loading={creating} disabled={Boolean(block)}>{league ? "Start the season" : "Start the draft"}</Button>
       </SetupStickyBar>
     </form>

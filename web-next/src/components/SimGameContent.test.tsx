@@ -132,6 +132,8 @@ describe("SimGameContent", () => {
     // The checklist step and the status header's one action both say it.
     expect(screen.getAllByText("Set your lineup").length).toBe(2);
     expect(screen.getByTestId("status-primary")).toHaveTextContent("Set your lineup");
+    // The hero leads with the user's team logo.
+    expect(within(screen.getByTestId("sim-status-header")).getByTestId("sim-crest")).toBeInTheDocument();
     expect(screen.getByTestId("bye-alert")).toHaveTextContent("Look at the wire for a fill-in: Fill Ford");
     expect(screen.getByTestId("waiver-suggestion")).toHaveTextContent("Covers Hurt Harry (out)");
     expect(screen.getByTestId("home-injury")).toHaveTextContent("Out 2 wk");
@@ -617,9 +619,35 @@ describe("SimGameContent", () => {
       });
     });
 
+    it("setup is a 3-step stepper: one card per step, Next/Back walk it, Start is always one tap away", async () => {
+      await openSetup();
+      expect(screen.getByRole("button", { name: "Step 1 of 3: Team" })).toHaveAttribute("aria-current", "step");
+      expect(screen.getByTestId("sim-setup-card-start")).toBeInTheDocument();
+      expect(screen.queryByTestId("sim-setup-card-difficulty")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Next: Difficulty" }));
+      expect(screen.getByTestId("sim-setup-card-difficulty")).toBeInTheDocument();
+      expect(screen.queryByTestId("sim-setup-card-start")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Next: League" }));
+      expect(screen.getByRole("switch", { name: "Auto-set my lineup" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Next:/ })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(screen.getByTestId("sim-setup-card-difficulty")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start the draft" })).toBeEnabled();
+    });
+
+    it("helper notes are one line until tapped", async () => {
+      await openSetup();
+      fireEvent.click(screen.getByRole("button", { name: "Next: Difficulty" }));
+      const note = screen.getByText("Your own scoring is the same at every level.");
+      expect(note).toHaveAttribute("aria-expanded", "false");
+      fireEvent.click(note);
+      expect(note).toHaveAttribute("aria-expanded", "true");
+    });
+
     it("customize changes the league and the derived draft length, and the live summary follows", async () => {
       await openSetup();
       fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
+      fireEvent.click(screen.getByRole("button", { name: "Step 3 of 3: League" }));
       fireEvent.click(screen.getByRole("switch", { name: "Superflex" }));
       fireEvent.click(screen.getByRole("switch", { name: "Defense (DEF)" }));
       fireEvent.click(screen.getByRole("tab", { name: "14 teams" }));

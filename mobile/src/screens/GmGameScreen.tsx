@@ -49,13 +49,13 @@ import { SimPlayersTab, SimTeamTab } from '../components/SimGameTeam';
 import { SimTradesTab } from '../components/SimGameTrades';
 import GlassCard from '../components/GlassCard';
 import { MotionIn } from '../components/Motion';
-import { DifficultyTiles, SetupCard, SetupField, SetupNote, SetupStickyBar, SetupSummaryCard, SetupToggleGroup, SetupToggleRow } from '../components/SimSetupParts';
+import { DifficultyTiles, SetupCard, SetupChoiceRow, SetupField, SetupNote, SetupStepper, SetupStickyBar, SetupSummaryCard, SetupToggleGroup, SetupToggleRow } from '../components/SimSetupParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { setPillBarPresent } from '../lib/bottomPillStore.ts';
 import { useOrbClearance } from '../lib/orbLayout';
 import { usePillState } from '../lib/useBottomPillContext.ts';
-import { SIM_DIFFICULTY_FOOTNOTE, SIM_SETUP_TABS, simSetupCardSummaries, simSetupChips, simSetupHeadline, type SimSetupTab } from '../lib/simSetupView';
+import { SIM_DIFFICULTY_FOOTNOTE, SIM_SETUP_STEPS, SIM_SETUP_TABS, simSetupCardSummaries, simSetupChips, simSetupHeadline, type SimSetupTab } from '../lib/simSetupView';
 import { simGameChrome } from '../lib/simGameChrome';
 import {
   SIM_DIFFICULTY_COPY,
@@ -796,6 +796,9 @@ function SetupForm({
   const summaries = simSetupCardSummaries(state, state.nameChoice === SIM_NAME_CUSTOM ? state.name.trim() : state.nameChoice === SIM_NAME_RANDOM ? '' : nameLabel(state.nameChoice));
   const detail = `${simSetupSummary(state, options?.layout)}${options?.season ? ` ${options.season.regular_weeks}-week season, then ${options.season.playoff_teams}-team playoffs. Trade deadline week ${options.season.trade_deadline_week}.` : ''}`;
   const cardCount = custom ? 6 : 3;
+  // Three steps, one choice each (Team, Difficulty, League rules). Quick start stays one tap: Start is always in the bar.
+  const [step, setStep] = useState(0);
+  const lastStep = SIM_SETUP_STEPS.length - 1;
   return (
     <View style={styles.root}>
       <GridBackground />
@@ -808,6 +811,8 @@ function SetupForm({
           onChange={setTab}
         />
         <SetupSummaryCard headline={simSetupHeadline(state)} chips={simSetupChips(state)} detail={detail} />
+        <SetupStepper active={step} onSelect={setStep} />
+        {step === 0 ? (
         <SetupCard id="start" summary={summaries.start} index={0} count={cardCount}>
           {canImport && (custom || league) ? (
             <SetupField label="Starting point" note={league ? SIM_START_LEAGUE_NOTE : undefined}>
@@ -828,10 +833,10 @@ function SetupForm({
                 </>
               ) : null}
               {(leagues ?? []).map((row) => (
-                <Button
+                <SetupChoiceRow
                   key={row.league_id}
-                  size="sm"
-                  variant={state.leagueId === row.league_id ? 'primary' : 'secondary'}
+                  avatarName={row.league_name || row.league_id}
+                  selected={state.leagueId === row.league_id}
                   label={row.league_name || row.league_id}
                   onPress={() => setState((prev) => ({ ...prev, leagueId: row.league_id, rosterId: '' }))}
                 />
@@ -847,10 +852,10 @@ function SetupForm({
               ) : null}
               {leagueTeams.status === 'ready'
                 ? leagueTeams.teams.map((team) => (
-                    <Button
+                    <SetupChoiceRow
                       key={team.roster_id}
-                      size="sm"
-                      variant={state.rosterId === team.roster_id ? 'primary' : 'secondary'}
+                      avatarName={team.team_name}
+                      selected={state.rosterId === team.roster_id}
                       label={`${simLeagueTeamLabel(team)}${team.is_you ? ' (you)' : ''}`}
                       onPress={() => set('rosterId', team.roster_id)}
                     />
@@ -882,11 +887,14 @@ function SetupForm({
             </SetupField>
           ) : null}
         </SetupCard>
+        ) : null}
+        {step === 1 ? (
         <SetupCard id="difficulty" summary={summaries.difficulty} index={1} count={cardCount}>
           <DifficultyTiles values={(opts?.difficulty.values ?? ['easy', 'normal', 'hard']) as SimDifficulty[]} active={state.difficulty} onSelect={(value) => set('difficulty', value)} />
           <SetupNote>{SIM_DIFFICULTY_FOOTNOTE}</SetupNote>
         </SetupCard>
-        {custom ? (
+        ) : null}
+        {step === 2 && custom ? (
           <>
             <SetupCard id="format" summary={summaries.format} index={2} count={cardCount}>
               {modes.length > 1 ? (
@@ -1010,6 +1018,7 @@ function SetupForm({
             </SetupCard>
           </>
         ) : null}
+        {step === 2 ? (
         <MotionIn index={custom ? 5 : 2} count={cardCount}>
           <GlassCard>
             <SetupToggleGroup>
@@ -1019,9 +1028,11 @@ function SetupForm({
             {watching ? <SimWatchSliders waivers={state.watchWaivers} trades={state.watchTrades} onWaivers={(v) => set('watchWaivers', v)} onTrades={(v) => set('watchTrades', v)} /> : null}
           </GlassCard>
         </MotionIn>
+        ) : null}
       </ScrollView>
       <SetupStickyBar warning={block}>
-        <Button variant="ghost" label="Back" onPress={onBack} />
+        <Button variant="ghost" label="Back" onPress={step > 0 ? () => setStep(step - 1) : onBack} />
+        {step < lastStep ? <Button variant="secondary" label={`Next: ${SIM_SETUP_STEPS[step + 1].title}`} onPress={() => setStep(step + 1)} /> : null}
         <View style={styles.grow}>
           <Button label={league ? 'Start the season' : 'Start the draft'} loading={creating} disabled={Boolean(block)} onPress={() => onCreate(simSetupBody(state))} />
         </View>

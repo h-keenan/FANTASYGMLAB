@@ -12,6 +12,20 @@ export const SIM_SETUP_TABS: { key: SimSetupTab; label: string }[] = [
   { key: "custom", label: "Customize" },
 ];
 
+/** The three-step setup: one choice per step (Team, Difficulty, League rules). Step buttons are tappable, so Quick start stays one tap. */
+export type SimSetupStepId = "team" | "difficulty" | "league";
+
+export const SIM_SETUP_STEPS: { id: SimSetupStepId; title: string }[] = [
+  { id: "team", title: "Team" },
+  { id: "difficulty", title: "Difficulty" },
+  { id: "league", title: "League" },
+];
+
+/** The stepper's accessible name for one step: "Step 2 of 3: Difficulty". */
+export function simSetupStepLabel(index: number): string {
+  return `Step ${index + 1} of ${SIM_SETUP_STEPS.length}: ${SIM_SETUP_STEPS[index]?.title ?? ""}`;
+}
+
 export type SimSetupCardId = "start" | "difficulty" | "format" | "league" | "extras";
 
 /** Icon (existing SimGlyph names), title and the static one-line job of each card. */

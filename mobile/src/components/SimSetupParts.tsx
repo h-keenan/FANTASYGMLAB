@@ -6,10 +6,12 @@ import AppText from './AppText';
 import GlassCard from './GlassCard';
 import { MotionIn } from './Motion';
 import SimGlyph from './SimGlyph';
+import { SimMoreNote } from './SimMoreNote';
+import { SimTeamLogo } from './SimTeamIdentity';
 import Toggle from './Toggle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { SIM_DIFFICULTY_COPY, type SimDifficulty } from '../lib/simGame';
-import { SIM_DIFFICULTY_CARDS, SIM_SETUP_CARDS, type SimSetupCardId } from '../lib/simSetupView';
+import { SIM_DIFFICULTY_CARDS, SIM_SETUP_CARDS, SIM_SETUP_STEPS, simSetupStepLabel, type SimSetupCardId } from '../lib/simSetupView';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
@@ -50,14 +52,14 @@ export function SetupField({ label, note, children }: { label: string; note?: st
     <View style={styles.field}>
       <AppText style={styles.fieldLabel}>{label}</AppText>
       {children}
-      {note ? <AppText style={styles.help}>{note}</AppText> : null}
+      {note ? <SimMoreNote>{note}</SimMoreNote> : null}
     </View>
   );
 }
 
 export function SetupNote({ children, testID }: { children: ReactNode; testID?: string }) {
   const { styles } = useStyles();
-  return <AppText style={styles.help} testID={testID}>{children}</AppText>;
+  return <SimMoreNote testID={testID}>{children}</SimMoreNote>;
 }
 
 export function SetupToggleGroup({ children }: { children: ReactNode }) {
@@ -71,7 +73,7 @@ export function SetupToggleRow({ label, note, value, onChange, first = false }: 
     <View style={[styles.toggleRow, first ? null : styles.toggleDivider]}>
       <View style={styles.grow}>
         <AppText style={styles.fieldLabel}>{label}</AppText>
-        <AppText style={styles.help}>{note}</AppText>
+        <SimMoreNote>{note}</SimMoreNote>
       </View>
       <Toggle value={value} onValueChange={onChange} label={label} />
     </View>
@@ -122,9 +124,45 @@ export function SetupSummaryCard({ headline, chips, detail }: { headline: string
             </View>
           ))}
         </View>
-        <AppText style={styles.help} testID="sim-setup-summary">{detail}</AppText>
+        <SimMoreNote testID="sim-setup-summary">{detail}</SimMoreNote>
       </GlassCard>
     </MotionIn>
+  );
+}
+
+/** The 3-step setup header (Team, Difficulty, League): numbered glass pills, the lit one is the current step. Every step is tappable. */
+export function SetupStepper({ active, onSelect }: { active: number; onSelect: (index: number) => void }) {
+  const { styles } = useStyles();
+  return (
+    <View style={styles.stepper} accessibilityRole="tablist" accessibilityLabel="Setup steps" testID="sim-setup-stepper">
+      {SIM_SETUP_STEPS.map((step, index) => {
+        const on = index === active;
+        return (
+          <Pressable
+            key={step.id}
+            onPress={() => onSelect(index)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={simSetupStepLabel(index)}
+            style={[styles.step, on ? styles.stepOn : null]}
+          >
+            <AppText style={[styles.stepText, on ? styles.stepTextOn : null]} numberOfLines={1}>{`${index + 1}  ${step.title}`}</AppText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** One selectable row of a pick list (a league, a team): the team logo leads, the check marks the choice. Replaces a stack of equal-weight buttons. */
+export function SetupChoiceRow({ label, avatarName, selected, onPress }: { label: string; avatarName: string; selected: boolean; onPress: () => void }) {
+  const { colors, styles } = useStyles();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="radio" accessibilityState={{ checked: selected }} accessibilityLabel={label} style={[styles.choice, selected ? styles.tileOn : null]}>
+      <SimTeamLogo name={avatarName} size="row" />
+      <AppText style={[styles.fieldLabel, styles.grow]} numberOfLines={2}>{label}</AppText>
+      {selected ? <SimGlyph name="check" color={colors.accent} size={16} /> : null}
+    </Pressable>
   );
 }
 
@@ -154,6 +192,12 @@ function createStyles(colors: ThemeColors) {
     toggleGroup: { borderRadius: radii.md, borderWidth: StyleSheet.hairlineWidth * 1.5, borderColor: colors.glassBorder, paddingHorizontal: spacing.md, backgroundColor: colors.accentMuted },
     toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.sm, minHeight: 56 },
     toggleDivider: { borderTopWidth: StyleSheet.hairlineWidth * 1.5, borderTopColor: colors.glassBorder },
+    stepper: { flexDirection: 'row', gap: spacing.sm },
+    step: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.glassBorder },
+    stepOn: { borderColor: colors.accent, backgroundColor: colors.accentMuted },
+    stepText: { fontSize: 13, fontWeight: '800', color: colors.textSecondary },
+    stepTextOn: { color: colors.accent },
+    choice: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 52, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.glassBorder },
     tiles: { gap: spacing.sm },
     tile: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.glassBorder },
     tileOn: { borderColor: colors.accent, backgroundColor: colors.accentMuted, shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 3 },
