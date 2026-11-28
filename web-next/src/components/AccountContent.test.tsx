@@ -186,3 +186,22 @@ describe("AccountContent replay tour", () => {
     expect(document.querySelector("[data-onboarding-root]")).toBeNull();
   });
 });
+
+describe("AccountContent grouped layout", () => {
+  it("leads with a profile header (avatar, name, plan badge) and groups settings under named headings", () => {
+    renderContent({ user: user({ email: "gm@example.com", sleeper_username: "zachgm", entitlement: "premium" }) });
+    const profile = screen.getByLabelText("Profile");
+    expect(within(profile).getByText("zachgm")).toBeInTheDocument();
+    expect(within(profile).getByText("Pro")).toBeInTheDocument();
+    for (const name of ["Account", "Preferences", "Notifications", "Privacy & data", "Help & legal"]) {
+      expect(screen.getByRole("heading", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("keeps experience level, privacy, help and legal reachable", () => {
+    renderContent({});
+    expect(screen.getByText("Experience level")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/legal/privacy");
+    expect(screen.getByTestId("help-link")).toBeInTheDocument();
+  });
+});

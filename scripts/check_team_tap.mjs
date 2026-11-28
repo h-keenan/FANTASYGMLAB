@@ -25,6 +25,7 @@ const COMPONENT_FILES = {
 const SKIP = /\/(TeamNameLink|TeamAvatar|ManagerProfileSheet|ManagerProfileModal)\.tsx$|\/shareCard\/|ShareCard\.tsx$|\/design\//;
 
 const OWN = "shows the user's own team / league card (a switcher or setup list, not a league-mate), so there is no other team sheet to open; audited in the 2026-11 team tap sweep";
+const PROFILE = "the avatar is the signed-in user's own profile picture on the Account/More header, not a league-mate's team, so there is no team sheet to open";
 const ROW = "the whole row is already one tap target that opens the team sheet (a name inside it must not nest a second button)";
 // path (relative to repo root) -> reason. Only shrinks.
 export const RAW_ALLOWLIST = {
@@ -37,7 +38,9 @@ export const RAW_ALLOWLIST = {
   "mobile/src/components/WeeklyMatchupCard.tsx": ROW,
   "mobile/src/screens/DashboardScreen.tsx": ROW,
   "mobile/src/screens/HomeScreen.tsx": OWN,
+  "mobile/src/screens/MoreScreen.tsx": PROFILE,
   "mobile/src/screens/TeamsScreen.tsx": ROW,
+  "web-next/src/components/AccountContent.tsx": PROFILE,
   "web-next/src/components/EspnImportForm.tsx": OWN,
   "web-next/src/components/GmPlanSteps.tsx": ROW,
   "web-next/src/components/LeagueRankingsContent.tsx": ROW,
