@@ -266,25 +266,24 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 
   if (step === "check-email") {
     return (
-      <div className="glass-surface flex flex-col gap-4 p-6 text-center items-center">
+      <div className="glass-surface flex flex-col gap-3 p-6 text-center items-center">
         <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
           Check your email
         </h2>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          We sent a confirmation link to <strong style={{ color: "var(--color-text-primary)" }}>{email}</strong>.
-          {isGuest
-            ? " Confirm it to finish creating your account. Everything you set up as a guest stays with it."
-            : " Confirm your account, then come back here to sign in."}
+          Confirmation link sent to <strong style={{ color: "var(--color-text-primary)" }}>{email}</strong>.
+          {isGuest ? " Confirm it to finish; everything as a guest stays with it." : " Confirm it, then sign in."}
         </p>
         <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => {
             setStep("password");
             setNeedsAgeGate(false);
             setError(null);
           }}
-        style={{ alignSelf: "auto" }}
-      >
+        >
           Back to sign in
         </Button>
       </div>
@@ -316,17 +315,36 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   }
 
   if (step === "email") {
+    const oauthButton = (provider: "google" | "apple", name: string) => (
+      <Button
+        type="button"
+        fullWidth
+        aria-label={oauthBusy === provider ? undefined : `Continue with ${name}`}
+        onClick={() => handleOAuth(provider)}
+        disabled={oauthBusy !== null}
+      >
+        {oauthBusy === provider ? `Redirecting to ${name}…` : `Continue with ${name}`}
+      </Button>
+    );
     return (
       <div id="get-started" className="glass-surface flex flex-col gap-3 p-4">
+        <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          Get started
+        </h2>
+        <div className="flex flex-col gap-2">
+          {oauthButton("apple", "Apple")}
+          {oauthButton("google", "Google")}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
+          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            or use email
+          </span>
+          <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
+        </div>
+
         <form onSubmit={handleEmailContinue} className="flex flex-col gap-3">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-              Get started
-            </h2>
-            <p className="hidden sm:block text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              Enter your email to sign in or create an account.
-            </p>
-          </div>
           <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
             Email
             <Input
@@ -347,51 +365,10 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               {error}
             </p>
           ) : null}
-          <Button
-            type="submit"
-        style={{ alignSelf: "auto" }}
-      >
+          <Button type="submit" variant="secondary" fullWidth>
             Continue
           </Button>
         </form>
-
-        <div className="flex items-center gap-3">
-          <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
-          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-            or continue with
-          </span>
-          <div className="flex-1" style={{ height: "1px", background: "var(--color-border)" }} />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          aria-label={oauthBusy === "google" ? undefined : "Continue with Google"}
-          onClick={() => handleOAuth("google")}
-          disabled={oauthBusy !== null}
-          className="glass-input px-4 py-2.5 text-sm font-bold min-h-[var(--touch-target-min)]"
-          style={{
-            color: "var(--color-text-primary)",
-            borderRadius: "var(--radius-control)",
-            opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
-          }}
-        >
-          {oauthBusy === "google" ? "Redirecting to Google…" : "Google"}
-        </button>
-        <button
-          type="button"
-          aria-label={oauthBusy === "apple" ? undefined : "Continue with Apple"}
-          onClick={() => handleOAuth("apple")}
-          disabled={oauthBusy !== null}
-          className="glass-input px-4 py-2.5 text-sm font-bold min-h-[var(--touch-target-min)]"
-          style={{
-            color: "var(--color-text-primary)",
-            borderRadius: "var(--radius-control)",
-            opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
-          }}
-        >
-          {oauthBusy === "apple" ? "Redirecting to Apple…" : "Apple"}
-        </button>
-        </div>
       </div>
     );
   }
@@ -414,9 +391,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         {resetMode ? "Reset your password" : "Create your account or sign in"}
       </h2>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-        {resetMode
-          ? "We'll email a link to set a new password."
-          : "New here? Choose a password (6+ characters) to create your account. Already have one? Enter it to sign in."}
+        {resetMode ? "We'll email you a reset link." : "New? Choose a password (6+). Have one? Enter it."}
       </p>
 
       {resetMode ? (
@@ -431,7 +406,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               {error}
             </p>
           ) : null}
-          <Button type="submit" loading={resetBusy}>
+          <Button type="submit" fullWidth loading={resetBusy}>
             {resetBusy ? "Sending…" : "Send reset link"}
           </Button>
           <button
@@ -441,7 +416,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               setError(null);
               setNotice(null);
             }}
-            className="self-start text-xs"
+            className="tap-link self-start text-xs"
             style={{ color: "var(--color-text-secondary)" }}
           >
             Back to sign in
@@ -481,10 +456,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
               {error}
             </p>
           ) : null}
-          <Button
-            type="submit"
-            loading={busy}
-          >
+          <Button type="submit" fullWidth loading={busy}>
             {busy ? "Continuing…" : "Continue"}
           </Button>
           {!isGuest ? (

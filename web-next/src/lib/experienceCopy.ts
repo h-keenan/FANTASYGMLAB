@@ -46,15 +46,15 @@ export function normalizeExperienceLevel(value: unknown): ExperienceLevelSetting
 export const EXPERIENCE_LEVEL_OPTIONS = {
   new_to_fantasy: {
     title: "New to fantasy football",
-    body: "We'll explain everything from the ground up, including basic fantasy terms.",
+    body: "We'll explain everything, terms included.",
   },
   beginner: {
     title: "New to dynasty",
-    body: "Explain the why behind every recommendation: trade logic, value, roster strategy.",
+    body: "Explain the why behind every call.",
   },
   advanced: {
     title: "Veteran dynasty manager",
-    body: "Skip the explanations. Just the call, the value, and the confidence.",
+    body: "Skip the explanations. Just the call.",
   },
 } as const;
 
@@ -180,7 +180,7 @@ export const PLAIN_COPY = {
   onboardingDynastyNote:
     "Dynasty is the long-term fantasy format where you keep your players year to year. If you're completely new to fantasy football, choose New to fantasy football.",
   onboardingLevelQuestion: "Which sounds most like you?",
-  onboardingLevelBody: "Sets how much explanation shows up. Change it anytime in Account.",
+  onboardingLevelBody: "Sets how much we explain. Change it anytime in Account.",
   onboardingPickOne: "Pick one to continue",
   showExplanationsAction: "Show explanations",
   showExplanationsDone: "Explanations are on. Change this anytime in Account.",

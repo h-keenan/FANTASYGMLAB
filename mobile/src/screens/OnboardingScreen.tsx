@@ -365,7 +365,6 @@ export default function OnboardingScreen({ navigation, route }: Props) {
               Which sounds most like <AppText style={styles.headlineAccent}>you</AppText>?
             </AppText>
             <AppText style={styles.body}>{PLAIN_COPY.onboardingLevelBody}</AppText>
-            <AppText style={styles.body}>{PLAIN_COPY.onboardingDynastyNote}</AppText>
             <View style={styles.cards}>
               {LEVEL_OPTIONS.map((option) => {
                 const selected = level === option.value;

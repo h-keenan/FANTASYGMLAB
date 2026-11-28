@@ -230,7 +230,6 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
               Which sounds most like <span className="onboarding-gradient">you</span>?
             </h1>
             <p className="onboarding-body onboarding-body--center">{PLAIN_COPY.onboardingLevelBody}</p>
-            <p className="onboarding-body onboarding-body--center">{PLAIN_COPY.onboardingDynastyNote}</p>
             <div className="onboarding-cards" style={{ marginTop: "var(--space-md)" }}>
               {(Object.keys(EXPERIENCE_LEVEL_OPTIONS) as ExperienceLevel[]).map((value) => {
                 const option = EXPERIENCE_LEVEL_OPTIONS[value];

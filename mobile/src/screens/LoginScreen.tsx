@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -28,11 +27,20 @@ import { SESSION_ENDED_NOTICE } from '../lib/sessionEnded';
 import { AUTH_PROMISE_LINE, SAMPLE_TRY_LABEL } from '../lib/sampleLeague';
 import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
+import { radii, spacing, typography, type ThemeColors } from '../theme';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
 import Input from '../components/Input';
 
 const LEGAL_PAGES = (legalContent as { pages: Record<string, { title: string; sections: ContentSection[] }> }).pages;
+
+function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
+  const { colors } = useThemeMode();
+  return (
+    <PressableScale accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 24, right: 24 }} onPress={onPress}>
+      <AppText style={{ textAlign: 'center', marginTop: spacing.md, color: colors.textSecondary, fontSize: 14.5 }}>{label}</AppText>
+    </PressableScale>
+  );
+}
 
 export default function LoginScreen() {
   const { signIn, signUp, resetPassword, sessionEnded } = useAuth();
@@ -43,6 +51,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
+  const [step, setStep] = useState<'email' | 'password'>('email');
   const [submitting, setSubmitting] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [resetSubmitting, setResetSubmitting] = useState(false);
@@ -132,128 +141,116 @@ export default function LoginScreen() {
       >
         <BrandMark width={112} style={styles.brandMark} />
         <AppText style={styles.title}>FantasyDesk</AppText>
-        <AppText style={[styles.subtitle, resetMode ? { marginBottom: spacing.xl } : null]}>
+        <AppText style={styles.subtitle}>
           {resetMode
             ? 'Reset your password'
-            : mode === 'signIn'
-              ? 'Sign in to your account'
-              : 'Create an account'}
+            : step === 'email'
+              ? AUTH_PROMISE_LINE
+              : mode === 'signIn'
+                ? 'Enter your password to sign in'
+                : 'Choose a password to create your account'}
         </AppText>
-        {resetMode ? null : (
-          <>
-            {/* Promise + a way to look around above the fold: no account wall before any value (first-time-user audit F2). */}
-            <AppText style={styles.promise}>{AUTH_PROMISE_LINE}</AppText>
-            <Button
-              label={SAMPLE_TRY_LABEL}
-              variant="secondary"
-              onPress={() => navigation.navigate('SampleLeague')}
-              style={styles.sampleButton}
-            />
-          </>
-        )}
-
-        {!resetMode && appleAvailable ? (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-            cornerRadius={radii.sm}
-            style={styles.appleButton}
-            onPress={onApplePress}
-          />
-        ) : null}
-
-        {!resetMode && google.available ? (
-          <PressableScale accessibilityRole="button"
-            style={[styles.socialButton, !google.ready && styles.buttonDisabled]}
-            onPress={() => void google.signIn()}
-            disabled={!google.ready || google.submitting}
-          >
-            {google.submitting ? (
-              <ActivityIndicator color={colors.textPrimary} />
-            ) : (
-              <AppText style={styles.socialButtonText}>Continue with Google</AppText>
-            )}
-          </PressableScale>
-        ) : null}
-
-        {!resetMode && (appleAvailable || google.available) ? (
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <AppText style={styles.dividerText}>or</AppText>
-            <View style={styles.dividerLine} />
-          </View>
-        ) : null}
-
-        <Input
-          style={styles.input}
-          placeholder="Email"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          // Without these, iOS/Android can't tell this is the username half
-          // of a credential pair, so saved-password autofill can misfire
-          // (e.g. dropping the saved password into this field instead of
-          // Password). textContentType="username" is Apple's documented
-          // token for the identifier field even when it's an email address.
-          textContentType="username"
-          autoComplete="email"
-          value={email}
-          onChangeText={setEmail}
-        />
-        {!resetMode ? (
-          <Input
-            style={styles.input}
-            placeholder="Password"
-              secureTextEntry
-            textContentType={mode === 'signUp' ? 'newPassword' : 'password'}
-            autoComplete={mode === 'signUp' ? 'new-password' : 'password'}
-            value={password}
-            onChangeText={setPassword}
-          />
-        ) : null}
 
         {error ? <AppText style={styles.error}>{error}</AppText> : null}
         {notice || sessionEnded ? <AppText style={styles.notice}>{notice ?? SESSION_ENDED_NOTICE}</AppText> : null}
 
         {resetMode ? (
           <>
+            <Input
+              style={styles.input}
+              placeholder="Email"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              textContentType="username"
+              autoComplete="email"
+              value={email}
+              onChangeText={setEmail}
+            />
             <Button label="Send reset link" onPress={onResetPasswordPress} disabled={!email} loading={resetSubmitting} style={styles.button} />
-
-            <PressableScale accessibilityRole="button"
+            <TextLink
+              label="Back to sign in"
               onPress={() => {
                 setResetMode(false);
                 setError(null);
                 setNotice(null);
               }}
-            >
-              <AppText style={styles.switchMode}>Back to sign in</AppText>
-            </PressableScale>
+            />
+          </>
+        ) : step === 'email' ? (
+          <>
+            {/* Apple + Google are the only filled primaries; email is one field + Continue. */}
+            {appleAvailable ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={radii.sm}
+                style={styles.appleButton}
+                onPress={onApplePress}
+              />
+            ) : null}
+            {google.available ? (
+              <Button
+                label="Continue with Google"
+                onPress={() => void google.signIn()}
+                disabled={!google.ready}
+                loading={google.submitting}
+                style={styles.socialButton}
+              />
+            ) : null}
+            {appleAvailable || google.available ? (
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <AppText style={styles.dividerText}>or use email</AppText>
+                <View style={styles.dividerLine} />
+              </View>
+            ) : null}
+            <Input
+              style={styles.input}
+              placeholder="Email"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              // Without these, iOS/Android can't tell this is the username half
+              // of a credential pair, so saved-password autofill can misfire.
+              textContentType="username"
+              autoComplete="email"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <Button label="Continue" variant="secondary" onPress={() => setStep('password')} disabled={!email} style={styles.button} />
+            <TextLink
+              label={mode === 'signIn' ? 'New here? Create an account' : 'Have an account? Sign in'}
+              onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
+            />
+            {/* A way to look around above the fold: no account wall before any value (first-time-user audit F2). */}
+            <TextLink label={SAMPLE_TRY_LABEL} onPress={() => navigation.navigate('SampleLeague')} />
           </>
         ) : (
           <>
+            <TextLink label={`\u2190 ${email}`} onPress={() => { setStep('email'); setError(null); setNotice(null); }} />
+            <Input
+              style={styles.input}
+              placeholder="Password"
+              secureTextEntry
+              textContentType={mode === 'signUp' ? 'newPassword' : 'password'}
+              autoComplete={mode === 'signUp' ? 'new-password' : 'password'}
+              value={password}
+              onChangeText={setPassword}
+            />
             <Button label={mode === 'signIn' ? 'Sign in' : 'Sign up'} onPress={submit} disabled={!email || !password} loading={submitting} style={styles.button} />
-
             {mode === 'signIn' ? (
-              <PressableScale accessibilityRole="button"
-                hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}
+              <TextLink
+                label="Forgot password?"
                 onPress={() => {
                   setResetMode(true);
                   setError(null);
                   setNotice(null);
                 }}
-              >
-                <AppText style={styles.forgotPassword}>Forgot password?</AppText>
-              </PressableScale>
+              />
             ) : null}
-
-            <PressableScale accessibilityRole="button"
+            <TextLink
+              label={mode === 'signIn' ? 'New here? Create an account' : 'Have an account? Sign in'}
               onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
-            >
-              <AppText style={styles.switchMode}>
-                {mode === 'signIn'
-                  ? "Don't have an account? Sign up"
-                  : 'Already have an account? Sign in'}
-              </AppText>
-            </PressableScale>
+            />
           </>
         )}
 
@@ -310,16 +307,6 @@ function createStyles(colors: ThemeColors) {
     fontSize: 16.5,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  promise: {
-    fontSize: 14.5,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  sampleButton: {
-    alignSelf: 'stretch',
     marginBottom: spacing.xl,
   },
   appleButton: {
@@ -327,34 +314,12 @@ function createStyles(colors: ThemeColors) {
     height: 48,
     marginBottom: spacing.sm,
   },
-  socialButton: {
-    height: 48,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceSolid,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  socialButtonText: { color: colors.textPrimary, fontSize: 17, fontWeight: '600' },
+  socialButton: { alignSelf: 'stretch' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.md },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   dividerText: { color: colors.textTertiary, fontSize: 13.5, marginHorizontal: spacing.sm },
   input: { marginBottom: spacing.md },
   button: { marginTop: spacing.xs },
-  buttonDisabled: { opacity: disabledOpacity },
-  switchMode: {
-    textAlign: 'center',
-    marginTop: spacing.lg,
-    color: colors.accent,
-  },
-  forgotPassword: {
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    color: colors.textSecondary,
-    fontSize: 14.5,
-  },
   legalRow: {
     flexDirection: 'row',
     justifyContent: 'center',
