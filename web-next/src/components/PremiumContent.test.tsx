@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PremiumContent } from "./PremiumContent";
@@ -73,8 +73,9 @@ describe("PremiumContent", () => {
 
     const highlights = screen.getByTestId("pro-highlights");
     expect(highlights.querySelectorAll("li")).toHaveLength(3);
-    expect(screen.getByText(/Free shows the top 4/)).toBeInTheDocument();
-    expect(screen.getByText(/Free shows the first 2/)).toBeInTheDocument();
+    expect(within(highlights).getByText("4 \u2192 All")).toBeInTheDocument();
+    expect(within(highlights).getByText("2 \u2192 All")).toBeInTheDocument();
+    expect(screen.getByText("Compare plans")).toBeInTheDocument();
     // The old per-plan feature wall is gone.
     expect(screen.queryByText("Full League Pulse")).not.toBeInTheDocument();
     expect(screen.queryByText("Priority support")).not.toBeInTheDocument();
@@ -184,7 +185,7 @@ describe("PremiumContent", () => {
 
   it("renders the Free vs Pro comparison", () => {
     render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
-    // Collapsed behind "Everything in Pro" so it is not a wall of text.
+    // Collapsed behind the "Compare plans" chip so it is not a wall of text.
     expect(screen.getByTestId("pro-comparison").tagName).toBe("DETAILS");
     expect(screen.getByRole("rowheader", { name: "Trade Hub ideas", hidden: true })).toBeTruthy();
   });

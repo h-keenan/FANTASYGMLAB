@@ -349,8 +349,14 @@ export default function PaywallScreen({ navigation, route }: Props) {
         />
       }
     >
-      <PressableScale accessibilityRole="button" style={styles.closeButton} onPress={exit} hitSlop={LINK_HIT_SLOP}>
-        <AppText style={styles.closeButtonText}>{fromOnboarding ? 'Skip' : 'Close'}</AppText>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={fromOnboarding ? 'Skip' : 'Close'}
+        style={styles.closeButton}
+        onPress={exit}
+        hitSlop={LINK_HIT_SLOP}
+      >
+        <Ionicons name="close" size={22} color={colors.textTertiary} />
       </PressableScale>
 
       {/* Headline/subtitle match web-next: OnboardingPaywall ("Start your
@@ -362,17 +368,14 @@ export default function PaywallScreen({ navigation, route }: Props) {
       </AppText>
       <AppText style={styles.subtitle}>{PAYWALL_HERO_SUB}</AppText>
 
-      <SectionHeading title="What Pro adds" icon="sparkles-outline" />
       <View style={styles.highlights} testID="pro-highlights">
         {proHighlights(comparison).map((item) => (
-          <View key={item.key} style={styles.highlightRow}>
+          <View key={item.key} style={styles.highlightTile}>
             <View style={styles.highlightIcon}>
               <Ionicons name={HIGHLIGHT_ICONS[item.icon]} size={20} color={colors.premium} />
             </View>
-            <View style={styles.highlightText}>
-              <AppText style={styles.highlightTitle}>{item.title}</AppText>
-              <AppText style={styles.highlightBody}>{item.body}</AppText>
-            </View>
+            <AppText style={styles.highlightTitle}>{item.title}</AppText>
+            <AppText style={styles.highlightStat}>{item.stat}</AppText>
           </View>
         ))}
       </View>
@@ -384,7 +387,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
         hitSlop={LINK_HIT_SLOP}
       >
         <AppText style={styles.compareToggleText}>{PAYWALL_COMPARISON_TITLE}</AppText>
-        <Ionicons name={showAllRows ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
+        <Ionicons name={showAllRows ? 'chevron-up' : 'chevron-down'} size={16} color={colors.premium} />
       </PressableScale>
       {showAllRows ? (
         <View style={styles.featuresCard} accessibilityLabel="Free compared with Pro">
@@ -530,7 +533,19 @@ export default function PaywallScreen({ navigation, route }: Props) {
           thing on a screen this conversion-critical. Still visually
           subordinate to the cyan primary Continue button above it (Magna
           Carta button hierarchy), just no longer easy to miss entirely. */}
-      <Button variant="premiumOutline" label="Restore purchases" onPress={onRestore} loading={restoring} />
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityState={{ busy: restoring, disabled: restoring }}
+        onPress={restoring ? undefined : onRestore}
+        style={styles.skipFree}
+        hitSlop={LINK_HIT_SLOP}
+      >
+        {restoring ? (
+          <ActivityIndicator size="small" color={colors.textSecondary} />
+        ) : (
+          <AppText style={styles.skipFreeText}>Restore purchases</AppText>
+        )}
+      </PressableScale>
 
       {fromOnboarding ? (
         <PressableScale accessibilityRole="button" onPress={exit} style={styles.skipFree} hitSlop={LINK_HIT_SLOP}>
@@ -583,9 +598,8 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.xl,
   },
   closeButton: { alignSelf: 'flex-end', marginBottom: spacing.md },
-  closeButtonText: { color: colors.textSecondary, fontSize: 16.5, fontWeight: '500' },
-  title: { fontSize: 27, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { fontSize: 15.5, color: colors.textSecondary, marginBottom: spacing.xl, lineHeight: 22 },
+    title: { fontSize: 27, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs },
+  subtitle: { fontSize: 15.5, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 22 },
   featuresCard: {
     backgroundColor: colors.glass,
     borderRadius: radii.md,
@@ -627,8 +641,18 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.xs,
   },
   featureBadgeText: { color: colors.premium, fontSize: 12, fontWeight: '700' },
-  highlights: { gap: spacing.md, marginBottom: spacing.md },
-  highlightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  highlights: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  highlightTile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+    backgroundColor: colors.glass,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.hairline,
+  },
   highlightIcon: {
     width: 40,
     height: 40,
@@ -637,17 +661,21 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  highlightText: { flex: 1, gap: 2 },
-  highlightTitle: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
-  highlightBody: { fontSize: 14.5, lineHeight: 20, color: colors.textSecondary },
+  highlightTitle: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  highlightStat: { fontSize: 13.5, fontWeight: '800', color: colors.premium, textAlign: 'center' },
   compareToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    alignSelf: 'center',
+    gap: spacing.xs,
     minHeight: 44,
+    paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.premium,
   },
-  compareToggleText: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
+  compareToggleText: { fontSize: 13.5, fontWeight: '700', color: colors.premium },
   loadingIndicator: { marginVertical: spacing.xl },
   packages: { gap: spacing.sm, marginBottom: spacing.lg },
   packageRow: { flexDirection: 'row', alignItems: 'center' },
