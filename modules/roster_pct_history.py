@@ -168,7 +168,8 @@ def _parse_day(value: Any) -> date | None:
         return None
 
 
-def compute_trend(rows: Sequence[Mapping[str, Any]], *, days: int = 7, today: date | None = None) -> dict[str, Any] | None:
+def compute_trend(rows: Sequence[Mapping[str, Any]], *, days: int = 7, today: date | None = None,
+                  require_baseline: bool = True) -> dict[str, Any] | None:
     """Pure: one player's snapshot rows -> {current, previous, delta, ...} or None.
 
     Current must be from today or yesterday; the baseline must be within
@@ -199,14 +200,18 @@ def compute_trend(rows: Sequence[Mapping[str, Any]], *, days: int = 7, today: da
         if baseline_day:
             break
     if baseline_day is None:
-        return None
+        if require_baseline:
+            return None
+        # Latest verified snapshot only: no trend claim (previous/delta stay None).
+        return {"current": points[current_day], "previous": None, "delta": None,
+                "current_date": current_day.isoformat(), "previous_date": None}
     current, previous = points[current_day], points[baseline_day]
     return {"current": current, "previous": previous, "delta": round(current - previous, 4),
             "current_date": current_day.isoformat(), "previous_date": baseline_day.isoformat()}
 
 
 def get_roster_pct_trend(player_ids: Sequence[str], days: int = 7, *, config: Config | None = None,
-                         today: date | None = None) -> dict[str, dict[str, Any] | None]:
+                         today: date | None = None, require_baseline: bool = True) -> dict[str, dict[str, Any] | None]:
     """player_id -> {current, previous, delta, ...} or None (insufficient history / any I/O problem)."""
     ids = [str(p) for p in player_ids if str(p).strip()]
     result: dict[str, dict[str, Any] | None] = {pid: None for pid in ids}
@@ -235,5 +240,5 @@ def get_roster_pct_trend(player_ids: Sequence[str], days: int = 7, *, config: Co
                 grouped.setdefault(str(row.get("player_id")), []).append(row)
         for pid, rows in grouped.items():
             if pid in result:
-                result[pid] = compute_trend(rows, days=days, today=today)
+                result[pid] = compute_trend(rows, days=days, today=today, require_baseline=require_baseline)
     return result

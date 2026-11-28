@@ -80,3 +80,13 @@ def test_run_mocks_espn_and_sleeper():
          patch.object(rph.requests, "delete", return_value=_ok()):
         stats = rph.run_roster_pct_snapshot(environ=env)
     assert stats["ok"] and stats["rows_sent"] == 1 and stats["pruned"]
+
+
+def test_latest_only_when_baseline_not_required():
+    rows = [_r("2026-11-19", 55)]
+    got = rph.compute_trend(rows, today=TODAY, require_baseline=False)
+    assert got["current"] == 55 and got["previous"] is None and got["delta"] is None
+    # staleness is still enforced: never a stale or future % presented as current
+    assert rph.compute_trend([_r("2026-11-12", 55)], today=TODAY, require_baseline=False) is None
+    # with a real baseline the trend is unchanged
+    assert rph.compute_trend([_r("2026-11-12", 40), _r("2026-11-19", 55)], today=TODAY, require_baseline=False)["delta"] == 15

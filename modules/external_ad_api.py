@@ -1210,11 +1210,11 @@ def load_trending() -> list[dict[str, Any]]:
     return sleeper.get_trending_players("add", lookback_hours=24, limit=100)
 
 
-def load_roster_pct(player_ids: Sequence[str]) -> dict[str, Any]:
+def load_roster_pct(player_ids: Sequence[str], *, require_baseline: bool = True) -> dict[str, Any]:
     from modules import roster_pct_history
 
     try:
-        return roster_pct_history.get_roster_pct_trend(list(player_ids), 7)
+        return roster_pct_history.get_roster_pct_trend(list(player_ids), 7, require_baseline=require_baseline)
     except Exception:
         return {}
 
