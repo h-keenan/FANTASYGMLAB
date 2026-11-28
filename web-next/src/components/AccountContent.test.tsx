@@ -194,7 +194,7 @@ describe("AccountContent grouped layout", () => {
     expect(within(profile).getByText("zachgm")).toBeInTheDocument();
     expect(within(profile).getByText("Pro")).toBeInTheDocument();
     for (const name of ["Account", "Preferences", "Notifications", "Privacy & data", "Help & legal"]) {
-      expect(screen.getByRole("heading", { name })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 2, name })).toBeInTheDocument();
     }
   });
 
