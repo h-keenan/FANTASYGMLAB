@@ -43,6 +43,7 @@ import { OvrGauge } from "@/components/OvrGauge";
 import { ViewTabs } from "@/components/ui/ViewTabs";
 import { StatStrip } from "@/components/StatStrip";
 import { OutlookRow, PlanSteps } from "@/components/GmPlanSteps";
+import { countPlanNeeds, planHeaderChips } from "@/lib/gmPlanHeader";
 import { buildPlanSteps, buildPlanWhy, planFacts, planStatTiles, type PlanStance } from "@/lib/gmPlanPlan";
 import { PlayerCard } from "@/components/PlayerCardKit";
 import { playerCardFromStarter } from "@/lib/playerCard";
@@ -57,7 +58,7 @@ import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTa
 import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
-import { PresenceList } from "@/components/ui/Presence";
+import { Collapse, PresenceList } from "@/components/ui/Presence";
 
 /**
  * Ports modules/gm_plan_ui.py's render_gm_plan_workspace / mobile's
@@ -82,6 +83,8 @@ import { PresenceList } from "@/components/ui/Presence";
  * roster-wide checklist, the other a tracked-watchlist view over the
  * same underlying flag) — a known, minor, forgivable overlap, not a bug.
  */
+
+const HEADER_GLYPH = { posture: "franchise", window: "age", needs: "injury" } as const;
 
 function focusItemKey(item: GmPlanFocusItem, index: number): string {
   if ("outlook_topic" in item) return `outlook-${item.outlook_topic}-${index}`;
@@ -327,7 +330,7 @@ function ProtectPlayerRow({
         injuryStatus={player.injury_label}
         className="flex-1 min-w-0"
       >
-        {player.team || "FA"}
+        {player.team || "FA"} · {isProtected ? "Held out of trade ideas" : "Open to trade offers"}
       </PlayerIdentity>
       <OvrGauge rating={player.overall_rating} size="sm" />
       <button
@@ -364,6 +367,7 @@ function TargetRowView({
   onToggleUntouchable: (playerId: string, next: boolean) => void;
   onRemove: (playerId: string) => void;
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
   const { target, player } = row;
   const injury = waiverInjuryDisplay(player?.injury_status);
   const contextLine = targetContextLine(row);
@@ -393,35 +397,49 @@ function TargetRowView({
           <OvrGauge rating={player?.overall_rating ?? null} size="sm" />
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
         <a
           href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(target.player_id)}&name=${encodeURIComponent(leagueName)}`}
           className="px-2 py-1 text-xs font-bold"
-          style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+          style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
         >
           Compare
         </a>
         <button
           type="button"
-          onClick={() => onToggleUntouchable(target.player_id, !target.untouchable)}
+          onClick={() => setMoreOpen((v) => !v)}
+          aria-expanded={moreOpen}
+          aria-label={`More actions for ${name}`}
           className="px-2 py-1 text-xs font-bold"
-          style={
-            target.untouchable
-              ? { background: "var(--color-accent-strong)", color: "var(--color-on-accent)", border: "var(--border-width-default) solid var(--color-accent-strong)" }
-              : { color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }
-          }
+          style={{ minHeight: "var(--touch-target-min)", color: "var(--color-text-secondary)" }}
         >
-          {target.untouchable ? "Unmark untouchable" : "Mark untouchable"}
-        </button>
-        <button
-          type="button"
-          onClick={() => onRemove(target.player_id)}
-          className="px-2 py-1 text-xs font-bold"
-          style={{ color: "var(--color-danger)", border: "var(--border-width-default) solid var(--color-danger)" }}
-        >
-          Remove
+          More {moreOpen ? "⌃" : "⌄"}
         </button>
       </div>
+      <Collapse open={moreOpen}>
+        <div className="flex items-center gap-2 pb-1">
+          <button
+            type="button"
+            onClick={() => onToggleUntouchable(target.player_id, !target.untouchable)}
+            className="px-2 py-1 text-xs font-bold"
+            style={
+              target.untouchable
+                ? { background: "var(--color-accent-strong)", color: "var(--color-on-accent)", border: "var(--border-width-default) solid var(--color-accent-strong)" }
+                : { color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }
+            }
+          >
+            {target.untouchable ? "Unmark untouchable" : "Mark untouchable"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onRemove(target.player_id)}
+            className="px-2 py-1 text-xs font-bold"
+            style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+          >
+            Remove
+          </button>
+        </div>
+      </Collapse>
     </div>
   );
 }
@@ -617,6 +635,12 @@ export function GmPlanContent({
     capital: facts.capital,
     areas: otherAreas.map((a) => ({ key: a.key, title: a.title, framing: a.framing ?? "", count: a.items.length, hasSignal: a.status !== "no_signal" && a.items.length > 0 })),
   });
+  const headerChips = planHeaderChips({
+    stance: stanceKey,
+    deadlineWeek: banner ? banner.week : null,
+    pastDeadline,
+    needs: countPlanNeeds(data.focus_areas ?? []),
+  });
   const planWhy = buildPlanWhy(stanceKey, facts, banner ? banner.week : null);
 
   // Gate order matches the app (GmPlanScreen): the Pro lock decides first (the server answers Free with the upsell before any
@@ -718,6 +742,14 @@ export function GmPlanContent({
               banner={banner}
               pastDeadline={pastDeadline}
               tradeHubHref={tradeHubHref}
+            />
+          ) : null}
+
+          {!planGate ? (
+            <StatStrip
+              columns={3}
+              dense
+              items={headerChips.map((chip) => ({ glyph: HEADER_GLYPH[chip.key], label: chip.label, value: chip.value, note: chip.note }))}
             />
           ) : null}
 

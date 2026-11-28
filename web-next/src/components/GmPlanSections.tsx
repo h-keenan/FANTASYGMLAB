@@ -5,6 +5,7 @@ import { InfoMark } from "@/components/ui/InfoMark";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { IconRow } from "@/components/IconRow";
 import { CompactModule } from "@/components/ui/CompactModule";
+import { WhyLine } from "@/components/ui/WhyLine";
 import { ToneBadge } from "@/components/ToneBadge";
 import { TEAM_STANCE_OPTIONS, type TeamStance } from "@/lib/api";
 import type { DeadlineBanner } from "@/lib/gmPlanSnapshot";
@@ -147,9 +148,9 @@ export function TeamSituationCard({
         })}
       </div>
       {selected && selectedLook ? (
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        <WhyLine line={`${selected.label}: ${selectedLook.tagline}`} label={`${selected.label} stance`} testId="stance-why">
           {selected.description}
-        </p>
+        </WhyLine>
       ) : (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           Pick the stance that fits your team right now.

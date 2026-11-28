@@ -355,7 +355,29 @@ describe("GmPlanContent", () => {
       expandAll();
 
       expect(screen.getByRole("tab", { name: /^Rebuilding/, selected: true })).toBeInTheDocument();
+      // One line up front; the full reason opens on tap.
+      expect(screen.getByText("Rebuilding: Youth + picks")).toBeInTheDocument();
+      expect(screen.queryByText("Prioritize youth and future draft capital")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Rebuilding stance\. Show why/ }));
       expect(screen.getByText("Prioritize youth and future draft capital")).toBeInTheDocument();
+    });
+
+    it("shows posture, window and needs chips in the header", () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[]}
+          rankings={{ ok: true, players: [] }}
+        />,
+      );
+      expect(screen.getByText("Stance")).toBeInTheDocument();
+      expect(screen.getByText("Rebuild")).toBeInTheDocument();
+      expect(screen.getByText("Window")).toBeInTheDocument();
+      expect(screen.getByText("Needs")).toBeInTheDocument();
     });
 
     it("calls setTeamStance when a different stance is picked", () => {
@@ -548,6 +570,7 @@ describe("GmPlanContent", () => {
         vi.mocked(api.removeGmTarget).mockClear();
         renderWatching();
 
+        fireEvent.click(screen.getByRole("button", { name: /^More actions for/ }));
         fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
         expect(screen.queryByText("Watched Player")).not.toBeInTheDocument();
@@ -564,6 +587,7 @@ describe("GmPlanContent", () => {
         vi.mocked(api.removeGmTarget).mockClear();
         renderWatching();
 
+        fireEvent.click(screen.getByRole("button", { name: /^More actions for/ }));
         fireEvent.click(screen.getByRole("button", { name: "Remove" }));
         fireEvent.click(screen.getByRole("button", { name: "Undo" }));
         act(() => {
