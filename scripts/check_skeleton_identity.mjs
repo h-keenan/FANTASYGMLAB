@@ -37,7 +37,6 @@ const SPINNER_ALLOW = [
   { file: "mobile/src/components/TradeOutcomePrompt.tsx", why: "answer busy state under real content" },
   { file: "mobile/src/screens/MoreScreen.tsx", why: "row trailing busy control" },
   { file: "mobile/src/screens/GmPlanScreen.tsx", why: "row trailing busy control" },
-  { file: "mobile/src/screens/LoginScreen.tsx", why: "sign-in button busy state" },
   { file: "mobile/src/screens/GmGameScreen.tsx", why: "Sim To progress line beside its status text" },
 ];
 
