@@ -3,7 +3,7 @@ import { PageTitle } from "@/components/PageTitle";
 import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { TradeSummaryRow } from "@/components/ui/TradeSummaryRow";
-import { tradeOutcomeChips } from "@/lib/tradeOutcomeChips";
+import { isPickAsset, tradeOutcomeChips, tradeValueDelta, tradeVerdictBadge } from "@/lib/tradeOutcomeChips";
 import { abbreviatePlayerName } from "@/lib/formatPlayerName";
 import { tradeIdeaNamesText } from "@/lib/tradeIdeaSummary";
 import { NetEdgeBar } from "@/components/TradeOutcomeHeader";
@@ -59,7 +59,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
   const receivedAssets = toTradeAssets(summary.receive);
   const sent = tradeIdeaNamesText(sentAssets.map((asset) => abbreviatePlayerName(asset.name)));
   const received = tradeIdeaNamesText(receivedAssets.map((asset) => abbreviatePlayerName(asset.name)));
-  const people = (assets: typeof sentAssets, side: string) => assets.map((a, i) => ({ key: `${side}${i}`, playerId: a.player_id ?? null, name: a.name ?? "", position: a.position }));
+  const people = (assets: typeof sentAssets, side: string) => assets.map((a, i) => ({ key: `${side}${i}`, playerId: a.player_id ?? null, name: a.name ?? "", position: a.position, isPick: isPickAsset(a) }));
 
   return (
     <TradeSummaryRow
@@ -68,7 +68,9 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
       send={people(sentAssets, "s")}
       receive={people(receivedAssets, "r")}
       swapText={sent && received ? `${sent} for ${received}` : ""}
-      chips={tradeOutcomeChips({ outcomeLabel: outcomeLabel(outcome.outcome), netPts, netPct })}
+      chips={tradeOutcomeChips({ outcomeLabel: outcomeLabel(outcome.outcome), netPts })}
+      verdict={result && verdict ? tradeVerdictBadge(verdict, result.verdict_label) : null}
+      delta={tradeValueDelta(netPct)}
       date={date}
     >
       {pointsLine ? (

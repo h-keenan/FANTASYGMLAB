@@ -17,7 +17,7 @@ import ValuesCredit from '../components/ValuesCredit';
 import { NetEdgeBar } from '../components/TradeOutcomeHeader';
 import { api, type PastTradeOutcome, type SharedCommunityTrade, type TradeOutcomeAnswer, type TradeOutcomeAssetSummary } from '../lib/api';
 import { tradePointsLine } from '../lib/trackRecordView';
-import { tradeOutcomeChips } from '../lib/tradeOutcomeChips';
+import { isPickAsset, tradeOutcomeChips, tradeValueDelta, tradeVerdictBadge } from '../lib/tradeOutcomeChips';
 import { tradeIdeaNamesText } from '../lib/tradeIdeaSummary';
 import { abbreviatePlayerName } from '../lib/formatPlayerName';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -189,7 +189,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
   const pointsLine = outcome.outcome === 'yes' ? tradePointsLine(result) : null;
   const names = (xs: TradeOutcomeAssetSummary[]) => tradeIdeaNamesText(xs.map((x) => abbreviatePlayerName(x.name)));
   const people = (xs: TradeOutcomeAssetSummary[], side: string) =>
-    xs.map((x, i) => ({ key: `${side}${i}`, playerId: x.player_id || null, name: x.name, position: x.position }));
+    xs.map((x, i) => ({ key: `${side}${i}`, playerId: x.player_id || null, name: x.name, position: x.position, isPick: isPickAsset(x) }));
   const sent = names(summary.send);
   const received = names(summary.receive);
 
@@ -199,7 +199,9 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
       send={people(summary.send, 's')}
       receive={people(summary.receive, 'r')}
       swapText={sent && received ? `${sent} for ${received}` : ''}
-      chips={tradeOutcomeChips({ outcomeLabel, netPts, netPct })}
+      chips={tradeOutcomeChips({ outcomeLabel, netPts })}
+      verdict={result && verdict ? tradeVerdictBadge(verdict, result.verdict_label) : null}
+      delta={tradeValueDelta(netPct)}
       date={date}
     >
       {pointsLine ? <AppText style={styles.pointsLine}>{pointsLine}</AppText> : null}

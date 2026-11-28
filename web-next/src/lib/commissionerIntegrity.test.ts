@@ -99,7 +99,9 @@ describe("trade veto calculator helpers", () => {
     expect(vetoBandTone("fair")).toBe("success");
     expect(vetoBandTone("explainable")).toBe("muted");
     expect(vetoBandTone("lopsided")).toBe("warning");
-    expect(vetoBandTone("outrage")).toBe("danger");
+    // A verdict is never red: the worst band reads the warning tone (docs/ui-patterns.md, "Verdict colours").
+    expect(vetoBandTone("outrage")).toBe("warning");
+    for (const band of ["fair", "explainable", "lopsided", "outrage"] as const) expect(vetoBandTone(band)).not.toBe("danger");
   });
   it("labels postures and formats signed numbers", () => {
     expect(vetoPostureLabel("rebuild")).toBe("Rebuild");
