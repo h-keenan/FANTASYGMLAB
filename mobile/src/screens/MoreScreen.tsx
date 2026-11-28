@@ -22,6 +22,8 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AnimatedCard from '../components/AnimatedCard';
 import ErrorState from '../components/ErrorState';
 import IconCircle from '../components/IconCircle';
+import LeagueCrest from '../components/LeagueCrest';
+import TeamAvatar from '../components/TeamAvatar';
 import { api, ApiError, type MeResponse, type PushCategory } from '../lib/api';
 import { planOf } from '../lib/plan';
 import { supabase } from '../lib/supabase';
@@ -59,7 +61,6 @@ import {
   DELETE_ACCOUNT_STRIPE_NOTE,
   DELETE_ACCOUNT_SUMMARY,
 } from '../lib/accountDeletionCopy';
-import { ACCOUNT_SECTION_TITLE } from '../lib/accountSections';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 type IconName = React.ComponentProps<typeof IconCircle>['name'];
@@ -154,6 +155,7 @@ export default function MoreScreen({ navigation }: Props) {
     };
   }, [isGuest]);
   const [deleting, setDeleting] = useState(false);
+  const [openRow, setOpenRow] = useState<string | null>(null);
 
   // Web Account parity: "Community Trade Feed" opt-out, same
   // /v1/community/preferences endpoint and wording. Fails soft (row hidden)
@@ -440,6 +442,35 @@ export default function MoreScreen({ navigation }: Props) {
     );
   };
 
+  const plan = planOf(me);
+  const planName = me ? (plan === 'pro' ? 'Pro' : plan === 'free' ? 'Free' : 'Unavailable') : '—';
+  const profileName = me?.sleeper_username || me?.email || session?.user?.email || 'Your account';
+  const pushOnCount = pushCategories ? PUSH_CATEGORY_LABELS.filter((item) => pushCategories[item.value]).length : 0;
+  const toggleRow = (key: string) => setOpenRow((prev) => (prev === key ? null : key));
+  const experienceTitle = experienceLevel === null ? 'Not set' : EXPERIENCE_LEVEL_OPTIONS[experienceLevel].title;
+  const densityTitle = DENSITY_OPTIONS.find((o) => o.value === density)?.label ?? '';
+  const themeTitle = THEME_OPTIONS.find((o) => o.value === themeMode)?.label ?? '';
+  const collegeRow =
+    collegeInterestStatus === 'yes' ? (
+      <SettingsRow
+        icon="eye-off-outline"
+        iconColor={colors.textSecondary}
+        label="Hide college scouting"
+        description="You can turn it back on here."
+        onPress={() => respondToCollegeInterest(false)}
+        showDivider={false}
+      />
+    ) : collegeInterestStatus === 'no' ? (
+      <SettingsRow
+        icon="school-outline"
+        iconColor={colors.textSecondary}
+        label="Follow college football?"
+        description="Tap to turn on prospect scouting"
+        onPress={() => respondToCollegeInterest(true)}
+        showDivider={false}
+      />
+    ) : null;
+
   return (
     <View style={styles.root}>
       <GridBackground />
@@ -448,24 +479,38 @@ export default function MoreScreen({ navigation }: Props) {
         contentContainerStyle={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}
       >
         {isGuest ? null : (
-          <>
-            <SectionHeading title={ACCOUNT_SECTION_TITLE.identity} />
-            <AnimatedCard style={styles.groupCard}>
-              <SettingsRow
-                label="Email"
-                right={<AppText style={styles.identityValue}>{me?.email || session?.user?.email || '—'}</AppText>}
-                showDivider
-              />
-              <SettingsRow
-                label="Sleeper username"
-                right={<AppText style={styles.identityValue}>{me ? me.sleeper_username || 'Not linked' : '—'}</AppText>}
-                showDivider
-              />
+          <AnimatedCard style={styles.profileCard}>
+            <TeamAvatar avatarId={null} name={profileName} size={56} />
+            <View style={styles.profileText}>
+              <AppText style={styles.profileName} numberOfLines={1}>{profileName}</AppText>
+              {me?.sleeper_username && (me.email || session?.user?.email) ? (
+                <AppText style={styles.rowDescription} numberOfLines={1}>{me.email || session?.user?.email}</AppText>
+              ) : null}
+            </View>
+            <View style={[styles.planBadge, plan === 'pro' && { borderColor: colors.premium }]}>
+              <AppText style={[styles.planBadgeText, plan === 'pro' && { color: colors.premium }]}>{planName}</AppText>
+            </View>
+          </AnimatedCard>
+        )}
+
+        <SectionHeading title="Account" topGap={isGuest ? 0 : 16} />
+        <AnimatedCard style={styles.groupCard}>
+          {isGuest ? (
+            <SettingsRow
+              icon="person-add-outline"
+              iconColor={colors.accent}
+              label="Create account"
+              description="Keep this league connected without re-entering Sleeper info"
+              onPress={() => setGuestUpgradeOpen(true)}
+              showDivider={false}
+            />
+          ) : (
+            <>
               <SettingsRow
                 icon="person-outline"
                 iconColor={colors.accent}
-                label={me?.sleeper_username ? 'Change Sleeper username' : 'Link Sleeper username'}
-                description="Used to find your team in each league"
+                label="Sleeper username"
+                value={me ? me.sleeper_username || 'Not linked' : '—'}
                 onPress={() => {
                   setRelinkText(me?.sleeper_username ?? '');
                   setRelinkError(null);
@@ -475,91 +520,210 @@ export default function MoreScreen({ navigation }: Props) {
                 showDivider
               />
               <SettingsRow
+                icon="card-outline"
+                iconColor={plan === 'pro' ? colors.premium : colors.textSecondary}
                 label="Plan"
-                right={
-                  <AppText
-                    style={[
-                      styles.identityValue,
-                      planOf(me) === 'pro' && { color: colors.premium },
-                    ]}
-                  >
-                    {me ? (planOf(me) === 'pro' ? 'Pro' : planOf(me) === 'free' ? 'Free' : 'Unavailable') : '—'}
-                  </AppText>
-                }
+                description={trialEndLabel(trialEnd) || undefined}
+                value={`${planName} · ${plan === 'free' ? 'Upgrade' : 'Manage'}`}
+                onPress={onManageSubscription}
                 showDivider={false}
               />
-            </AnimatedCard>
-          </>
+            </>
+          )}
+        </AnimatedCard>
+
+        {isGuest ? null : (
+          <View style={styles.referralWrap}>
+            <ReferralCard />
+          </View>
         )}
 
-        <SectionHeading title={ACCOUNT_SECTION_TITLE.billing} topGap={isGuest ? 0 : 16} />
+        {savedLeaguesFailed && savedLeagues.length === 0 ? (
+          <ErrorState compact title="Could not load your saved leagues" onRetry={() => setSavedLeaguesAttempt((n) => n + 1)} />
+        ) : null}
+        <SectionHeading title="Leagues" topGap={16} />
+        <AnimatedCard style={styles.groupCard}>
+          {savedLeagues.map((league) => (
+            <SettingsRow
+              key={league.id}
+              leading={<LeagueCrest leagueId={league.league_id} name={league.league_name} size={32} />}
+              label={league.league_name || league.league_id}
+              description="Not your league? Remove"
+              onPress={() => onRemoveLeague(league)}
+              disabled={removingLeagueId === league.league_id}
+              right={
+                removingLeagueId === league.league_id ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <IconCircle name="trash-outline" color={colors.textSecondary} />
+                )
+              }
+              showDivider
+            />
+          ))}
+          <SettingsRow
+            icon="compass-outline"
+            iconColor={colors.accent}
+            label="GM Plan"
+            description="Team Situation, protected players and plan"
+            onPress={onOpenTeamStance}
+            showDivider
+          />
+          <SettingsRow
+            icon="swap-horizontal-outline"
+            iconColor={colors.accent}
+            label="Trade History"
+            description="Trades you've shared, and how they worked out"
+            onPress={() => navigation.navigate('TradeHistory')}
+            showDivider
+          />
+          <SettingsRow
+            icon="trophy-outline"
+            iconColor={colors.accent}
+            label="Guess the Player Leaderboard"
+            description="Daily-game streaks among leaguemates"
+            onPress={() => onOpenLeagueScreen('GuessThePlayerLeaderboard', 'to see the leaderboard')}
+            showDivider={Boolean(collegeRow)}
+          />
+          {collegeRow}
+        </AnimatedCard>
+
+        <SectionHeading title="Preferences" topGap={16} />
         <AnimatedCard style={styles.groupCard}>
           <SettingsRow
-            icon="card-outline"
+            icon="school-outline"
+            iconColor={colors.violet}
+            label="Experience level"
+            value={experienceTitle}
+            valueChevron={openRow === 'experience' ? '⌃' : '›'}
+            onPress={() => toggleRow('experience')}
+            showDivider={openRow !== 'experience'}
+          />
+          {openRow === 'experience' ? (
+            <View style={styles.expanded}>
+              {EXPERIENCE_OPTIONS.map((option) => (
+                <OptionCard
+                  key={option.value}
+                  label={option.label}
+                  description={option.description}
+                  active={experienceLevel === option.value}
+                  onPress={() => setExperienceLevel(option.value)}
+                />
+              ))}
+            </View>
+          ) : null}
+          <SettingsRow
+            icon="reader-outline"
             iconColor={colors.textSecondary}
-            label={planOf(me) === 'free' ? 'Upgrade to Pro' : 'Manage Subscription'}
-            description={trialEndLabel(trialEnd) || undefined}
-            onPress={onManageSubscription}
+            label="Density"
+            value={densityTitle}
+            valueChevron={openRow === 'density' ? '⌃' : '›'}
+            onPress={() => toggleRow('density')}
+            showDivider={openRow !== 'density'}
+          />
+          {openRow === 'density' ? (
+            <View style={styles.expanded}>
+              {DENSITY_OPTIONS.map((option) => (
+                <OptionCard
+                  key={option.value}
+                  label={option.label}
+                  description={option.description}
+                  active={density === option.value}
+                  onPress={() => setDensity(option.value)}
+                />
+              ))}
+            </View>
+          ) : null}
+          <SettingsRow
+            icon="contrast-outline"
+            iconColor={colors.textSecondary}
+            label="Theme"
+            value={themeTitle}
+            valueChevron={openRow === 'theme' ? '⌃' : '›'}
+            onPress={() => toggleRow('theme')}
+            showDivider={openRow !== 'theme'}
+          />
+          {openRow === 'theme' ? (
+            <View style={styles.expanded}>
+              {THEME_OPTIONS.map((option) => (
+                <OptionCard
+                  key={option.value}
+                  label={option.label}
+                  description={option.description}
+                  active={themeMode === option.value}
+                  onPress={() => setThemeMode(option.value)}
+                />
+              ))}
+            </View>
+          ) : null}
+          <SettingsRow
+            label="Haptics"
+            description="Taps and snaps you can feel. Never on live scores."
+            showDivider
+            right={<Toggle value={effects.haptics} onValueChange={(v) => { effectsPrefs.set({ haptics: v }) }} label="Haptics" />}
+          />
+          <SettingsRow
+            label="Reduced effects"
+            description="Turns off shimmer and ambient motion to save battery."
             showDivider={false}
+            right={<Toggle value={effects.reducedEffects} onValueChange={(v) => { effectsPrefs.set({ reducedEffects: v }); }} label="Reduced effects" />}
           />
         </AnimatedCard>
 
-        <SectionHeading title={ACCOUNT_SECTION_TITLE.preferences} topGap={16} />
-        <AnimatedCard style={styles.prefsCard}>
-        <AppText style={styles.groupCaption}>Density</AppText>
-        <View style={styles.optionRow}>
-          {DENSITY_OPTIONS.map((option) => (
-            <OptionCard
-              key={option.value}
-              label={option.label}
-              description={option.description}
-              active={density === option.value}
-              onPress={() => setDensity(option.value)}
-            />
-          ))}
-        </View>
-        <AppText style={styles.groupCaption}>{experienceLevel === null ? 'Explanations · Not set' : 'Explanations'}</AppText>
-        <View style={styles.optionRow}>
-          {EXPERIENCE_OPTIONS.map((option) => (
-            <OptionCard
-              key={option.value}
-              label={option.label}
-              description={option.description}
-              active={experienceLevel === option.value}
-              onPress={() => setExperienceLevel(option.value)}
-            />
-          ))}
-        </View>
-        <AppText style={styles.groupCaption}>Theme</AppText>
-        <View style={styles.optionRow}>
-          {THEME_OPTIONS.map((option) => (
-            <OptionCard
-              key={option.value}
-              label={option.label}
-              description={option.description}
-              active={themeMode === option.value}
-              onPress={() => setThemeMode(option.value)}
-            />
-          ))}
-        </View>
-        <SettingsRow
-          label="Haptics"
-          description="Taps and snaps you can feel. Never on live score updates."
-          showDivider
-          right={<Toggle value={effects.haptics} onValueChange={(v) => { effectsPrefs.set({ haptics: v }) }} label="Haptics" />}
-        />
-        <SettingsRow
-          label="Reduced effects"
-          description="Turns off shimmer, parallax and ambient motion. Helps battery on older phones."
-          showDivider={communityOptedOut !== null}
-          right={<Toggle value={effects.reducedEffects} onValueChange={(v) => { effectsPrefs.set({ reducedEffects: v }); }} label="Reduced effects" />}
-        />
-        {communityOptedOut !== null ? (
-          <>
+        <SectionHeading title="Notifications" topGap={16} />
+        <AnimatedCard style={styles.groupCard}>
+          {pushCategories ? (
+            <>
+              <SettingsRow
+                icon="notifications-outline"
+                iconColor={colors.accent}
+                label="Push notifications"
+                value={`${pushOnCount} of ${PUSH_CATEGORY_LABELS.length} on`}
+                valueChevron={openRow === 'push' ? '⌃' : '›'}
+                onPress={() => toggleRow('push')}
+                showDivider
+              />
+              {openRow === 'push'
+                ? PUSH_CATEGORY_LABELS.map((item) => (
+                    <SettingsRow
+                      key={item.value}
+                      label={item.label}
+                      description={item.description}
+                      showDivider
+                      right={
+                        <Toggle
+                          value={pushCategories[item.value]}
+                          onValueChange={(next) => onTogglePushCategory(item.value, next)}
+                          disabled={updatingCategory === item.value}
+                          label={item.label}
+                        />
+                      }
+                    />
+                  ))
+                : null}
+            </>
+          ) : null}
+          <SettingsRow
+            icon="paper-plane-outline"
+            iconColor={colors.accent}
+            label="Send test notification"
+            onPress={onSendTestPush}
+            disabled={sendingTestPush}
+            right={sendingTestPush ? <ActivityIndicator size="small" color={colors.accent} /> : undefined}
+            showDivider={false}
+          />
+        </AnimatedCard>
+        {pushCategories ? <NotificationControls savedLeagues={savedLeagues} /> : null}
+
+        <SectionHeading title="Privacy & data" topGap={16} />
+        <AnimatedCard style={styles.groupCard}>
+          {communityOptedOut !== null ? (
             <SettingsRow
+              icon="people-outline"
+              iconColor={colors.textSecondary}
               label="Community Trade Feed"
               description="I don't want MY trades to appear in this feed"
-              showDivider={false}
+              showDivider
               right={
                 <Toggle
                   value={communityOptedOut}
@@ -570,142 +734,44 @@ export default function MoreScreen({ navigation }: Props) {
                 />
               }
             />
-          </>
-        ) : null}
+          ) : null}
+          {showcaseAvailable ? (
+            <SettingsRow
+              icon="videocam-outline"
+              iconColor={colors.premium}
+              label="Privacy mode"
+              description="Hides names, avatars and email for screenshots."
+              showDivider
+              right={<Toggle value={showcaseMode} onValueChange={setShowcaseMode} tone="premium" label="Privacy mode" />}
+            />
+          ) : null}
+          <SettingsRow
+            icon="download-outline"
+            iconColor={colors.textSecondary}
+            label="Export My Data"
+            onPress={onExportData}
+            disabled={exporting}
+            right={exporting ? <ActivityIndicator size="small" color={colors.textSecondary} /> : undefined}
+            showDivider={!isGuest}
+          />
+          {isGuest ? null : (
+            <SettingsRow
+              icon="trash-outline"
+              iconColor={colors.danger}
+              label="Delete account"
+              danger
+              onPress={onDeleteAccount}
+              disabled={deleting}
+              right={deleting ? <ActivityIndicator size="small" color={colors.danger} /> : null}
+              showDivider={false}
+            />
+          )}
         </AnimatedCard>
 
-        {savedLeaguesFailed && savedLeagues.length === 0 ? (
-          <ErrorState compact title="Could not load your saved leagues" onRetry={() => setSavedLeaguesAttempt((n) => n + 1)} />
-        ) : null}
-        {savedLeagues.length > 0 ? (
-          <>
-            <SectionHeading title="Saved leagues" topGap={16} />
-            <AnimatedCard style={styles.groupCard}>
-              {savedLeagues.map((league, index) => (
-                <SettingsRow
-                  key={league.id}
-                  icon="trophy-outline"
-                  iconColor={colors.accent}
-                  label={league.league_name || league.league_id}
-                  description="Not your league? Remove"
-                  onPress={() => onRemoveLeague(league)}
-                  disabled={removingLeagueId === league.league_id}
-                  right={
-                    removingLeagueId === league.league_id ? (
-                      <ActivityIndicator size="small" color={colors.textSecondary} />
-                    ) : (
-                      <IconCircle name="trash-outline" color={colors.textSecondary} />
-                    )
-                  }
-                  showDivider={index < savedLeagues.length - 1}
-                />
-              ))}
-            </AnimatedCard>
-          </>
-        ) : null}
-
-        <SectionHeading title="Your Team" topGap={16} />
-        <AnimatedCard style={styles.groupCard}>
-          <SettingsRow
-            icon="compass-outline"
-            iconColor={colors.accent}
-            label="GM Plan"
-            description="Your Team Situation (Rebuilding / Competing / Balanced), protected players and plan"
-            onPress={onOpenTeamStance}
-            showDivider
-          />
-          <SettingsRow
-            icon="swap-horizontal-outline"
-            iconColor={colors.accent}
-            label="Trade History"
-            description="Trades you've shared and confirmed, plus how they've worked out so far"
-            onPress={() => navigation.navigate('TradeHistory')}
-            showDivider
-          />
-          <SettingsRow
-            icon="trophy-outline"
-            iconColor={colors.accent}
-            label="Guess the Player Leaderboard"
-            description="Daily-game streaks among leaguemates on FantasyDesk"
-            onPress={() => onOpenLeagueScreen('GuessThePlayerLeaderboard', 'to see the leaderboard')}
-            showDivider={false}
-          />
-        </AnimatedCard>
-
-        {collegeInterestStatus === 'yes' ? (
-          <>
-            <SectionHeading title="Scouting" topGap={16} />
-            <AnimatedCard style={styles.groupCard}>
-              {/* Web parity: Account has a College football on/off switch, so
-                  the app can turn it back off too (it could only opt in). */}
-              <SettingsRow
-                icon="eye-off-outline"
-                iconColor={colors.textSecondary}
-                label="Hide college scouting"
-                description="Stop the college football scouting prompts. You can turn it back on here."
-                onPress={() => respondToCollegeInterest(false)}
-                showDivider={false}
-              />
-            </AnimatedCard>
-          </>
-        ) : null}
-
-        {/* Discoverability audit (2026-09-26): saying "Not for me" (or just
-            dismissing) the one-time Dashboard prompt permanently hid College
-            Prospects with no way back - the only revisit path in the whole
-            app was reinstalling. "Replay intro tutorial" below already
-            establishes the pattern of a small always-available link back to a
-            one-time choice; this mirrors it for the college-football opt-in
-            instead of inventing a new mechanism. */}
-        {collegeInterestStatus === 'no' ? (
-          <>
-            <SectionHeading title="Scouting" topGap={16} />
-            <AnimatedCard style={styles.groupCard}>
-              <SettingsRow
-                icon="school-outline"
-                iconColor={colors.textSecondary}
-                label="Follow college football?"
-                description="You said this wasn't for you. Tap to turn on prospect scouting"
-                onPress={() => respondToCollegeInterest(true)}
-                showDivider={false}
-              />
-            </AnimatedCard>
-          </>
-        ) : null}
-
-        <SectionHeading title="Notifications" topGap={16} />
-        <AnimatedCard style={styles.groupCard}>
-          <SettingsRow
-            icon="notifications-outline"
-            iconColor={colors.accent}
-            label="Send test notification"
-            onPress={onSendTestPush}
-            disabled={sendingTestPush}
-            right={sendingTestPush ? <ActivityIndicator size="small" color={colors.accent} /> : undefined}
-            showDivider={Boolean(pushCategories)}
-          />
-          {pushCategories
-            ? PUSH_CATEGORY_LABELS.map((item, index) => (
-                <SettingsRow
-                  key={item.value}
-                  label={item.label}
-                  description={item.description}
-                  showDivider={index < PUSH_CATEGORY_LABELS.length - 1}
-                  right={
-                    <Toggle
-                      value={pushCategories[item.value]}
-                      onValueChange={(next) => onTogglePushCategory(item.value, next)}
-                      disabled={updatingCategory === item.value}
-                      label={item.label}
-                    />
-                  }
-                />
-              ))
-            : null}
-        </AnimatedCard>
-        {pushCategories ? <NotificationControls savedLeagues={savedLeagues} /> : null}
-
-        <SectionHeading title="About" topGap={16} />
+        {/* Hidden dev path: long-press (1.5s) opens the design-system reference. */}
+        <Pressable accessibilityRole="button" onLongPress={() => navigation.navigate('Design')} delayLongPress={1500}>
+          <SectionHeading title="Help & legal" topGap={16} />
+        </Pressable>
         <AnimatedCard style={styles.groupCard}>
           <SettingsRow
             icon="school-outline"
@@ -724,95 +790,34 @@ export default function MoreScreen({ navigation }: Props) {
             }}
             showDivider
           />
-          <HelpLink context={{ topic: 'more' }} />
           <SettingsRow
             icon="apps-outline"
             iconColor={colors.accent}
             label="See everything FantasyDesk can do"
             onPress={() => navigation.navigate('Features')}
-            showDivider={false}
+            showDivider
           />
-        </AnimatedCard>
-
-        {showcaseAvailable ? (
-          <>
-            <SectionHeading title="Developer" topGap={16} />
-            <AnimatedCard style={styles.groupCard}>
-              <SettingsRow
-                icon="videocam-outline"
-                iconColor={colors.premium}
-                label="Privacy mode"
-                description="Hides manager, team and league names, avatars and email for screenshots. Display only; player and football data are untouched."
-                showDivider={false}
-                right={
-                  <Toggle value={showcaseMode} onValueChange={setShowcaseMode} tone="premium" label="Privacy mode" />
-                }
-              />
-            </AnimatedCard>
-          </>
-        ) : null}
-
-        {/* Hidden dev path: long-press (1.5s) opens the design-system reference. */}
-        <Pressable accessibilityRole="button" onLongPress={() => navigation.navigate('Design')} delayLongPress={1500}>
-          <SectionHeading title="Legal" topGap={16} />
-        </Pressable>
-        <AnimatedCard style={styles.groupCard}>
-          {LEGAL_ITEMS.map((item, index) => (
-            <SettingsRow
-              key={item.pageKey}
-              icon={item.icon}
-              iconColor={colors.textSecondary}
-              label={item.label}
-              onPress={() => navigation.navigate('LegalPage', { pageKey: item.pageKey })}
-              showDivider={index < LEGAL_ITEMS.length - 1}
-            />
-          ))}
-        </AnimatedCard>
-
-        {isGuest ? null : (
-          <View style={styles.referralWrap}>
-            <ReferralCard />
-          </View>
-        )}
-
-        <SectionHeading title={ACCOUNT_SECTION_TITLE.actions} topGap={16} />
-        <AnimatedCard style={styles.groupCard}>
-          {isGuest ? (
-            <SettingsRow
-              icon="person-add-outline"
-              iconColor={colors.accent}
-              label="Create account"
-              description="Keep this league connected: no need to re-enter your Sleeper info"
-              onPress={() => setGuestUpgradeOpen(true)}
-              showDivider
-            />
-          ) : null}
+          <HelpLink context={{ topic: 'more' }} />
           <SettingsRow
-            icon="download-outline"
+            icon="document-text-outline"
             iconColor={colors.textSecondary}
-            label="Export My Data"
-            onPress={onExportData}
-            disabled={exporting}
-            right={exporting ? <ActivityIndicator size="small" color={colors.textSecondary} /> : undefined}
-            showDivider={false}
+            label="Legal"
+            valueChevron={openRow === 'legal' ? '⌃' : '›'}
+            onPress={() => toggleRow('legal')}
+            showDivider={openRow === 'legal'}
           />
-        </AnimatedCard>
-
-        {/* Destructive action gets its own visually distinct surface
-            (danger border/tint) rather than sitting in the neutral Account
-            card above - Magna Carta §17: destructive actions should look
-            distinct, not just be a row with red text among routine ones. */}
-        <AnimatedCard style={styles.dangerCard}>
-          <SettingsRow
-            icon="trash-outline"
-            iconColor={colors.danger}
-            label="Delete account"
-            danger
-            onPress={onDeleteAccount}
-            disabled={deleting}
-            right={deleting ? <ActivityIndicator size="small" color={colors.danger} /> : null}
-            showDivider={false}
-          />
+          {openRow === 'legal'
+            ? LEGAL_ITEMS.map((item, index) => (
+                <SettingsRow
+                  key={item.pageKey}
+                  icon={item.icon}
+                  iconColor={colors.textSecondary}
+                  label={item.label}
+                  onPress={() => navigation.navigate('LegalPage', { pageKey: item.pageKey })}
+                  showDivider={index < LEGAL_ITEMS.length - 1}
+                />
+              ))
+            : null}
         </AnimatedCard>
       </ScrollView>
 
@@ -886,14 +891,20 @@ function OptionCard({
 function SettingsRow({
   icon,
   iconColor,
+  leading,
   label,
   description,
+  value,
+  valueChevron,
   onPress,
   disabled,
   right,
   showDivider,
   danger,
 }: {
+  leading?: React.ReactNode;
+  value?: string;
+  valueChevron?: string;
   icon?: IconName;
   iconColor?: string;
   label: string;
@@ -915,6 +926,7 @@ function SettingsRow({
   const content = (
     <View style={[styles.row, showDivider && styles.rowDivider]}>
       <View style={styles.labelGroup}>
+        {leading ? <View style={styles.icon}>{leading}</View> : null}
         {icon ? (
           <IconCircle
             name={icon}
@@ -929,7 +941,14 @@ function SettingsRow({
           {description ? <AppText style={styles.rowDescription}>{description}</AppText> : null}
         </View>
       </View>
-      {right !== undefined ? right : onPress ? <AppText style={styles.chevron}>{'›'}</AppText> : null}
+      {right !== undefined ? (
+        right
+      ) : (
+        <View style={styles.valueGroup}>
+          {value ? <AppText style={styles.identityValue} numberOfLines={1}>{value}</AppText> : null}
+          {onPress ? <AppText style={styles.chevron}>{valueChevron ?? '›'}</AppText> : null}
+        </View>
+      )}
     </View>
   );
   if (!onPress) return content;
@@ -970,6 +989,13 @@ function createStyles(colors: ThemeColors) {
     // Web wraps Preferences in one glass card; the option tiles nest as glassInset.
     prefsCard: { padding: spacing.md, paddingBottom: 0 },
     referralWrap: { marginTop: 16 },
+    profileCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
+    profileText: { flex: 1, minWidth: 0 },
+    profileName: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+    planBadge: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+    planBadgeText: { fontSize: 13.5, fontWeight: '800', color: colors.textSecondary },
+    valueGroup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
+    expanded: { gap: spacing.sm, paddingBottom: spacing.md },
     dangerCard: {
       padding: spacing.md,
       paddingVertical: 0,

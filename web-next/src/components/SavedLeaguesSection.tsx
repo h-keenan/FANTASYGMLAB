@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
+import { LeagueCrest } from "@/components/LeagueCrest";
 import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
@@ -67,10 +68,10 @@ export function SavedLeaguesSection() {
   if (leagues.length === 0) return null;
 
   return (
-    <section className="glass-surface p-4 flex flex-col gap-3" aria-labelledby="account-saved-leagues-heading">
+    <section className="flex flex-col gap-2" aria-labelledby="account-saved-leagues-heading">
       <h2
         id="account-saved-leagues-heading"
-        className="text-xs font-bold uppercase"
+        className="text-xs font-bold uppercase px-1"
         style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}
       >
         Saved leagues
@@ -80,11 +81,16 @@ export function SavedLeaguesSection() {
           {error}
         </p>
       ) : null}
-      <ul className="flex flex-col gap-2">
-        {leagues.map((league) => (
-          <li key={league.league_id} className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-semibold min-w-0 break-words">{league.league_name || league.league_id}</span>
+      <ul className="glass-surface flex flex-col">
+        {leagues.map((league, index) => (
+          <li
+            key={league.league_id}
+            className="flex flex-col gap-2 px-4 py-3"
+            style={index === 0 ? undefined : { borderTop: "var(--border-width-default) solid var(--color-border)" }}
+          >
+            <div className="flex items-center gap-3 text-sm">
+              <LeagueCrest leagueId={league.league_id} name={league.league_name} size={32} />
+              <span className="font-semibold min-w-0 flex-1 break-words">{league.league_name || league.league_id}</span>
               {confirmingId === league.league_id ? null : (
                 <button
                   type="button"

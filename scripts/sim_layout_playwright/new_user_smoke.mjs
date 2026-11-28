@@ -230,7 +230,7 @@ for (const [plan, entitlement] of [["Pro", "premium"], ["Free", "free"]]) {
     if (await env.page.locator('[data-testid="plan-step-trades"]').count()) { console.log("FAIL 6b Free sees the Pro module"); results.push({ name: "6b", fails: ["Free sees Pro module"] }); }
   }
   await goto(env, "/account");
-  await check(env, `6c Account plan label (${plan})`, { expectText: ["smoke@example.com"], expectSel: [`dd:text-is("${plan}")`] });
+  await check(env, `6c Account plan label (${plan})`, { expectText: ["smoke@example.com"], expectSel: [`section[aria-label="Profile"] span:text-is("${plan}")`] });
   await env.ctx.close();
 }
 
