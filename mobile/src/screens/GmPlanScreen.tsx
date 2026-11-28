@@ -36,6 +36,9 @@ import SectionHeading from '../components/SectionHeading';
 import { ViewTabs } from '../components/PageControlRow';
 import DashboardStatRow from '../components/DashboardStatRow';
 import PlanSteps, { OutlookRow } from '../components/GmPlanSteps';
+import { countPlanNeeds, planHeaderChips } from '../lib/gmPlanHeader';
+import { targetContextLine } from '../lib/gmTargetsPresentation';
+import WhyLine from '../components/WhyLine';
 import { buildPlanSteps, buildPlanWhy, planFacts, planStatTiles, type PlanStance } from '../lib/gmPlanPlan';
 import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/Skeleton';
 import SharedTradeIdeaCard from '../components/TradeIdeaCard';
@@ -65,7 +68,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
-import { PresenceList } from '../components/Presence';
+import { Collapse, PresenceList } from '../components/Presence';
 import { useLatestGate } from '../lib/useLatestGate';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GmPlan'>;
@@ -78,6 +81,12 @@ const TABS: Array<{ key: Tab; label: string; glyph: TabIconName }> = [
   { key: 'core', label: 'Core', glyph: 'core' },
   { key: 'watching', label: TERMS.watchlist, glyph: 'watching' },
 ];
+
+const HEADER_ICON: Record<'posture' | 'window' | 'needs', IconName> = {
+  posture: 'compass-outline',
+  window: 'time-outline',
+  needs: 'medkit-outline',
+};
 
 const TILE_ICON: Record<'power' | 'capital' | 'odds' | 'record', IconName> = {
   power: 'stats-chart-outline',
@@ -328,6 +337,12 @@ export default function GmPlanScreen({ route, navigation }: Props) {
     capital: facts.capital,
     areas: otherAreas.map((a) => ({ key: a.key, title: a.title, framing: a.framing ?? '', count: a.items.length, hasSignal: a.status !== 'no_signal' && a.items.length > 0 })),
   });
+  const headerChips = planHeaderChips({
+    stance: stanceKey,
+    deadlineWeek: weekAhead,
+    pastDeadline,
+    needs: countPlanNeeds(plan?.focus_areas ?? []),
+  });
   const planWhy = buildPlanWhy(stanceKey, facts, weekAhead);
 
   const tradeIdeasParts = () =>
@@ -382,6 +397,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
           position={player.position}
           team={player.team}
           tier={player.tier}
+          contextLine={protectedIds.has(player.player_id) ? 'Held out of trade ideas' : 'Open to trade offers'}
           showDivider={false}
         />
       </View>
@@ -439,6 +455,12 @@ export default function GmPlanScreen({ route, navigation }: Props) {
 
         {tab === 'overview' ? (
           <>
+            {!gateNotice ? (
+              <DashboardStatRow
+                dense
+                items={headerChips.map((c) => ({ label: c.label, icon: HEADER_ICON[c.key], value: c.value, note: c.note }))}
+              />
+            ) : null}
             <CompactModule
               id="gmplan.situation"
               title="Team Situation"
@@ -485,7 +507,13 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                 })}
               </View>
               {TEAM_STANCE_OPTIONS.find((o) => o.value === stance) ? (
-                <AppText style={styles.caption}>{TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.description}</AppText>
+                <WhyLine
+                  line={`${TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.label}: ${stanceLook(stance as TeamStance, colors).tagline}`}
+                  label={`${TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.label} stance`}
+                  testID="stance-why"
+                >
+                  {TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.description}
+                </WhyLine>
               ) : (
                 <AppText style={styles.caption}>Pick the stance that fits your team right now.</AppText>
               )}
@@ -658,6 +686,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                         position={player?.position}
                         team={player?.team}
                         tier={player?.tier}
+                        contextLine={targetContextLine({ target, player })}
                         showDivider={false}
                         onPress={player ? () => openQuickView(player, { leagueId, leagueName }) : undefined}
                       />
@@ -670,17 +699,21 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                         ) : null}
                         <OverallRatingBadge rating={player?.overall_rating} positionRank={player?.position_rank} />
                       </View>
-                      <View style={styles.actions}>
-                        <Button
-                          variant="accentOutline"
-                          size="sm"
-                          label="Compare"
-                          disabled={!player}
-                          onPress={() => player && navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
-                        />
+                      <MoreActions
+                        primary={
+                          <Button
+                            variant="accentOutline"
+                            size="sm"
+                            label="Compare"
+                            disabled={!player}
+                            onPress={() => player && navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
+                          />
+                        }
+                        label={`More actions for ${player?.name ?? target.player_id}`}
+                      >
                         <Button variant="accentOutline" size="sm" label="Mark untouchable" onPress={() => onToggleProtect(target.player_id, true)} />
                         <Button variant="dangerOutline" size="sm" label="Remove" onPress={() => onRemoveTarget(target.player_id)} />
-                      </View>
+                      </MoreActions>
                     </AnimatedCard>
                   );
                   }}
@@ -716,6 +749,26 @@ function gmPlanItemToIdea(item: GmPlanTradeItem): TradeIdea {
     impact_tag: '',
     landed_gm_target_player_ids: [],
   };
+}
+
+/** One primary action up front; the rest open on tap (compact, tap-to-expand). */
+function MoreActions({ primary, label, children }: { primary: React.ReactNode; label: string; children: React.ReactNode }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [open, setOpen] = useState(false);
+  return (
+    <View>
+      <View style={styles.moreActionsRow}>
+        {primary}
+        <PressableScale accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={label} onPress={() => setOpen((v) => !v)} style={styles.moreToggle}>
+          <AppText style={styles.moreToggleText}>More {open ? '⌃' : '⌄'}</AppText>
+        </PressableScale>
+      </View>
+      <Collapse open={open}>
+        <View style={styles.actions}>{children}</View>
+      </Collapse>
+    </View>
+  );
 }
 
 function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewDetails: () => void }) {
@@ -964,6 +1017,9 @@ function createStyles(colors: ThemeColors) {
     watchMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     valueLabel: { fontSize: 12, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.4 },
     valueText: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
+    moreActionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    moreToggle: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.sm },
+    moreToggleText: { fontSize: 12.5, fontWeight: '700', color: colors.textSecondary },
     actions: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   });
 }

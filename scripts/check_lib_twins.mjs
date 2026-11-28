@@ -54,6 +54,8 @@ export const IDENTICAL = [
   "moduleTemplates.ts",
   "tradeIdeaSummary.ts",
   "gmPlanPlan.ts",
+  "gmPlanHeader.ts",
+  "gmTargetsPresentation.ts",
   "tradeIdeaPick.ts",
   "trackRecordView.ts",
   "tradeOutcomeChips.ts",

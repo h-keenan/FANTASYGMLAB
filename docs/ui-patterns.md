@@ -26,6 +26,7 @@ Ground rules for every pattern here:
 | `LetterGrade` / `GradeBar` / `GradeLegendSheet` | `ui/LetterGrade.tsx` | `LetterGrade.tsx` | `simGrade.ts` | built; the Fantasy Sim's overall (replaces the OVR gauge there only), see "Fantasy Sim letter grades" |
 | `CompactModule` | `ui/CompactModule.tsx` | `CompactModule.tsx` | `compactModule.ts` (+ `simSummaries.ts`, `simDraft.ts`) | built (Phase 1 of `docs/audits/2026-11-information-architecture.md`); Sim home folds and the Sim draft room use it; `Collapsible` is superseded (SimFold renders CompactModule) |
 | `ExpandRow` / `ExpandRowGroup` | `ui/ExpandRow.tsx` | `ExpandRow.tsx` | `todayView.ts` (`todayActionRow`) | built (2026-11 Today redesign): one-line row (avatar, short line, one button, chevron) whose tap opens the detail; rows share one grouped surface. Used by Today's Do this now and More |
+| `WhyLine` | `ui/WhyLine.tsx` | `WhyLine.tsx` | `gmPlanHeader.ts` (header chips twin) | built (GM Plan declutter): one short line plus a "Why" toggle that opens the longer reason; replaces a stacked explanatory paragraph. Used by GM Plan's stance line |
 | `Skeleton` set | `components/Skeleton.tsx` (+ `LoadingScreen`) | `components/Skeleton.tsx` (+ `screens/LoadingScreen.tsx`) | none (visual only) | built; see "Loading identity" |
 
 ## Copy casing and shared copy (web + app, 2026-11-17)
