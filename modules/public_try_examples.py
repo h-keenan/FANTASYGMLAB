@@ -291,7 +291,8 @@ def get_public_try_examples(db_path: str, *, now: datetime | None = None) -> dic
         return _unavailable("The public dynasty board is unavailable.", clock, now)
     trending = ads.load_trending()
     ids = {str(r["player_id"]) for r in board}
-    pct = ads.load_roster_pct([p for p in (str(t.get("player_id")) for t in trending) if p in ids]) if trending else {}
+    # Only the latest verified (today/yesterday) snapshot %; no 7-day trend is claimed, so no baseline is required.
+    pct = ads.load_roster_pct([p for p in (str(t.get("player_id")) for t in trending) if p in ids], require_baseline=False) if trending else {}
     matchups = ads.week_matchups(ads.load_games(), season, week, ads._team_aliases())
     defense = ads.load_defense(season) if matchups else {}
 

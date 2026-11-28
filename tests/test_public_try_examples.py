@@ -118,7 +118,7 @@ def test_in_season_payload_is_cached_for_the_week_but_empty_is_not(monkeypatch):
     monkeypatch.setattr(ads, "clock_info", lambda: {"season": 2026, "phase": "regular", "week": 12, "source": "t"})
     monkeypatch.setattr(ads, "load_board", lambda db, fmt: (BOARD, "x"))
     monkeypatch.setattr(ads, "load_trending", lambda: TRENDING)
-    monkeypatch.setattr(ads, "load_roster_pct", lambda ids: PCT)
+    monkeypatch.setattr(ads, "load_roster_pct", lambda ids, **kw: PCT if kw.get("require_baseline") is False else {})
     monkeypatch.setattr(ads, "load_games", lambda: None)
     monkeypatch.setattr(ads, "_team_aliases", lambda: {})
     monkeypatch.setattr(ads, "week_matchups", lambda games, s, w, a: MATCHUPS)

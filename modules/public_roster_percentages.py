@@ -16,6 +16,11 @@ def normalized(name):
     return re.sub(r"[^a-z0-9]", "", str(name).lower())
 
 
+# ESPN's top-1500 ownership payload (decoded) was ~9.2 MB by Nov 2026 and grows with in-season stats; the old 8 MB
+# cap silently turned every fetch into [] (no roster %, so the daily snapshot job failed with "No roster percentages").
+MAX_RESPONSE_BYTES = 24_000_000
+
+
 def source_url(season):
     return f"https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{season}/segments/0/leaguedefaults/3?view=kona_player_info"
 
@@ -29,7 +34,7 @@ def ownership_rows(season, bucket):
             raw = bytearray()
             for part in response.iter_content(65536):
                 raw.extend(part)
-                if len(raw) > 8_000_000:
+                if len(raw) > MAX_RESPONSE_BYTES:
                     return []
         payload = json.loads(raw)
         rows = []
