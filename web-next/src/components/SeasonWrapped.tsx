@@ -1,5 +1,6 @@
 "use client";
 
+import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Button, ButtonLink } from "@/components/Button";
@@ -399,6 +400,7 @@ export function SeasonWrapped({ deck, itemId, onClose, startIndex = 0, lastFoote
   const card = deck.cards[index];
   const locked = card.locked || !card.data;
   return (
+    <OverlayPortal lockScroll>
     <div
       role="dialog"
       aria-modal="true"
@@ -434,6 +436,7 @@ export function SeasonWrapped({ deck, itemId, onClose, startIndex = 0, lastFoote
         {locked ? <div style={{ height: 40 }} aria-hidden /> : <ShareCardButton card={card} deck={deck} itemId={itemId} />}
       </div>
     </div>
+    </OverlayPortal>
   );
 }
 

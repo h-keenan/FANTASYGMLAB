@@ -1,5 +1,6 @@
 "use client";
 
+import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import Image from "next/image";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import Link from "next/link";
@@ -232,14 +233,16 @@ export function AppHeader() {
               {/* Full-viewport click-catcher to close on outside click —
                   simpler and more robust than a document-level listener for
                   a menu this small. */}
-              <button
-                type="button"
-                aria-hidden
-                tabIndex={-1}
-                className="fixed inset-0"
-                style={{ background: "transparent", zIndex: 40 }}
-                onClick={() => setMenuOpen(false)}
-              />
+              <OverlayPortal>
+                <button
+                  type="button"
+                  aria-hidden
+                  tabIndex={-1}
+                  className="fixed inset-0"
+                  style={{ background: "transparent", zIndex: 40 }}
+                  onClick={() => setMenuOpen(false)}
+                />
+              </OverlayPortal>
               <div
                 role="menu"
                 className="glass-surface absolute right-0 top-full mt-1 flex flex-col py-1 min-w-[12rem]"

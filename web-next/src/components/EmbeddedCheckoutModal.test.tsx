@@ -11,8 +11,8 @@ vi.mock("@stripe/react-stripe-js", () => ({
 
 describe("EmbeddedCheckoutModal layout", () => {
   it("sizes the overlay in dvh and makes the form region the scroll area, so the submit button is reachable on iOS Safari", () => {
-    const { container } = render(<EmbeddedCheckoutModal clientSecret="cs_x" publishableKey="pk_test_x" onClose={() => {}} />);
-    const overlay = container.firstElementChild as HTMLElement;
+    render(<EmbeddedCheckoutModal clientSecret="cs_x" publishableKey="pk_test_x" onClose={() => {}} />);
+    const overlay = document.body.lastElementChild as HTMLElement;
     expect(overlay.style.height).toBe("100dvh");
     const form = screen.getByTestId("stripe-form");
     expect(form.closest(".overflow-y-auto")).not.toBeNull();

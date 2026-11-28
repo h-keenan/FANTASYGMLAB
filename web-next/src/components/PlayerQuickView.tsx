@@ -1,5 +1,6 @@
 "use client";
 
+import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import { AdpCredit } from "@/components/AdpInline";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ExplorerLeagueProvider } from "@/context/ExplorerLeagueContext";
@@ -373,272 +374,274 @@ export function PlayerQuickView({
   ) : null;
 
   return (
-    <div
-      className="pqv-backdrop"
-      style={backdropStyle}
-      hidden={overlay.hidden}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) overlay.closeAll();
-      }}
-    >
+    <OverlayPortal>
       <div
-        ref={(node) => {
-          dialogRef.current = node;
-          sheetRef.current = node;
+        className="pqv-backdrop"
+        style={backdropStyle}
+        hidden={overlay.hidden}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) overlay.closeAll();
         }}
-        className="pqv-modal"
-        data-snap={snap}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pqv-name"
-        onKeyDown={handleKeyDown}
-        style={sheetStyle}
       >
-        {/* coridian_, 2026-10-18: "Also need that moving background behind
-            the pqv" — same field/sweep texture as the GM orb sheet,
-            contained to this modal rather than the viewport-fixed global
-            layer (which sits behind this modal's own opaque background). */}
-        <div className="pqv-field" aria-hidden="true" />
-        <div className="pqv-sweep" aria-hidden="true" />
-        <SheetHandle snap={snap} onSnap={setSnap} />
-        <OverlayBack overlay={overlay} />
-        <SheetCloseButton ref={closeButtonRef} label="Close player details" onClose={overlay.closeAll} />
+        <div
+          ref={(node) => {
+            dialogRef.current = node;
+            sheetRef.current = node;
+          }}
+          className="pqv-modal"
+          data-snap={snap}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pqv-name"
+          onKeyDown={handleKeyDown}
+          style={sheetStyle}
+        >
+          {/* coridian_, 2026-10-18: "Also need that moving background behind
+              the pqv" — same field/sweep texture as the GM orb sheet,
+              contained to this modal rather than the viewport-fixed global
+              layer (which sits behind this modal's own opaque background). */}
+          <div className="pqv-field" aria-hidden="true" />
+          <div className="pqv-sweep" aria-hidden="true" />
+          <SheetHandle snap={snap} onSnap={setSnap} />
+          <OverlayBack overlay={overlay} />
+          <SheetCloseButton ref={closeButtonRef} label="Close player details" onClose={overlay.closeAll} />
 
-        <div className="pqv-scroll" ref={scrollRef}>
+          <div className="pqv-scroll" ref={scrollRef}>
 
-        <PlayerHeroHeader
-          playerId={identity.player_id}
-          name={name}
-          nameId="pqv-name"
-          contextLabel={identity.sourceLabel}
-          position={identity.position || resolved?.position}
-          team={identity.team || resolved?.team}
-          age={identity.age ?? resolved?.age ?? null}
-          tier={identity.tier}
-          score={isSim ? null : (identity.score ?? resolved?.value_score ?? null)}
-          gradeTile={isSim ? (sim?.heroGrade ?? null) : null}
-          valueNote={identity.value_note ?? resolved?.value_note}
-          valueLabel={identity.value_label ?? null}
-          avatarId={remote ? identity.player_id : null}
-          loadingIdentity={loading}
-          byeWeek={realWorld.showBye ? (resolved?.bye_week ?? null) : null}
-          onByeThisWeek={realWorld.showBye ? (resolved?.on_bye_this_week ?? false) : false}
-          unavailable={availability?.unavailable ?? false}
-          overallRating={overallRating}
-          overallRank={isSim ? null : identity.overall_rank}
-          positionRank={isSim ? null : identity.position_rank}
-          usageTrend={model?.usage_trend ?? null}
-          simTiles={sim?.heroTiles ?? null}
-          usageLoading={loading}
-          usageLocked={model?.usage_profile?.gated === true}
-          valueChart={asOf != null ? null : <PlayerValueHistory playerId={identity.player_id} bare />}
-          ovrChart={model && !isSim ? <SubRatingRow model={model} bare /> : null}
-          depthChartNote={realWorld.showDepthChartNote ? model?.depth_chart_note : null}
-          rookie={rookieBadge(bio)}
-          metaLine={sim?.headerMeta?.line ?? null}
-          teamLogo={sim?.headerMeta?.logo ?? null}
-        />
+          <PlayerHeroHeader
+            playerId={identity.player_id}
+            name={name}
+            nameId="pqv-name"
+            contextLabel={identity.sourceLabel}
+            position={identity.position || resolved?.position}
+            team={identity.team || resolved?.team}
+            age={identity.age ?? resolved?.age ?? null}
+            tier={identity.tier}
+            score={isSim ? null : (identity.score ?? resolved?.value_score ?? null)}
+            gradeTile={isSim ? (sim?.heroGrade ?? null) : null}
+            valueNote={identity.value_note ?? resolved?.value_note}
+            valueLabel={identity.value_label ?? null}
+            avatarId={remote ? identity.player_id : null}
+            loadingIdentity={loading}
+            byeWeek={realWorld.showBye ? (resolved?.bye_week ?? null) : null}
+            onByeThisWeek={realWorld.showBye ? (resolved?.on_bye_this_week ?? false) : false}
+            unavailable={availability?.unavailable ?? false}
+            overallRating={overallRating}
+            overallRank={isSim ? null : identity.overall_rank}
+            positionRank={isSim ? null : identity.position_rank}
+            usageTrend={model?.usage_trend ?? null}
+            simTiles={sim?.heroTiles ?? null}
+            usageLoading={loading}
+            usageLocked={model?.usage_profile?.gated === true}
+            valueChart={asOf != null ? null : <PlayerValueHistory playerId={identity.player_id} bare />}
+            ovrChart={model && !isSim ? <SubRatingRow model={model} bare /> : null}
+            depthChartNote={realWorld.showDepthChartNote ? model?.depth_chart_note : null}
+            rookie={rookieBadge(bio)}
+            metaLine={sim?.headerMeta?.line ?? null}
+            teamLogo={sim?.headerMeta?.logo ?? null}
+          />
 
-        {detail?.adp && detail.adp.adp != null ? (
-          <div className="text-xs px-1" style={{ color: "var(--color-text-secondary)" }} data-testid="pqv-adp">
-            {detail.adp.label} {detail.adp.adp.toFixed(1)}
-            {detail.adp.our_rank != null ? ` · our rank ${detail.adp.our_rank}` : ""}
-            {detail.adp.verdict ? ` · ${detail.adp.read}` : ""}
-            {detail.adp.source ? <AdpCredit asOf={detail.adp.source.as_of} /> : null}
-          </div>
-        ) : null}
-
-        <div className="pqv-signal-row">
-          {identity.opportunity_label ? <ToneBadge label={identity.opportunity_label} color={TAG_TONE_COLOR[opportunityLabelTone(identity.opportunity_label)]} size="xs" testId="pqv-opportunity-chip" /> : null}
-          {identity.tags?.length ? (
-            <>
-              <PlayerBadges badges={identity.tags.map((tag) => headerBadge(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
-              {identity.tags.filter((tag) => !headerBadge(tag)).map((tag) =>
-                tag.key === "owner" ? (
-                  // The owning fantasy team: a small "Owner" cue ahead of the (unaltered) team name so it never reads as a stray tag.
-                  <span key={tag.key} className="pqv-owner-tag" role="group" aria-label={`Owner: ${tag.label}`} data-testid="pqv-owner-tag">
-                    <span className="pqv-owner-label" aria-hidden="true">Owner</span>
-                    <ToneBadge label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
-                  </span>
-                ) : (
-                  <ToneBadge key={tag.key} label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
-                ),
-              )}
-            </>
-          ) : injury.label ? (
-            badgeFromInjury(injury.label) ? (
-              <PlayerBadges badges={[{ kind: badgeFromInjury(injury.label)!, detail: injury.label }]} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
-            ) : (
-              <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span>
-            )
+          {detail?.adp && detail.adp.adp != null ? (
+            <div className="text-xs px-1" style={{ color: "var(--color-text-secondary)" }} data-testid="pqv-adp">
+              {detail.adp.label} {detail.adp.adp.toFixed(1)}
+              {detail.adp.our_rank != null ? ` · our rank ${detail.adp.our_rank}` : ""}
+              {detail.adp.verdict ? ` · ${detail.adp.read}` : ""}
+              {detail.adp.source ? <AdpCredit asOf={detail.adp.source.as_of} /> : null}
+            </div>
           ) : null}
-          <BadgeLegendSheet open={legendOpen} onClose={() => setLegendOpen(false)} />
-          {/* Beginner-only "?" for the hero's Value / Overall / Tier labels (lib/experienceCopy.ts); renders nothing for advanced/unset. Inline at the end of the chip row with its text in a popover, so it never takes a row of its own. */}
-          <InfoMark
-            beginnerOnly
-            label={isSim ? "Overall and Tier" : "Value, Overall and Tier"}
-            lines={[
-              identity.score != null && !isSim ? BEGINNER_HELP.playerValue : null,
-              overallRating != null ? BEGINNER_HELP.overallRating : null,
-              identity.tier ? BEGINNER_HELP.playerTier : null,
-            ]}
-          />
-        </div>
-        <div className="pqv-peek-fold">
-        {/* coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt
-            make sense if he hasnt been playing much" — tier (season-long
-            value) and opportunity_label (right-now depth-chart read) can
-            legitimately disagree; this names the specific combination that
-            caused the confusion instead of leaving two silently
-            contradicting chips. */}
-        {tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label) ? (
-          <p className="pqv-tier-mismatch-note">{tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label)}</p>
-        ) : null}
-        {opportunityUsageCaption(identity.opportunity_label, model?.usage_trend ?? null) ? (
-          <p className="pqv-tier-mismatch-note">{opportunityUsageCaption(identity.opportunity_label, model?.usage_trend ?? null)}</p>
-        ) : null}
-        </div>
 
-        <ExplorerLeagueProvider leagueId={identity.leagueId}>
-          <Tabs
-            id="pqv"
-            // Not pinned: a pinned strip over the glass sheet clipped the rows scrolling under it and, with its
-            // tallest-tab minimum, left empty space under short tabs (coridian_ 2026-11-16, "tabs clip" / "wasted space").
-            sticky={false}
-            ariaLabel="Player sections"
-            tabs={orderPlayerSheetTabs([
-              {
-                key: "overview",
-                label: "Overview",
-                render: () => (
-                  <>
-                    {sim?.overview ?? null}
-                    {availability ? <AvailabilityBlock availability={availability} injuryItem={news?.injury_item ?? null} newsLoading={newsLoading} /> : null}
-                    {!isSim && remote && realWorld.showInjuryHistory ? <InjuryHistorySection record={injuryRecord} /> : null}
-                    {isSim && realWorld.showDepthChart && sim?.depthChart !== undefined ? <DepthChartSection chart={sim.depthChart} idPrefix="simpqv" /> : null}
-                    {!isSim && remote && realWorld.showDepthChart ? <DepthChartSection chart={depthChart} /> : null}
-                    {!loadError && remote && realWorld.showNews ? (
-                      <LatestNewsSection
-                        items={news ? news.items : null}
-                        hideItem={availability ? news?.injury_item ?? null : null}
-                        loading={newsLoading}
-                        playerId={identity.player_id}
-                        name={name}
-                        seeAllHref={identity.leagueId ? playerProfileNewsHref(identity.leagueId, identity.player_id, identity.leagueName || "") : undefined}
-                      />
-                    ) : null}
-                    <div className="pqv-body">
-                      {bodyGate ?? (
-                        <>
-                          {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
-                          <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} playerId={identity.player_id} />
-                        </>
-                      )}
-                    </div>
-                  </>
-                ),
-              },
-              ...(sim?.outlook || (remote && !isSim)
-                ? [
-                    {
-                      key: "outlook",
-                      label: "Outlook",
-                      render: () => (
-                        <div className="pqv-body">
-                          {sim?.outlook ?? null}
-                          {!isSim ? (bodyGate ?? <PlayerTrendsPanel playerId={identity.player_id} name={identity.name || "This player"} gradientId="pqv-weekly-fill" />) : null}
-                        </div>
-                      ),
-                    },
-                  ]
-                : []),
-              ...(remote || sim?.stats
-                ? [
-                    {
-                      key: "stats",
-                      label: "Stats",
-                      render: () => (
-                        <div className="pqv-body">
-                          {sim?.stats ?? null}
-                          {!remote ? null : bodyGate ?? (
-                            <>
-                              <PlayerUsageBlock profile={model?.usage_profile} position={stats?.position ?? identity.position} playerId={identity.player_id} />
-                              <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} playerId={identity.player_id} />
-                              {stats && stats.college.length > 0 ? (
-                                <section className="pqv-stat-season">
-                                  <h3>College</h3>
-                                  <StatGroup title="College Stats" items={stats.college} hideTitle />
-                                </section>
-                              ) : null}
-                            </>
-                          )}
-                        </div>
-                      ),
-                    },
-                  ]
-                : []),
-              ...(remote || sim?.profile
-                ? [
-                    {
-                      key: "profile",
-                      label: "Profile",
-                      render: () => (
-                        <div className="pqv-body">
-                          {sim?.profile ?? null}
-                          {!remote ? null : bodyGate ?? (
-                            <>
-                              {shownAwards.length > 0 ? <AwardsStrip awards={shownAwards} /> : null}
-                              {bio ? <BioGrid bio={pqvBioForContext(bio, isSim)} /> : null}
-                            </>
-                          )}
-                        </div>
-                      ),
-                    },
-                  ]
-                : []),
-              ...(sim?.scouting ? [{ key: "scouting", label: "Scouting", render: () => <>{sim.scouting}</> }] : []),
-              ...(sim?.history ? [{ key: "history", label: "History", render: () => <>{sim.history}</> }] : []),
-            ])}
-          />
-        </ExplorerLeagueProvider>
-
-        {identity.leagueId ? (
-          <div className="pqv-actions">
-            <PlayerLeagueActions
-              leagueId={identity.leagueId}
-              leagueName={identity.leagueName || ""}
-              playerId={identity.player_id}
-              sourceSurface="player_quick_view"
-              hideAddToTrade={(pathname ?? "").startsWith("/trade-analyzer")}
+          <div className="pqv-signal-row">
+            {identity.opportunity_label ? <ToneBadge label={identity.opportunity_label} color={TAG_TONE_COLOR[opportunityLabelTone(identity.opportunity_label)]} size="xs" testId="pqv-opportunity-chip" /> : null}
+            {identity.tags?.length ? (
+              <>
+                <PlayerBadges badges={identity.tags.map((tag) => headerBadge(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
+                {identity.tags.filter((tag) => !headerBadge(tag)).map((tag) =>
+                  tag.key === "owner" ? (
+                    // The owning fantasy team: a small "Owner" cue ahead of the (unaltered) team name so it never reads as a stray tag.
+                    <span key={tag.key} className="pqv-owner-tag" role="group" aria-label={`Owner: ${tag.label}`} data-testid="pqv-owner-tag">
+                      <span className="pqv-owner-label" aria-hidden="true">Owner</span>
+                      <ToneBadge label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
+                    </span>
+                  ) : (
+                    <ToneBadge key={tag.key} label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
+                  ),
+                )}
+              </>
+            ) : injury.label ? (
+              badgeFromInjury(injury.label) ? (
+                <PlayerBadges badges={[{ kind: badgeFromInjury(injury.label)!, detail: injury.label }]} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
+              ) : (
+                <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span>
+              )
+            ) : null}
+            <BadgeLegendSheet open={legendOpen} onClose={() => setLegendOpen(false)} />
+            {/* Beginner-only "?" for the hero's Value / Overall / Tier labels (lib/experienceCopy.ts); renders nothing for advanced/unset. Inline at the end of the chip row with its text in a popover, so it never takes a row of its own. */}
+            <InfoMark
+              beginnerOnly
+              label={isSim ? "Overall and Tier" : "Value, Overall and Tier"}
+              lines={[
+                identity.score != null && !isSim ? BEGINNER_HELP.playerValue : null,
+                overallRating != null ? BEGINNER_HELP.overallRating : null,
+                identity.tier ? BEGINNER_HELP.playerTier : null,
+              ]}
             />
-            {/* coridian_, 2026-10-19: "the pqv on the app has tabs that the
-                site doesnt. Thats a consistency error" — this is the real
-                product fix: a destination for mobile's Stats/Trends/
-                Schedule/Career/Model tabs, which this condensed modal
-                deliberately never carries (see this file's own header doc
-                comment). */}
-            <a
-              className="pqv-action-link"
-              href={`/players/${encodeURIComponent(identity.leagueId)}/${encodeURIComponent(
-                identity.player_id,
-              )}?name=${encodeURIComponent(identity.leagueName || "")}`}
-            >
-              Open Full Profile
-            </a>
-            <a
-              className="pqv-action-link"
-              href={`/player-compare/${encodeURIComponent(identity.leagueId)}?a=${encodeURIComponent(
-                identity.player_id,
-              )}&name=${encodeURIComponent(identity.leagueName || "")}`}
-            >
-              Compare this player
-            </a>
           </div>
-        ) : null}
-        {customSections ? null : <ValuesCredit className="text-center" freshness={["values", "injuries"]} />}
+          <div className="pqv-peek-fold">
+          {/* coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt
+              make sense if he hasnt been playing much" — tier (season-long
+              value) and opportunity_label (right-now depth-chart read) can
+              legitimately disagree; this names the specific combination that
+              caused the confusion instead of leaving two silently
+              contradicting chips. */}
+          {tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label) ? (
+            <p className="pqv-tier-mismatch-note">{tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label)}</p>
+          ) : null}
+          {opportunityUsageCaption(identity.opportunity_label, model?.usage_trend ?? null) ? (
+            <p className="pqv-tier-mismatch-note">{opportunityUsageCaption(identity.opportunity_label, model?.usage_trend ?? null)}</p>
+          ) : null}
+          </div>
+
+          <ExplorerLeagueProvider leagueId={identity.leagueId}>
+            <Tabs
+              id="pqv"
+              // Not pinned: a pinned strip over the glass sheet clipped the rows scrolling under it and, with its
+              // tallest-tab minimum, left empty space under short tabs (coridian_ 2026-11-16, "tabs clip" / "wasted space").
+              sticky={false}
+              ariaLabel="Player sections"
+              tabs={orderPlayerSheetTabs([
+                {
+                  key: "overview",
+                  label: "Overview",
+                  render: () => (
+                    <>
+                      {sim?.overview ?? null}
+                      {availability ? <AvailabilityBlock availability={availability} injuryItem={news?.injury_item ?? null} newsLoading={newsLoading} /> : null}
+                      {!isSim && remote && realWorld.showInjuryHistory ? <InjuryHistorySection record={injuryRecord} /> : null}
+                      {isSim && realWorld.showDepthChart && sim?.depthChart !== undefined ? <DepthChartSection chart={sim.depthChart} idPrefix="simpqv" /> : null}
+                      {!isSim && remote && realWorld.showDepthChart ? <DepthChartSection chart={depthChart} /> : null}
+                      {!loadError && remote && realWorld.showNews ? (
+                        <LatestNewsSection
+                          items={news ? news.items : null}
+                          hideItem={availability ? news?.injury_item ?? null : null}
+                          loading={newsLoading}
+                          playerId={identity.player_id}
+                          name={name}
+                          seeAllHref={identity.leagueId ? playerProfileNewsHref(identity.leagueId, identity.player_id, identity.leagueName || "") : undefined}
+                        />
+                      ) : null}
+                      <div className="pqv-body">
+                        {bodyGate ?? (
+                          <>
+                            {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
+                            <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} playerId={identity.player_id} />
+                          </>
+                        )}
+                      </div>
+                    </>
+                  ),
+                },
+                ...(sim?.outlook || (remote && !isSim)
+                  ? [
+                      {
+                        key: "outlook",
+                        label: "Outlook",
+                        render: () => (
+                          <div className="pqv-body">
+                            {sim?.outlook ?? null}
+                            {!isSim ? (bodyGate ?? <PlayerTrendsPanel playerId={identity.player_id} name={identity.name || "This player"} gradientId="pqv-weekly-fill" />) : null}
+                          </div>
+                        ),
+                      },
+                    ]
+                  : []),
+                ...(remote || sim?.stats
+                  ? [
+                      {
+                        key: "stats",
+                        label: "Stats",
+                        render: () => (
+                          <div className="pqv-body">
+                            {sim?.stats ?? null}
+                            {!remote ? null : bodyGate ?? (
+                              <>
+                                <PlayerUsageBlock profile={model?.usage_profile} position={stats?.position ?? identity.position} playerId={identity.player_id} />
+                                <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} playerId={identity.player_id} />
+                                {stats && stats.college.length > 0 ? (
+                                  <section className="pqv-stat-season">
+                                    <h3>College</h3>
+                                    <StatGroup title="College Stats" items={stats.college} hideTitle />
+                                  </section>
+                                ) : null}
+                              </>
+                            )}
+                          </div>
+                        ),
+                      },
+                    ]
+                  : []),
+                ...(remote || sim?.profile
+                  ? [
+                      {
+                        key: "profile",
+                        label: "Profile",
+                        render: () => (
+                          <div className="pqv-body">
+                            {sim?.profile ?? null}
+                            {!remote ? null : bodyGate ?? (
+                              <>
+                                {shownAwards.length > 0 ? <AwardsStrip awards={shownAwards} /> : null}
+                                {bio ? <BioGrid bio={pqvBioForContext(bio, isSim)} /> : null}
+                              </>
+                            )}
+                          </div>
+                        ),
+                      },
+                    ]
+                  : []),
+                ...(sim?.scouting ? [{ key: "scouting", label: "Scouting", render: () => <>{sim.scouting}</> }] : []),
+                ...(sim?.history ? [{ key: "history", label: "History", render: () => <>{sim.history}</> }] : []),
+              ])}
+            />
+          </ExplorerLeagueProvider>
+
+          {identity.leagueId ? (
+            <div className="pqv-actions">
+              <PlayerLeagueActions
+                leagueId={identity.leagueId}
+                leagueName={identity.leagueName || ""}
+                playerId={identity.player_id}
+                sourceSurface="player_quick_view"
+                hideAddToTrade={(pathname ?? "").startsWith("/trade-analyzer")}
+              />
+              {/* coridian_, 2026-10-19: "the pqv on the app has tabs that the
+                  site doesnt. Thats a consistency error" — this is the real
+                  product fix: a destination for mobile's Stats/Trends/
+                  Schedule/Career/Model tabs, which this condensed modal
+                  deliberately never carries (see this file's own header doc
+                  comment). */}
+              <a
+                className="pqv-action-link"
+                href={`/players/${encodeURIComponent(identity.leagueId)}/${encodeURIComponent(
+                  identity.player_id,
+                )}?name=${encodeURIComponent(identity.leagueName || "")}`}
+              >
+                Open Full Profile
+              </a>
+              <a
+                className="pqv-action-link"
+                href={`/player-compare/${encodeURIComponent(identity.leagueId)}?a=${encodeURIComponent(
+                  identity.player_id,
+                )}&name=${encodeURIComponent(identity.leagueName || "")}`}
+              >
+                Compare this player
+              </a>
+            </div>
+          ) : null}
+          {customSections ? null : <ValuesCredit className="text-center" freshness={["values", "injuries"]} />}
+          </div>
         </div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 }
 
