@@ -735,14 +735,6 @@ export function GmPlanContent({
 
       {tab === "overview" ? (
         <>
-          {!planGate ? (
-            <StatStrip
-              columns={3}
-              dense
-              items={headerChips.map((chip) => ({ glyph: HEADER_GLYPH[chip.key], label: chip.label, value: chip.value, note: chip.note }))}
-            />
-          ) : null}
-
           {teamStance ? (
             <TeamSituationCard
               stance={stance}
@@ -750,6 +742,14 @@ export function GmPlanContent({
               banner={banner}
               pastDeadline={pastDeadline}
               tradeHubHref={tradeHubHref}
+            />
+          ) : null}
+
+          {!planGate ? (
+            <StatStrip
+              columns={3}
+              dense
+              items={headerChips.map((chip) => ({ glyph: HEADER_GLYPH[chip.key], label: chip.label, value: chip.value, note: chip.note }))}
             />
           ) : null}
 

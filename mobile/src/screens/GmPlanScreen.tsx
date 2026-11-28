@@ -455,12 +455,6 @@ export default function GmPlanScreen({ route, navigation }: Props) {
 
         {tab === 'overview' ? (
           <>
-            {!gateNotice ? (
-              <DashboardStatRow
-                dense
-                items={headerChips.map((c) => ({ label: c.label, icon: HEADER_ICON[c.key], value: c.value, note: c.note }))}
-              />
-            ) : null}
             <CompactModule
               id="gmplan.situation"
               title="Team Situation"
@@ -534,6 +528,12 @@ export default function GmPlanScreen({ route, navigation }: Props) {
             </View>
             </CompactModule>
 
+            {!gateNotice ? (
+              <DashboardStatRow
+                dense
+                items={headerChips.map((c) => ({ label: c.label, icon: HEADER_ICON[c.key], value: c.value, note: c.note }))}
+              />
+            ) : null}
             {statTiles.length > 0 ? (
               <DashboardStatRow
                 dense
