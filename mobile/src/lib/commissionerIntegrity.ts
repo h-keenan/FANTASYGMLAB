@@ -272,10 +272,12 @@ export const VETO_BAND_LABEL: Record<VetoBand, string> = {
   outrage: "Outrage-level: review before it processes",
 };
 
-/** Same fixed semantic tones as the integrity view; no new colors. */
+/**
+ * Same fixed semantic tones as the integrity view; no new colors. A verdict is never red (docs/ui-patterns.md,
+ * "Verdict colours"), so the worst band ("outrage") reads the warning tone, same as "lopsided".
+ */
 export function vetoBandTone(band: VetoBand): IntegrityTone {
-  if (band === "outrage") return "danger";
-  if (band === "lopsided") return "warning";
+  if (band === "outrage" || band === "lopsided") return "warning";
   if (band === "fair") return "success";
   return "muted";
 }

@@ -97,7 +97,9 @@ test('veto bands use the same fixed tones as the integrity view', () => {
   assert.equal(vetoBandTone('fair'), 'success');
   assert.equal(vetoBandTone('explainable'), 'muted');
   assert.equal(vetoBandTone('lopsided'), 'warning');
-  assert.equal(vetoBandTone('outrage'), 'danger');
+  // A verdict is never red: the worst band reads the warning tone (docs/ui-patterns.md, "Verdict colours").
+  assert.equal(vetoBandTone('outrage'), 'warning');
+  for (const band of ['fair', 'explainable', 'lopsided', 'outrage'] as const) assert.notEqual(vetoBandTone(band), 'danger');
 });
 
 test('veto copy helpers label postures and format numbers', () => {

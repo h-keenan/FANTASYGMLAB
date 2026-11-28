@@ -134,4 +134,33 @@ describe("TradeHistoryContent", () => {
     expect(screen.getByText("Didn't make it")).toBeInTheDocument();
     expect(screen.queryByText("This trade has worked out")).not.toBeInTheDocument();
   });
+
+  it("shows a verdict badge, the value delta number, and picks as chips on the collapsed card", () => {
+    const base = outcome({});
+    render(
+      <TradeHistoryContent
+        data={{
+          ok: true,
+          outcomes: [
+            outcome({
+              trade_summary: { ...base.trade_summary, send: [{ name: "2027 Round 1", position: "" }, ...base.trade_summary.send] },
+              result_summary: {
+                status: "ready",
+                reason: "",
+                verdict: "worked_out",
+                verdict_label: "Worked out",
+                confidence: "high",
+                days_since_trade: 35,
+                production: { net_points_ppr: 21, avg_net_per_week: 4.2, weeks_counted: 5 },
+                value: { sent_delta_pct: -2, received_delta_pct: 10, net_delta_pct: 12 },
+              },
+            }),
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByTestId("trade-verdict-badge")).toHaveTextContent("Worked out");
+    expect(screen.getByTestId("trade-value-delta")).toHaveTextContent("+12%");
+    expect(screen.getByText("2027 Round 1")).toBeInTheDocument();
+  });
 });
