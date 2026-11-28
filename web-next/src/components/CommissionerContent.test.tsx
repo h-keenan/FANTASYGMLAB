@@ -54,6 +54,18 @@ describe("CommissionerContent", () => {
     expect(screen.getByText("Alpha")).toBeTruthy();
   });
 
+  it("keeps the summary to one line with the caveat and limits behind the info mark, and shows team avatars rows", async () => {
+    vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(body());
+    render(<CommissionerContent leagueId="L1" leagueName="My League" />);
+    await screen.findByText("Tanker");
+    expect(screen.getByTestId("integrity-summary").textContent).toBe("After 6 weeks: 1 team worth a look.");
+    expect(screen.queryByText("Sleeper does not say who was injured.")).toBeNull();
+    expect(screen.getByRole("button", { name: /About what this can and can't tell you/i })).toBeTruthy();
+    expect(screen.queryByText("What this can and can’t tell you")).toBeNull();
+    expect(screen.getByTestId("integrity-team-6")).toBeTruthy();
+    expect(screen.getByText("5 of 6 weeks flagged", { exact: false })).toBeTruthy();
+  });
+
   it("re-requests with the draft-order rule the commissioner picks", async () => {
     vi.mocked(api.getCommissionerIntegrity).mockResolvedValue(body());
     render(<CommissionerContent leagueId="L1" leagueName="My League" />);

@@ -7,6 +7,7 @@ import {
   flagText,
   gapLabel,
   gapTone,
+  infoText,
   lineupsSummaryLine,
   normalizeCommissionerLineups,
   setVsBestLine,
@@ -47,6 +48,14 @@ test('flag and swap text', () => {
     swapLine({ slot: 'RB', start: { player_id: '1', name: 'Bench Guy', position: 'RB', team: 'BUF', points: 12 }, over: null, over_reason: 'empty_slot', gain: 12 }),
     'RB: Start Bench Guy over an empty slot (+12.0)',
   );
+});
+
+test('locked hurt starters are info notes, not flags', () => {
+  assert.equal(infoText({ kind: 'left_game', label: 'Left game (injury)', player: 'J. Smith', slot: 'WR' }), 'Left game (injury): J. Smith');
+  const n = normalizeCommissionerLineups({ ok: true, teams: [{ roster_id: '2', info: [{ kind: 'left_game', label: 'Left game (injury)', player: 'J. Smith', slot: 'WR' }] }, { roster_id: '3' }] });
+  assert.equal(n.teams[0].info?.length, 1);
+  assert.equal(n.teams[0].flags.length, 0);
+  assert.equal(n.teams[1].info?.length, 0);
 });
 
 test('summary line and normalizer', () => {

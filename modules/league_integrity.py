@@ -798,8 +798,10 @@ def build_league_integrity(
         ))
     order = {BAND_STRONG: 0, BAND_LOOK: 1, BAND_FINE: 2, BAND_NOT_ENOUGH: 3}
     teams.sort(key=lambda t: (order[t["band"]], -t["score"], t["team_name"]))
+    avatars = {str(rid): ((p or {}).get("avatar_url") or None) for rid, p in profiles.items()}
     for t in teams:
         base["summary"][t["band"]] += 1
+        t["avatar_url"] = avatars.get(str(t["roster_id"]))
 
     result = {
         **base,
@@ -810,6 +812,8 @@ def build_league_integrity(
         "collusion": collusion_pairs(legs, team_names),
         "inactive": _inactive_managers(facts, transactions, team_names, owner_names, played_weeks),
     }
+    for m in result["inactive"]:
+        m["avatar_url"] = avatars.get(str(m["roster_id"]))
     if len(played_weeks) < MIN_WEEKS_FOR_BAND:
         result["reason"] = "not_enough_weeks"
     return result

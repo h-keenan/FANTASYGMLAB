@@ -8,6 +8,7 @@ import { TeamNameLink } from "@/components/TeamNameLink";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ExpandRow, ExpandRowGroup } from "@/components/ui/ExpandRow";
 import { api } from "@/lib/api";
@@ -17,6 +18,7 @@ import {
   formatPoints,
   gapLabel,
   gapTone,
+  infoText,
   lineupsReasonMessage,
   lineupsSummaryLine,
   setVsBestLine,
@@ -32,6 +34,8 @@ import {
  * from modules/commissioner_lineups.py (the Matchup engine's projections); nothing is computed here. A big gap is a
  * prompt to look, never a verdict, so tones are warning/muted, never red. Mobile twin: components/LineupCheck.tsx.
  */
+
+const LINEUP_CAVEAT = "Each team's set lineup vs its best lineup this week. A big gap is a prompt to look, not a verdict.";
 
 const TONE_COLOR: Record<LineupTone, string> = {
   warning: "var(--color-warning)",
@@ -56,6 +60,9 @@ function TeamRow({ team, leagueId, leagueName }: { team: LineupCheckTeam; league
           {team.possible_tanking ? <ToneBadge label="Possible tanking" color={TONE_COLOR.warning} size="xs" /> : null}
           {team.flags.map((f, i) => (
             <ToneBadge key={`${f.kind}-${i}`} label={flagText(f)} color={TONE_COLOR[flagTone(f.kind)]} size="xs" />
+          ))}
+          {(team.info ?? []).map((n, i) => (
+            <ToneBadge key={`${n.kind}-${i}`} label={infoText(n)} color={TONE_COLOR.muted} size="xs" />
           ))}
           {team.locked_count ? <ToneBadge label={`${team.locked_count} locked`} color={TONE_COLOR.muted} size="xs" /> : null}
         </>
@@ -110,28 +117,17 @@ export function LineupCheckView({ data, leagueId, leagueName }: { data: Commissi
   if (data.reason) return <EmptyState title="Nothing to check yet" subtitle={lineupsReasonMessage(data.reason)} />;
   return (
     <>
-      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="lineup-summary">
-        {lineupsSummaryLine(data)}
-      </p>
+      <div className="flex items-center">
+        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="lineup-summary">
+          {lineupsSummaryLine(data)}
+        </p>
+        <InfoMark label="what this can and can't tell you" lines={[LINEUP_CAVEAT, ...(data.limits ?? [])]} />
+      </div>
       <ExpandRowGroup accent={TONE_COLOR.warning} testId="lineup-teams">
         {data.teams.map((t) => (
           <TeamRow key={t.roster_id} team={t} leagueId={leagueId} leagueName={leagueName} />
         ))}
       </ExpandRowGroup>
-      {data.limits?.length ? (
-        <details className="glass-surface p-4">
-          <summary className="text-sm font-bold cursor-pointer" style={{ color: "var(--color-text-primary)" }}>
-            What this can and can&rsquo;t tell you
-          </summary>
-          <div className="flex flex-col gap-2 mt-3">
-            {data.limits.map((limit) => (
-              <IconRow key={limit} icon="info" color="var(--color-text-muted)" textClassName="text-xs">
-                {limit}
-              </IconRow>
-            ))}
-          </div>
-        </details>
-      ) : null}
     </>
   );
 }
@@ -155,7 +151,7 @@ export function LineupCheck({ leagueId, leagueName, lens }: { leagueId: string; 
   if (!state.data || state.data.is_premium === false) return null;
   return (
     <section className="flex flex-col gap-3" aria-label="Lineup check" data-testid="lineup-check">
-      <SectionHeading note="Each team's set lineup vs its best lineup this week. A big gap is a prompt to look, not a verdict.">Lineup check</SectionHeading>
+      <SectionHeading>Lineup check</SectionHeading>
       <LineupCheckView data={state.data} leagueId={leagueId} leagueName={leagueName} />
     </section>
   );

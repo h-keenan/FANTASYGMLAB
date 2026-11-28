@@ -7,9 +7,12 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AccentCard from '../components/AccentCard';
+import { ExpandRow, ExpandRowGroup } from '../components/ExpandRow';
+import { Collapse } from '../components/Presence';
+import InfoMark from '../components/InfoMark';
+import TeamAvatar from '../components/TeamAvatar';
 import AppText from '../components/AppText';
 import { SkeletonList } from '../components/Skeleton';
-import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
@@ -33,6 +36,8 @@ import {
   calendarLines,
   integrityReasonMessage,
   integritySummaryLine,
+  INTEGRITY_CAVEAT,
+  weeksFlaggedLine,
   restSummary,
   splitTeams,
   type CommissionerIntegrityResponse,
@@ -49,7 +54,6 @@ import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { Collapse } from '../components/Presence';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Commissioner'>;
 
@@ -204,7 +208,17 @@ function EfficiencyBars({ team, colors, styles }: { team: IntegrityTeam; colors:
   );
 }
 
-function TeamCard({
+/** The grouped surface every flagged-item list shares (one card, hairline dividers, one row per team or pair). */
+function IntegrityRows({ children, accent, testID }: { children: React.ReactNode; accent: string; testID?: string }) {
+  return (
+    <ExpandRowGroup accent={accent} testID={testID}>
+      {children}
+    </ExpandRowGroup>
+  );
+}
+
+/** One team: avatar, name, "n of m weeks flagged", a band badge; tapping opens the evidence, the weekly bars and the innocent explanations. */
+function TeamRow({
   leagueId,
   leagueName,
   team,
@@ -219,50 +233,32 @@ function TeamCard({
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const [open, setOpen] = useState(team.band === 'strong');
   const expandable = team.band === 'strong' || team.band === 'worth_a_look';
+  const interpretation = INTERPRETATION_LABEL[team.interpretation];
+  const caption = [team.owner_name, weeksFlaggedLine(team)].filter(Boolean).join(' · ');
   return (
-    <AccentCard accent={toneColor(team.band)}>
-      <View style={[styles.cardHead, styles.cardHeadCenter]}>
-        {team.weeks.evaluated ? (
-          <CircularProgressRing
-            percent={Math.round((team.weeks.flagged / team.weeks.evaluated) * 100)}
-            size={48}
-            strokeWidth={5}
-            color={toneColor(team.band)}
-            valueLabel={`${team.weeks.flagged}/${team.weeks.evaluated}`}
-            valueFontScale={0.27}
-          />
-        ) : null}
-        <View style={styles.flex}>
-          <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={team.roster_id} name={team.team_name} textStyle={styles.teamName} />
-          <AppText style={styles.muted}>
-            {team.owner_name}
-            {team.weeks.evaluated ? ` · ${team.weeks.flagged} of ${team.weeks.evaluated} weeks flagged` : ''}
-          </AppText>
-        </View>
-        <ToneBadge label={BAND_LABEL[team.band]} color={toneColor(team.band)} />
-      </View>
+    <ExpandRow
+      testID={`integrity-team-${team.roster_id}`}
+      label={`${team.team_name}, ${BAND_LABEL[team.band]}`}
+      // team-tap-exempt: the whole row is one expand toggle; the team sheet opens from the "Open team" link inside it
+      leading={<TeamAvatar avatarId={team.avatar_url} name={team.team_name} size={32} />}
+      title={team.team_name}
+      caption={caption || undefined}
+      chips={expandable && interpretation ? <ToneBadge label={`${interpretation} · ${CONFIDENCE_LABEL[team.confidence]}`} color={colors.textTertiary} /> : undefined}
+      action={<ToneBadge label={BAND_LABEL[team.band]} color={toneColor(team.band)} />}
+      defaultOpen={team.band === 'strong'}
+    >
       {expandable ? (
         <>
-          {INTERPRETATION_LABEL[team.interpretation] ? (
-            <AppText style={styles.body}>
-              {INTERPRETATION_LABEL[team.interpretation]} · {CONFIDENCE_LABEL[team.confidence]}
-            </AppText>
-          ) : null}
-          <PressableScale onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
-            <AppText style={styles.link}>{open ? 'Hide the evidence' : 'Show the evidence'}</AppText>
-          </PressableScale>
-          <Collapse open={open}>
-            <>
-              <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} styles={styles} icon="alert" color={toneColor(team.band)} />
-              <EfficiencyBars team={team} colors={colors} styles={styles} />
-              <Bullets title="Could be innocent" items={team.innocent_explanations} styles={styles} icon="info" color={colors.accent} />
-            </>
-          </Collapse>
+          <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={team.roster_id} name={team.team_name} ownerName={team.owner_name} avatarId={team.avatar_url} textStyle={styles.teamLink}>
+            Open team
+          </TeamNameLink>
+          <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} styles={styles} icon="alert" color={toneColor(team.band)} />
+          <EfficiencyBars team={team} colors={colors} styles={styles} />
+          <Bullets title="Could be innocent" items={team.innocent_explanations} styles={styles} icon="info" color={colors.accent} />
         </>
       ) : null}
-    </AccentCard>
+    </ExpandRow>
   );
 }
 
@@ -288,26 +284,34 @@ function IntegrityBody({
   const [showRest, setShowRest] = useState(false);
   return (
     <View style={styles.stack}>
-      <AppText style={styles.body}>{integritySummaryLine(data)}</AppText>
+      <View style={styles.summaryRow}>
+        <AppText style={[styles.body, styles.flex]}>{integritySummaryLine(data)}</AppText>
+        <InfoMark label="what this can and can't tell you" lines={[INTEGRITY_CAVEAT, ...(data.limits ?? [])]} />
+      </View>
       <CalendarCard calendar={data.calendar} accent={colors.accent} styles={styles} />
       <View style={styles.bullets}>
-        <AppText style={styles.bulletsTitle}>How is your draft order set?</AppText>
+        <View style={styles.summaryRow}>
+          <AppText style={styles.bulletsTitle}>How is your draft order set?</AppText>
+          <InfoMark
+            label="the draft order rule"
+            lines={['Worst record means the worst team picks first; Lottery covers any other order. Sleeper does not publish this, so it changes how a flagged team is described, not the lineup math.']}
+          />
+        </View>
         <SegmentedTabBar
           options={DRAFT_ORDER_OPTIONS.map((o) => ({ key: o.value, label: o.label }))}
           active={draftOrder}
           onChange={onDraftOrder}
         />
-        <AppText style={styles.muted}>
-          Sleeper does not publish this, so it changes how a flagged team is described, not the lineup math.
-        </AppText>
       </View>
 
       {flagged.length ? (
         <View style={styles.stack}>
           <SectionHeading title="Worth a look" />
-          {flagged.map((team) => (
-            <TeamCard key={team.roster_id} leagueId={leagueId} leagueName={leagueName} team={team} toneColor={toneColor} colors={colors} styles={styles} />
-          ))}
+          <IntegrityRows accent={colors.warning} testID="integrity-flagged">
+            {flagged.map((team) => (
+              <TeamRow key={team.roster_id} leagueId={leagueId} leagueName={leagueName} team={team} toneColor={toneColor} colors={colors} styles={styles} />
+            ))}
+          </IntegrityRows>
         </View>
       ) : null}
 
@@ -315,20 +319,29 @@ function IntegrityBody({
         <View style={styles.stack}>
           <SectionHeading
             title="Repeated trades worth a look"
-            caption="Same two managers, repeated trades: one-sided on value (picks priced like the Trade Analyzer), assets going back and forth, or several trades in one week. A prompt to look, not a verdict."
+            info={
+              <InfoMark
+                label="repeated trades"
+                lines={['Same two managers, repeated trades: one-sided on value (picks priced like the Trade Analyzer), assets going back and forth, or several trades in one week. A prompt to look, not a verdict.']}
+              />
+            }
           />
-          {data.collusion.map((pair) => (
-            <CollusionCard key={pair.roster_ids.join('-')} pair={pair} toneColor={toneColor} accent={colors.accent} styles={styles} />
-          ))}
+          <IntegrityRows accent={colors.warning} testID="integrity-collusion">
+            {data.collusion.map((pair) => (
+              <CollusionRow key={pair.roster_ids.join('-')} pair={pair} teams={data.teams} toneColor={toneColor} accent={colors.accent} styles={styles} />
+            ))}
+          </IntegrityRows>
         </View>
       ) : null}
 
       {data.inactive.length ? (
         <View style={styles.stack}>
           <SectionHeading title="Possibly inactive" />
-          {data.inactive.map((m) => (
-            <InactiveCard key={m.roster_id} leagueId={leagueId} leagueName={leagueName} manager={m} accent={colors.warning} infoColor={colors.accent} styles={styles} />
-          ))}
+          <IntegrityRows accent={colors.warning} testID="integrity-inactive">
+            {data.inactive.map((m) => (
+              <InactiveRow key={m.roster_id} leagueId={leagueId} leagueName={leagueName} manager={m} teams={data.teams} accent={colors.warning} infoColor={colors.accent} styles={styles} />
+            ))}
+          </IntegrityRows>
         </View>
       ) : null}
 
@@ -347,13 +360,15 @@ function IntegrityBody({
               </PressableScale>
             </View>
           </AccentCard>
-          {showRest
-            ? rest.map((team) => <TeamCard key={team.roster_id} leagueId={leagueId} leagueName={leagueName} team={team} toneColor={toneColor} colors={colors} styles={styles} />)
-            : null}
+          <Collapse open={showRest}>
+            <IntegrityRows accent={colors.success} testID="integrity-rest">
+              {rest.map((team) => (
+                <TeamRow key={team.roster_id} leagueId={leagueId} leagueName={leagueName} team={team} toneColor={toneColor} colors={colors} styles={styles} />
+              ))}
+            </IntegrityRows>
+          </Collapse>
         </View>
       ) : null}
-
-      {data.limits?.length ? <Bullets title="What this can and can't tell you" items={data.limits} styles={styles} icon="info" color={colors.textTertiary} /> : null}
     </View>
   );
 }
@@ -418,38 +433,59 @@ function CalendarCard({
   );
 }
 
-function CollusionCard({
+/** Both teams of a repeated-trade pair, overlapped (a team missing from the list falls back to initials). */
+function PairAvatars({ pair, teams }: { pair: IntegrityCollusionPair; teams: IntegrityTeam[] }) {
+  const names = [pair.beneficiary_name, pair.giver_name];
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      {pair.roster_ids.slice(0, 2).map((rid, i) => {
+        const t = teams.find((x) => x.roster_id === rid);
+        return (
+          <View key={rid} style={{ marginLeft: i ? -10 : 0 }}>
+            {/* team-tap-exempt: decorative mark inside the row's expand toggle */}
+            <TeamAvatar avatarId={t?.avatar_url} name={t?.team_name ?? names[i]} size={28} />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function CollusionRow({
   pair,
+  teams,
   toneColor,
   accent,
   styles,
 }: {
   pair: IntegrityCollusionPair;
+  teams: IntegrityTeam[];
   toneColor: (band: IntegrityBand) => string;
   accent: string;
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <AccentCard accent={toneColor(pair.band)}>
-      <View style={styles.cardHead}>
-        <AppText style={[styles.teamName, styles.flex]}>
-          {pair.headline}
-        </AppText>
-        <ToneBadge label={BAND_LABEL[pair.band]} color={toneColor(pair.band)} />
-      </View>
-      <AppText style={styles.body}>
-        {pair.summary} · {CONFIDENCE_LABEL[pair.confidence]}
-      </AppText>
+    <ExpandRow
+      testID={`integrity-pair-${pair.roster_ids.join('-')}`}
+      label={`${pair.headline}, repeated trades`}
+      // team-tap-exempt: the whole row is one expand toggle; the pair's teams open from the Teams tab
+      leading={<PairAvatars pair={pair} teams={teams} />}
+      title={pair.headline}
+      caption={`${pair.summary} · ${CONFIDENCE_LABEL[pair.confidence]}`}
+      action={<ToneBadge label={BAND_LABEL[pair.band]} color={toneColor(pair.band)} />}
+      defaultOpen
+    >
       <Bullets title="Evidence" items={pair.evidence} styles={styles} icon="alert" color={toneColor(pair.band)} />
       <Bullets title="Could be innocent" items={pair.innocent_explanations} styles={styles} icon="info" color={accent} />
-    </AccentCard>
+    </ExpandRow>
   );
 }
 
-function InactiveCard({
+function InactiveRow({
   leagueId,
   leagueName,
   manager,
+  teams,
   accent,
   infoColor,
   styles,
@@ -457,16 +493,29 @@ function InactiveCard({
   leagueId: string;
   leagueName: string;
   manager: IntegrityInactiveManager;
+  teams: IntegrityTeam[];
   accent: string;
   infoColor: string;
   styles: ReturnType<typeof createStyles>;
 }) {
+  const avatar = manager.avatar_url ?? teams.find((t) => t.roster_id === manager.roster_id)?.avatar_url;
   return (
-    <AccentCard accent={accent}>
-      <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={manager.roster_id} name={manager.team_name} textStyle={styles.teamName} />
+    <ExpandRow
+      testID={`integrity-inactive-${manager.roster_id}`}
+      label={`${manager.team_name}, possibly inactive`}
+      // team-tap-exempt: the whole row is one expand toggle; the team sheet opens from the "Open team" link inside it
+      leading={<TeamAvatar avatarId={avatar} name={manager.team_name} size={32} />}
+      title={manager.team_name}
+      caption={manager.owner_name || undefined}
+      action={<ToneBadge label="Possibly inactive" color={accent} />}
+      defaultOpen
+    >
+      <TeamNameLink leagueId={leagueId} leagueName={leagueName} rosterId={manager.roster_id} name={manager.team_name} ownerName={manager.owner_name} avatarId={avatar} textStyle={styles.teamLink}>
+        Open team
+      </TeamNameLink>
       <Bullets title="Evidence" items={manager.evidence} styles={styles} icon="clock" color={accent} />
       <Bullets title="Could be innocent" items={manager.innocent_explanations} styles={styles} icon="info" color={infoColor} />
-    </AccentCard>
+    </ExpandRow>
   );
 }
 
@@ -478,6 +527,7 @@ function createStyles(colors: ThemeColors) {
     stack: { gap: spacing.md },
     flex: { flex: 1 },
     cardHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+    teamLink: { fontSize: 14, fontWeight: '800', color: colors.accent },
     teamName: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
     body: { fontSize: 15.5, color: colors.textSecondary },
     muted: { fontSize: 13.5, color: colors.textTertiary },
@@ -485,6 +535,7 @@ function createStyles(colors: ThemeColors) {
     bullets: { gap: spacing.xs },
     bulletsTitle: { fontSize: 12.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: colors.textTertiary },
     cardHeadCenter: { alignItems: 'center' },
+    summaryRow: { flexDirection: 'row', alignItems: 'center' },
     tileRow: { flexDirection: 'row', gap: spacing.sm },
     tile: { minWidth: 0, flexBasis: 0, flexGrow: 1 },
     progressTrack: { height: 6, width: '100%', backgroundColor: colors.border, overflow: 'hidden' },

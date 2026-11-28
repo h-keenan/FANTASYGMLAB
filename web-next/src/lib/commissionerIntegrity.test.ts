@@ -15,6 +15,8 @@ import {
   vetoStatusMessage,
   vetoWorstPositionLine,
   bandTone,
+  INTEGRITY_CAVEAT,
+  weeksFlaggedLine,
   integrityReasonMessage,
   calendarLines,
   integritySummaryLine,
@@ -40,7 +42,8 @@ describe("commissioner integrity presentation", () => {
   it("maps bands to the fixed semantic tones", () => {
     expect(bandTone("fine")).toBe("success");
     expect(bandTone("worth_a_look")).toBe("warning");
-    expect(bandTone("strong")).toBe("danger");
+    // A signal is a prompt to look, never a red verdict.
+    expect(bandTone("strong")).toBe("warning");
     expect(bandTone("not_enough_data")).toBe("muted");
   });
 
@@ -49,8 +52,14 @@ describe("commissioner integrity presentation", () => {
     const { flagged, rest } = splitTeams(teams);
     expect(flagged.map((t) => t.roster_id)).toEqual([1, 3]);
     expect(rest.map((t) => t.roster_id)).toEqual([2, 4]);
-    expect(integritySummaryLine(resp(teams))).toBe("After 5 weeks: 2 teams worth a look. These are prompts to check, not conclusions.");
+    expect(integritySummaryLine(resp(teams))).toBe("After 5 weeks: 2 teams worth a look.");
+    expect(INTEGRITY_CAVEAT).toBe("These are prompts to check, not conclusions.");
     expect(integritySummaryLine(resp([team("fine")]))).toContain("No team stands out");
+  });
+
+  it("words the weeks-flagged caption", () => {
+    expect(weeksFlaggedLine(team("strong"))).toBe("0 of 5 weeks flagged");
+    expect(weeksFlaggedLine({ weeks: { evaluated: 0, flagged: 0, longest_streak: 0, latest_streak: 0 } })).toBe("");
   });
 
   it("explains every empty-state reason, with an honest fallback", () => {
