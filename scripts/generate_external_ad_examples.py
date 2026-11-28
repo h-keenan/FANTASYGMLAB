@@ -45,6 +45,10 @@ def examples() -> dict:
         A.load_rating_snapshots = lambda days: {
             "latest": F.LATEST_RATINGS, "baseline": F.BASELINE_RATINGS, "latest_date": "2026-12-07", "baseline_date": "2026-11-30",
         }
+        A.load_identity_sources = lambda: (F.ID_DUMP, F.DP_ROWS, None)
+        A.load_official_reports = lambda season: (F.OFFICIAL_ROWS, None)
+        A.load_status_events = lambda season: (F.STATUS_EVENTS, None)
+        A.load_news_reports = lambda db, now: (F.NEWS_REPORTS, None)
         A.clock_info = _clock()
         n = F.NOW
         return {

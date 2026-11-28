@@ -20,6 +20,16 @@ ENVELOPE_KEYS = {"status", "unavailable_reason", "generated_at", "season", "phas
 REPO = Path(__file__).resolve().parent.parent
 
 
+@pytest.fixture(autouse=True)
+def _evidence_providers_use_fixtures(monkeypatch):
+    """Evidence sources are real files/stores in production; tests never read them."""
+
+    monkeypatch.setattr(A, "load_identity_sources", lambda: (F.ID_DUMP, F.DP_ROWS, None))
+    monkeypatch.setattr(A, "load_official_reports", lambda season: (F.OFFICIAL_ROWS, None))
+    monkeypatch.setattr(A, "load_status_events", lambda season: (F.STATUS_EVENTS, None))
+    monkeypatch.setattr(A, "load_news_reports", lambda db, now: (F.NEWS_REPORTS, None))
+
+
 def _assert_contract(payload):
     assert ENVELOPE_KEYS <= payload.keys()
     assert payload["count"] == len(payload["items"])

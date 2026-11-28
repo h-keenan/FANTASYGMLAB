@@ -1,20 +1,77 @@
-# External read-only API contract
+# External read-only API contract (`/v1/external/*`)
 
-Phase 1 of coridian_'s external content-posting bot wish list: real API-key
-auth (not a per-user Supabase session — a bot has no user account) plus a
-documented weekly-projections endpoint. Phase 2 (structured news evidence
-with a conservative retraction/supersession signal), Phase 3 (persisted
-rating-change history), and Phase 4 (identity/completeness/evidence
-hardening of the Phase 1 projections endpoints, described in detail below)
-are also covered — this is now the complete wish list. The weekly recap
-(completed-week actual production) followed once per-week box scores were
-retained; see "Weekly recap" below.
+Complete contract for every deployed `/v1/external/*` route: the player-level feeds (projections, news,
+rating history, background, weekly results), the seasonal content endpoints (trades, plan, playoff SOS,
+waivers, lineup, value changes, rookies, changes, roster construction, demo scenarios) and, new in
+`ad-api-v1` (2026-11-28), the **canonical identity**, **availability provenance** and **claim evidence**
+blocks that let the desktop advertising pipeline decide what it may publish automatically.
 
-All `/v1/external/*` routes live in `services/mobile_api_service.py` and are
-served by the same `fantasygm-lab-mobile-api` Render service as the mobile
-app's own `/v1/*` routes. They never touch user accounts, leagues, or
-billing — only the shared, public player-projections data every signed-in
-caller already sees via `/v1/players/{id}/schedule`.
+All `/v1/external/*` routes live in `services/mobile_api_service.py` and are served by the same
+`fantasygm-lab-mobile-api` Render service as the mobile app's own `/v1/*` routes. They never touch user
+accounts, leagues, or billing, and read no private data. History: Phase 1 projections, Phase 2 news
+evidence, Phase 3 rating history, Phase 4 projections hardening, then background, weekly recap, news
+feed, trades and the adaptive advertising API (see "Change history").
+
+## Endpoint index
+
+| Route | Purpose | Detail |
+|---|---|---|
+| `GET /v1/external/players/{player_id}/projections` | One player's weekly projection | "`GET /v1/external/players/{player_id}/projections`" |
+| `GET /v1/external/projections` | The week's whole projectable slate | "`GET /v1/external/projections`" |
+| `GET /v1/external/players/{player_id}/news` | Structured news evidence for one player | "`GET /v1/external/players/{player_id}/news`" |
+| `GET /v1/external/news` | Cursor feed of ingested headlines | "`GET /v1/external/news`" |
+| `GET /v1/external/players/{player_id}/rating-history` | Persisted 0-99 rating change | "rating-history" |
+| `GET /v1/external/players/{player_id}/background` | Contract, team situation, production | "background" |
+| `GET /v1/external/players/{player_id}/week-result`, `GET /v1/external/recap` | Completed-week real production | "Weekly recap" |
+| `GET /v1/external/trades/interesting`, `.../{item_id}/share-card.png` | Graded concrete trades + branded PNG | "Trades feed" below, full detail in `docs/external-trades-interesting.md` |
+| `GET /v1/external/promo/plan` | What to advertise now | "Adaptive advertising API" |
+| `GET /v1/external/playoff-sos` | Fantasy-playoff strength of schedule | same |
+| `GET /v1/external/waivers/replacements` | **Injury alerts** + trending replacements | same |
+| `GET /v1/external/lineup/decisions` | **Start/sit** for borderline starters | same |
+| `GET /v1/external/dynasty/value-changes` | Dynasty risers and fallers | same |
+| `GET /v1/external/rookies` | Rookie rankings, ADP, landing spots | same |
+| `GET /v1/external/changes` | Depth-chart movement | same |
+| `GET /v1/external/dynasty/roster-construction` | Always a structured `unavailable` | same |
+| `GET /v1/external/demo/scenarios` | Synthetic product demos | same |
+
+## Conventions shared by every route
+
+- **Auth**: one static key in the `Authorization` header, `Authorization: Bearer <FANTASYDESK_EXTERNAL_API_KEY>`
+  (see "Auth"). `401` `{"detail": "Invalid API key."}` for any missing/wrong key (never says which),
+  `503` `{"detail": "External API is not configured."}` when the server has no key.
+- **Validation errors**: `422` `{"detail": "<specific message>"}` for a bad query parameter. Nothing else is
+  a client error: a request with nothing to say is **`200`** with an honest empty/`unavailable` body.
+- **Unavailable shape** (adaptive routes): `status: "unavailable"`, `count: 0`, `items: []` and a specific
+  `unavailable_reason`. Never padded with filler items. Player-level routes use their own documented
+  `status` values (`bye_week`, `unknown_player`, ...), also `200`.
+- **Nulls mean unknown**: a `null` field is "not available" and, wherever a field can be unavailable for a
+  reason, a sibling `*_unavailable_reason` (or an `unavailable_reasons` map) says why. A `null` is never `0`,
+  `false` or "healthy".
+- **Freshness**: every adaptive response and item carries `freshness {data_as_of, age_hours, stale, source}`;
+  `stale` is `true` past 36 h and `null` when the source gave no date. Player-level routes carry their own
+  `calculated_at` / `data_as_of` fields, documented per route.
+- **Additive evolution**: fields are only ever added. A caller that reads only fields documented earlier keeps
+  working byte-for-byte.
+
+## Which fields are reliable today (honest matrix, 2026-11-28)
+
+| Field | Reliability | Why |
+|---|---|---|
+| `identity.player_id` / `ids.sleeper_id` | **Reliable** | Our id is the Sleeper id; every board player has one. |
+| `identity.name`, `team`, `position` | **Reliable** | From the public board (Sleeper directory). Team is the current Sleeper team. |
+| `ids.sportradar_id`, `ids.rotowire_id` | Reliable for active offense (about 99% / 92% in the committed Sleeper dump) | Sleeper's own dump. |
+| `ids.espn_id`, `ids.yahoo_id` | **Partial** (about 46% / 48% of active QB/RB/WR/TE in the Sleeper dump alone) | Sleeper's dump is sparse; DynastyProcess fills the rest only when its table is cached on the server. Null carries a reason. |
+| `ids.gsis_id` | **Partial** (about 31% of active QB/RB/WR/TE in the Sleeper dump alone) | Same. Rookies and recent additions are usually null. A null gsis also means the official injury report cannot be joined to the player, so that player cannot be `confirmed`. |
+| `ids.pfr_id`, `ids.fantasypros_id` | **Conditional** | Exist only in the DynastyProcess table; `null` with `dynastyprocess_id_table_not_cached_on_this_server` when that file is absent. Never in the Sleeper dump. |
+| `availability` from **Sleeper** status (`platform_status`) | Reliable as "what Sleeper shows now", **not verified** | `is_official: false`, `verified_at: null`. `observed_at` is when our 30-minute sync first recorded the designation (change log), not a last-checked time. |
+| `availability` from the **official NFL injury report** (`official_team_report`) | **Official but currently cannot prove freshness** | nflverse rows are the NFL's own weekly report, ingested Tue and Sat 15:30 UTC. Since 2025 nflverse no longer publishes `date_modified`, so `verified_at` / `source_published_at` are `null` and **nothing can be `auto_publish_eligible` from the real 2026 file today**. Also lags: Friday designations land on the Saturday run, so a mid-week alert has no official row yet. |
+| `availability` from **news headlines** | Reported only | Headline + URL + publish time from RSS; the article is never fetched. Never parsed into a designation. |
+| `availability` from **league transactions** | **Unavailable** | No transaction feed is ingested (`source_type: "league_transaction"` is reserved and never emitted). |
+| `claims[]` `claim_status: "confirmed"` | Only from the official report | Everything else is `reported` or `unverified`. |
+| `claims[]` matchup (`/lineup/decisions`) | `reported`, never confirmed | Schedule comes from nflverse games, not an NFL-controlled endpoint we ingest. |
+| `claims[]` recommendation (start/sit verdict) | `unverified` by design | It is our model's opinion (opponent points allowed), not a verifiable fact. |
+| `game_id` in `availability.applies_to` | Lineup only | The waiver route does not load the schedule: `null` with a reason. |
+| Dedicated injury date/return timeline | **Unavailable** | No return date is on record; nothing is inferred. |
 
 ## Auth
 
@@ -1806,13 +1863,32 @@ nflverse data on 2026-10-22:
 }
 ```
 
+## Trades feed (`GET /v1/external/trades/interesting`)
+
+Concrete 2-3 asset dynasty trades graded by the app's own Trade Analyzer against a league-median reference
+roster of real players. Full parameter, type, spice and dedupe contract: `docs/external-trades-interesting.md`
+(authoritative; this is the summary).
+
+- Params: `format=superflex|1qb`, `lens=ppr|tep`, `type` (comma list of `buy_low_window`, `sell_high_cliff`,
+  `positional_arbitrage`, `pick_for_player`, `consolidation`, `injury_return_stash`), `limit` 1-25 (default 5),
+  `min_spice` 0-100, `exclude_ids` (max 500), `since` (freshness filter on `generated_at`, clamped to 14 days).
+  Bad values: `422`.
+- Response: `{ok, format, lens, format_label, valuation, rotation_date, generated_at, since_applied, data_as_of,
+  verdict_basis, count, available_types, spice, items[]}`. An empty pool is `200` with `count: 0`.
+- Freshness: `data_as_of` is the `players.db` modification time; the pool is cached about 10 minutes.
+- `GET /v1/external/trades/interesting/{item_id}/share-card.png?format=&lens=`: branded PNG for one current item;
+  an id that rotated out of the pool is a real `404`, never a fabricated image.
+- Injury-linked items (`injury_return_stash`) state that no return date is on record. Items do not carry the
+  `identity` / `claims` blocks (see "Known gaps").
+
 ## Adaptive advertising API
 
 Read-only, season-aware endpoints for the desktop advertising app. Same auth as
 everything above (`Authorization: Bearer <FANTASYDESK_EXTERNAL_API_KEY>`; `401` generic,
 `503` when unconfigured). Code: `modules/external_ad_api.py`; routes in
 `services/mobile_api_service.py`. **No user, league, account, billing or analytics data is
-read**, and the existing endpoints above are unchanged (this release only adds routes).
+read**. Since 2026-11-28 the player-bearing items additionally carry `identity`, `availability` and
+`claims[]` blocks (next subsection); every earlier field is unchanged and keeps its order.
 
 Built on the existing clocks: `modules.season_clock` (phase/week; Sleeper `/state/nfl` with a calendar
 fallback) and `modules.league_calendar` (deadline phase, applied to a *reference* league with
@@ -1842,6 +1918,7 @@ trade deadline week 12 and fantasy playoffs weeks 15-17; real leagues vary, and 
 | `freshness` | `{data_as_of, age_hours, stale, source}`; `stale` is true past 36 h; nulls mean the source gave no date. |
 | `relevance` | `{dynasty, redraft}` each `low`/`medium`/`high`: how much the item matters per league type. |
 | `unavailable_reason` | `null` on a real item (reserved so every item shape can say why data is missing). |
+| `identity`, `availability`, `claims[]`, `auto_publish_*` | Player-bearing items only; see "Identity, availability provenance and claim evidence". |
 
 ### Routes
 
@@ -1857,11 +1934,115 @@ trade deadline week 12 and fantasy playoffs weeks 15-17; real leagues vary, and 
 | `GET /v1/external/changes` | Depth-chart movement between the two latest weekly snapshots (prepared). | `sections.team_changes` is always `unavailable`: no team-affiliation history is retained. |
 | `GET /v1/external/dynasty/roster-construction` | Always a structured `unavailable` (prepared). | Needs a roster, which this API never reads. |
 
+### Identity, availability provenance and claim evidence (additive, `ad-api-v1`)
+
+Added to the player-bearing routes so the ad pipeline can tell what is verified from what is merely
+reported. Nothing here is fabricated: every value is read from a source we ingest, or is `null` with a reason.
+Code: `modules/external_ad_evidence.py` (pure builders) and the providers at the bottom of
+`modules/external_ad_api.py`.
+
+**Where each block appears**
+
+| Route | `identity` | `availability` | `claims[]` + `auto_publish_*` |
+|---|---|---|---|
+| `/waivers/replacements` | `injured_player.identity`, `replacements[].identity` | `injured_player.availability`, `replacements[].availability` | item level (injury alert) |
+| `/lineup/decisions` | `player.identity` | `player.availability` | item level (start/sit) |
+| `/dynasty/value-changes` | `player.identity` | not applicable (no status statement) | not applicable |
+| `/rookies` | `player.identity`, `landing_spot.higher_valued_teammates[].identity` | not applicable | not applicable |
+| `/changes` | `player.identity` | not applicable | not applicable |
+| `/demo/scenarios` | `identity: null` + `identity_unavailable_reason` (fictional players) | not applicable | not applicable |
+| `/promo/plan`, `/playoff-sos`, `/dynasty/roster-construction` | no player items | | |
+
+Existing fields keep their names, values and order; the new keys come after them.
+
+#### `identity`
+
+```
+{
+  "player_id": "100", "id_namespace": "sleeper",       // our id (the Sleeper id)
+  "name": "...", "team": "...", "position": "...",
+  "ids": {"sleeper_id", "gsis_id", "espn_id", "yahoo_id", "pfr_id", "fantasypros_id", "sportradar_id", "rotowire_id"},
+  "id_sources": {"gsis_id": "dynastyprocess_db_playerids+sleeper_player_directory", ...},   // only for non-null ids
+  "ids_unavailable_reasons": {"gsis_id": "id_not_mapped_in_sources", ...}                     // only for null ids
+}
+```
+
+Sources: Sleeper's own `players/nfl` dump, plus the DynastyProcess `db_playerids` table when it is cached
+on the server (the same file the ESPN import uses; never fetched during a request). A **null id means not
+mapped**; an id is never guessed from a name. Reasons: `player_not_in_crosswalk_sources`,
+`id_not_mapped_in_sources`, `sources_disagree` (two sources give different ids: both dropped),
+`id_shared_by_multiple_players` (one platform id on several players: dropped), `gsis_malformed`,
+`dynastyprocess_id_table_not_cached_on_this_server` / `_unreadable` (for `pfr_id`, `fantasypros_id`).
+
+#### `availability`
+
+| Field | Meaning |
+|---|---|
+| `status`, `designation` | The designation as the source writes it (`Out`) and lower-cased (`out`); `null` when no source applies. |
+| `practice_status` | Official report practice participation, when an official row exists. |
+| `applies_to` | `{season, week, game_id}`: the game week the status is about. `game_id` is `null` with a reason where the schedule is not loaded. |
+| `source_type` | `official_team_report` \| `league_transaction` \| `platform_status` \| `news_report` \| `inferred`. Today only `official_team_report`, `platform_status` and `news_report` are emitted; `league_transaction` and `inferred` are reserved and never produced as an availability source. |
+| `source_name`, `source_url` | Source label and a URL only when we store one: the nflverse release file for official rows; the article URL for news; `null` for Sleeper (no per-player URL). |
+| `is_official` | `true` only for `official_team_report`. Never for Sleeper, news or inference. |
+| `observed_at` | When we first recorded it. Platform: first time our sync saw this designation (change log). Official rows: `null` (`ingest_time_not_recorded`). |
+| `verified_at`, `source_published_at` | Official rows: the report row's own `date_modified`, else `null` (`report_row_has_no_date_modified`). Platform/news: `verified_at` is always `null`. |
+| `sources[]` | Every source considered, each with the same fields plus `unavailable_reasons`. The top-level fields mirror the primary one (official designation > Sleeper status > none). |
+| `sources_not_available` | Per source type, why it contributed nothing (`official_reports_loaded_through_week_11_not_yet_week_12`, `no_official_report_row_for_player_this_week`, `platform_status_is_current_state_and_does_not_apply_to_the_requested_week`, ...). |
+| `unavailable_reason` | Set when no source applies. **The absence of a designation is never evidence the player is healthy.** |
+
+Sleeper status describes the present, so it is only attached when the week asked about is the current
+week; a preview week (`/lineup/decisions?week=16` while it is week 15) gets official data for that week
+or nothing.
+
+#### `claims[]`
+
+Each claim: `claim_id` (stable), `claim_type` (`availability_designation`, `trending_add`, `matchup`,
+`recommendation`), `subject_player_id`, `claim_text` (the sentence you may publish, already worded with its
+provenance), `claim_status`, `evidence[]` (`{source_type, source, url, timestamp, timestamp_kind, is_official,
+detail}`; `timestamp_unavailable_reason` when null), `method`, `confidence` (`low`/`medium`/`high`),
+`required_for_auto_publish`, `auto_publish_eligible`, `auto_publish {freshness_window_hours,
+evidence_age_hours, fresh, blockers[]}`, `unavailable_reason`.
+
+| `claim_status` | Rule |
+|---|---|
+| `confirmed` | **Only** when backed by an official NFL injury-report row we ingested for exactly this season and week, with no other source disagreeing and no conflicting official rows. Enforced in code: a `confirmed` claim without official evidence is downgraded to `reported`. News, Sleeper status and models can never produce it, including news from `nfl.com`. |
+| `reported` | A non-official source states it (Sleeper status, a non-speculative headline, the schedule), or an official row exists but the sources disagree. |
+| `unverified` | Speculative-only news, or our own model's inference (start/sit verdicts). |
+
+Item-level fields: `claims`, `availability_claim_unavailable_reason` (when no source supports an availability
+claim), `auto_publish_eligible`, `auto_publish_blockers[]`, `auto_publish_freshness_window_hours`. Item
+eligibility is true only when it has at least one `required_for_auto_publish` claim and **all** of them are
+eligible. Required claims: `/waivers/replacements` = the injured player's availability claim;
+`/lineup/decisions` = the matchup claim (which is only ever `reported`, so start/sit items are never
+auto-publishable today; `auto_publish_blockers` says `matchup:claim_not_confirmed`).
+
+Endpoint-level: `/waivers/replacements` and `/lineup/decisions` add `evidence_contract` with which evidence
+sources loaded (`official_reports.latest_week_loaded`, `status_change_log`, `news`) and each reason when not.
+
+#### `auto_publish_eligible` (per claim)
+
+`true` only when **all** hold:
+
+1. `claim_status == "confirmed"` (official evidence, see above);
+2. the official row carries a timestamp and it is no older than **48 hours** (`AUTO_PUBLISH_FRESH_HOURS`) and not
+   more than 5 minutes in the future; a missing timestamp is "cannot prove fresh", never "fresh";
+3. the claim's week is the current week and the season phase is `regular`;
+4. no `blockers` (`claim_not_confirmed`, `official_source_timestamp_unavailable`,
+   `official_source_older_than_freshness_window`, `official_source_timestamp_in_future`,
+   `season_phase_not_regular`, `claim_week_is_not_the_current_week`, `sources_disagree`, `official_rows_disagree`).
+
 ### Example responses
 
 Generated from the real builders with synthetic fixtures (`tests/external_ad_fixtures.py`) by
 `python scripts/generate_external_ad_examples.py --write`; a test fails if they drift. Player and team
 names are fixtures, not real data. Lists are trimmed with `limit` only.
+
+The waiver and lineup examples use a fixture where the official NFL report row for the injured player is stamped
+inside the 48-hour window, so the alert shows `confirmed` / `auto_publish_eligible: true`. With the real 2026
+nflverse file (no `date_modified`) the same alert returns `claim_status: "confirmed"` only if a row exists, with
+`auto_publish_eligible: false` and blocker `official_source_timestamp_unavailable`; without an official row it
+is `reported` from Sleeper status. Start/sit items show `matchup` (`reported`) and `recommendation` (`unverified`)
+claims and are never eligible.
 
 #### `GET /v1/external/promo/plan?as_of=2026-12-15&limit=3`
 
@@ -2293,7 +2474,113 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
         "position": "WR",
         "team": "AAA",
         "injury_status": "Out",
-        "position_rank": 12
+        "position_rank": 12,
+        "identity": {
+          "player_id": "100",
+          "id_namespace": "sleeper",
+          "name": "Alex Hurt",
+          "team": "AAA",
+          "position": "WR",
+          "ids": {
+            "sleeper_id": "100",
+            "gsis_id": "00-0034001",
+            "espn_id": "4000100",
+            "yahoo_id": "31000",
+            "pfr_id": "HurtAl00",
+            "fantasypros_id": "20100",
+            "sportradar_id": "sr-100",
+            "rotowire_id": "9100"
+          },
+          "id_sources": {
+            "sleeper_id": "sleeper_player_directory",
+            "gsis_id": "dynastyprocess_db_playerids+sleeper_player_directory",
+            "espn_id": "dynastyprocess_db_playerids+sleeper_player_directory",
+            "yahoo_id": "dynastyprocess_db_playerids+sleeper_player_directory",
+            "pfr_id": "dynastyprocess_db_playerids",
+            "fantasypros_id": "dynastyprocess_db_playerids",
+            "sportradar_id": "sleeper_player_directory",
+            "rotowire_id": "sleeper_player_directory"
+          },
+          "ids_unavailable_reasons": {}
+        },
+        "availability": {
+          "status": "Out",
+          "designation": "out",
+          "practice_status": "Did Not Participate In Practice",
+          "applies_to": {
+            "season": 2026,
+            "week": 15,
+            "game_id": null
+          },
+          "source_type": "official_team_report",
+          "source_name": "NFL official injury report (via nflverse)",
+          "source_url": "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_2026.csv",
+          "is_official": true,
+          "observed_at": null,
+          "verified_at": "2026-12-07T21:30:00+00:00",
+          "source_published_at": "2026-12-07T21:30:00+00:00",
+          "sources": [
+            {
+              "source_type": "official_team_report",
+              "source_name": "NFL official injury report (via nflverse)",
+              "source_url": "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_2026.csv",
+              "is_official": true,
+              "status": "Out",
+              "designation": "out",
+              "observed_at": null,
+              "verified_at": "2026-12-07T21:30:00+00:00",
+              "source_published_at": "2026-12-07T21:30:00+00:00",
+              "unavailable_reasons": {
+                "observed_at": "ingest_time_not_recorded"
+              },
+              "practice_status": "Did Not Participate In Practice",
+              "injury": "Hamstring",
+              "report_week": 15,
+              "rows_conflict": false
+            },
+            {
+              "source_type": "platform_status",
+              "source_name": "Sleeper player directory",
+              "source_url": null,
+              "is_official": false,
+              "status": "Out",
+              "designation": "out",
+              "observed_at": "2026-12-06T08:30:00+00:00",
+              "verified_at": null,
+              "source_published_at": null,
+              "unavailable_reasons": {
+                "verified_at": "platform_status_is_not_independently_verified",
+                "source_published_at": "sleeper_does_not_publish_a_status_timestamp",
+                "source_url": "no_url_stored_for_this_source"
+              },
+              "injury": "Hamstring",
+              "observed_at_meaning": "first time our sync recorded this designation, not the time of the last check"
+            },
+            {
+              "source_type": "news_report",
+              "source_name": "rotowire.com",
+              "source_url": "https://www.rotowire.com/football/news/alex-hurt-1",
+              "is_official": false,
+              "status": null,
+              "designation": null,
+              "observed_at": "2026-12-07T22:10:00+00:00",
+              "verified_at": null,
+              "source_published_at": "2026-12-07T22:00:00+00:00",
+              "unavailable_reasons": {
+                "verified_at": "headline_only_article_not_fetched",
+                "designation": "news_headlines_are_not_parsed_into_a_designation"
+              },
+              "headline": "Alex Hurt ruled out for Week 15 with a hamstring injury",
+              "event_type": "INJURY",
+              "speculative": false
+            }
+          ],
+          "sources_not_available": {},
+          "unavailable_reason": null,
+          "applies_to_unavailable_reasons": {
+            "game_id": "game_not_resolved_for_this_endpoint"
+          }
+        }
       },
       "replacements": [
         {
@@ -2305,7 +2592,62 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
           "trending_rank": 1,
           "roster_pct": 12.0,
           "same_team": true,
-          "availability_verified": true
+          "availability_verified": true,
+          "identity": {
+            "player_id": "101",
+            "id_namespace": "sleeper",
+            "name": "Bo Backup",
+            "team": "AAA",
+            "position": "WR",
+            "ids": {
+              "sleeper_id": "101",
+              "gsis_id": null,
+              "espn_id": "4000101",
+              "yahoo_id": "31001",
+              "pfr_id": null,
+              "fantasypros_id": "20101",
+              "sportradar_id": "sr-101",
+              "rotowire_id": null
+            },
+            "id_sources": {
+              "sleeper_id": "sleeper_player_directory",
+              "espn_id": "dynastyprocess_db_playerids",
+              "yahoo_id": "dynastyprocess_db_playerids+sleeper_player_directory",
+              "fantasypros_id": "dynastyprocess_db_playerids",
+              "sportradar_id": "sleeper_player_directory"
+            },
+            "ids_unavailable_reasons": {
+              "gsis_id": "id_not_mapped_in_sources",
+              "pfr_id": "id_not_mapped_in_sources",
+              "rotowire_id": "id_not_mapped_in_sources"
+            }
+          },
+          "availability": {
+            "status": null,
+            "designation": null,
+            "practice_status": null,
+            "applies_to": {
+              "season": 2026,
+              "week": 15,
+              "game_id": null
+            },
+            "source_type": null,
+            "source_name": null,
+            "source_url": null,
+            "is_official": false,
+            "observed_at": null,
+            "verified_at": null,
+            "source_published_at": null,
+            "sources": [],
+            "sources_not_available": {
+              "official_team_report": "no_official_report_row_for_player_this_week",
+              "news_report": "no_recent_availability_headline_matched_this_player"
+            },
+            "unavailable_reason": "No designation is on record from a source that applies to this week. The absence of a designation is not evidence the player is healthy.",
+            "applies_to_unavailable_reasons": {
+              "game_id": "game_not_resolved_for_this_endpoint"
+            }
+          }
         },
         {
           "player_id": "102",
@@ -2316,12 +2658,228 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
           "trending_rank": 2,
           "roster_pct": 31.5,
           "same_team": false,
-          "availability_verified": true
+          "availability_verified": true,
+          "identity": {
+            "player_id": "102",
+            "id_namespace": "sleeper",
+            "name": "Cy Stream",
+            "team": "CCC",
+            "position": "WR",
+            "ids": {
+              "sleeper_id": "102",
+              "gsis_id": "00-0034002",
+              "espn_id": "4000102",
+              "yahoo_id": null,
+              "pfr_id": null,
+              "fantasypros_id": null,
+              "sportradar_id": null,
+              "rotowire_id": null
+            },
+            "id_sources": {
+              "sleeper_id": "sleeper_player_directory",
+              "gsis_id": "sleeper_player_directory",
+              "espn_id": "sleeper_player_directory"
+            },
+            "ids_unavailable_reasons": {
+              "yahoo_id": "id_not_mapped_in_sources",
+              "pfr_id": "id_not_mapped_in_sources",
+              "fantasypros_id": "id_not_mapped_in_sources",
+              "sportradar_id": "id_not_mapped_in_sources",
+              "rotowire_id": "id_not_mapped_in_sources"
+            }
+          },
+          "availability": {
+            "status": "Questionable",
+            "designation": "questionable",
+            "practice_status": "Limited Participation in Practice",
+            "applies_to": {
+              "season": 2026,
+              "week": 15,
+              "game_id": null
+            },
+            "source_type": "official_team_report",
+            "source_name": "NFL official injury report (via nflverse)",
+            "source_url": "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_2026.csv",
+            "is_official": true,
+            "observed_at": null,
+            "verified_at": null,
+            "source_published_at": null,
+            "sources": [
+              {
+                "source_type": "official_team_report",
+                "source_name": "NFL official injury report (via nflverse)",
+                "source_url": "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_2026.csv",
+                "is_official": true,
+                "status": "Questionable",
+                "designation": "questionable",
+                "observed_at": null,
+                "verified_at": null,
+                "source_published_at": null,
+                "unavailable_reasons": {
+                  "observed_at": "ingest_time_not_recorded",
+                  "verified_at": "report_row_has_no_date_modified",
+                  "source_published_at": "report_row_has_no_date_modified"
+                },
+                "practice_status": "Limited Participation in Practice",
+                "injury": "Ankle",
+                "report_week": 15,
+                "rows_conflict": false
+              }
+            ],
+            "sources_not_available": {
+              "news_report": "no_recent_availability_headline_matched_this_player"
+            },
+            "unavailable_reason": null,
+            "applies_to_unavailable_reasons": {
+              "game_id": "game_not_resolved_for_this_endpoint"
+            }
+          }
         }
       ],
-      "roster_pct_available": true
+      "roster_pct_available": true,
+      "claims": [
+        {
+          "claim_id": "62c2d70c2ee9",
+          "claim_type": "availability_designation",
+          "subject_player_id": "100",
+          "claim_text": "Alex Hurt (WR, AAA) is listed Out for 2026 week 15 on the official NFL injury report.",
+          "claim_status": "confirmed",
+          "evidence": [
+            {
+              "source_type": "official_team_report",
+              "source": "NFL official injury report (via nflverse)",
+              "url": "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_2026.csv",
+              "timestamp": "2026-12-07T21:30:00+00:00",
+              "timestamp_kind": "source_published_at",
+              "is_official": true,
+              "detail": "Out"
+            },
+            {
+              "source_type": "platform_status",
+              "source": "Sleeper player directory",
+              "url": null,
+              "timestamp": "2026-12-06T08:30:00+00:00",
+              "timestamp_kind": "observed_at",
+              "is_official": false,
+              "detail": "Out"
+            },
+            {
+              "source_type": "news_report",
+              "source": "rotowire.com",
+              "url": "https://www.rotowire.com/football/news/alex-hurt-1",
+              "timestamp": "2026-12-07T22:00:00+00:00",
+              "timestamp_kind": "source_published_at",
+              "is_official": false,
+              "detail": "Alex Hurt ruled out for Week 15 with a hamstring injury",
+              "speculative": false
+            }
+          ],
+          "method": "official_report_lookup",
+          "confidence": "high",
+          "required_for_auto_publish": true,
+          "auto_publish_eligible": true,
+          "auto_publish": {
+            "freshness_window_hours": 48.0,
+            "evidence_age_hours": 17.5,
+            "fresh": true,
+            "blockers": []
+          },
+          "unavailable_reason": null
+        },
+        {
+          "claim_id": "07f7b62f9c9f",
+          "claim_type": "trending_add",
+          "subject_player_id": "101",
+          "claim_text": "Bo Backup (WR, AAA) is among Sleeper's most-added players in the last 24 hours (5400 adds, trend rank 1).",
+          "claim_status": "reported",
+          "evidence": [
+            {
+              "source_type": "platform_status",
+              "source": "Sleeper trending adds",
+              "url": null,
+              "timestamp": "2026-12-08T15:00:00+00:00",
+              "timestamp_kind": "observed_at",
+              "is_official": false,
+              "detail": {
+                "adds": 5400,
+                "trend_rank": 1,
+                "roster_pct": 12.0
+              }
+            }
+          ],
+          "method": "platform_trending_lookup",
+          "confidence": "medium",
+          "required_for_auto_publish": false,
+          "auto_publish_eligible": false,
+          "auto_publish": {
+            "freshness_window_hours": 48.0,
+            "evidence_age_hours": null,
+            "fresh": null,
+            "blockers": [
+              "claim_not_confirmed"
+            ]
+          },
+          "unavailable_reason": null
+        },
+        {
+          "claim_id": "398c93d25734",
+          "claim_type": "trending_add",
+          "subject_player_id": "102",
+          "claim_text": "Cy Stream (WR, CCC) is among Sleeper's most-added players in the last 24 hours (3100 adds, trend rank 2).",
+          "claim_status": "reported",
+          "evidence": [
+            {
+              "source_type": "platform_status",
+              "source": "Sleeper trending adds",
+              "url": null,
+              "timestamp": "2026-12-08T15:00:00+00:00",
+              "timestamp_kind": "observed_at",
+              "is_official": false,
+              "detail": {
+                "adds": 3100,
+                "trend_rank": 2,
+                "roster_pct": 31.5
+              }
+            }
+          ],
+          "method": "platform_trending_lookup",
+          "confidence": "medium",
+          "required_for_auto_publish": false,
+          "auto_publish_eligible": false,
+          "auto_publish": {
+            "freshness_window_hours": 48.0,
+            "evidence_age_hours": null,
+            "fresh": null,
+            "blockers": [
+              "claim_not_confirmed"
+            ]
+          },
+          "unavailable_reason": null
+        }
+      ],
+      "availability_claim_unavailable_reason": null,
+      "auto_publish_eligible": true,
+      "auto_publish_blockers": [],
+      "auto_publish_freshness_window_hours": 48.0
     }
-  ]
+  ],
+  "evidence_contract": {
+    "auto_publish_freshness_window_hours": 48.0,
+    "official_reports": {
+      "loaded": true,
+      "latest_week_loaded": 15,
+      "source": "NFL official injury report (via nflverse)",
+      "unavailable_reason": null
+    },
+    "status_change_log": {
+      "loaded": true,
+      "unavailable_reason": null
+    },
+    "news": {
+      "loaded": true,
+      "unavailable_reason": null
+    }
+  }
 }
 ```
 <!-- /example:waivers -->
@@ -2418,17 +2976,164 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
         "name": "Dee Flex",
         "position": "RB",
         "team": "AAA",
-        "position_rank": 20
+        "position_rank": 20,
+        "identity": {
+          "player_id": "103",
+          "id_namespace": "sleeper",
+          "name": "Dee Flex",
+          "team": "AAA",
+          "position": "RB",
+          "ids": {
+            "sleeper_id": "103",
+            "gsis_id": "00-0034003",
+            "espn_id": null,
+            "yahoo_id": null,
+            "pfr_id": null,
+            "fantasypros_id": null,
+            "sportradar_id": null,
+            "rotowire_id": null
+          },
+          "id_sources": {
+            "sleeper_id": "sleeper_player_directory",
+            "gsis_id": "sleeper_player_directory"
+          },
+          "ids_unavailable_reasons": {
+            "espn_id": "id_not_mapped_in_sources",
+            "yahoo_id": "id_not_mapped_in_sources",
+            "pfr_id": "id_not_mapped_in_sources",
+            "fantasypros_id": "id_not_mapped_in_sources",
+            "sportradar_id": "id_not_mapped_in_sources",
+            "rotowire_id": "id_not_mapped_in_sources"
+          }
+        },
+        "availability": {
+          "status": null,
+          "designation": null,
+          "practice_status": null,
+          "applies_to": {
+            "season": 2026,
+            "week": 16,
+            "game_id": "2026_16_AAA_BBB"
+          },
+          "source_type": null,
+          "source_name": null,
+          "source_url": null,
+          "is_official": false,
+          "observed_at": null,
+          "verified_at": null,
+          "source_published_at": null,
+          "sources": [],
+          "sources_not_available": {
+            "official_team_report": "official_reports_loaded_through_week_15_not_yet_week_16",
+            "news_report": "no_recent_availability_headline_matched_this_player"
+          },
+          "unavailable_reason": "No designation is on record from a source that applies to this week. The absence of a designation is not evidence the player is healthy."
+        }
       },
       "opponent": "BBB",
       "is_home": false,
       "game_id": "2026_16_AAA_BBB",
-      "matchup_gap_pct": 25.0
+      "matchup_gap_pct": 25.0,
+      "claims": [
+        {
+          "claim_id": "21e06548bd8c",
+          "claim_type": "matchup",
+          "subject_player_id": "103",
+          "claim_text": "AAA plays BBB (away) in 2026 week 16.",
+          "claim_status": "reported",
+          "evidence": [
+            {
+              "source_type": "inferred",
+              "source": "nflverse schedule",
+              "url": null,
+              "timestamp": null,
+              "timestamp_kind": null,
+              "timestamp_unavailable_reason": "schedule_rows_carry_no_publication_timestamp",
+              "is_official": false,
+              "detail": {
+                "opponent": "BBB",
+                "is_home": false,
+                "game_id": "2026_16_AAA_BBB"
+              }
+            }
+          ],
+          "method": "schedule_lookup",
+          "confidence": "medium",
+          "required_for_auto_publish": true,
+          "auto_publish_eligible": false,
+          "auto_publish": {
+            "freshness_window_hours": 48.0,
+            "evidence_age_hours": null,
+            "fresh": null,
+            "blockers": [
+              "claim_not_confirmed"
+            ]
+          },
+          "unavailable_reason": null
+        },
+        {
+          "claim_id": "7f5ad942e1f5",
+          "claim_type": "recommendation",
+          "subject_player_id": "103",
+          "claim_text": "START Dee Flex: the opponent allows +25.0% vs the league average to RB.",
+          "claim_status": "unverified",
+          "evidence": [
+            {
+              "source_type": "inferred",
+              "source": "dynastygm matchup model (opponent points allowed)",
+              "url": null,
+              "timestamp": "2026-12-08T15:00:00+00:00",
+              "timestamp_kind": "observed_at",
+              "is_official": false,
+              "detail": {
+                "matchup_gap_pct": 25.0,
+                "tier": "weak"
+              }
+            }
+          ],
+          "method": "model_inference",
+          "confidence": "low",
+          "required_for_auto_publish": false,
+          "auto_publish_eligible": false,
+          "auto_publish": {
+            "freshness_window_hours": 48.0,
+            "evidence_age_hours": null,
+            "fresh": null,
+            "blockers": [
+              "claim_not_confirmed"
+            ]
+          },
+          "unavailable_reason": null
+        }
+      ],
+      "availability_claim_unavailable_reason": "No designation is on record from a source that applies to this week. The absence of a designation is not evidence the player is healthy.",
+      "auto_publish_eligible": false,
+      "auto_publish_blockers": [
+        "matchup:claim_not_confirmed"
+      ],
+      "auto_publish_freshness_window_hours": 48.0
     }
   ],
   "requested": {
     "season": 2026,
     "week": 16
+  },
+  "evidence_contract": {
+    "auto_publish_freshness_window_hours": 48.0,
+    "official_reports": {
+      "loaded": true,
+      "latest_week_loaded": 15,
+      "source": "NFL official injury report (via nflverse)",
+      "unavailable_reason": null
+    },
+    "status_change_log": {
+      "loaded": true,
+      "unavailable_reason": null
+    },
+    "news": {
+      "loaded": true,
+      "unavailable_reason": null
+    }
   }
 }
 ```
@@ -2505,7 +3210,36 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
         "name": "Bo Backup",
         "position": "WR",
         "team": "AAA",
-        "age": 26.0
+        "age": 26.0,
+        "identity": {
+          "player_id": "101",
+          "id_namespace": "sleeper",
+          "name": "Bo Backup",
+          "team": "AAA",
+          "position": "WR",
+          "ids": {
+            "sleeper_id": "101",
+            "gsis_id": null,
+            "espn_id": "4000101",
+            "yahoo_id": "31001",
+            "pfr_id": null,
+            "fantasypros_id": "20101",
+            "sportradar_id": "sr-101",
+            "rotowire_id": null
+          },
+          "id_sources": {
+            "sleeper_id": "sleeper_player_directory",
+            "espn_id": "dynastyprocess_db_playerids",
+            "yahoo_id": "dynastyprocess_db_playerids+sleeper_player_directory",
+            "fantasypros_id": "dynastyprocess_db_playerids",
+            "sportradar_id": "sleeper_player_directory"
+          },
+          "ids_unavailable_reasons": {
+            "gsis_id": "id_not_mapped_in_sources",
+            "pfr_id": "id_not_mapped_in_sources",
+            "rotowire_id": "id_not_mapped_in_sources"
+          }
+        }
       },
       "rating_previous": 62,
       "rating_current": 70,
@@ -2563,7 +3297,36 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
         "name": "Dee Flex",
         "position": "RB",
         "team": "AAA",
-        "age": 26.0
+        "age": 26.0,
+        "identity": {
+          "player_id": "103",
+          "id_namespace": "sleeper",
+          "name": "Dee Flex",
+          "team": "AAA",
+          "position": "RB",
+          "ids": {
+            "sleeper_id": "103",
+            "gsis_id": "00-0034003",
+            "espn_id": null,
+            "yahoo_id": null,
+            "pfr_id": null,
+            "fantasypros_id": null,
+            "sportradar_id": null,
+            "rotowire_id": null
+          },
+          "id_sources": {
+            "sleeper_id": "sleeper_player_directory",
+            "gsis_id": "sleeper_player_directory"
+          },
+          "ids_unavailable_reasons": {
+            "espn_id": "id_not_mapped_in_sources",
+            "yahoo_id": "id_not_mapped_in_sources",
+            "pfr_id": "id_not_mapped_in_sources",
+            "fantasypros_id": "id_not_mapped_in_sources",
+            "sportradar_id": "id_not_mapped_in_sources",
+            "rotowire_id": "id_not_mapped_in_sources"
+          }
+        }
       },
       "rating_previous": 80,
       "rating_current": 75,
@@ -2652,7 +3415,36 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
         "name": "Fox Rookie",
         "position": "RB",
         "team": "CCC",
-        "age": 21.5
+        "age": 21.5,
+        "identity": {
+          "player_id": "105",
+          "id_namespace": "sleeper",
+          "name": "Fox Rookie",
+          "team": "CCC",
+          "position": "RB",
+          "ids": {
+            "sleeper_id": "105",
+            "gsis_id": null,
+            "espn_id": null,
+            "yahoo_id": null,
+            "pfr_id": null,
+            "fantasypros_id": null,
+            "sportradar_id": null,
+            "rotowire_id": null
+          },
+          "id_sources": {
+            "sleeper_id": "sleeper_player_directory"
+          },
+          "ids_unavailable_reasons": {
+            "gsis_id": "player_not_in_crosswalk_sources",
+            "espn_id": "player_not_in_crosswalk_sources",
+            "yahoo_id": "player_not_in_crosswalk_sources",
+            "pfr_id": "player_not_in_crosswalk_sources",
+            "fantasypros_id": "player_not_in_crosswalk_sources",
+            "sportradar_id": "player_not_in_crosswalk_sources",
+            "rotowire_id": "player_not_in_crosswalk_sources"
+          }
+        }
       },
       "our_rank": 1,
       "adp": 4.5,
@@ -2735,7 +3527,36 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
         "player_id": "103",
         "name": "Dee Flex",
         "position": "RB",
-        "team": "AAA"
+        "team": "AAA",
+        "identity": {
+          "player_id": "103",
+          "id_namespace": "sleeper",
+          "name": "Dee Flex",
+          "team": "AAA",
+          "position": "RB",
+          "ids": {
+            "sleeper_id": "103",
+            "gsis_id": "00-0034003",
+            "espn_id": null,
+            "yahoo_id": null,
+            "pfr_id": null,
+            "fantasypros_id": null,
+            "sportradar_id": null,
+            "rotowire_id": null
+          },
+          "id_sources": {
+            "sleeper_id": "sleeper_player_directory",
+            "gsis_id": "sleeper_player_directory"
+          },
+          "ids_unavailable_reasons": {
+            "espn_id": "id_not_mapped_in_sources",
+            "yahoo_id": "id_not_mapped_in_sources",
+            "pfr_id": "id_not_mapped_in_sources",
+            "fantasypros_id": "id_not_mapped_in_sources",
+            "sportradar_id": "id_not_mapped_in_sources",
+            "rotowire_id": "id_not_mapped_in_sources"
+          }
+        }
       },
       "previous_order": 2,
       "current_order": 1,
@@ -2900,6 +3721,8 @@ names are fixtures, not real data. Lists are trimmed with `limit` only.
       "verdict": "Accept",
       "verdict_basis": "Received total 8600 vs given 8100 (+6.2%).",
       "synthetic": true,
+      "identity": null,
+      "identity_unavailable_reason": "synthetic_fictional_players_have_no_real_player_ids",
       "try_topic": "trade",
       "try_url": "https://fantasygmlab.com/try/trade?utm_source=ad_app&utm_medium=demo&utm_campaign=demo_scenarios&utm_content=demo-trade-1",
       "links": {
@@ -2966,6 +3789,41 @@ Operational notes: data sources are shared with the app (public dynasty board, n
 directory/trending, daily rating snapshots, weekly depth-chart snapshots, rookie ADP snapshot). Value changes
 and roster-percentage evidence need the existing Supabase snapshot jobs to be running; no new migration,
 secret or dependency is introduced.
+
+### Auto-publish rules for the ad pipeline
+
+1. Only call something an **injury alert** (an availability statement) when the matching claim has
+   `auto_publish_eligible: true`. Publish that claim's `claim_text` (or text built only from its `evidence`),
+   not the item `headline`, which also mentions replacements.
+2. `claim_status: "reported"` or `"unverified"` is never auto-published. Send it to a person, and word it as
+   reported (for example "listed Out on Sleeper") if it is used at all. Never upgrade the wording to
+   "confirmed", "official" or "ruled out".
+3. Start/sit recommendations are model output and are never `confirmed`: a human reviews them, and any
+   availability sentence in them still follows rule 1. An item with `auto_publish_eligible: false` and
+   `auto_publish_blockers` listing the reasons must not be posted unattended.
+4. Re-check freshness at publish time: eligibility is computed when the response is generated, and the
+   window is 48 hours from the official row's timestamp. If more than a few minutes have passed, call again.
+5. If `status` is `unavailable`, an `availability.unavailable_reason` is set, or `identity.ids_unavailable_reasons`
+   says an id is missing, post nothing that depends on it. A missing id is not a reason to match by name.
+6. Join to other systems on `identity.ids`, preferring `gsis_id` (NFL) then `sleeper_id`; only use ids that are
+   non-null. `team` is the current Sleeper team and can lag a trade by hours.
+7. **Today's reality (2026-11-28):** because the 2026 nflverse injury file carries no `date_modified`, no real
+   claim can reach `auto_publish_eligible: true` yet; alerts come back `reported` (Sleeper) with the reason in
+   `auto_publish_blockers`. The pipeline's first auto-publishable alerts need either upstream timestamps or an
+   ingest-time record on our side (not built; see "Known gaps").
+
+### Known gaps (not guessed, not built)
+
+- Official report timestamps: nflverse dropped `date_modified` from 2025, so freshness of official rows cannot be
+  proven. Fix needs the ingest job to record when each row first appeared.
+- Official report cadence: ingested Tuesday and Saturday 15:30 UTC only, and nflverse lags (week 11 loaded while
+  Sleeper events already show week 12). Weekday and Sunday-inactive designations have no official source.
+- No league-transaction feed (IR moves, activations, waivers) and no official game-day inactive list.
+- `espn_id`, `yahoo_id`, `gsis_id` coverage is partial; `pfr_id` / `fantasypros_id` depend on the DynastyProcess
+  table being cached on the server.
+- `/trades/interesting` items and the player-level routes (`projections`, `news`, `rating-history`,
+  `background`, `week-result`, `recap`) do not carry the new `identity` block; `news` has its own `player_ids`
+  (`sleeper`, `gsis`) block with the same null-with-reason rule.
 
 ## Change history
 
@@ -3062,3 +3920,4 @@ secret or dependency is introduced.
   players needs a team mention) and reads `players.db` read-only. Corrected the
   "Evidence step" paragraph: no fetch-and-hash code exists. Additive otherwise.
 - `ad-api-v1` (2026-11-26): added the Adaptive advertising API section (`/v1/external/promo/plan`, `/playoff-sos`, `/waivers/replacements`, `/lineup/decisions`, `/dynasty/value-changes`, `/rookies`, `/changes`, `/dynasty/roster-construction`, `/demo/scenarios`). Purely additive: no existing route or field changed.
+- `ad-api-v1` (2026-11-28): added canonical `identity` blocks (our id plus gsis/espn/yahoo/pfr/fantasypros/sportradar/rotowire ids, null with a reason when unmapped) to every player item on `/waivers/replacements`, `/lineup/decisions`, `/dynasty/value-changes`, `/rookies` and `/changes`; `availability` provenance (source type, official flag, observed/verified timestamps, game week) and `claims[]` with `claim_status` (confirmed | reported | unverified), evidence, method, confidence and `auto_publish_eligible` to `/waivers/replacements` and `/lineup/decisions`; `evidence_contract` on those two envelopes. Purely additive: no existing field changed. Rewrote this document as the complete contract (index, conventions, reliability matrix, trades summary, auto-publish rules).

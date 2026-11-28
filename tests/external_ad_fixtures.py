@@ -58,3 +58,40 @@ BASELINE_RATINGS = {"100": 90, "101": 62, "102": 61, "103": 80, "104": 66, "105"
 ROOKIE_ADP = {"as_of": "2026-12-07", "players": {"105": {"adp": 4.5, "drafts": 40}}}
 SLEEPER_PLAYERS = {"105": {"depth_chart_order": 2}, "106": {"depth_chart_order": 3}}
 DEPTH_SNAPSHOTS = {"2026-W48": {"103": 2, "104": 1}, "2026-W49": {"103": 1, "104": 1}}
+
+
+# --- identity / availability / claim evidence fixtures ----------------------
+
+ID_DUMP = {
+    "100": {"player_id": "100", "gsis_id": "00-0034001", "espn_id": "4000100", "yahoo_id": "31000", "sportradar_id": "sr-100", "rotowire_id": 9100},
+    "101": {"player_id": "101", "gsis_id": None, "espn_id": None, "yahoo_id": "31001", "sportradar_id": "sr-101", "rotowire_id": None},
+    "102": {"player_id": "102", "gsis_id": "00-0034002", "espn_id": "4000102", "yahoo_id": None},
+    "103": {"player_id": "103", "gsis_id": "00-0034003"},
+    "104": {"player_id": "104", "gsis_id": "00-0034004"},
+}
+DP_ROWS = {
+    "100": {"sleeper_id": "100", "gsis_id": "00-0034001", "espn_id": "4000100", "yahoo_id": "31000", "pfr_id": "HurtAl00", "fantasypros_id": "20100"},
+    "101": {"sleeper_id": "101", "gsis_id": "", "espn_id": "4000101", "yahoo_id": "31001", "pfr_id": "", "fantasypros_id": "20101"},
+}
+
+# One official NFL report row per row below (nflverse injuries). Alex Hurt's row is
+# stamped inside the freshness window; Cy Stream's has no date_modified (as the real 2026 file today).
+OFFICIAL_ROWS = [
+    {"season": "2026", "season_type": "REG", "week": "15", "team": "AAA", "gsis_id": "00-0034001", "sleeper_id": "100", "position": "WR",
+     "full_name": "Alex Hurt", "report_status": "Out", "report_primary_injury": "Hamstring", "report_secondary_injury": "",
+     "practice_status": "Did Not Participate In Practice", "practice_primary_injury": "Hamstring", "practice_secondary_injury": "",
+     "date_modified": "2026-12-07T21:30:00Z"},
+    {"season": "2026", "season_type": "REG", "week": "15", "team": "CCC", "gsis_id": "00-0034002", "sleeper_id": "102", "position": "WR",
+     "full_name": "Cy Stream", "report_status": "Questionable", "report_primary_injury": "Ankle", "report_secondary_injury": "",
+     "practice_status": "Limited Participation in Practice", "practice_primary_injury": "Ankle", "practice_secondary_injury": "",
+     "date_modified": ""},
+]
+STATUS_EVENTS = [
+    {"captured_at": "2026-12-06T08:30:00Z", "season": "2026", "week": "14", "player_id": "100", "team": "AAA", "position": "WR",
+     "status": "Active", "injury_status": "Out", "body_part": "Hamstring", "practice": "", "practice_desc": "", "source": "sleeper_live"},
+]
+NEWS_REPORTS = {
+    "100": [{"headline": "Alex Hurt ruled out for Week 15 with a hamstring injury", "url": "https://www.rotowire.com/football/news/alex-hurt-1",
+             "publisher_domain": "rotowire.com", "published_ts": 1796680800, "first_seen_at": "2026-12-07T22:10:00+00:00",
+             "event_type": "INJURY", "speculative": False}],
+}
