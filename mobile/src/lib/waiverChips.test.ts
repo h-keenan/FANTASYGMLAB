@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { filterByRecommendation, waiverReasonChips } from './waiverChips.ts';
+import { filterByRecommendation, waiverReasonChips, waiverReasonLine } from './waiverChips.ts';
 
 describe('waiverReasonChips', () => {
   it('maps real signals, catalysts first, capped at 2', () => {
@@ -46,5 +46,21 @@ describe('filterByRecommendation', () => {
     const rows = [{ recommendation_label: 'Add' }, { recommendation_label: 'Stash' }];
     assert.equal(filterByRecommendation(rows, 'Stash').length, 1);
     assert.equal(filterByRecommendation(rows, 'all').length, 2);
+  });
+});
+
+describe('waiverReasonLine', () => {
+  it('is the top chip plus a count of the rest (chips and the usage flag)', () => {
+    const line = waiverReasonLine({
+      sleeper_trending_add: true,
+      injury_replacement_fit: true,
+      usage_flag: { label: 'Role growing' },
+      faab: { reasons: ['Usage up 40% lately'] },
+    });
+    assert.deepEqual(line, { line: 'Trending', more: 3 });
+  });
+  it('falls back to the usage flag and is empty with no signals', () => {
+    assert.deepEqual(waiverReasonLine({ usage_flag: { label: 'Role growing' } }), { line: 'Role growing', more: 0 });
+    assert.deepEqual(waiverReasonLine({}), { line: null, more: 0 });
   });
 });

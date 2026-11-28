@@ -60,6 +60,16 @@ export function waiverReasonChips(
     .slice(0, max);
 }
 
+/** The row's ONE short reason line: the top reason chip (or the usage flag when nothing else applies) plus how many more
+ * the expanded "why" holds. The full list (chips, usage flag, Fit, schedule, bye, handcuff / injury cover, bid history)
+ * stays in the expansion. Web twin: lib/waiversPresentation.ts. */
+export function waiverReasonLine(
+  player: Parameters<typeof waiverReasonChips>[0] & { usage_flag?: { label: string } | null },
+): { line: string | null; more: number } {
+  const all = [...waiverReasonChips(player, 6), ...(player.usage_flag?.label ? [player.usage_flag.label] : [])];
+  return { line: all[0] ?? null, more: Math.max(0, all.length - 1) };
+}
+
 export type WaiverRecFilter = 'all' | 'Add' | 'Stash' | 'Watch';
 
 /** Filter pills for "More recommended adds" — by the server's own

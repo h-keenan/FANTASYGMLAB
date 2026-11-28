@@ -127,7 +127,7 @@ function SwapTile({ side, player, name, playerId, position, team }: { side: 'add
 }
 
 /** ADD tile, arrow, DROP tile; effect pills; two icon reason chips; alternative cuts as avatar chips that swap the selection. */
-function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggestion; drop: DropPlayer; alternatives: DropPlayer[] }) {
+function SwapBody({ suggestion, drop, alternatives, hideTiles = false }: { suggestion: DropSuggestion; drop: DropPlayer; alternatives: DropPlayer[]; hideTiles?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -144,11 +144,13 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
       >
         {' '}
       </AppText>
+      {hideTiles ? null : (
       <View style={styles.swapRow}>
         <SwapTile side="add" name={suggestion.add.name} playerId={suggestion.add.player_id} position={suggestion.add.position} />
         <Ionicons name="swap-horizontal" size={22} color={colors.textTertiary} />
         <SwapTile side="drop" player={selected} name={selected.name} playerId={selected.player_id} position={selected.position} team={selected.team} />
       </View>
+      )}
       <View style={styles.pillRow} testID="swap-effect" accessibilityLabel={`Whole swap: ${effectSentence}`}>
         <AppText style={styles.kicker}>SWAP</AppText>
         {effectPills(selected.effect, colors).map((pill) => (
@@ -290,12 +292,70 @@ export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: numbe
   );
 }
 
-export function SuggestedDrop({ suggestion, compact = false }: { suggestion: DropSuggestion; compact?: boolean }) {
+/**
+ * ADD -> DROP at a glance: the add's avatar, an arrow, the cut's own small avatar and short name, in one line. Row-level picture
+ * of a roster move (Waivers rows, Today's top add); the effect, why and alternative cuts sit one tap away in the row's
+ * expansion (SuggestedDrop `bare`). Drop reads amber, never red. Web twin: AddDropPair in components/SuggestedDrop.tsx.
+ */
+export function AddDropPair({
+  add,
+  drop,
+  noDropText,
+  showAdd = true,
+}: {
+  add: { player_id: string; name: string; position: string };
+  drop: { player_id: string; name: string; position: string; team?: string | null; action?: string } | null;
+  noDropText?: string | null;
+  /** False when the add's own avatar already sits just above (a list row's identity). */
+  showAdd?: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.pairRow} testID="add-drop-pair">
+      {showAdd ? <PlayerAvatar playerId={add.player_id} name={add.name} position={add.position} size={24} /> : null}
+      <Ionicons name="arrow-forward" size={14} color={colors.textTertiary} />
+      {drop ? (
+        <PlayerTap player={{ id: drop.player_id, name: drop.name, position: drop.position, team: drop.team ?? undefined }}>
+          <View style={styles.pairRow}>
+            <PlayerAvatar playerId={drop.player_id} name={drop.name} position={drop.position} size={24} />
+            <AppText style={[styles.meta, { color: colors.warning, fontWeight: '700' }]}>{drop.action === 'move_to_ir' ? 'To IR' : 'Drop'}</AppText>
+            <PlayerName name={drop.name} style={[styles.meta, { color: colors.textPrimary, fontWeight: '700', flexShrink: 1 }]} />
+          </View>
+        </PlayerTap>
+      ) : noDropText ? (
+        <AppText style={styles.meta}>{noDropText}</AppText>
+      ) : null}
+    </View>
+  );
+}
+
+/** The pair for a suggestion (the add's avatar optional). */
+export function SuggestedDropPair({ suggestion, showAdd = true }: { suggestion: DropSuggestion; showAdd?: boolean }) {
+  const noDropText = suggestion.drop ? null : suggestion.drop_required === false ? 'Spot open, no drop' : suggestion.no_good_drop ? 'No good drop' : null;
+  return <AddDropPair add={suggestion.add} drop={suggestion.drop} noDropText={noDropText} showAdd={showAdd} />;
+}
+
+export function SuggestedDrop({ suggestion, compact = false, bare = false }: { suggestion: DropSuggestion; compact?: boolean; /** Details only: the pair above shows the add and the cut, so no tiles, no box, no second collapse. */ bare?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const badge = useBadge(suggestion);
   if (compact) return <CompactSuggestedDrop suggestion={suggestion} />;
   const { drop, alternatives } = suggestion;
+  if (bare) {
+    return (
+      <View style={{ gap: spacing.xs }} testID="suggested-drop-bare">
+        {drop ? (
+          <SwapBody suggestion={suggestion} drop={drop} alternatives={alternatives} hideTiles />
+        ) : (
+          <>
+            <AppText style={styles.body}>{suggestion.why}</AppText>
+            {suggestion.no_good_drop && suggestion.cheapest ? <DropPlayerLine player={suggestion.cheapest} lead="Cheapest cut:" /> : null}
+          </>
+        )}
+      </View>
+    );
+  }
   return (
     <View style={styles.box} testID="suggested-drop">
       <View style={styles.headRow}>
@@ -410,6 +470,7 @@ function createStyles(colors: ThemeColors) {
     playerLine: { gap: 4 },
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
     pillRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
+    pairRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
     swapRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     tile: { flex: 1, alignItems: 'center', gap: 4, padding: spacing.sm, borderRadius: radii.md, borderWidth: 1 },
     reasonChip: {

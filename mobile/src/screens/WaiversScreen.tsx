@@ -30,7 +30,6 @@ import ErrorState from '../components/ErrorState';
 import { SkeletonRows, SkeletonList } from '../components/Skeleton';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import FilterSheet from '../components/FilterSheet';
-import FilterDropdownButton from '../components/FilterDropdownButton';
 import { ViewTabs } from '../components/PageControlRow';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from '../lib/filterSheet';
@@ -488,12 +487,12 @@ export default function WaiversScreen({ route, navigation }: Props) {
           testID="waivers-view-select"
         />
         {tab === 'recommended' && secondaryPriority.length > 0 ? (
-          <FilterDropdownButton<string>
-            label="Show"
+          <ViewTabs<string>
+            label="Recommendation filter"
             options={REC_FILTER_OPTIONS.map((o) => (o.key === 'all' ? 'All adds' : o.label))}
             value={recFilter === 'all' ? 'All adds' : recFilter}
-            allValue="All adds"
             onChange={(label) => setRecFilter(label === 'All adds' ? 'all' : (label as WaiverRecFilter))}
+            testID="waivers-rec-filter"
           />
         ) : null}
         {tab === 'explore' ? (

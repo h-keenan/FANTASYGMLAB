@@ -18,6 +18,7 @@ import type { Decision, DecisionPlayer, DecisionSwap, DecisionQueue as Queue } f
 import { GAME_PLAN_INTERNAL_ROUTES, gamePlanTileHref } from "@/lib/gamePlanPresentation";
 import { TRADES_BLOCK_COPY } from "@/lib/dashboardLayout";
 import { thisWeekHref } from "@/lib/thisWeek";
+import { AddDropPair } from "@/components/SuggestedDrop";
 import { matchupPlanParams, swapGainLabel, type TodayAction } from "@/lib/todayView";
 
 /** Where a decision's one primary action goes. Shared by the queue rows and the hero's next action. */
@@ -69,7 +70,7 @@ function ActionRow({ a, leagueId, leagueName, tradeHref }: { a: TodayAction<Brie
       label={`${a.kind === "swap" ? "LINEUP" : (d?.label ?? "TRADE")}: ${a.reason}`}
       leading={a.player ? <PlayerAvatarSlot player={playerRef(a.player)} tier="row" nonInteractive="the row's toggle is the tap target" /> : <span aria-hidden="true" className="shrink-0 rounded-full" style={{ width: 10, height: 10, background: tone }} />}
       title={a.reason}
-      caption={gain ? <span style={{ color: "var(--color-success)" }}>{gain} projected</span> : undefined}
+      caption={gain ? <span style={{ color: "var(--color-success)" }}>{gain} projected</span> : d?.kind === "waiver" && d.drop && first ? <AddDropPair add={{ player_id: first.id ?? "", name: first.name, position: first.position ?? "" }} drop={{ player_id: d.drop.id ?? "", name: d.drop.name, position: d.drop.position ?? "", team: d.drop.team, action: d.drop.note === "To IR" ? "move_to_ir" : "drop" }} showAdd={false} /> : undefined}
       action={
         <ButtonLink href={href} variant="primary" size="sm" aria-label={`${a.button}: ${a.reason}`} data-testid="decision-primary">
           {a.button}

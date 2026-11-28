@@ -45,13 +45,14 @@ import {
   trendingAddLabel,
   waiverInjuryDisplay,
   waiverReasonChips,
+  waiverReasonLine,
   waiversReasonMessage,
   type WaiverRecFilter,
 } from "@/lib/waiversPresentation";
 import { sharedBidNote, sharedDropCandidate } from "@/lib/waiverGroups";
 import { isIdpPositionFilter, withIdpPositionOptions } from "@/lib/idpPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
-import { DroppablePlayersSection, NeedsBreakdown, SharedDropNote, SuggestedDrop } from "@/components/SuggestedDrop";
+import { DroppablePlayersSection, NeedsBreakdown, SharedDropNote, SuggestedDrop, SuggestedDropPair } from "@/components/SuggestedDrop";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { waiversHeaderParts } from "@/lib/waiversHeader";
 import { limitedDataNote, needsHeadline, teamNeedStat } from "@/lib/dropsPresentation";
@@ -244,6 +245,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
           Top waiver target · {player.recommendation_label} #1
         </span>
         <WaiverIdentity player={player} avatarSize={48} />
+        {player.drop_suggestion ? <SuggestedDropPair suggestion={player.drop_suggestion} showAdd={false} /> : null}
         <ReasonChips chips={waiverReasonChips(player)} />
         <UsageFlagChip player={player} />
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -330,10 +332,10 @@ function RecommendedRow({
   const contextLine = freeAgentContextLine(player);
   const { primary, secondary } = faabRangeText(player.faab);
   const isBid = faabIsBid(player.faab);
-  const chips = waiverReasonChips(player);
+  const chips = waiverReasonChips(player, 6);
+  const reasonLine = waiverReasonLine(player);
   const flag = player.usage_flag;
   const ownDrop = player.drop_suggestion?.drop?.player_id;
-  const differentDrop = sharedDropId != null && ownDrop != null && ownDrop !== sharedDropId ? player.drop_suggestion!.drop! : null;
   // The group's cut is said once above the list (SharedDropNote); the expanded row never repeats it.
   const sharesGroupDrop = sharedDropId != null && ownDrop === sharedDropId;
   return (
@@ -364,8 +366,8 @@ function RecommendedRow({
             </PlayerMetaLine>
           </span>
           <span
-            className="shrink-0 text-sm font-extrabold tabular-nums text-right"
-            style={{ color: "var(--color-text-secondary)" }}
+            className="shrink-0 text-sm font-extrabold tabular-nums text-right px-2"
+            style={{ color: "var(--color-text-secondary)", borderRadius: "var(--radius-pill)", background: "var(--color-surface-muted)", lineHeight: "1.5rem" }}
             data-testid="waiver-bid"
           >
             {isBid ? <Money all>{primary}</Money> : primary}
@@ -374,13 +376,21 @@ function RecommendedRow({
         <span className="ml-[3.75rem] block h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.1)" }} role="img" aria-label={`Bid size ${Math.round(barFraction * 100)}% of the largest`} data-testid="waiver-bid-bar">
           <span className="block h-full rounded-full" style={{ width: `${Math.round(barFraction * 100)}%`, background: "var(--color-accent-strong, var(--color-accent))" }} />
         </span>
-        <span className="flex flex-wrap items-center gap-1 pl-[3.75rem] w-full empty:hidden">
-          {chips.map((chip) => (
-            <ReasonPill key={chip} label={chip} kind="spark" tone="accent" />
-          ))}
-          {flag ? <ReasonPill label={flag.label} kind={flag.tone === "positive" ? "up" : "down"} tone={flag.tone === "positive" ? "success" : "warning"} /> : null}
-          {differentDrop ? <ReasonPill label={`Drop ${differentDrop.name}`} kind="down" tone="danger" /> : null}
-        </span>
+        {player.drop_suggestion ? (
+          <span className="block pl-[3.75rem] min-w-0">
+            <SuggestedDropPair suggestion={player.drop_suggestion} showAdd={false} />
+          </span>
+        ) : null}
+        {reasonLine.line ? (
+          <span className="flex items-center gap-1 pl-[3.75rem] w-full min-w-0" data-testid="waiver-reason-line">
+            <ReasonPill label={reasonLine.line} kind={flag && reasonLine.line === flag.label && flag.tone !== "positive" ? "down" : "spark"} tone={flag && reasonLine.line === flag.label && flag.tone !== "positive" ? "warning" : "accent"} />
+            {reasonLine.more > 0 ? (
+              <span className="text-[0.6875rem] font-bold shrink-0" style={{ color: "var(--color-text-muted)" }}>
+                +{reasonLine.more} more
+              </span>
+            ) : null}
+          </span>
+        ) : null}
         </div>
       </div>
       <Collapse open={open}>
@@ -389,6 +399,12 @@ function RecommendedRow({
             <ValueWithRing player={player} />
             <FaabRange player={player} />
           </div>
+          <span className="flex flex-wrap items-center gap-1 empty:hidden">
+            {chips.map((chip) => (
+              <ReasonPill key={chip} label={chip} kind="spark" tone="accent" />
+            ))}
+            {flag ? <ReasonPill label={flag.label} kind={flag.tone === "positive" ? "up" : "down"} tone={flag.tone === "positive" ? "success" : "warning"} /> : null}
+          </span>
           {player.recommendation_reason ? (
             <p className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="waiver-fit-reason">
               <span className="font-bold">Fit: </span>
@@ -407,7 +423,7 @@ function RecommendedRow({
               {flag.explanation}
             </p>
           ) : null}
-          {player.drop_suggestion && !sharesGroupDrop ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
+          {player.drop_suggestion && !sharesGroupDrop ? <SuggestedDrop suggestion={player.drop_suggestion} bare /> : null}
           <div className="flex">
             <ViewDetailsButton player={player} />
           </div>
@@ -736,20 +752,12 @@ export function WaiversContent({
           onChange={(value) => setTab(value as WaiverTab)}
         />
         {tab === "recommended" && secondaryPriority.length > 0 ? (
-          // view-select-ok: pre-existing recommendation filter; candidate for chips, tracked as follow-up
-          <select
-            aria-label="Recommendation filter"
+          <ViewTabs
+            label="Recommendation filter"
             value={recFilter}
-            onChange={(event) => setRecFilter(event.target.value as WaiverRecFilter)}
-            className="filter-input px-3 text-sm"
-            style={{ minHeight: "2.75rem" }}
-          >
-            {REC_FILTER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.value === "all" ? "All adds" : option.label}
-              </option>
-            ))}
-          </select>
+            options={REC_FILTER_OPTIONS}
+            onChange={(value) => setRecFilter(value as WaiverRecFilter)}
+          />
         ) : null}
         {tab === "explore" ? (
           <>

@@ -7,6 +7,7 @@ import {
   isWaiverDay,
   nextGameLine,
   seeAllLabel,
+  waiverCutFor,
   type DecisionInput,
   type DecisionItem,
   type DecisionMove,
@@ -229,5 +230,21 @@ describe("decision queue: empty state and gating", () => {
     expect(parts[0]).toMatchObject({ key: "title", strong: true, tone: "danger" });
     expect(parts[0].text).toBe("1 starter can't play (bye or out)");
     expect(parts[1].text).toBe("Best swap: start Sub Rob over Rob (+4.1 pts)");
+  });
+});
+
+describe("decision queue: the waiver add's cut", () => {
+  const waivers = { priority_adds: [{ player_id: "moo", drop_suggestion: { drop: { player_id: "dw", name: "Dead Weight", position: "RB", team: "BUF", action: "drop" } } }, { player_id: "x", drop_suggestion: null }] };
+  const moo = item({ headline: "Claim D. Mooney", destination: "waivers", route_player_id: "moo", route_player_name: "Dee Mooney", route_player_position: "WR" });
+
+  it("looks up the cut for an add, and is null when there is none", () => {
+    expect(waiverCutFor(waivers, "moo")?.drop).toMatchObject({ id: "dw", name: "Dead Weight", note: "Drop" });
+    expect(waiverCutFor(waivers, "x")).toBeNull();
+    expect(waiverCutFor(null, "moo")).toBeNull();
+  });
+
+  it("the waiver decision carries the cut only for its lead add", () => {
+    expect(buildDecisionQueue(base({ items: [moo], waiverCut: waiverCutFor(waivers, "moo") })).all[0].drop?.name).toBe("Dead Weight");
+    expect(buildDecisionQueue(base({ items: [moo], waiverCut: waiverCutFor(waivers, "other") })).all[0].drop).toBeNull();
   });
 });
