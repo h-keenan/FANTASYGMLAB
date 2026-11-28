@@ -11,6 +11,9 @@ Contract rules, enforced by ``finalize`` and ``item``:
 
 * every item carries ``timestamp``, ``evidence``, ``methodology``,
   ``confidence``, ``freshness`` and ``unavailable_reason``;
+* player items additionally carry (additively) an ``identity`` block, and the
+  injury/start-sit items an ``availability`` block plus ``claims[]`` with
+  ``claim_status`` and ``auto_publish_eligible`` (``modules.external_ad_evidence``);
 * an endpoint with nothing to say returns ``status: "unavailable"`` with a
   reason, never a filler item;
 * no private user data is read, no network call is made by the pure builders
@@ -22,11 +25,12 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlencode
 
-from modules import brand_identity, league_calendar, season_clock
+from modules import brand_identity, external_ad_evidence as EV, league_calendar, season_clock
 from modules.coerce import float_nan_to_none as _num
 
 CONTRACT_VERSION = "ad-api-v1"
@@ -165,6 +169,20 @@ def finalize(
 
 def _text(value: Any) -> str:
     return "" if value is None else str(value).strip()
+
+
+def _ctx(ctx: "EV.EvidenceContext | None", now: datetime) -> "EV.EvidenceContext":
+    return ctx if ctx is not None else EV.EvidenceContext.empty(now)
+
+
+def identity_for(row: Mapping[str, Any], ctx: "EV.EvidenceContext") -> dict[str, Any]:
+    return ctx.identity.resolve(row.get("player_id"), name=row.get("name"), team=row.get("team"), position=row.get("position"))
+
+
+def with_identity(player: Mapping[str, Any], row: Mapping[str, Any], ctx: "EV.EvidenceContext") -> dict[str, Any]:
+    """The existing player dict, byte-for-byte, plus an ``identity`` block."""
+
+    return {**player, "identity": identity_for(row, ctx)}
 
 
 # --------------------------------------------------------------------------
@@ -548,7 +566,13 @@ def build_waiver_replacements(
     board_as_of: str | None,
     max_roster_pct: float = 50.0,
     per_player: int = 3,
+    ctx: "EV.EvidenceContext | None" = None,
+    season: int | None = None,
+    week: int | None = None,
 ) -> list[dict[str, Any]]:
+    ctx = _ctx(ctx, now)
+    season = season if season is not None else ctx.clock_season
+    week = week if week is not None else ctx.clock_week
     by_id = {str(r.get("player_id")): r for r in board}
     adds = {}
     for rank, row in enumerate(trending, start=1):
@@ -578,6 +602,28 @@ def build_waiver_replacements(
             continue
         verified = [p for p in picks if p[3] is not None]
         conf = "medium" if verified else "low"
+        hurt_identity = identity_for(hurt, ctx)
+        hurt_availability = EV.build_availability(hurt, hurt_identity, ctx, season=season, week=week)
+        claims: list[dict[str, Any]] = []
+        alert, alert_reason = EV.build_availability_claim(hurt_availability, hurt_identity, ctx, required=True)
+        if alert:
+            claims.append(alert)
+        for _, r, a, p in picks:
+            r_identity = identity_for(r, ctx)
+            claims.append(
+                EV.finalize_claim(
+                    claim_type="trending_add",
+                    subject_id=r_identity["player_id"],
+                    claim_text=f"{EV._label(r_identity)} is among Sleeper's most-added players in the last 24 hours ({a['count']} adds, trend rank {a['rank']}).",
+                    claim_status="reported",
+                    evidence=[{
+                        "source_type": "platform_status", "source": "Sleeper trending adds", "url": None, "timestamp": _iso(now),
+                        "timestamp_kind": "observed_at", "is_official": False, "detail": {"adds": a["count"], "trend_rank": a["rank"], "roster_pct": p},
+                    }],
+                    method="platform_trending_lookup", confidence="medium" if p is not None else "low",
+                    required_for_auto_publish=False, now=ctx.now, applies_week=week, clock_week=ctx.clock_week, clock_phase=ctx.clock_phase,
+                )
+            )
         items.append(
             item(
                 f"waiver:{hurt.get('player_id')}",
@@ -601,17 +647,26 @@ def build_waiver_replacements(
                 confidence=conf,
                 fresh=fresh,
                 relevance={"dynasty": "medium", "redraft": "high"},
-                injured_player={k: hurt.get(k) for k in ("player_id", "name", "position", "team", "injury_status", "position_rank")},
+                injured_player={
+                    **{k: hurt.get(k) for k in ("player_id", "name", "position", "team", "injury_status", "position_rank")},
+                    "identity": hurt_identity,
+                    "availability": hurt_availability,
+                },
                 replacements=[
                     {
                         "player_id": r.get("player_id"), "name": r.get("name"), "position": r.get("position"), "team": r.get("team"),
                         "trending_adds_24h": a["count"], "trending_rank": a["rank"], "roster_pct": p,
                         "same_team": _text(r.get("team")) == _text(hurt.get("team")),
                         "availability_verified": p is not None,
+                        "identity": identity_for(r, ctx),
+                        "availability": EV.build_availability(r, identity_for(r, ctx), ctx, season=season, week=week),
                     }
                     for _, r, a, p in picks
                 ],
                 roster_pct_available=have_pct,
+                claims=claims,
+                availability_claim_unavailable_reason=alert_reason if not alert else None,
+                **EV.roll_up(claims),
             )
         )
     return items
@@ -624,6 +679,7 @@ def endpoint_waiver_replacements(*, db_path: str, fmt: str, limit: int, now: dat
     board, as_of = load_board(db_path, fmt)
     reason = None
     items: list[dict[str, Any]] = []
+    ctx: EV.EvidenceContext | None = None
     if not board:
         reason = "The public dynasty board is unavailable."
     elif clock["phase"] != season_clock.PHASE_REGULAR:
@@ -635,13 +691,15 @@ def endpoint_waiver_replacements(*, db_path: str, fmt: str, limit: int, now: dat
         else:
             board_ids = {str(r["player_id"]) for r in board}
             pct = load_roster_pct([p for p in (str(t.get("player_id")) for t in trending) if p in board_ids])
-            items = build_waiver_replacements(board, trending, pct, now=now, board_as_of=as_of)[:limit]
+            ctx = load_evidence_context(db_path, now, clock, season=clock["season"], week=clock["week"])
+            items = build_waiver_replacements(board, trending, pct, now=now, board_as_of=as_of, ctx=ctx, season=clock["season"], week=clock["week"])[:limit]
             if not items:
                 reason = "No injured starter-range players have a healthy same-position replacement on the trending-add list."
     return finalize(
         "/v1/external/waivers/replacements", now=now, clock=clock, items=items,
         methodology="Injured starter-range players paired with trending healthy same-position adds. See item methodology.",
         fresh=freshness(as_of, now, source="public_dynasty_board"), unavailable_reason=reason,
+        extra={"evidence_contract": evidence_contract(ctx)},
     )
 
 
@@ -678,7 +736,9 @@ def build_lineup_decisions(
     board_as_of: str | None,
     limit: int = 10,
     min_gap_pct: float = 8.0,
+    ctx: "EV.EvidenceContext | None" = None,
 ) -> list[dict[str, Any]]:
+    ctx = _ctx(ctx, now)
     league_avg: dict[str, float] = {}
     for pos in OFFENSE_POSITIONS:
         vals = [_num(d.get(pos, {}).get("weighted_points_allowed_per_game")) for d in defense.values()]
@@ -705,6 +765,40 @@ def build_lineup_decisions(
         if abs(gap) < min_gap_pct or entry["tier"] == "average":
             continue
         verdict = "start" if gap > 0 else "sit"
+        identity = identity_for(row, ctx)
+        availability = EV.build_availability(row, identity, ctx, season=season, week=week, game_id=match.get("game_id"))
+        claims: list[dict[str, Any]] = []
+        avail_claim, avail_reason = EV.build_availability_claim(availability, identity, ctx, required=False)
+        if avail_claim:
+            claims.append(avail_claim)
+        claims.append(
+            EV.finalize_claim(
+                claim_type="matchup", subject_id=identity["player_id"],
+                claim_text=f"{row.get('team')} plays {match['opponent']} ({'home' if match['is_home'] else 'away'}) in {season} week {week}.",
+                claim_status="reported",
+                evidence=[{
+                    "source_type": "inferred", "source": "nflverse schedule", "url": None, "timestamp": None, "timestamp_kind": None,
+                    "timestamp_unavailable_reason": "schedule_rows_carry_no_publication_timestamp", "is_official": False,
+                    "detail": {"opponent": match["opponent"], "is_home": match["is_home"], "game_id": match.get("game_id")},
+                }],
+                method="schedule_lookup", confidence="medium", required_for_auto_publish=True, now=ctx.now,
+                applies_week=week, clock_week=ctx.clock_week, clock_phase=ctx.clock_phase,
+            )
+        )
+        claims.append(
+            EV.finalize_claim(
+                claim_type="recommendation", subject_id=identity["player_id"],
+                claim_text=f"{verdict.upper()} {row.get('name')}: the opponent allows {round(gap, 1):+.1f}% vs the league average to {pos}.",
+                claim_status="unverified",
+                evidence=[{
+                    "source_type": "inferred", "source": "dynastygm matchup model (opponent points allowed)", "url": None,
+                    "timestamp": _iso(now), "timestamp_kind": "observed_at", "is_official": False,
+                    "detail": {"matchup_gap_pct": round(gap, 1), "tier": entry["tier"]},
+                }],
+                method="model_inference", confidence="low", required_for_auto_publish=False, now=ctx.now,
+                applies_week=week, clock_week=ctx.clock_week, clock_phase=ctx.clock_phase,
+            )
+        )
         questionable = _text(row.get("injury_status")).lower() in {"questionable", "q"}
         conf = "medium" if (not entry.get("low_sample") and abs(gap) >= 15 and not questionable) else "low"
         rec = item(
@@ -730,11 +824,14 @@ def build_lineup_decisions(
             fresh=fresh,
             relevance={"dynasty": "low", "redraft": "high"},
             verdict=verdict,
-            player={k: row.get(k) for k in ("player_id", "name", "position", "team", "position_rank")},
+            player={**{k: row.get(k) for k in ("player_id", "name", "position", "team", "position_rank")}, "identity": identity, "availability": availability},
             opponent=match["opponent"],
             is_home=match["is_home"],
             game_id=match.get("game_id"),
             matchup_gap_pct=round(gap, 1),
+            claims=claims,
+            availability_claim_unavailable_reason=avail_reason if not avail_claim else None,
+            **EV.roll_up(claims),
         )
         (starts if verdict == "start" else sits).append((abs(gap), rec))
     starts.sort(key=lambda t: (-t[0], t[1]["id"]))
@@ -757,6 +854,7 @@ def endpoint_lineup_decisions(
     use_week = int(week) if week is not None else clock["week"]
     reason = None
     items: list[dict[str, Any]] = []
+    ctx: EV.EvidenceContext | None = None
     board, as_of = load_board(db_path, fmt)
     if use_week is None or not 1 <= use_week <= 18:
         reason = f"No regular-season week to decide for (season clock phase is {clock['phase']}); pass week=1..18 to preview."
@@ -771,14 +869,15 @@ def endpoint_lineup_decisions(
             if not defense:
                 reason = f"No completed {use_season} games to rate opposing defenses yet."
             else:
-                items = build_lineup_decisions(board, matchups, defense, season=use_season, week=use_week, now=now, board_as_of=as_of, limit=limit)
+                ctx = load_evidence_context(db_path, now, clock, season=use_season, week=use_week)
+                items = build_lineup_decisions(board, matchups, defense, season=use_season, week=use_week, now=now, board_as_of=as_of, limit=limit, ctx=ctx)
                 if not items:
                     reason = "No borderline starters face a meaningfully weak or tough defense this week."
     return finalize(
         "/v1/external/lineup/decisions", now=now, clock=clock, items=items,
         methodology="Matchup-driven start/sit for borderline starters from opponent points allowed by position.",
         fresh=freshness(as_of, now, source="public_dynasty_board"), unavailable_reason=reason,
-        extra={"requested": {"season": use_season, "week": use_week}},
+        extra={"requested": {"season": use_season, "week": use_week}, "evidence_contract": evidence_contract(ctx)},
     )
 
 
@@ -797,7 +896,9 @@ def build_value_changes(
     now: datetime,
     min_delta: int = MIN_RATING_DELTA,
     limit: int = 10,
+    ctx: "EV.EvidenceContext | None" = None,
 ) -> list[dict[str, Any]]:
+    ctx = _ctx(ctx, now)
     by_id = {str(r.get("player_id")): r for r in board}
     span = (date.fromisoformat(latest_date) - date.fromisoformat(baseline_date)).days
     fresh = freshness(f"{latest_date}T00:00:00+00:00", now, source="player_rating_snapshots")
@@ -835,7 +936,7 @@ def build_value_changes(
                     fresh=fresh,
                     relevance={"dynasty": "high", "redraft": "low"},
                     direction=direction,
-                    player={k: row.get(k) for k in ("player_id", "name", "position", "team", "age")},
+                    player=with_identity({k: row.get(k) for k in ("player_id", "name", "position", "team", "age")}, row, ctx),
                     rating_previous=prev, rating_current=cur, rating_delta=delta,
                     window={"baseline_date": baseline_date, "latest_date": latest_date, "span_days": span},
                 )
@@ -857,7 +958,7 @@ def endpoint_value_changes(*, db_path: str, fmt: str, days: int, limit: int, now
     elif snap.get("reason"):
         reason = snap["reason"]
     else:
-        items = build_value_changes(snap["latest"], snap["baseline"], board, latest_date=snap["latest_date"], baseline_date=snap["baseline_date"], now=now, limit=limit)
+        items = build_value_changes(snap["latest"], snap["baseline"], board, latest_date=snap["latest_date"], baseline_date=snap["baseline_date"], now=now, limit=limit, ctx=load_evidence_context(db_path, now, clock, identity_only=True))
         if not items:
             reason = "No board players moved at least the minimum rating delta in the window."
     return finalize(
@@ -881,7 +982,9 @@ def build_rookies(
     now: datetime,
     board_as_of: str | None,
     limit: int = 30,
+    ctx: "EV.EvidenceContext | None" = None,
 ) -> list[dict[str, Any]]:
+    ctx = _ctx(ctx, now)
     rookies = [r for r in board if r.get("years_exp") == 0 and _text(r.get("team")) and r.get("position") in OFFENSE_POSITIONS]
     rookies.sort(key=lambda r: -(_num(r.get("score")) or 0))
     adp_players = (adp_snapshot or {}).get("players") or {}
@@ -914,12 +1017,12 @@ def build_rookies(
                 confidence="medium" if has_adp and (adp.get("drafts") or 0) >= 10 else "low",
                 fresh=fresh,
                 relevance={"dynasty": "high", "redraft": "medium"},
-                player={k: row.get(k) for k in ("player_id", "name", "position", "team", "age")},
+                player=with_identity({k: row.get(k) for k in ("player_id", "name", "position", "team", "age")}, row, ctx),
                 our_rank=rank,
                 adp=adp.get("adp") if has_adp else None,
                 adp_drafts=adp.get("drafts") if has_adp else None,
                 adp_as_of=adp_as_of if has_adp else None,
-                landing_spot={"team": row.get("team"), "depth_chart_order": order, "higher_valued_teammates": [{"player_id": r.get("player_id"), "name": r.get("name")} for r in ahead]},
+                landing_spot={"team": row.get("team"), "depth_chart_order": order, "higher_valued_teammates": [{"player_id": r.get("player_id"), "name": r.get("name"), "identity": identity_for(r, ctx)} for r in ahead]},
                 draft_capital=None,
                 draft_capital_unavailable_reason="Draft round/pick is not part of the verified player board.",
             )
@@ -932,7 +1035,11 @@ def endpoint_rookies(*, db_path: str, fmt: str, limit: int, now: datetime | None
     now = now or datetime.now(timezone.utc)
     clock = clock_info()
     board, as_of = load_board(db_path, fmt)
-    items = build_rookies(board, load_rookie_adp(), load_sleeper_players(), now=now, board_as_of=as_of, limit=limit) if board else []
+    items = (
+        build_rookies(board, load_rookie_adp(), load_sleeper_players(), now=now, board_as_of=as_of, limit=limit, ctx=load_evidence_context(db_path, now, clock, identity_only=True))
+        if board
+        else []
+    )
     reason = None if items else ("The public dynasty board is unavailable." if not board else "No rookies (zero years of experience, assigned to a team) are on the current board, which is expected before the NFL Draft.")
     return finalize(
         "/v1/external/rookies", now=now, clock=clock, items=items,
@@ -942,8 +1049,10 @@ def endpoint_rookies(*, db_path: str, fmt: str, limit: int, now: datetime | None
 
 
 def build_depth_chart_changes(
-    snapshots: Mapping[str, Mapping[str, int]], board: Sequence[Mapping[str, Any]], *, now: datetime, limit: int = 15
+    snapshots: Mapping[str, Mapping[str, int]], board: Sequence[Mapping[str, Any]], *, now: datetime, limit: int = 15,
+    ctx: "EV.EvidenceContext | None" = None,
 ) -> list[dict[str, Any]]:
+    ctx = _ctx(ctx, now)
     keys = sorted(k for k, v in snapshots.items() if isinstance(v, Mapping) and v)
     if len(keys) < 2:
         return []
@@ -967,7 +1076,7 @@ def build_depth_chart_changes(
                 methodology="Difference between the two most recent weekly snapshots of Sleeper's depth_chart_order, for players on the current board. A move is not a confirmed role change.",
                 confidence="low" if abs(delta) == 1 else "medium",
                 fresh=fresh, relevance={"dynasty": "medium", "redraft": "high"},
-                player={k: row.get(k) for k in ("player_id", "name", "position", "team")},
+                player=with_identity({k: row.get(k) for k in ("player_id", "name", "position", "team")}, row, ctx),
                 previous_order=int(prev[pid]), current_order=int(cur[pid]), direction="up" if delta > 0 else "down",
             )
         )
@@ -979,7 +1088,11 @@ def endpoint_changes(*, db_path: str, fmt: str, limit: int, now: datetime | None
     now = now or datetime.now(timezone.utc)
     clock = clock_info()
     board, as_of = load_board(db_path, fmt)
-    items = build_depth_chart_changes(load_depth_snapshots(), board, now=now, limit=limit) if board else []
+    items = (
+        build_depth_chart_changes(load_depth_snapshots(), board, now=now, limit=limit, ctx=load_evidence_context(db_path, now, clock, identity_only=True))
+        if board
+        else []
+    )
     team_section = {
         "status": "unavailable",
         "unavailable_reason": "No team-affiliation history is retained (only the current Sleeper team and weekly depth-chart order are stored), so free-agency and trade moves cannot be diffed without guessing.",
@@ -1116,6 +1229,8 @@ def build_demo_scenarios(
                 relevance={"dynasty": "medium", "redraft": "medium"},
                 scenario_type=s["type"], setup=s["setup"], options=s["options"], rule=s["rule"], verdict=verdict["verdict"], verdict_basis=verdict["basis"],
                 synthetic=True,
+                identity=None,
+                identity_unavailable_reason="synthetic_fictional_players_have_no_real_player_ids",
                 try_topic=topic, try_url=matching_try_url,
                 links={
                     "sample_league": f"{base}/sample-league?{_DEMO_UTM}&utm_content={s['id']}",
@@ -1266,3 +1381,184 @@ def load_rating_snapshots(days: int) -> dict[str, Any]:
     if not latest_map or not base_map:
         return {"reason": "A snapshot day could not be read completely; no partial comparison is made."}
     return {"latest": latest_map, "baseline": base_map, "latest_date": latest, "baseline_date": baseline}
+
+
+# --------------------------------------------------------------------------
+# Evidence providers (I/O). Every one fails soft with a reason: a missing
+# source makes a field null + explained, never an error and never a guess.
+# --------------------------------------------------------------------------
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+DP_IDS_CACHE = "data/dynastyprocess_playerids.csv"
+NEWS_LOOKBACK_HOURS = 48
+NEWS_MAX_PAGES = 5
+
+
+def _mtime(path: Path) -> int:
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return 0
+
+
+_FILE_CACHE: dict[str, tuple[int, Any]] = {}
+
+
+def _cached(path: Path, build: Any) -> Any:
+    key = str(path)
+    stamp = _mtime(path)
+    hit = _FILE_CACHE.get(key)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    value = build(path)
+    _FILE_CACHE[key] = (stamp, value)
+    return value
+
+
+def load_identity_sources() -> tuple[Mapping[str, Any], dict[str, dict[str, str]], str | None]:
+    """(Sleeper dump, DynastyProcess rows keyed by sleeper id, reason the DP table is missing).
+
+    Disk reads only; the DynastyProcess table is the same cached file the ESPN
+    import uses and is never fetched from a request."""
+
+    dump: Mapping[str, Any] = {}
+    try:
+        from modules import sleeper
+
+        dump = _cached(_REPO_ROOT / sleeper.PLAYERS_CACHE_PATH, lambda p: sleeper.load_cached_players_disk(str(p))[0] or {})
+    except Exception:
+        dump = {}
+    path = _REPO_ROOT / DP_IDS_CACHE
+
+    def _read(p: Path) -> dict[str, dict[str, str]]:
+        import pandas as pd
+
+        header = pd.read_csv(p, nrows=0).columns
+        cols = [c for c in EV.DP_COLUMNS if c in header]
+        if "sleeper_id" not in cols:
+            return {}
+        frame = pd.read_csv(p, usecols=cols, dtype=str, keep_default_na=False)
+        frame = frame[frame["sleeper_id"].str.strip() != ""]
+        frame = frame.drop_duplicates(subset="sleeper_id", keep=False)  # a sleeper id listed twice is ambiguous
+        return {str(r["sleeper_id"]).strip(): {k: v for k, v in r.items()} for r in frame.to_dict("records")}
+
+    if not path.exists():
+        return dump, {}, "dynastyprocess_id_table_not_cached_on_this_server"
+    try:
+        rows = _cached(path, _read)
+    except Exception:
+        return dump, {}, "dynastyprocess_id_table_unreadable"
+    return dump, rows, (None if rows else "dynastyprocess_id_table_has_no_usable_rows")
+
+
+def load_official_reports(season: int) -> tuple[list[dict[str, str]], str | None]:
+    """Official weekly NFL injury-report rows (nflverse, committed by the sync job)."""
+
+    from modules import nflverse_injury_reports as R
+
+    path = R.report_path(_REPO_ROOT, season)
+    if not path.exists():
+        return [], f"official_report_file_for_{season}_not_present_on_this_server"
+    try:
+        rows = _cached(path, R.read_existing)
+    except Exception:
+        return [], "official_report_file_unreadable"
+    return list(rows), (None if rows else f"official_report_file_for_{season}_is_empty")
+
+
+def load_status_events(season: int) -> tuple[list[dict[str, str]], str | None]:
+    """Our own log of when Sleeper's designation changed (data/injury_history/events_<season>.csv)."""
+
+    from modules import injury_history as H
+
+    path = H.events_path(_REPO_ROOT, season)
+    if not path.exists():
+        return [], f"status_change_log_for_{season}_not_present_on_this_server"
+    try:
+        rows = _cached(path, H.read_rows)
+    except Exception:
+        return [], "status_change_log_unreadable"
+    return list(rows), (None if rows else "status_change_log_is_empty")
+
+
+def load_news_reports(db_path: str, now: datetime) -> tuple[dict[str, list[dict[str, Any]]], str | None]:
+    """Recent availability headlines per matched Sleeper player id (headline only, never fetched articles)."""
+
+    try:
+        from modules import external_news_contract as enc
+        from modules import external_news_feed as feed
+        from modules import news_identity, news_ingest
+
+        store = news_ingest.open_store(use_cache=True)
+        players_df, index = news_identity.load_index(db_path)
+        since = (now - timedelta(hours=NEWS_LOOKBACK_HOURS)).timestamp()
+        out: dict[str, list[dict[str, Any]]] = {}
+        cursor = None
+        for _ in range(NEWS_MAX_PAGES):
+            page = feed.build_feed(
+                store, players_df=players_df, index=index, cursor=cursor,
+                since=None if cursor else str(since), limit=feed.MAX_LIMIT, now=now.timestamp(),
+            )
+            for it in page.get("items", []):
+                if it.get("event_type") not in enc.AVAILABILITY_EVENT_TYPES or it.get("superseded") or it.get("retracted"):
+                    continue
+                prov = (it.get("provenance") or [{}])[0]
+                url = prov.get("retrieved_url") or prov.get("original_url")
+                for m in it.get("player_ids") or []:
+                    out.setdefault(str(m["sleeper"]), []).append({
+                        "headline": (it.get("content") or {}).get("headline"), "url": url, "publisher_domain": prov.get("publisher_domain"),
+                        "published_ts": it.get("published_ts"), "first_seen_at": it.get("first_seen_at"),
+                        "event_type": it.get("event_type"), "speculative": bool(it.get("speculative")),
+                    })
+            if not page.get("has_more"):
+                break
+            cursor = page.get("next_cursor")
+        if not out:
+            return {}, "no_availability_headlines_in_the_last_48_hours"
+        return out, None
+    except Exception:
+        return {}, "news_store_unavailable"
+
+
+def load_evidence_context(
+    db_path: str, now: datetime, clock: Mapping[str, Any], *, season: int | None = None, week: int | None = None, identity_only: bool = False
+) -> "EV.EvidenceContext":
+    dump, dp_rows, dp_reason = load_identity_sources()
+    ctx = EV.EvidenceContext(
+        now=now, clock_season=clock.get("season"), clock_week=clock.get("week"), clock_phase=clock.get("phase"),
+        identity=EV.IdentityResolver(dump, dp_rows, dp_unavailable_reason=dp_reason),
+    )
+    if identity_only:
+        return ctx
+    use_season = season if season is not None else clock.get("season")
+    if use_season is not None:
+        rows, reason = load_official_reports(int(use_season))
+        ctx.official = EV.OfficialIndex(rows, int(use_season)) if rows else None
+        ctx.official_unavailable_reason = reason
+        events, ev_reason = load_status_events(int(use_season))
+        latest: dict[str, Mapping[str, Any]] = {}
+        for e in events:
+            pid = str(e.get("player_id") or "").strip()
+            if pid and (pid not in latest or str(e.get("captured_at")) >= str(latest[pid].get("captured_at"))):
+                latest[pid] = e
+        ctx.observations = latest
+        ctx.observations_unavailable_reason = ev_reason
+    ctx.news, ctx.news_unavailable_reason = load_news_reports(db_path, now)
+    return ctx
+
+
+def evidence_contract(ctx: "EV.EvidenceContext | None") -> dict[str, Any]:
+    """Endpoint-level statement of which evidence sources were loaded for this response."""
+
+    ctx = ctx or EV.EvidenceContext.empty(datetime.now(timezone.utc))
+    return {
+        "auto_publish_freshness_window_hours": EV.AUTO_PUBLISH_FRESH_HOURS,
+        "official_reports": {
+            "loaded": ctx.official is not None,
+            "latest_week_loaded": ctx.official.latest_week if ctx.official else None,
+            "source": EV.OFFICIAL_SOURCE_NAME,
+            "unavailable_reason": None if ctx.official else ctx.official_unavailable_reason,
+        },
+        "status_change_log": {"loaded": bool(ctx.observations), "unavailable_reason": None if ctx.observations else ctx.observations_unavailable_reason},
+        "news": {"loaded": bool(ctx.news), "unavailable_reason": None if ctx.news else ctx.news_unavailable_reason},
+    }
