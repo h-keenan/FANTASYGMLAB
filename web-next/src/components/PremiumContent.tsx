@@ -245,8 +245,7 @@ export function PremiumContent({
 
       {isPro ? <ManageBilling trialEndsAt={trialEndsAt} /> : null}
 
-      <section className="flex flex-col gap-3" aria-labelledby="highlights-heading">
-        <SectionHeading id="highlights-heading">What Pro adds</SectionHeading>
+      <section className="flex flex-col gap-3" aria-label="What Pro adds">
         <ProHighlights rows={rows} />
         <ComparisonDisclosure rows={rows} />
       </section>

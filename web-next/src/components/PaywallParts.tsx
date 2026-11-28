@@ -37,12 +37,12 @@ const ICON_PATHS: Record<HighlightIcon, ReactNode> = {
   ),
 };
 
-/** The three headline Pro benefits: icon, outcome title, one line with the real Free limit. */
+/** The three headline Pro benefits as icon tiles: icon, short title, Free -> Pro number. */
 export function ProHighlights({ rows }: { rows: PremiumComparisonRow[] }) {
   return (
-    <ul className="flex flex-col gap-3 m-0 p-0" style={{ listStyle: "none" }} data-testid="pro-highlights">
+    <ul className="grid grid-cols-3 gap-2 m-0 p-0" style={{ listStyle: "none" }} data-testid="pro-highlights">
       {proHighlights(rows).map((item) => (
-        <li key={item.key} className="flex items-start gap-3">
+        <li key={item.key} className="glass-surface flex flex-col items-center gap-1.5 p-3 text-center">
           <span
             aria-hidden="true"
             className="inline-flex shrink-0 items-center justify-center"
@@ -58,11 +58,9 @@ export function ProHighlights({ rows }: { rows: PremiumComparisonRow[] }) {
               {ICON_PATHS[item.icon]}
             </svg>
           </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-base font-bold">{item.title}</span>
-            <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              {item.body}
-            </span>
+          <span className="text-sm font-bold">{item.title}</span>
+          <span className="text-xs font-extrabold" style={{ color: "var(--color-premium)" }}>
+            {item.stat}
           </span>
         </li>
       ))}
@@ -70,14 +68,24 @@ export function ProHighlights({ rows }: { rows: PremiumComparisonRow[] }) {
   );
 }
 
-/** The full Free-vs-Pro table, collapsed so it never becomes a wall of text. */
+/** The full Free-vs-Pro table behind one "Compare plans" chip, so it never becomes a wall of text. */
 export function ComparisonDisclosure({ rows }: { rows: PremiumComparisonRow[] }) {
   return (
-    <details className="glass-surface p-3" data-testid="pro-comparison">
-      <summary className="cursor-pointer text-sm font-bold" style={{ minHeight: "var(--touch-target-min)", display: "flex", alignItems: "center" }}>
+    <details className="flex flex-col items-center" data-testid="pro-comparison">
+      <summary
+        className="cursor-pointer text-xs font-bold px-3"
+        style={{
+          minHeight: "var(--touch-target-min)",
+          display: "inline-flex",
+          alignItems: "center",
+          color: "var(--color-premium)",
+          border: "var(--border-width-default) solid var(--color-premium)",
+          borderRadius: "var(--radius-pill)",
+        }}
+      >
         {PAYWALL_COMPARISON_TITLE}
       </summary>
-      <div className="pt-2">
+      <div className="glass-surface p-3 mt-2 w-full">
         <PremiumComparison rows={rows} />
       </div>
     </details>

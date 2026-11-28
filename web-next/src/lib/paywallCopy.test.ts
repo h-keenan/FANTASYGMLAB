@@ -28,8 +28,8 @@ describe("paywallCopy", () => {
     );
     const items = proHighlights(rows);
     expect(items).toHaveLength(3);
-    expect(items[0].body).toContain("top 6");
-    expect(items[1].body).toContain("first 2");
+    expect(items[0].stat).toBe("6 \u2192 All");
+    expect(items[1].stat).toBe("2 \u2192 All");
   });
 
   it("uses only canonical glossary names (no Next Moves / Game Plan / Premium)", () => {

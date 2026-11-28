@@ -8,16 +8,17 @@
  * computed from the two real prices the store/Stripe returned.
  */
 export const PAYWALL_HERO_TITLE = "Make the right call every week";
-export const PAYWALL_HERO_SUB =
-  "Free already gives you real recommendations. Pro removes the caps, so you see every move, every trade idea and the whole waiver board.";
+export const PAYWALL_HERO_SUB = "Free gives you real recommendations. Pro removes the caps.";
 
 export type HighlightIcon = "today" | "trades" | "waivers";
 
 export interface ProHighlight {
   key: string;
   icon: HighlightIcon;
+  /** Short benefit name. */
   title: string;
-  body: string;
+  /** The visual: the real Free limit -> what Pro shows, e.g. "4 -> All". */
+  stat: string;
 }
 
 export interface ComparisonRowLike {
@@ -26,32 +27,19 @@ export interface ComparisonRowLike {
   pro: string;
 }
 
+/** The first number in the server's Free limit ("Top 4" -> "4"), else the raw text. */
 function freeLimit(rows: ComparisonRowLike[], key: string, fallback: string): string {
   const row = rows.find((r) => r.key === key);
-  return (row?.free || fallback).trim().toLowerCase();
+  const text = (row?.free || fallback).trim();
+  return /\d+/.exec(text)?.[0] ?? text;
 }
 
-/** The three headline benefits, with the real Free limit in each line. */
+/** The three headline benefits: a short title and the real Free limit against Pro. */
 export function proHighlights(rows: ComparisonRowLike[]): ProHighlight[] {
   return [
-    {
-      key: "today",
-      icon: "today",
-      title: "Your whole Today briefing",
-      body: `Free shows the ${freeLimit(rows, "next_moves", "top 4")}. Pro shows every move worth making.`,
-    },
-    {
-      key: "trades",
-      icon: "trades",
-      title: "Every trade idea",
-      body: `Free shows the ${freeLimit(rows, "trade_hub", "first 2")}. Pro shows all of them, ranked for your roster.`,
-    },
-    {
-      key: "waivers",
-      icon: "waivers",
-      title: "The full waiver board",
-      body: "Stash candidates, deeper watchlist and a FAAB shortlist, not just the priority adds.",
-    },
+    { key: "today", icon: "today", title: "Today briefing", stat: `${freeLimit(rows, "next_moves", "4")} \u2192 All` },
+    { key: "trades", icon: "trades", title: "Trade ideas", stat: `${freeLimit(rows, "trade_hub", "2")} \u2192 All` },
+    { key: "waivers", icon: "waivers", title: "Waiver board", stat: "Priority \u2192 Full" },
   ];
 }
 
@@ -75,4 +63,4 @@ export function annualSavingsPercent(monthly: string | number | null | undefined
 
 export const PAYWALL_TRIAL_REASSURANCE = "Cancel anytime. You can switch plans or stop whenever you like.";
 export const PAYWALL_CARD_NOTE = "The Pro trial needs a card. The free plan never does.";
-export const PAYWALL_COMPARISON_TITLE = "Everything in Pro";
+export const PAYWALL_COMPARISON_TITLE = "Compare plans";
