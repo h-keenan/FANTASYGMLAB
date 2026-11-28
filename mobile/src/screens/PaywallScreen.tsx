@@ -540,11 +540,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
         style={styles.skipFree}
         hitSlop={LINK_HIT_SLOP}
       >
-        {restoring ? (
-          <ActivityIndicator size="small" color={colors.textSecondary} />
-        ) : (
-          <AppText style={styles.skipFreeText}>Restore purchases</AppText>
-        )}
+        <AppText style={styles.skipFreeText}>{restoring ? 'Restoring…' : 'Restore purchases'}</AppText>
       </PressableScale>
 
       {fromOnboarding ? (
